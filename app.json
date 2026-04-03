@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.levanton.donothing"
+      "bundleIdentifier": "com.levanton.donothing",
+      "appleTeamId": "45DBHDBF45"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,6 +39,21 @@
           "dark": {
             "backgroundColor": "#0a0a0a"
           }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ],
+      [
+        "react-native-device-activity",
+        {
+          "appleTeamId": "45DBHDBF45",
+          "appGroup": "group.com.levanton.donothing"
         }
       ]
     ],

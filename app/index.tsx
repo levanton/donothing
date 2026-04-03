@@ -22,6 +22,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import {
+  DeviceActivitySelectionView,
+} from 'react-native-device-activity';
 import { Fonts } from '@/constants/theme';
 import { themes, ThemeMode } from '@/lib/theme';
 import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
@@ -33,6 +36,13 @@ import {
   saveTheme,
 } from '@/lib/storage';
 import { getStats } from '@/lib/stats';
+import {
+  checkAvailable,
+  getAuth,
+  requestAuth,
+  blockApps,
+  unblockApps,
+} from '@/lib/screen-time';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -129,10 +139,12 @@ export default function DoNothingScreen() {
   const [ready, setReady] = useState(false);
 
   // Focus lock state
-  const [showFocusPicker, setShowFocusPicker] = useState(false);
-  const [focusActive, setFocusActive] = useState(false);
+  type FocusStep = 'hidden' | 'pickApps' | 'pickTime' | 'active';
+  const [focusStep, setFocusStep] = useState<FocusStep>('hidden');
   const [focusRemaining, setFocusRemaining] = useState(0);
   const [focusTotal, setFocusTotal] = useState(0);
+  const [screenTimeAvailable, setScreenTimeAvailable] = useState(false);
+  const [appSelection, setAppSelection] = useState<string | null>(null);
   const focusEndRef = useRef(0);
   const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -282,38 +294,95 @@ export default function DoNothingScreen() {
     });
   }, []);
 
-  // --- Focus lock ---
-  const startFocus = useCallback((seconds: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowFocusPicker(false);
-    setFocusTotal(seconds);
-    setFocusRemaining(seconds);
-    setFocusActive(true);
-    focusEndRef.current = Date.now() + seconds * 1000;
-
-    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-    focusIntervalRef.current = setInterval(() => {
-      const left = Math.max(
-        0,
-        Math.ceil((focusEndRef.current - Date.now()) / 1000),
-      );
-      setFocusRemaining(left);
-      if (left <= 0) {
-        if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-        focusIntervalRef.current = null;
-        setFocusActive(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    }, 1000);
+  // --- Screen Time availability check ---
+  useEffect(() => {
+    checkAvailable().then(setScreenTimeAvailable);
   }, []);
 
-  const cancelFocus = useCallback(() => {
+  // --- Focus lock ---
+  const handleLockPress = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (!screenTimeAvailable) {
+      // Fallback: skip app picker, go straight to time picker
+      setFocusStep('pickTime');
+      return;
+    }
+
+    const auth = await getAuth();
+    if (auth === 'approved') {
+      setFocusStep('pickApps');
+    } else {
+      const result = await requestAuth();
+      if (result === 'approved') {
+        setFocusStep('pickApps');
+      } else {
+        // Denied — fallback to time-only focus
+        setFocusStep('pickTime');
+      }
+    }
+  }, [screenTimeAvailable]);
+
+  const handleAppsPicked = useCallback((selection: string) => {
+    setAppSelection(selection);
+    setFocusStep('pickTime');
+  }, []);
+
+  const startFocus = useCallback(
+    async (seconds: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setFocusTotal(seconds);
+      setFocusRemaining(seconds);
+      setFocusStep('active');
+      focusEndRef.current = Date.now() + seconds * 1000;
+
+      // Block apps if selection exists
+      if (appSelection && screenTimeAvailable) {
+        try {
+          await blockApps(appSelection);
+        } catch {}
+      }
+
+      if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+      focusIntervalRef.current = setInterval(() => {
+        const left = Math.max(
+          0,
+          Math.ceil((focusEndRef.current - Date.now()) / 1000),
+        );
+        setFocusRemaining(left);
+        if (left <= 0) {
+          if (focusIntervalRef.current)
+            clearInterval(focusIntervalRef.current);
+          focusIntervalRef.current = null;
+          // Unblock apps
+          if (appSelection && screenTimeAvailable) {
+            unblockApps(appSelection).catch(() => {});
+          }
+          setFocusStep('hidden');
+          setAppSelection(null);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }, 1000);
+    },
+    [appSelection, screenTimeAvailable],
+  );
+
+  const cancelFocus = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
     focusIntervalRef.current = null;
-    setFocusActive(false);
+
+    // Unblock apps
+    if (appSelection && screenTimeAvailable) {
+      try {
+        await unblockApps(appSelection);
+      } catch {}
+    }
+
+    setFocusStep('hidden');
     setFocusRemaining(0);
-  }, []);
+    setAppSelection(null);
+  }, [appSelection, screenTimeAvailable]);
 
   useEffect(() => {
     return () => {
@@ -352,16 +421,13 @@ export default function DoNothingScreen() {
   }
 
   // =========================================================================
-  // Focus lock overlay
+  // Focus lock overlay — active session
   // =========================================================================
-  if (focusActive) {
+  if (focusStep === 'active') {
     const progress = focusTotal > 0 ? 1 - focusRemaining / focusTotal : 0;
     const focusMsg = getFocusMessage(focusRemaining, focusTotal);
     const ringSize = 200;
     const strokeWidth = 3;
-    const radius = (ringSize - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference * (1 - progress);
 
     return (
       <Animated.View style={[styles.container, animatedContainerStyle]}>
@@ -371,6 +437,12 @@ export default function DoNothingScreen() {
           FOCUS MODE
         </Text>
 
+        {appSelection && (
+          <Text style={[styles.focusAppsNote, { color: theme.textTertiary }]}>
+            apps blocked
+          </Text>
+        )}
+
         {/* Circular progress */}
         <View style={{ width: ringSize, height: ringSize, marginTop: 24 }}>
           <View
@@ -379,7 +451,6 @@ export default function DoNothingScreen() {
               { alignItems: 'center', justifyContent: 'center' },
             ]}
           >
-            {/* SVG-less ring: track */}
             <View
               style={{
                 width: ringSize,
@@ -391,8 +462,6 @@ export default function DoNothingScreen() {
               }}
             />
           </View>
-
-          {/* Timer in center */}
           <View
             style={[
               StyleSheet.absoluteFill,
@@ -416,7 +485,9 @@ export default function DoNothingScreen() {
         </Text>
 
         {/* Progress bar */}
-        <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+        <View
+          style={[styles.progressTrack, { backgroundColor: theme.border }]}
+        >
           <View
             style={[
               styles.progressFill,
@@ -442,9 +513,69 @@ export default function DoNothingScreen() {
   }
 
   // =========================================================================
-  // Focus picker overlay
+  // Focus — pick apps to block (Screen Time)
   // =========================================================================
-  if (showFocusPicker) {
+  if (focusStep === 'pickApps') {
+    return (
+      <Animated.View style={[styles.container, animatedContainerStyle]}>
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+
+        <Text style={[styles.pickerTitle, { color: theme.text }]}>
+          Block apps
+        </Text>
+        <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
+          Select apps to block during focus
+        </Text>
+
+        <View style={styles.appPickerContainer}>
+          <DeviceActivitySelectionView
+            style={styles.appPicker}
+            onSelectionChange={(event) => {
+              const token = event.nativeEvent.familyActivitySelection;
+              if (token) handleAppsPicked(token);
+            }}
+          />
+        </View>
+
+        <View style={styles.appPickerButtons}>
+          <Pressable
+            onPress={() => {
+              // Skip app blocking, go to time picker
+              setAppSelection(null);
+              setFocusStep('pickTime');
+            }}
+            style={styles.pickerCancel}
+          >
+            <Text
+              style={[styles.pickerCancelText, { color: theme.textSecondary }]}
+            >
+              skip
+            </Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setFocusStep('hidden');
+            setAppSelection(null);
+          }}
+          style={styles.pickerCancel}
+        >
+          <Text
+            style={[styles.pickerCancelText, { color: theme.textSecondary }]}
+          >
+            cancel
+          </Text>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // =========================================================================
+  // Focus — pick duration
+  // =========================================================================
+  if (focusStep === 'pickTime') {
     return (
       <Animated.View style={[styles.container, animatedContainerStyle]}>
         <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
@@ -453,7 +584,9 @@ export default function DoNothingScreen() {
           Lock yourself in
         </Text>
         <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
-          Choose how long to do nothing
+          {appSelection
+            ? 'Apps will be blocked. Choose duration.'
+            : 'Choose how long to do nothing'}
         </Text>
 
         <View style={styles.pickerOptions}>
@@ -473,11 +606,14 @@ export default function DoNothingScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowFocusPicker(false);
+            setFocusStep('hidden');
+            setAppSelection(null);
           }}
           style={styles.pickerCancel}
         >
-          <Text style={[styles.pickerCancelText, { color: theme.textSecondary }]}>
+          <Text
+            style={[styles.pickerCancelText, { color: theme.textSecondary }]}
+          >
             cancel
           </Text>
         </Pressable>
@@ -494,10 +630,7 @@ export default function DoNothingScreen() {
 
       {/* Lock button — top left */}
       <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowFocusPicker(true);
-        }}
+        onPress={handleLockPress}
         style={[styles.lockButton, { top: insets.top + 12 }]}
         hitSlop={16}
       >
@@ -727,7 +860,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '300',
   },
+  // --- App picker ---
+  appPickerContainer: {
+    width: '100%',
+    maxWidth: 300,
+    height: 340,
+    marginBottom: 16,
+  },
+  appPicker: {
+    flex: 1,
+  },
+  appPickerButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
   // --- Focus active ---
+  focusAppsNote: {
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: '400',
+    textTransform: 'uppercase',
+    marginTop: 6,
+  },
   focusLabel: {
     fontSize: 11,
     letterSpacing: 4,
