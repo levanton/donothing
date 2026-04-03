@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -17,9 +24,22 @@ import Animated, {
 
 import { Fonts } from '@/constants/theme';
 import { themes, ThemeMode } from '@/lib/theme';
-import { timerDisplay, formatTimeShort } from '@/lib/format';
-import { Session, loadSessions, addSession, loadTheme, saveTheme } from '@/lib/storage';
+import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
+import {
+  Session,
+  loadSessions,
+  addSession,
+  loadTheme,
+  saveTheme,
+} from '@/lib/storage';
 import { getStats } from '@/lib/stats';
+
+const FOCUS_OPTIONS = [
+  { label: '15 min', seconds: 15 * 60 },
+  { label: '30 min', seconds: 30 * 60 },
+  { label: '1 hour', seconds: 60 * 60 },
+  { label: '2 hours', seconds: 2 * 60 * 60 },
+];
 
 function getMessage(seconds: number): string {
   if (seconds < 10) return '';
@@ -30,6 +50,76 @@ function getMessage(seconds: number): string {
   return 'just be.';
 }
 
+function getFocusMessage(remaining: number, total: number): string {
+  const progress = 1 - remaining / total;
+  if (progress < 0.1) return 'settle in.';
+  if (progress < 0.25) return 'let go of the urge.';
+  if (progress < 0.5) return 'you don\u2019t need your phone.';
+  if (progress < 0.75) return 'halfway there.';
+  if (progress < 0.9) return 'almost free.';
+  return 'just a little more.';
+}
+
+// ---------------------------------------------------------------------------
+// Expanding ring component
+// ---------------------------------------------------------------------------
+function ExpandingRing({ color, delay }: { color: string; delay: number }) {
+  const scale = useSharedValue(0.3);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(0.3, { duration: 0 }),
+          withTiming(2.5, {
+            duration: 3000,
+            easing: Easing.out(Easing.quad),
+          }),
+        ),
+        -1,
+        false,
+      ),
+    );
+    opacity.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(0.35, { duration: 0 }),
+          withTiming(0, { duration: 3000, easing: Easing.out(Easing.quad) }),
+        ),
+        -1,
+        false,
+      ),
+    );
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: color,
+          position: 'absolute',
+        },
+        animStyle,
+      ]}
+    />
+  );
+}
+
+// ===========================================================================
+// Main Screen
+// ===========================================================================
 export default function DoNothingScreen() {
   const insets = useSafeAreaInsets();
 
@@ -37,6 +127,14 @@ export default function DoNothingScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [ready, setReady] = useState(false);
+
+  // Focus lock state
+  const [showFocusPicker, setShowFocusPicker] = useState(false);
+  const [focusActive, setFocusActive] = useState(false);
+  const [focusRemaining, setFocusRemaining] = useState(0);
+  const [focusTotal, setFocusTotal] = useState(0);
+  const focusEndRef = useRef(0);
+  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sessionStartRef = useRef(Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,7 +148,9 @@ export default function DoNothingScreen() {
   const themeProgress = useSharedValue(0);
 
   useEffect(() => {
-    themeProgress.value = withTiming(themeMode === 'dark' ? 0 : 1, { duration: 600 });
+    themeProgress.value = withTiming(themeMode === 'dark' ? 0 : 1, {
+      duration: 600,
+    });
   }, [themeMode]);
 
   const animatedContainerStyle = useAnimatedStyle(() => ({
@@ -116,34 +216,6 @@ export default function DoNothingScreen() {
     opacity: messageOpacity.value,
   }));
 
-  // --- Breathing dot ---
-  const breathScale = useSharedValue(1);
-  const breathOpacity = useSharedValue(0.15);
-
-  useEffect(() => {
-    breathScale.value = withRepeat(
-      withSequence(
-        withTiming(1.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-    breathOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.45, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.15, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
-
-  const breathingStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: breathScale.value }],
-    opacity: breathOpacity.value,
-  }));
-
   // --- Timer ---
   const startTimer = useCallback(() => {
     sessionStartRef.current = Date.now();
@@ -202,6 +274,7 @@ export default function DoNothingScreen() {
 
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setThemeMode((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
       saveTheme(next);
@@ -209,8 +282,48 @@ export default function DoNothingScreen() {
     });
   }, []);
 
+  // --- Focus lock ---
+  const startFocus = useCallback((seconds: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowFocusPicker(false);
+    setFocusTotal(seconds);
+    setFocusRemaining(seconds);
+    setFocusActive(true);
+    focusEndRef.current = Date.now() + seconds * 1000;
+
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = setInterval(() => {
+      const left = Math.max(
+        0,
+        Math.ceil((focusEndRef.current - Date.now()) / 1000),
+      );
+      setFocusRemaining(left);
+      if (left <= 0) {
+        if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+        focusIntervalRef.current = null;
+        setFocusActive(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }, 1000);
+  }, []);
+
+  const cancelFocus = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = null;
+    setFocusActive(false);
+    setFocusRemaining(0);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    };
+  }, []);
+
   // --- Share ---
   const handleShare = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const currentStats = getStats(sessions);
     const text = [
       `I did nothing for ${formatTimeShort(elapsed)}.`,
@@ -227,18 +340,176 @@ export default function DoNothingScreen() {
     } catch {}
   }, [elapsed, sessions]);
 
+  const handleHistory = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/history');
+  }, []);
+
   if (!ready) {
-    return <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />;
+    return (
+      <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />
+    );
   }
 
+  // =========================================================================
+  // Focus lock overlay
+  // =========================================================================
+  if (focusActive) {
+    const progress = focusTotal > 0 ? 1 - focusRemaining / focusTotal : 0;
+    const focusMsg = getFocusMessage(focusRemaining, focusTotal);
+    const ringSize = 200;
+    const strokeWidth = 3;
+    const radius = (ringSize - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference * (1 - progress);
+
+    return (
+      <Animated.View style={[styles.container, animatedContainerStyle]}>
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+
+        <Text style={[styles.focusLabel, { color: theme.textTertiary }]}>
+          FOCUS MODE
+        </Text>
+
+        {/* Circular progress */}
+        <View style={{ width: ringSize, height: ringSize, marginTop: 24 }}>
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { alignItems: 'center', justifyContent: 'center' },
+            ]}
+          >
+            {/* SVG-less ring: track */}
+            <View
+              style={{
+                width: ringSize,
+                height: ringSize,
+                borderRadius: ringSize / 2,
+                borderWidth: strokeWidth,
+                borderColor: theme.border,
+                position: 'absolute',
+              }}
+            />
+          </View>
+
+          {/* Timer in center */}
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { alignItems: 'center', justifyContent: 'center' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.focusTimer,
+                { color: theme.text, fontFamily: Fonts!.mono },
+              ]}
+            >
+              {timerDisplay(focusRemaining)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Focus message */}
+        <Text style={[styles.focusMessage, { color: theme.textSecondary }]}>
+          {focusMsg}
+        </Text>
+
+        {/* Progress bar */}
+        <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: theme.dot,
+                width: `${Math.min(progress * 100, 100)}%`,
+              },
+            ]}
+          />
+        </View>
+
+        {/* Quit button */}
+        <Pressable
+          onPress={cancelFocus}
+          style={[styles.quitButton, { borderColor: theme.border }]}
+        >
+          <Text style={[styles.quitText, { color: theme.textSecondary }]}>
+            give up
+          </Text>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // =========================================================================
+  // Focus picker overlay
+  // =========================================================================
+  if (showFocusPicker) {
+    return (
+      <Animated.View style={[styles.container, animatedContainerStyle]}>
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+
+        <Text style={[styles.pickerTitle, { color: theme.text }]}>
+          Lock yourself in
+        </Text>
+        <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
+          Choose how long to do nothing
+        </Text>
+
+        <View style={styles.pickerOptions}>
+          {FOCUS_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.seconds}
+              onPress={() => startFocus(opt.seconds)}
+              style={[styles.pickerOption, { borderColor: theme.border }]}
+            >
+              <Text style={[styles.pickerOptionText, { color: theme.text }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowFocusPicker(false);
+          }}
+          style={styles.pickerCancel}
+        >
+          <Text style={[styles.pickerCancelText, { color: theme.textSecondary }]}>
+            cancel
+          </Text>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // =========================================================================
+  // Main screen
+  // =========================================================================
   return (
     <Animated.View style={[styles.container, animatedContainerStyle]}>
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
+      {/* Lock button — top left */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowFocusPicker(true);
+        }}
+        style={[styles.lockButton, { top: insets.top + 12 }]}
+        hitSlop={16}
+      >
+        <Text style={[styles.lockIcon, { color: theme.text }]}>
+          {'\uD83D\uDD12'}
+        </Text>
+      </Pressable>
+
       {/* Header */}
       <Text style={[styles.header, { color: theme.text }]}>DO NOTHING</Text>
 
-      {/* Theme toggle */}
+      {/* Theme toggle — top right */}
       <Pressable
         onPress={toggleTheme}
         style={[styles.themeToggle, { top: insets.top + 12 }]}
@@ -247,10 +518,7 @@ export default function DoNothingScreen() {
         <View
           style={[
             styles.themeCircle,
-            {
-              backgroundColor: theme.text,
-              opacity: 0.2,
-            },
+            { backgroundColor: theme.text, opacity: 0.2 },
           ]}
         />
       </Pressable>
@@ -273,17 +541,20 @@ export default function DoNothingScreen() {
         </Text>
       </Animated.View>
 
-      {/* Breathing dot */}
-      <Animated.View
-        style={[styles.dot, breathingStyle, { backgroundColor: theme.text }]}
-      />
+      {/* Expanding rings */}
+      <View style={styles.ringsContainer}>
+        <ExpandingRing color={theme.dot} delay={0} />
+        <ExpandingRing color={theme.dot} delay={1000} />
+        <ExpandingRing color={theme.dot} delay={2000} />
+        <View style={[styles.ringCenter, { backgroundColor: theme.dot }]} />
+      </View>
 
       {/* Stats */}
-      <Pressable onPress={() => router.push('/history')}>
+      <Pressable onPress={handleHistory}>
         <Animated.View style={[styles.statsRow, statsEntryStyle]}>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.text }]}>
-              {formatTimeShort(stats.today + elapsed)}
+              {formatTimeStat(stats.today + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
               Today
@@ -291,7 +562,7 @@ export default function DoNothingScreen() {
           </View>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.text }]}>
-              {formatTimeShort(stats.week + elapsed)}
+              {formatTimeStat(stats.week + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
               This Week
@@ -299,7 +570,7 @@ export default function DoNothingScreen() {
           </View>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.text }]}>
-              {formatTimeShort(stats.year + elapsed)}
+              {formatTimeStat(stats.year + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
               This Year
@@ -311,7 +582,7 @@ export default function DoNothingScreen() {
       {/* Bottom buttons */}
       <Animated.View style={[styles.bottomButtons, shareEntryStyle]}>
         <Pressable
-          onPress={() => router.push('/history')}
+          onPress={handleHistory}
           style={[styles.pillButton, { borderColor: theme.border }]}
         >
           <Text style={[styles.pillText, { color: theme.text }]}>HISTORY</Text>
@@ -342,6 +613,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 32,
   },
+  lockButton: {
+    position: 'absolute',
+    left: 24,
+  },
+  lockIcon: {
+    fontSize: 20,
+    opacity: 0.25,
+  },
   themeToggle: {
     position: 'absolute',
     right: 24,
@@ -366,11 +645,17 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
   },
-  dot: {
+  ringsContainer: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+  },
+  ringCenter: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    marginTop: 32,
   },
   statsRow: {
     flexDirection: 'row',
@@ -405,5 +690,82 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 3,
     fontWeight: '500',
+  },
+  // --- Focus picker ---
+  pickerTitle: {
+    fontSize: 24,
+    fontWeight: '200',
+    letterSpacing: 1,
+  },
+  pickerSubtitle: {
+    fontSize: 14,
+    fontWeight: '300',
+    marginTop: 8,
+    marginBottom: 40,
+  },
+  pickerOptions: {
+    gap: 12,
+    width: '100%',
+    maxWidth: 260,
+  },
+  pickerOption: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  pickerOptionText: {
+    fontSize: 17,
+    fontWeight: '300',
+    letterSpacing: 1,
+  },
+  pickerCancel: {
+    marginTop: 32,
+    padding: 12,
+  },
+  pickerCancelText: {
+    fontSize: 14,
+    fontWeight: '300',
+  },
+  // --- Focus active ---
+  focusLabel: {
+    fontSize: 11,
+    letterSpacing: 4,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+  },
+  focusTimer: {
+    fontSize: 48,
+    fontWeight: '200',
+    letterSpacing: 2,
+  },
+  focusMessage: {
+    fontSize: 16,
+    fontWeight: '300',
+    marginTop: 24,
+    textAlign: 'center',
+  },
+  progressTrack: {
+    width: '60%',
+    height: 3,
+    borderRadius: 1.5,
+    marginTop: 40,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 3,
+    borderRadius: 1.5,
+  },
+  quitButton: {
+    marginTop: 48,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+  },
+  quitText: {
+    fontSize: 13,
+    fontWeight: '300',
+    fontStyle: 'italic',
   },
 });

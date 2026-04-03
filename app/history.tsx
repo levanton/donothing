@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { themes, ThemeMode } from '@/lib/theme';
-import { formatTimeShort } from '@/lib/format';
+import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { loadSessions, loadTheme } from '@/lib/storage';
 import { getDailyStats, getStats, DayStats } from '@/lib/stats';
 
@@ -88,7 +88,7 @@ export default function HistoryScreen() {
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
           <Text style={[styles.summaryValue, { color: theme.text }]}>
-            {formatTimeShort(totalStats.today)}
+            {formatTimeStat(totalStats.today)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
             Today
@@ -96,7 +96,7 @@ export default function HistoryScreen() {
         </View>
         <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
           <Text style={[styles.summaryValue, { color: theme.text }]}>
-            {formatTimeShort(totalStats.week)}
+            {formatTimeStat(totalStats.week)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
             This Week
@@ -104,7 +104,7 @@ export default function HistoryScreen() {
         </View>
         <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
           <Text style={[styles.summaryValue, { color: theme.text }]}>
-            {formatTimeShort(totalStats.year)}
+            {formatTimeStat(totalStats.year)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
             This Year
