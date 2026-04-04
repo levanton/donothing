@@ -132,7 +132,7 @@ function BlockPickerContent({ onConfirm, onCancel, theme }: {
         </View>
         <View style={{ width: 20 }} />
         <View style={styles.sheetPickerCol}>
-          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>duration</Text>
+          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>do nothing</Text>
           <Pressable onPress={incDur} hitSlop={12} style={styles.sheetArrow}>
             <Feather name="chevron-up" size={24} color={theme.textSecondary} />
           </Pressable>
@@ -332,7 +332,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               {formatTime12(b.hour, b.minute)}
             </Text>
             <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
-              {b.durationMinutes} min block
+              do nothing for {b.durationMinutes} min
             </Text>
           </View>
           <View style={styles.cardActions}>

@@ -38,7 +38,7 @@ export interface AppState {
   sliderMinutes: number;
 
   // Focus lock
-  focusStep: 'hidden' | 'pickTime' | 'active';
+  focusStep: 'hidden' | 'pickTime' | 'active' | 'done';
   focusRemaining: number;
   focusTotal: number;
 
@@ -65,6 +65,7 @@ export interface AppState {
   openFocusPicker: () => void;
   startFocus: (seconds: number) => void;
   cancelFocus: () => void;
+  unlockFocus: () => void;
 
   // Settings actions
   openSettings: () => void;
@@ -185,7 +186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (focusInterval) clearInterval(focusInterval);
         focusInterval = null;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        set({ focusStep: 'hidden' });
+        set({ focusStep: 'done' });
       }
     }, 1000);
   },
@@ -193,6 +194,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   cancelFocus: () => {
     if (focusInterval) clearInterval(focusInterval);
     focusInterval = null;
+    set({ focusStep: 'hidden', focusRemaining: 0 });
+  },
+
+  unlockFocus: () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     set({ focusStep: 'hidden', focusRemaining: 0 });
   },
 

@@ -374,6 +374,14 @@ export default function DoNothingScreen() {
     useAppStore.getState().cancelFocus();
   }, []);
 
+  const handleUnlock = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    deactivateKeepAwake('focus');
+    deactivateKeepAwake('scheduled-block');
+    unblockAppsById('donothing-scheduled-block').catch(() => {});
+    useAppStore.getState().unlockFocus();
+  }, []);
+
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     activateKeepAwakeAsync('session');
@@ -412,6 +420,47 @@ export default function DoNothingScreen() {
   if (!ready) {
     return (
       <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />
+    );
+  }
+
+  // =========================================================================
+  // Focus done — unlock screen
+  // =========================================================================
+  if (focusStep === 'done') {
+    return (
+      <Animated.View style={[styles.container, animatedContainerStyle]}>
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+
+        <Text
+          style={[
+            styles.focusMessage,
+            { color: theme.textSecondary, fontFamily: Fonts!.serif, fontSize: 20, marginBottom: 32 },
+          ]}
+        >
+          well done.
+        </Text>
+
+        <Text
+          style={[
+            styles.focusMessage,
+            { color: theme.textTertiary, fontFamily: Fonts!.serif },
+          ]}
+        >
+          you did nothing successfully.
+        </Text>
+
+        <Pressable
+          onPress={handleUnlock}
+          style={[
+            styles.quitButton,
+            { backgroundColor: theme.accent, borderColor: theme.accent, marginTop: 48 },
+          ]}
+        >
+          <Text style={[styles.quitText, { color: theme.accentText, fontStyle: 'normal', fontWeight: '500' }]}>
+            unlock
+          </Text>
+        </Pressable>
+      </Animated.View>
     );
   }
 
