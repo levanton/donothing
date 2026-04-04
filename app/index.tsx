@@ -217,7 +217,10 @@ export default function DoNothingScreen() {
   }));
 
   const mainSlideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -historySlide.value * SCREEN_H }],
+    transform: [
+      { translateY: -historySlide.value * SCREEN_H },
+      { translateX: settingsSlide.value * SCREEN_W },
+    ],
   }));
 
   const historySlideStyle = useAnimatedStyle(() => ({
