@@ -127,7 +127,7 @@ function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: {
         />
       </Svg>
       <View style={styles.orbitCenter}>
-        <Feather name="square" size={16} color={color} style={{ opacity: 0.2 }} />
+        <Feather name="square" size={20} color={color} style={{ opacity: 0.6 }} />
       </View>
     </Pressable>
   );
@@ -181,7 +181,7 @@ export default function DoNothingScreen() {
   }));
 
   // --- Entry animations ---
-  const timerOpacity = useSharedValue(0);
+  const timerOpacity = useSharedValue(0.15);
   const dotProgress = useSharedValue(0);
   const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
   const buttonSize = useSharedValue(88);     // 88 = button, 12 = dot
@@ -397,7 +397,7 @@ export default function DoNothingScreen() {
     orbitAmount.value = withTiming(0, { duration: 600 });
     buttonSize.value = withTiming(88, { duration: 600 });
     playIconOpacity.value = withTiming(1, { duration: 900 });
-    timerOpacity.value = withTiming(0, { duration: 700 });
+    timerOpacity.value = withTiming(0.15, { duration: 700 });
     // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
