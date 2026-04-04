@@ -61,59 +61,67 @@ function getFocusMessage(remaining: number, total: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Expanding ring component
+// Breathing orb — inhale/exhale pulse
 // ---------------------------------------------------------------------------
-function ExpandingRing({ color, delay }: { color: string; delay: number }) {
-  const scale = useSharedValue(0.3);
-  const opacity = useSharedValue(0);
+function BreathingOrb({ color }: { color: string }) {
+  const scale = useSharedValue(1);
+  const glowOpacity = useSharedValue(0.15);
 
   useEffect(() => {
-    scale.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: 0 }),
-          withTiming(2.5, {
-            duration: 3000,
-            easing: Easing.out(Easing.quad),
-          }),
-        ),
-        -1,
-        false,
+    // 4s inhale, 4s exhale — natural breathing rhythm
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.35, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
       ),
+      -1,
+      false,
     );
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.35, { duration: 0 }),
-          withTiming(0, { duration: 3000, easing: Easing.out(Easing.quad) }),
-        ),
-        -1,
-        false,
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.3, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
       ),
+      -1,
+      false,
     );
   }, []);
 
-  const animStyle = useAnimatedStyle(() => ({
+  const glowStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+    opacity: glowOpacity.value,
+  }));
+
+  const coreStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.9 + (scale.value - 1) * 0.3 }],
   }));
 
   return (
-    <Animated.View
-      style={[
-        {
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          borderWidth: 1.5,
-          borderColor: color,
-          position: 'absolute',
-        },
-        animStyle,
-      ]}
-    />
+    <View style={styles.breathContainer}>
+      <Animated.View
+        style={[
+          {
+            width: 80,
+            height: 80,
+            borderRadius: 40,
+            backgroundColor: color,
+            position: 'absolute',
+          },
+          glowStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          {
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            backgroundColor: color,
+          },
+          coreStyle,
+        ]}
+      />
+    </View>
   );
 }
 
@@ -573,13 +581,8 @@ export default function DoNothingScreen() {
         </Text>
       </Animated.View>
 
-      {/* Expanding rings */}
-      <View style={styles.ringsContainer}>
-        <ExpandingRing color={theme.accent} delay={0} />
-        <ExpandingRing color={theme.accent} delay={1000} />
-        <ExpandingRing color={theme.accent} delay={2000} />
-        <View style={[styles.ringCenter, { backgroundColor: theme.accent }]} />
-      </View>
+      {/* Breathing orb */}
+      <BreathingOrb color={theme.accent} />
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
@@ -705,7 +708,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   header: {
-    fontSize: 28,
+    fontSize: 26,
     letterSpacing: 1,
     opacity: 0.85,
     fontWeight: '400',
@@ -744,17 +747,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  ringsContainer: {
-    width: 60,
-    height: 60,
+  breathContainer: {
+    width: 80,
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 24,
-  },
-  ringCenter: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
   },
   statsContainer: {
     flexDirection: 'row',
