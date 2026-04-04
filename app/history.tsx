@@ -14,18 +14,35 @@ import { Fonts } from '@/constants/theme';
 import { themes, ThemeMode } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { loadSessions, loadTheme } from '@/lib/storage';
-import { getDailyStats, getStats, DayStats } from '@/lib/stats';
+import { getDailyStats, getStats, getStreak, DayStats } from '@/lib/stats';
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+const ZEN_QUOTES = [
+  'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
+  'the quieter you become, the more you can hear.',
+  'in the midst of movement and chaos, keep stillness inside of you.',
+  'silence is the sleep that nourishes wisdom.',
+  'do nothing, and everything is done.',
+];
+
+function getQuote(): string {
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
+  );
+  return ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
+}
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [dailyStats, setDailyStats] = useState<DayStats[]>([]);
   const [totalStats, setTotalStats] = useState({ today: 0, week: 0, year: 0 });
+  const [streak, setStreak] = useState(0);
   const [ready, setReady] = useState(false);
 
   const theme = themes[themeMode];
+  const quote = getQuote();
 
   const themeProgress = useSharedValue(0);
 
@@ -50,12 +67,13 @@ export default function HistoryScreen() {
       setThemeMode(savedTheme);
       setDailyStats(getDailyStats(sessions));
       setTotalStats(getStats(sessions));
+      setStreak(getStreak(sessions));
       setReady(true);
     })();
   }, []);
 
-  // Find max duration for bar scaling
   const maxDuration = Math.max(...dailyStats.map((d) => d.duration), 1);
+  const totalAll = formatTimeStat(totalStats.year);
 
   if (!ready) {
     return <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />;
@@ -66,85 +84,191 @@ export default function HistoryScreen() {
       style={[styles.container, animatedBgStyle]}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 },
+        { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 40 },
       ]}
     >
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-      {/* Close button */}
-      <Pressable
-        onPress={() => router.back()}
-        style={styles.closeButton}
-        hitSlop={16}
-      >
-        <Text style={[styles.closeText, { color: theme.textSecondary }]}>
-          {'\u2715'}
+      {/* Header row */}
+      <View style={styles.headerRow}>
+        <Text
+          style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}
+        >
+          History
         </Text>
-      </Pressable>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={16}
+          style={styles.closeButton}
+        >
+          <Text style={[styles.closeText, { color: theme.textSecondary }]}>
+            {'\u2715'}
+          </Text>
+        </Pressable>
+      </View>
 
-      {/* Title */}
-      <Text
-        style={[
-          styles.title,
-          { color: theme.text, fontFamily: Fonts!.serif },
-        ]}
-      >
-        History
-      </Text>
+      {/* Hero — total time */}
+      <View style={[styles.heroCard, { borderColor: theme.border }]}>
+        <Text style={[styles.heroLabel, { color: theme.textTertiary }]}>
+          total stillness
+        </Text>
+        <View style={styles.heroValueRow}>
+          <Text
+            style={[
+              styles.heroValue,
+              { color: theme.text, fontFamily: Fonts!.serif },
+            ]}
+          >
+            {totalAll.value}
+          </Text>
+          <Text style={[styles.heroUnit, { color: theme.textTertiary }]}>
+            {totalAll.unit}
+          </Text>
+        </View>
+      </View>
 
-      {/* Summary cards */}
-      <View style={styles.summaryRow}>
-        {([
-          { stat: formatTimeStat(totalStats.today), label: 'Today' },
-          { stat: formatTimeStat(totalStats.week), label: 'This Week' },
-          { stat: formatTimeStat(totalStats.year), label: 'This Year' },
-        ] as const).map((item) => (
-          <View key={item.label} style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
-            <View style={styles.summaryValueRow}>
-              <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                {item.stat.value}
-              </Text>
-              <Text style={[styles.summaryUnit, { color: theme.textTertiary }]}>
-                {item.stat.unit}
-              </Text>
-            </View>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-              {item.label}
-            </Text>
-          </View>
-        ))}
+      {/* Streak + stats row */}
+      <View style={styles.miniStatsRow}>
+        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
+          <Text
+            style={[
+              styles.miniStatValue,
+              { color: theme.accent, fontFamily: Fonts!.serif },
+            ]}
+          >
+            {streak}
+          </Text>
+          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
+            day streak
+          </Text>
+        </View>
+        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
+          {(() => {
+            const t = formatTimeStat(totalStats.today);
+            return (
+              <View style={styles.miniValueRow}>
+                <Text
+                  style={[
+                    styles.miniStatValue,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  {t.value}
+                </Text>
+                <Text style={[styles.miniStatUnit, { color: theme.textTertiary }]}>
+                  {t.unit}
+                </Text>
+              </View>
+            );
+          })()}
+          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
+            today
+          </Text>
+        </View>
+        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
+          {(() => {
+            const w = formatTimeStat(totalStats.week);
+            return (
+              <View style={styles.miniValueRow}>
+                <Text
+                  style={[
+                    styles.miniStatValue,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  {w.value}
+                </Text>
+                <Text style={[styles.miniStatUnit, { color: theme.textTertiary }]}>
+                  {w.unit}
+                </Text>
+              </View>
+            );
+          })()}
+          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
+            this week
+          </Text>
+        </View>
+      </View>
+
+      {/* Week dots */}
+      <View style={styles.weekSection}>
+        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+          LAST 7 DAYS
+        </Text>
+        <View style={styles.weekGrid}>
+          {dailyStats.slice(0, 7).map((day) => {
+            const size = day.duration > 0
+              ? 16 + (day.duration / maxDuration) * 28
+              : 6;
+            return (
+              <View key={day.date} style={styles.weekDayCol}>
+                <View
+                  style={[
+                    styles.weekDot,
+                    {
+                      width: size,
+                      height: size,
+                      borderRadius: size / 2,
+                      backgroundColor: day.duration > 0
+                        ? theme.accent
+                        : theme.border,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[styles.weekDayLabel, { color: theme.textTertiary }]}
+                >
+                  {day.label.slice(0, 3)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
 
       {/* Daily list */}
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-        DAILY
+        ALL SESSIONS
       </Text>
 
       {dailyStats.map((day) => (
-        <View key={day.date} style={styles.dayRow}>
-          <View style={styles.dayInfo}>
-            <Text style={[styles.dayLabel, { color: theme.text }]}>
-              {day.label}
-            </Text>
-            <Text style={[styles.dayDuration, { color: theme.textSecondary }]}>
-              {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
-            </Text>
-          </View>
-          <View style={[styles.barTrack, { backgroundColor: theme.subtle }]}>
-            {day.duration > 0 && (
-              <View
-                style={[
-                  styles.barFill,
-                  {
-                    backgroundColor: theme.accent,
-                    width: `${Math.max((day.duration / maxDuration) * 100, 2)}%`,
-                  },
-                ]}
-              />
-            )}
-          </View>
+        <View
+          key={day.date}
+          style={[styles.dayRow, { borderBottomColor: theme.border }]}
+        >
+          <Text
+            style={[
+              styles.dayLabel,
+              { color: theme.text, fontFamily: Fonts!.serif },
+            ]}
+          >
+            {day.label}
+          </Text>
+          <Text
+            style={[
+              styles.dayDuration,
+              {
+                color: day.duration > 0 ? theme.text : theme.textTertiary,
+                fontFamily: Fonts!.serif,
+              },
+            ]}
+          >
+            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
+          </Text>
         </View>
       ))}
+
+      {/* Zen quote */}
+      <View style={styles.quoteContainer}>
+        <Text
+          style={[
+            styles.quoteText,
+            { color: theme.textTertiary, fontFamily: Fonts!.serif },
+          ]}
+        >
+          {quote}
+        </Text>
+      </View>
     </AnimatedScrollView>
   );
 }
@@ -156,83 +280,143 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+  },
   closeButton: {
-    alignSelf: 'flex-end',
     padding: 4,
   },
   closeText: {
     fontSize: 20,
     fontWeight: '300',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '400',
-    letterSpacing: 0.5,
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 40,
-  },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 16,
+  // --- Hero ---
+  heroCard: {
     borderWidth: 1.2,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    borderRadius: 20,
+    paddingVertical: 28,
     alignItems: 'center',
+    marginBottom: 16,
   },
-  summaryValueRow: {
+  heroLabel: {
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: '300',
+    marginBottom: 8,
+  },
+  heroValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  summaryValue: {
+  heroValue: {
+    fontSize: 56,
+    fontWeight: '300',
+  },
+  heroUnit: {
+    fontSize: 18,
+    fontWeight: '300',
+    marginLeft: 4,
+  },
+  // --- Mini stats ---
+  miniStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 28,
+  },
+  miniStatCard: {
+    flex: 1,
+    borderWidth: 1.2,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  miniValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  miniStatValue: {
     fontSize: 22,
     fontWeight: '400',
   },
-  summaryUnit: {
+  miniStatUnit: {
     fontSize: 11,
     fontWeight: '300',
     marginLeft: 2,
   },
-  summaryLabel: {
+  miniStatLabel: {
     fontSize: 10,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginTop: 6,
+    letterSpacing: 1,
+    fontWeight: '300',
+    marginTop: 4,
   },
+  // --- Week dots ---
+  weekSection: {
+    marginBottom: 28,
+  },
+  weekGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 60,
+    paddingHorizontal: 8,
+  },
+  weekDayCol: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
+    gap: 8,
+  },
+  weekDot: {
+    // sized dynamically
+  },
+  weekDayLabel: {
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+  },
+  // --- Section ---
   sectionTitle: {
     fontSize: 11,
     letterSpacing: 3,
     fontWeight: '500',
-    marginBottom: 20,
+    marginBottom: 16,
   },
+  // --- Day rows ---
   dayRow: {
-    marginBottom: 20,
-  },
-  dayInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   dayLabel: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '400',
   },
   dayDuration: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '300',
   },
-  barTrack: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
+  // --- Quote ---
+  quoteContainer: {
+    marginTop: 40,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
-  barFill: {
-    height: 4,
-    borderRadius: 2,
+  quoteText: {
+    fontSize: 14,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

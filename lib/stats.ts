@@ -49,6 +49,27 @@ function dayLabel(d: Date, todayKey: string, yesterdayKey: string): string {
   return `${SHORT_DAYS[d.getDay()]} ${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}`;
 }
 
+/** Count consecutive days with at least one session, ending today */
+export function getStreak(sessions: Session[]): number {
+  const days = new Set<string>();
+  for (const s of sessions) {
+    days.add(dateKey(new Date(s.timestamp)));
+  }
+
+  let streak = 0;
+  const d = new Date();
+  while (true) {
+    const key = dateKey(d);
+    if (days.has(key)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 export function getDailyStats(sessions: Session[], days: number = 30): DayStats[] {
   const now = new Date();
   const todayKey = dateKey(now);
