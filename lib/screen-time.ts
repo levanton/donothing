@@ -57,3 +57,20 @@ export async function blockApps(selectionToken: string): Promise<void> {
 export async function unblockApps(selectionToken: string): Promise<void> {
   await unblockSelection({ activitySelectionToken: selectionToken });
 }
+
+export async function blockAppsById(selectionId: string): Promise<void> {
+  await blockSelection({ activitySelectionId: selectionId });
+  await updateShield({
+    title: 'Do Nothing',
+    subtitle: 'This app is blocked during your scheduled session.',
+    primaryButtonLabel: '',
+    secondaryButtonLabel: '',
+  }, {
+    primary: { behavior: 'close' },
+    secondary: { behavior: 'close' },
+  });
+}
+
+export async function unblockAppsById(selectionId: string): Promise<void> {
+  await unblockSelection({ activitySelectionId: selectionId });
+}

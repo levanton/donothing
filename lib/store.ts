@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import * as Haptics from 'expo-haptics';
-import { loadSessions, addSession, loadTheme, saveTheme, Session } from './storage';
+import {
+  loadSessions, addSession, loadTheme, saveTheme, Session,
+  Reminder, ScheduledBlock,
+  loadDailyGoal, saveDailyGoal,
+  loadReminders, saveReminders,
+  loadScheduledBlocks, saveScheduledBlocks,
+} from './storage';
 import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
+import {
+  configureNotifications, requestPermission,
+  syncReminders, syncScheduledBlocks, cancelNotification,
+} from './notifications';
 
 // Module-level refs (not state, not serializable)
 let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -31,6 +41,12 @@ export interface AppState {
   focusRemaining: number;
   focusTotal: number;
 
+  // Settings
+  settingsOpen: boolean;
+  dailyGoalMinutes: number;
+  reminders: Reminder[];
+  scheduledBlocks: ScheduledBlock[];
+
   // Actions
   init: () => Promise<void>;
   startSession: () => void;
@@ -48,6 +64,17 @@ export interface AppState {
   openFocusPicker: () => void;
   startFocus: (seconds: number) => void;
   cancelFocus: () => void;
+
+  // Settings actions
+  openSettings: () => void;
+  closeSettings: () => void;
+  setDailyGoal: (minutes: number) => Promise<void>;
+  addReminder: (hour: number, minute: number) => Promise<void>;
+  removeReminder: (id: string) => Promise<void>;
+  toggleReminder: (id: string) => Promise<void>;
+  addScheduledBlock: (hour: number, minute: number, durationMinutes: number) => Promise<void>;
+  removeScheduledBlock: (id: string) => Promise<void>;
+  toggleScheduledBlock: (id: string) => Promise<void>;
 
   // AppState
   handleBackground: () => Promise<void>;
@@ -69,15 +96,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusRemaining: 0,
   focusTotal: 0,
 
+  // Settings
+  settingsOpen: false,
+  dailyGoalMinutes: 0,
+  reminders: [],
+  scheduledBlocks: [],
+
   // --- Init ---
   init: async () => {
-    const [sessions, themeMode] = await Promise.all([
+    configureNotifications();
+    const [sessions, themeMode, dailyGoalMinutes, rawReminders, rawBlocks] = await Promise.all([
       loadSessions(),
       loadTheme(),
+      loadDailyGoal(),
+      loadReminders(),
+      loadScheduledBlocks(),
     ]);
+    const reminders = await syncReminders(rawReminders);
+    const scheduledBlocks = await syncScheduledBlocks(rawBlocks);
+    await saveReminders(reminders);
+    await saveScheduledBlocks(scheduledBlocks);
     set({
       sessions,
       themeMode,
+      dailyGoalMinutes,
+      reminders,
+      scheduledBlocks,
       weekStats: getWeekStats(sessions),
       ready: true,
     });
@@ -149,6 +193,77 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (focusInterval) clearInterval(focusInterval);
     focusInterval = null;
     set({ focusStep: 'hidden', focusRemaining: 0 });
+  },
+
+  // --- Settings ---
+  openSettings: () => set({ settingsOpen: true }),
+  closeSettings: () => set({ settingsOpen: false }),
+
+  setDailyGoal: async (minutes) => {
+    set({ dailyGoalMinutes: minutes });
+    await saveDailyGoal(minutes);
+  },
+
+  addReminder: async (hour, minute) => {
+    const granted = await requestPermission();
+    if (!granted) return;
+    const reminders = [...get().reminders, {
+      id: Date.now().toString(),
+      hour, minute, enabled: true,
+    }];
+    const synced = await syncReminders(reminders);
+    set({ reminders: synced });
+    await saveReminders(synced);
+  },
+
+  removeReminder: async (id) => {
+    const old = get().reminders.find((r) => r.id === id);
+    if (old?.notificationId) {
+      try { await cancelNotification(old.notificationId); } catch {}
+    }
+    const reminders = get().reminders.filter((r) => r.id !== id);
+    set({ reminders });
+    await saveReminders(reminders);
+  },
+
+  toggleReminder: async (id) => {
+    const reminders = get().reminders.map((r) =>
+      r.id === id ? { ...r, enabled: !r.enabled } : r,
+    );
+    const synced = await syncReminders(reminders);
+    set({ reminders: synced });
+    await saveReminders(synced);
+  },
+
+  addScheduledBlock: async (hour, minute, durationMinutes) => {
+    const granted = await requestPermission();
+    if (!granted) return;
+    const blocks = [...get().scheduledBlocks, {
+      id: Date.now().toString(),
+      hour, minute, durationMinutes, enabled: true,
+    }];
+    const synced = await syncScheduledBlocks(blocks);
+    set({ scheduledBlocks: synced });
+    await saveScheduledBlocks(synced);
+  },
+
+  removeScheduledBlock: async (id) => {
+    const old = get().scheduledBlocks.find((b) => b.id === id);
+    if (old?.notificationId) {
+      try { await cancelNotification(old.notificationId); } catch {}
+    }
+    const blocks = get().scheduledBlocks.filter((b) => b.id !== id);
+    set({ scheduledBlocks: blocks });
+    await saveScheduledBlocks(blocks);
+  },
+
+  toggleScheduledBlock: async (id) => {
+    const blocks = get().scheduledBlocks.map((b) =>
+      b.id === id ? { ...b, enabled: !b.enabled } : b,
+    );
+    const synced = await syncScheduledBlocks(blocks);
+    set({ scheduledBlocks: synced });
+    await saveScheduledBlocks(synced);
   },
 
   // --- AppState ---

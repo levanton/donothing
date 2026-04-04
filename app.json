@@ -48,6 +48,12 @@
             "deploymentTarget": "16.0"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
       ]
     ],
     "experiments": {

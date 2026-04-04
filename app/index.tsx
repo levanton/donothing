@@ -12,6 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   interpolateColor,
@@ -28,9 +30,11 @@ import { themes, palette } from '@/lib/theme';
 import { timerDisplay, formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
+import { blockAppsById, unblockAppsById } from '@/lib/screen-time';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
+import SettingsContent from '@/components/SettingsContent';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -78,6 +82,8 @@ export default function DoNothingScreen() {
   const focusStep = useAppStore((s) => s.focusStep);
   const focusRemaining = useAppStore((s) => s.focusRemaining);
   const focusTotal = useAppStore((s) => s.focusTotal);
+  const settingsOpen = useAppStore((s) => s.settingsOpen);
+  const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
 
   const isActiveRef = useRef(true);
 
@@ -203,6 +209,13 @@ export default function DoNothingScreen() {
   const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
   const historyScrollY = useSharedValue(0);
 
+  // --- Settings slide ---
+  const settingsSlide = useSharedValue(0); // 0 = hidden, 1 = visible
+  const settingsSlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - settingsSlide.value) * SCREEN_H }],
+    opacity: settingsSlide.value,
+  }));
+
   const mainSlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -historySlide.value * SCREEN_H }],
   }));
@@ -282,9 +295,32 @@ export default function DoNothingScreen() {
     opacity: messageOpacity.value,
   }));
 
+  // Deactivate keep awake and unblock apps when focus ends
+  useEffect(() => {
+    if (focusStep === 'hidden') {
+      deactivateKeepAwake('focus');
+      deactivateKeepAwake('scheduled-block');
+      unblockAppsById('donothing-scheduled-block').catch(() => {});
+    }
+  }, [focusStep]);
+
   // --- Init ---
   useEffect(() => {
     useAppStore.getState().init();
+  }, []);
+
+  // --- Notification listener for scheduled blocks ---
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.type === 'scheduledBlock' && data?.durationMinutes) {
+        const durationSec = (data.durationMinutes as number) * 60;
+        blockAppsById('donothing-scheduled-block').catch(() => {});
+        activateKeepAwakeAsync('scheduled-block');
+        useAppStore.getState().startFocus(durationSec);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // --- AppState ---
@@ -292,6 +328,7 @@ export default function DoNothingScreen() {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if ((nextState === 'background' || nextState === 'inactive') && isActiveRef.current) {
         isActiveRef.current = false;
+        deactivateKeepAwake('session');
         await useAppStore.getState().handleBackground();
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
@@ -307,29 +344,41 @@ export default function DoNothingScreen() {
     useAppStore.getState().toggleTheme();
   }, []);
 
-  // --- Focus lock ---
-  const handleLockPress = useCallback(() => {
+  // --- Settings ---
+  const handleSettingsPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    useAppStore.getState().openFocusPicker();
+    settingsSlide.value = withTiming(1, { duration: 400 });
+    useAppStore.getState().openSettings();
   }, []);
 
+  const handleSettingsClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    settingsSlide.value = withTiming(0, { duration: 300 });
+    useAppStore.getState().closeSettings();
+  }, []);
+
+  // --- Focus lock ---
   const handleStartFocus = useCallback((seconds: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    activateKeepAwakeAsync('focus');
     useAppStore.getState().startFocus(seconds);
   }, []);
 
   const cancelFocus = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    deactivateKeepAwake('focus');
     useAppStore.getState().cancelFocus();
   }, []);
 
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    activateKeepAwakeAsync('session');
     useAppStore.getState().startSession();
   }, []);
 
   const handleStop = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    deactivateKeepAwake('session');
     await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
@@ -521,13 +570,13 @@ export default function DoNothingScreen() {
     <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-      {/* Lock button — top left */}
+      {/* Settings button — top left */}
       <Pressable
-        onPress={handleLockPress}
+        onPress={handleSettingsPress}
         style={[styles.lockButton, { top: insets.top + 12 }]}
         hitSlop={16}
       >
-        <Feather name="lock" size={24} color={theme.text} style={{ opacity: 0.9 }} />
+        <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
 
       {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
@@ -682,6 +731,11 @@ export default function DoNothingScreen() {
               <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
                 {formatTimeStat(stats.today + elapsed).unit}
               </Text>
+              {dailyGoalMinutes > 0 && (
+                <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
+                  {' / '}{dailyGoalMinutes}m
+                </Text>
+              )}
             </View>
           </View>
           <Text style={[styles.statDot, { color: theme.textTertiary }]}>·</Text>
@@ -786,6 +840,14 @@ export default function DoNothingScreen() {
       />
     </Animated.View>
     </GestureDetector>
+
+    {/* Settings screen */}
+    <Animated.View style={[styles.historyContainer, animatedContainerStyle, settingsSlideStyle]}>
+      <SettingsContent
+        onClose={handleSettingsClose}
+        insets={insets}
+      />
+    </Animated.View>
     </GestureHandlerRootView>
   );
 }
