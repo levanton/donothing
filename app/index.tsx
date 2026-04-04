@@ -250,18 +250,21 @@ export default function DoNothingScreen() {
   // --- Goal picker (single element expands from button to card) ---
   const goalExpand = useSharedValue(0);
   // Collapsed: right of play button (88/2 + 10 = 54 from orbitArea center)
-  const GOAL_LEFT = RING_SIZE / 2 + 44 + 10; // 102
-  const GOAL_TOP = (RING_SIZE - 34) / 2; // 31
-  const GOAL_W = 44;
-  const GOAL_H = 34;
+  // orbitArea starts at (280-96)/2 = 92 inside orbitWrap
+  // play button center = 92 + 48 = 140
+  // goal left = play center + play radius + gap = 140 + 44 + 16 = 200
+  const GOAL_LEFT = 200;
+  const GOAL_TOP = (RING_SIZE - 30) / 2; // 33
+  const GOAL_W = 52;
+  const GOAL_H = 30;
   const GOAL_EXP_W = 260;
   const GOAL_EXP_H = 240;
-  // Center of collapsed: (102+22, 31+17) = (124, 48)
-  // Center of expanded should be orbitArea center: (48, 48)
-  // Expanded top-left without translate: (102, 31), center = (102+130, 31+120) = (232, 151)
-  // translateX = 48 - 232 = -184, translateY = 48 - 151 = -103
-  const GOAL_TX = -184;
-  const GOAL_TY = -103;
+  // Collapsed center: (200+26, 33+15) = (226, 48)
+  // Expanded center should be orbitWrap center: (140, 48)
+  // Expanded top-left without translate: (200, 33), center = (200+130, 33+120) = (330, 153)
+  // translateX = 140 - 330 = -190, translateY = 48 - 153 = -105
+  const GOAL_TX = -190;
+  const GOAL_TY = -105;
 
   const goalAnimStyle = useAnimatedStyle(() => {
     const t = goalExpand.value;
@@ -270,20 +273,22 @@ export default function DoNothingScreen() {
       top: GOAL_TOP,
       width: GOAL_W + t * (GOAL_EXP_W - GOAL_W),
       height: GOAL_H + t * (GOAL_EXP_H - GOAL_H),
-      borderRadius: 17 + t * (20 - 17),
+      borderRadius: 10 + t * (20 - 10),
+      overflow: t > 0.5 ? 'hidden' : 'visible',
       transform: [
         { translateX: t * GOAL_TX },
         { translateY: t * GOAL_TY },
       ],
-    };
+    } as any;
   });
 
   const goalNumberStyle = useAnimatedStyle(() => ({
-    fontSize: 13 + goalExpand.value * (56 - 13),
+    fontSize: 15 + goalExpand.value * (56 - 15),
+    fontWeight: '400',
   }));
 
   const goalMinStyle = useAnimatedStyle(() => ({
-    fontSize: 11 + goalExpand.value * (14 - 11),
+    fontSize: 12 + goalExpand.value * (18 - 12),
   }));
 
   const goalExtrasStyle = useAnimatedStyle(() => ({
@@ -705,6 +710,7 @@ export default function DoNothingScreen() {
       </Animated.View>
 
       {/* Orbit ring + unified button/dot */}
+      <View style={styles.orbitWrap}>
       <View style={styles.orbitArea}>
         <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
           <OrbitRing
@@ -732,22 +738,35 @@ export default function DoNothingScreen() {
           </Animated.View>
         </Pressable>
 
-        {/* Goal button — absolute, to the right of play button */}
+      </View>
+
+        {/* Goal tap area — large invisible hit target */}
+        {!started && !goalExpanded && (
+          <Pressable
+            onPress={handleGoalOpen}
+            style={{
+              position: 'absolute',
+              left: GOAL_LEFT - 16,
+              top: GOAL_TOP - 16,
+              width: GOAL_W + 32,
+              height: GOAL_H + 32,
+              zIndex: 11,
+            }}
+          />
+        )}
+
+        {/* Goal button — absolute inside orbitWrap */}
         {!started && (
           <Animated.View
             style={[
               styles.goalElement,
               {
-                borderColor: themeMode === 'dark' ? palette.cream : palette.ink,
+                borderColor: theme.border,
                 backgroundColor: theme.bg,
               },
               goalAnimStyle,
             ]}
           >
-            {/* Tap overlay for collapsed state */}
-            {!goalExpanded && (
-              <Pressable onPress={handleGoalOpen} style={StyleSheet.absoluteFill} hitSlop={16} />
-            )}
 
             {/* Title — fades in when expanded */}
             {goalExpanded && (
@@ -772,7 +791,7 @@ export default function DoNothingScreen() {
             >
               <Animated.Text
                 style={[
-                  { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '200' },
+                  { color: theme.text, fontFamily: Fonts!.mono },
                   goalNumberStyle,
                 ]}
               >
@@ -998,10 +1017,16 @@ const styles = StyleSheet.create({
   orbitCenter: {
     position: 'absolute',
   },
+  orbitWrap: {
+    width: 280,
+    height: RING_SIZE,
+    marginTop: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   orbitArea: {
     width: RING_SIZE,
     height: RING_SIZE,
-    marginTop: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1167,9 +1192,9 @@ const styles = StyleSheet.create({
   goalElement: {
     position: 'absolute',
     borderWidth: 1,
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
     zIndex: 10,
   },
   goalNumberRow: {
