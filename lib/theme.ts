@@ -9,6 +9,7 @@ export const palette = {
   terracotta: '#C75B3A',
   salmon:     '#E8A99A',
   warmGray:   '#D9CFC2',
+  ink:        '#353235',
 } as const;
 
 // ── Opacity helpers ──────────────────────────────────────────────────────

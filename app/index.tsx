@@ -23,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
-import { themes, ThemeMode } from '@/lib/theme';
+import { themes, palette, ThemeMode } from '@/lib/theme';
 import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
 import {
   Session,
@@ -553,7 +553,7 @@ export default function DoNothingScreen() {
         <View
           style={[
             styles.themeCircle,
-            { backgroundColor: theme.accent, opacity: 0.25 },
+            { backgroundColor: theme.accent, opacity: 0.7 },
           ]}
         />
       </Pressable>
@@ -678,9 +678,9 @@ export default function DoNothingScreen() {
       >
         <Pressable
           onPress={handleHistory}
-          style={[styles.pillButton, { borderColor: theme.border }]}
+          style={[styles.pillButton, { borderColor: palette.ink }]}
         >
-          <Text style={[styles.pillText, { color: theme.text }]}>HISTORY</Text>
+          <Text style={[styles.pillText, { color: palette.ink }]}>History</Text>
         </Pressable>
         <Pressable
           onPress={handleShare}
@@ -691,7 +691,7 @@ export default function DoNothingScreen() {
           ]}
         >
           <Text style={[styles.pillText, { color: theme.accentText }]}>
-            SHARE
+            Share
           </Text>
         </Pressable>
       </Animated.View>
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   header: {
-    fontSize: 26,
+    fontSize: 22,
     letterSpacing: 1,
     opacity: 0.85,
     fontWeight: '400',
@@ -813,18 +813,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   pillButton: {
-    borderWidth: 1.2,
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+    borderWidth: 2,
+    borderRadius: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
   },
   pillButtonFilled: {
     borderWidth: 0,
   },
   pillText: {
-    fontSize: 13,
-    letterSpacing: 2,
-    fontWeight: '400',
+    fontSize: 15,
+    letterSpacing: 0.5,
+    fontWeight: '500',
   },
   // --- Focus picker ---
   pickerTitle: {
