@@ -13,11 +13,12 @@ export function configureNotifications() {
   });
 }
 
-export async function requestPermission(): Promise<boolean> {
+export async function requestPermission(): Promise<'granted' | 'denied' | 'undetermined'> {
   const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
+  if (existing === 'granted') return 'granted';
+  if (existing === 'denied') return 'denied';
   const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  return status === 'granted' ? 'granted' : 'denied';
 }
 
 export async function scheduleDailyNotification(

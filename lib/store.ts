@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
   loadSessions, addSession, loadTheme, saveTheme, Session,
@@ -205,8 +206,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addReminder: async (hour, minute) => {
-    const granted = await requestPermission();
-    if (!granted) return;
+    const status = await requestPermission();
+    if (status === 'denied') {
+      Alert.alert(
+        'Notifications disabled',
+        'Enable notifications in Settings to receive reminders.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+    if (status !== 'granted') return;
     const reminders = [...get().reminders, {
       id: Date.now().toString(),
       hour, minute, enabled: true,
@@ -236,8 +248,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addScheduledBlock: async (hour, minute, durationMinutes) => {
-    const granted = await requestPermission();
-    if (!granted) return;
+    const status = await requestPermission();
+    if (status === 'denied') {
+      Alert.alert(
+        'Notifications disabled',
+        'Enable notifications in Settings for scheduled blocking.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+    if (status !== 'granted') return;
     const blocks = [...get().scheduledBlocks, {
       id: Date.now().toString(),
       hour, minute, durationMinutes, enabled: true,
