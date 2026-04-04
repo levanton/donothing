@@ -10,13 +10,16 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   type SharedValue,
   interpolateColor,
+  runOnJS,
   useAnimatedProps,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
@@ -301,6 +304,7 @@ export default function DoNothingScreen() {
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
   const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
+  const historyScrollY = useSharedValue(0);
 
   const mainSlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -historySlide.value * SCREEN_H }],
@@ -309,6 +313,59 @@ export default function DoNothingScreen() {
   const historySlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - historySlide.value) * SCREEN_H }],
   }));
+
+  // Swipe up on main → open history
+  const showHistoryJS = useCallback(() => setShowHistory(true), []);
+  const hideHistoryJS = useCallback(() => setShowHistory(false), []);
+
+  const mainPanGesture = Gesture.Pan()
+    .activeOffsetY([-30, 10000])
+    .onStart(() => {
+      'worklet';
+      runOnJS(showHistoryJS)();
+    })
+    .onUpdate((e) => {
+      'worklet';
+      const drag = -e.translationY / SCREEN_H;
+      historySlide.value = Math.max(0, Math.min(1, drag));
+    })
+    .onEnd((e) => {
+      'worklet';
+      const shouldOpen = historySlide.value > 0.3 || -e.velocityY > 500;
+      if (shouldOpen) {
+        historySlide.value = withTiming(1, { duration: 300 });
+      } else {
+        historySlide.value = withTiming(0, { duration: 300 });
+        runOnJS(hideHistoryJS)();
+      }
+    });
+
+  // Swipe down on history → close (only when scrolled to top)
+  const historyPanGesture = Gesture.Pan()
+    .activeOffsetY([-10000, 20])
+    .onUpdate((e) => {
+      'worklet';
+      if (historyScrollY.value > 5) return;
+      const drag = e.translationY / SCREEN_H;
+      historySlide.value = Math.max(0, Math.min(1, 1 - Math.max(0, drag)));
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (historyScrollY.value > 5) return;
+      const shouldClose = historySlide.value < 0.7 || e.velocityY > 500;
+      if (shouldClose) {
+        historySlide.value = withTiming(0, { duration: 300 });
+        runOnJS(hideHistoryJS)();
+      } else {
+        historySlide.value = withTiming(1, { duration: 300 });
+      }
+    });
+
+  const historyScrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      historyScrollY.value = e.contentOffset.y;
+    },
+  });
 
   const handleGoalOpen = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -668,7 +725,8 @@ export default function DoNothingScreen() {
   // Main screen
   // =========================================================================
   return (
-    <View style={styles.screenStack}>
+    <GestureHandlerRootView style={[styles.screenStack, { backgroundColor: theme.bg }]}>
+    <GestureDetector gesture={mainPanGesture}>
     <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
@@ -974,9 +1032,11 @@ export default function DoNothingScreen() {
         </Pressable>
       </View>
     </Animated.View>
+    </GestureDetector>
 
     {/* History screen — slides up from below, pushing main screen up */}
     {showHistory && (
+      <GestureDetector gesture={historyPanGesture}>
       <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
         <HistoryContent
           theme={theme}
@@ -984,18 +1044,22 @@ export default function DoNothingScreen() {
           sessions={sessions}
           onClose={handleHistoryClose}
           insets={insets}
+          onScroll={historyScrollHandler}
         />
       </Animated.View>
+      </GestureDetector>
     )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
 // ===========================================================================
 // History Content (inline, not a separate route)
 // ===========================================================================
-function HistoryContent({ theme, themeMode, sessions, onClose, insets }: {
-  theme: any; themeMode: ThemeMode; sessions: any[]; onClose: () => void; insets: any;
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+function HistoryContent({ theme, themeMode, sessions, onClose, insets, onScroll }: {
+  theme: any; themeMode: ThemeMode; sessions: any[]; onClose: () => void; insets: any; onScroll?: any;
 }) {
   const dailyStats = getDailyStats(sessions);
   const totalStats = getStats(sessions);
@@ -1016,8 +1080,12 @@ function HistoryContent({ theme, themeMode, sessions, onClose, insets }: {
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
 
   return (
-    <ScrollView
+    <AnimatedScrollView
       style={{ flex: 1 }}
+      bounces={false}
+      overScrollMode="never"
+      onScroll={onScroll}
+      scrollEventThrottle={16}
       contentContainerStyle={{
         paddingHorizontal: 24,
         paddingTop: insets.top + 8,
@@ -1104,7 +1172,7 @@ function HistoryContent({ theme, themeMode, sessions, onClose, insets }: {
           {quote}
         </Text>
       </View>
-    </ScrollView>
+    </AnimatedScrollView>
   );
 }
 
