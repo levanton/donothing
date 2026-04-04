@@ -200,12 +200,12 @@ export default function DoNothingScreen() {
     playIconOpacity.value = withTiming(0, { duration: 300 });
     orbitAmount.value = withTiming(1, { duration: 600 });
     // Timer and ring appear
-    timerOpacity.value = withTiming(1, { duration: 1150 });
+    timerOpacity.value = withTiming(1, { duration: 1125 });
     // Header text morph
     hideOpacity.value = withTiming(0, { duration: 400 });
     hideWidth.value = withTiming(0, { duration: 860 });
     showWidth.value = withTiming(1, { duration: 690 });
-    showOpacity.value = withTiming(1, { duration: 1150 });
+    showOpacity.value = withTiming(1, { duration: 1125 });
   }, [started]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
@@ -392,8 +392,7 @@ export default function DoNothingScreen() {
     stopTimer();
     setStarted(false);
     startedRef.current = false;
-    setElapsed(0);
-    // Reverse: same durations, opposite direction
+    // Don't reset elapsed yet — dot needs current position for animation
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
     buttonSize.value = withTiming(88, { duration: 600 });
@@ -404,7 +403,9 @@ export default function DoNothingScreen() {
     showWidth.value = withTiming(0, { duration: 860 });
     // "Ready to " and "?" reappear
     hideWidth.value = withTiming(1, { duration: 690 });
-    hideOpacity.value = withTiming(1, { duration: 1150 });
+    hideOpacity.value = withTiming(1, { duration: 1125 });
+    // Reset elapsed after animations finish
+    setTimeout(() => setElapsed(0), 700);
     const updated = await addSession(duration);
     setSessions(updated);
     setWeekStats(getWeekStats(updated));
