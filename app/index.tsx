@@ -868,10 +868,12 @@ const styles = StyleSheet.create({
   statsColumn: {
     marginTop: 36,
     flexDirection: 'row',
-    gap: 24,
+    alignItems: 'center',
+    gap: 19,
   },
   statDot: {
     fontSize: 18,
+    marginTop: 7,
   },
   statRow: {
     flexDirection: 'row',
@@ -887,7 +889,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   statRowValue: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '300',
   },
   statRowUnit: {
