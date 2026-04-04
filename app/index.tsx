@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   AppState,
   Dimensions,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,32 +14,23 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  type SharedValue,
   interpolateColor,
   runOnJS,
-  useAnimatedProps,
   useAnimatedScrollHandler,
   useAnimatedStyle,
-  useFrameCallback,
   useSharedValue,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
-import Svg, { Circle as SvgCircle, Path as SvgPath } from 'react-native-svg';
-
-const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Fonts } from '@/constants/theme';
-import { themes, palette, ThemeMode } from '@/lib/theme';
-import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
-import {
-  Session,
-  loadSessions,
-  addSession,
-  loadTheme,
-  saveTheme,
-} from '@/lib/storage';
-import { getStats, getWeekStats, getDailyStats, getStreak, WeekDay } from '@/lib/stats';
+import { themes, palette } from '@/lib/theme';
+import { timerDisplay, formatTimeStat } from '@/lib/format';
+import { getStats } from '@/lib/stats';
+import { useAppStore } from '@/lib/store';
+import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
+import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
+import HistoryContent from '@/components/HistoryContent';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -68,151 +58,7 @@ function getFocusMessage(remaining: number, total: number): string {
   return 'just a little more.';
 }
 
-// ---------------------------------------------------------------------------
-// Orbit ring — dot traces a circle, colored stroke fills behind it
-// ---------------------------------------------------------------------------
-const RING_SIZE = 96;
 const RING_R = 42;
-const RING_STROKE = 3;
-const RING_CIRC = 2 * Math.PI * RING_R;
-const RING_PERIOD = 15; // seconds per full revolution
-
-function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: {
-  color: string; faintColor: string; elapsed: number;
-  onStop?: () => void; dotProgress: SharedValue<number>;
-}) {
-  const cx = RING_SIZE / 2;
-  const cy = RING_SIZE / 2;
-
-  const smoothLap = useSharedValue(0);
-  const lastElapsed = useSharedValue(elapsed);
-
-  useEffect(() => {
-    lastElapsed.value = elapsed;
-  }, [elapsed]);
-
-  useFrameCallback((info) => {
-    const fracSecond = (info.timeSinceFirstFrame % 1000) / 1000;
-    const totalSeconds = lastElapsed.value + fracSecond;
-    dotProgress.value = (totalSeconds % RING_PERIOD) / RING_PERIOD;
-    smoothLap.value = Math.floor(totalSeconds / RING_PERIOD);
-  });
-
-  const trailingProps = useAnimatedProps(() => ({
-    stroke: smoothLap.value % 2 === 0 ? faintColor : color,
-  }));
-
-  const leadingProps = useAnimatedProps(() => ({
-    stroke: smoothLap.value % 2 === 0 ? color : faintColor,
-    strokeDashoffset: RING_CIRC * (1 - dotProgress.value),
-  }));
-
-  return (
-    <Pressable onPress={onStop} style={styles.orbitContainer}>
-      <Svg width={RING_SIZE} height={RING_SIZE}>
-        <AnimatedCircle
-          cx={cx}
-          cy={cy}
-          r={RING_R}
-          strokeWidth={RING_STROKE}
-          fill="none"
-          animatedProps={trailingProps}
-        />
-        <AnimatedCircle
-          cx={cx}
-          cy={cy}
-          r={RING_R}
-          strokeWidth={RING_STROKE}
-          fill="none"
-          strokeDasharray={`${RING_CIRC}`}
-          strokeLinecap="round"
-          rotation={-90}
-          origin={`${cx}, ${cy}`}
-          animatedProps={leadingProps}
-        />
-      </Svg>
-      <View style={styles.orbitCenter}>
-        <Feather name="square" size={20} color={color} style={{ opacity: 0.6 }} />
-      </View>
-    </Pressable>
-  );
-}
-
-
-// ---------------------------------------------------------------------------
-// Wave slider — wavy progress indicator
-// ---------------------------------------------------------------------------
-const SLIDER_H = 24;
-const SLIDER_PAD = 10; // padding for thumb not to clip
-
-function GoalSliderBar({ progress, theme, width }: {
-  progress: Animated.SharedValue<number>;
-  theme: any;
-  width: number;
-}) {
-  const [p, setP] = useState(0);
-
-  useFrameCallback(() => {
-    const v = progress.value;
-    if (Math.abs(v - p) > 0.005) {
-      runOnJS(setP)(v);
-    }
-  });
-
-  const cy = SLIDER_H / 2;
-  const trackW = width - SLIDER_PAD * 2;
-  const fillX = SLIDER_PAD + p * trackW;
-  const ticks = [15, 30, 45];
-
-  return (
-    <View style={{ width, height: SLIDER_H + 20, alignItems: 'center' }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width, paddingHorizontal: SLIDER_PAD - 2, marginBottom: 2 }}>
-        <Text style={{ fontSize: 12, color: theme.textTertiary }}>0</Text>
-        <Text style={{ fontSize: 12, color: theme.textTertiary }}>60</Text>
-      </View>
-      <Svg width={width} height={SLIDER_H}>
-        {/* Track */}
-        <SvgPath
-          d={`M ${SLIDER_PAD} ${cy} L ${width - SLIDER_PAD} ${cy}`}
-          stroke={theme.border}
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-        {/* Tick marks */}
-        {ticks.map((m) => {
-          const tx = SLIDER_PAD + (m / 60) * trackW;
-          return (
-            <SvgPath
-              key={m}
-              d={`M ${tx} ${cy - 4} L ${tx} ${cy + 4}`}
-              stroke={theme.border}
-              strokeWidth={1}
-            />
-          );
-        })}
-        {/* Fill */}
-        {p > 0 && (
-          <SvgPath
-            d={`M ${SLIDER_PAD} ${cy} L ${fillX} ${cy}`}
-            stroke={theme.textSecondary}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-          />
-        )}
-        {/* Thumb — hollow circle */}
-        <SvgCircle
-          cx={fillX}
-          cy={cy}
-          r={7}
-          fill={theme.bg}
-          stroke={theme.textSecondary}
-          strokeWidth={2}
-        />
-        <SvgCircle cx={fillX} cy={cy} r={2} fill={theme.textSecondary} />
-      </Svg>
-    </View>
-  );
-}
 
 // ===========================================================================
 // Main Screen
@@ -220,26 +66,20 @@ function GoalSliderBar({ progress, theme, width }: {
 export default function DoNothingScreen() {
   const insets = useSafeAreaInsets();
 
-  const [elapsed, setElapsed] = useState(0);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
-  const [weekStats, setWeekStats] = useState<WeekDay[]>([]);
-  const [ready, setReady] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [goalSeconds, setGoalSeconds] = useState(0);
+  const elapsed = useAppStore((s) => s.elapsed);
+  const sessions = useAppStore((s) => s.sessions);
+  const themeMode = useAppStore((s) => s.themeMode);
+  const weekStats = useAppStore((s) => s.weekStats);
+  const ready = useAppStore((s) => s.ready);
+  const started = useAppStore((s) => s.started);
+  const goalSeconds = useAppStore((s) => s.goalSeconds);
+  const showGoalSlider = useAppStore((s) => s.showGoalSlider);
+  const sliderMinutes = useAppStore((s) => s.sliderMinutes);
+  const focusStep = useAppStore((s) => s.focusStep);
+  const focusRemaining = useAppStore((s) => s.focusRemaining);
+  const focusTotal = useAppStore((s) => s.focusTotal);
 
-  // Focus lock state
-  type FocusStep = 'hidden' | 'pickTime' | 'active';
-  const [focusStep, setFocusStep] = useState<FocusStep>('hidden');
-  const [focusRemaining, setFocusRemaining] = useState(0);
-  const [focusTotal, setFocusTotal] = useState(0);
-  const focusEndRef = useRef(0);
-  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const sessionStartRef = useRef(Date.now());
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isActiveRef = useRef(true);
-  const startedRef = useRef(false);
 
   const theme = themes[themeMode];
   const stats = getStats(sessions);
@@ -327,15 +167,20 @@ export default function DoNothingScreen() {
   }));
 
   // --- Goal slider ---
-  const [showGoalSlider, setShowGoalSlider] = useState(false);
-  const [sliderMinutes, setSliderMinutes] = useState(5);
   const SLIDER_W = 300;
-  const goalSliderX = useSharedValue(0); // 0..1
+  const goalSliderX = useSharedValue(0);
 
-  const updateSliderMin = useCallback((mins: number) => setSliderMinutes(mins), []);
+  const lastHapticMin = useRef(0);
+  const onSliderUpdate = useCallback((mins: number) => {
+    if (mins !== lastHapticMin.current) {
+      lastHapticMin.current = mins;
+      Haptics.selectionAsync();
+    }
+    useAppStore.getState().setSliderMinutes(mins);
+  }, []);
 
-  const setGoalFromSlider = useCallback((mins: number) => {
-    setGoalSeconds(mins * 60);
+  const onSliderEnd = useCallback((mins: number) => {
+    useAppStore.getState().setGoalFromSlider(mins);
   }, []);
 
   const goalSliderGesture = Gesture.Pan()
@@ -344,12 +189,12 @@ export default function DoNothingScreen() {
       const x = Math.max(0, Math.min(1, (e.x - SLIDER_PAD) / (SLIDER_W - SLIDER_PAD * 2)));
       goalSliderX.value = x;
       const mins = Math.round(x * 60);
-      runOnJS(updateSliderMin)(mins);
+      runOnJS(onSliderUpdate)(mins);
     })
     .onEnd(() => {
       'worklet';
       const mins = Math.round(goalSliderX.value * 60);
-      runOnJS(setGoalFromSlider)(mins);
+      runOnJS(onSliderEnd)(mins);
     });
 
 
@@ -404,20 +249,16 @@ export default function DoNothingScreen() {
 
   const handleGoalToggle = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (showGoalSlider || goalSeconds > 0) {
-      // Cancel — hide slider and reset goal
-      setGoalSeconds(0);
-      setShowGoalSlider(false);
+    const s = useAppStore.getState();
+    if (s.showGoalSlider || s.goalSeconds > 0) {
+      s.cancelGoal();
       timerOpacity.value = withTiming(0.15, { duration: 300 });
     } else {
-      // Open slider with default 5 min
       goalSliderX.value = 5 / 60;
-      setSliderMinutes(5);
-      setGoalSeconds(5 * 60);
-      setShowGoalSlider(true);
+      s.openGoalSlider();
       timerOpacity.value = withTiming(0.75, { duration: 300 });
     }
-  }, [showGoalSlider, goalSeconds]);
+  }, []);
 
   // --- Message fade ---
   const messageOpacity = useSharedValue(0);
@@ -441,134 +282,55 @@ export default function DoNothingScreen() {
     opacity: messageOpacity.value,
   }));
 
-  // --- Timer ---
-  const startTimer = useCallback(() => {
-    sessionStartRef.current = Date.now();
-    setElapsed(0);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - sessionStartRef.current) / 1000));
-    }, 1000);
-  }, []);
-
-  const stopTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
   // --- Init ---
   useEffect(() => {
-    (async () => {
-      const [loadedSessions, loadedTheme] = await Promise.all([
-        loadSessions(),
-        loadTheme(),
-      ]);
-      setSessions(loadedSessions);
-      setWeekStats(getWeekStats(loadedSessions));
-      setThemeMode(loadedTheme);
-      setReady(true);
-    })();
-    return () => stopTimer();
+    useAppStore.getState().init();
   }, []);
 
   // --- AppState ---
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState) => {
-      if (
-        (nextState === 'background' || nextState === 'inactive') &&
-        isActiveRef.current
-      ) {
+      if ((nextState === 'background' || nextState === 'inactive') && isActiveRef.current) {
         isActiveRef.current = false;
-        if (startedRef.current) {
-          const duration = Math.floor(
-            (Date.now() - sessionStartRef.current) / 1000,
-          );
-          stopTimer();
-          setStarted(false);
-          startedRef.current = false;
-          const updated = await addSession(duration);
-          setSessions(updated);
-        }
+        await useAppStore.getState().handleBackground();
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
-        const loaded = await loadSessions();
-        setSessions(loaded);
-        setWeekStats(getWeekStats(loaded));
+        await useAppStore.getState().handleForeground();
       }
     });
     return () => sub.remove();
-  }, [startTimer, stopTimer]);
+  }, []);
 
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setThemeMode((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      saveTheme(next);
-      return next;
-    });
+    useAppStore.getState().toggleTheme();
   }, []);
 
   // --- Focus lock ---
   const handleLockPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFocusStep('pickTime');
+    useAppStore.getState().openFocusPicker();
   }, []);
 
-  const startFocus = useCallback((seconds: number) => {
+  const handleStartFocus = useCallback((seconds: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setFocusTotal(seconds);
-    setFocusRemaining(seconds);
-    setFocusStep('active');
-    focusEndRef.current = Date.now() + seconds * 1000;
-
-    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-    focusIntervalRef.current = setInterval(() => {
-      const left = Math.max(
-        0,
-        Math.ceil((focusEndRef.current - Date.now()) / 1000),
-      );
-      setFocusRemaining(left);
-      if (left <= 0) {
-        if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-        focusIntervalRef.current = null;
-        setFocusStep('hidden');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    }, 1000);
+    useAppStore.getState().startFocus(seconds);
   }, []);
 
   const cancelFocus = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-    focusIntervalRef.current = null;
-    setFocusStep('hidden');
-    setFocusRemaining(0);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-    };
+    useAppStore.getState().cancelFocus();
   }, []);
 
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowGoalSlider(false);
-    setStarted(true);
-    startedRef.current = true;
-    startTimer();
-  }, [startTimer]);
+    useAppStore.getState().startSession();
+  }, []);
 
   const handleStop = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const duration = Math.floor((Date.now() - sessionStartRef.current) / 1000);
-    stopTimer();
-    setStarted(false);
-    startedRef.current = false;
-    // Don't reset elapsed yet — dot needs current position for animation
+    await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
     buttonSize.value = withTiming(88, { duration: 600 });
@@ -581,11 +343,8 @@ export default function DoNothingScreen() {
     hideWidth.value = withTiming(1, { duration: 690 });
     hideOpacity.value = withTiming(1, { duration: 1125 });
     // Reset elapsed after animations finish
-    setTimeout(() => setElapsed(0), 700);
-    const updated = await addSession(duration);
-    setSessions(updated);
-    setWeekStats(getWeekStats(updated));
-  }, [stopTimer]);
+    setTimeout(() => useAppStore.getState().resetElapsed(), 700);
+  }, []);
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -726,7 +485,7 @@ export default function DoNothingScreen() {
           {FOCUS_OPTIONS.map((opt) => (
             <Pressable
               key={opt.seconds}
-              onPress={() => startFocus(opt.seconds)}
+              onPress={() => handleStartFocus(opt.seconds)}
               style={[styles.pickerOption, { borderColor: theme.cardBorder }]}
             >
               <Text style={[styles.pickerOptionText, { color: theme.text }]}>
@@ -739,7 +498,7 @@ export default function DoNothingScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setFocusStep('hidden');
+            useAppStore.getState().cancelFocus();
           }}
           style={styles.pickerCancel}
         >
@@ -1021,9 +780,6 @@ export default function DoNothingScreen() {
     <GestureDetector gesture={historyPanGesture}>
     <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
       <HistoryContent
-        theme={theme}
-        themeMode={themeMode}
-        sessions={sessions}
         onClose={handleHistoryClose}
         insets={insets}
         onScroll={historyScrollHandler}
@@ -1034,152 +790,6 @@ export default function DoNothingScreen() {
   );
 }
 
-// ===========================================================================
-// History Content (inline, not a separate route)
-// ===========================================================================
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
-
-function HistoryContent({ theme, themeMode, sessions, onClose, insets, onScroll }: {
-  theme: any; themeMode: ThemeMode; sessions: any[]; onClose: () => void; insets: any; onScroll?: any;
-}) {
-  const dailyStats = getDailyStats(sessions);
-  const totalStats = getStats(sessions);
-  const streak = getStreak(sessions);
-  const maxDuration = Math.max(...dailyStats.map((d: any) => d.duration), 1);
-  const totalAll = formatTimeStat(totalStats.year);
-
-  const ZEN_QUOTES = [
-    'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
-    'the quieter you become, the more you can hear.',
-    'in the midst of movement and chaos, keep stillness inside of you.',
-    'silence is the sleep that nourishes wisdom.',
-    'do nothing, and everything is done.',
-  ];
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
-  );
-  const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
-
-  return (
-    <AnimatedScrollView
-      style={{ flex: 1 }}
-      bounces={false}
-      overScrollMode="never"
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      contentContainerStyle={{
-        paddingHorizontal: 24,
-        paddingTop: insets.top + 8,
-        paddingBottom: insets.bottom + 40,
-      }}
-    >
-      <View style={historyStyles.headerRow}>
-        <Text style={[historyStyles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          History
-        </Text>
-        <Pressable onPress={onClose} hitSlop={16} style={historyStyles.closeButton}>
-          <Text style={[historyStyles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
-        </Pressable>
-      </View>
-
-      <View style={historyStyles.heroSection}>
-        <View style={historyStyles.heroValueRow}>
-          <Text style={[historyStyles.heroValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {totalAll.value}
-          </Text>
-          <Text style={[historyStyles.heroUnit, { color: theme.textTertiary }]}>
-            {totalAll.unit}
-          </Text>
-        </View>
-        <Text style={[historyStyles.heroLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-          total stillness
-        </Text>
-      </View>
-
-      <View style={[historyStyles.inlineStats, { borderColor: theme.border }]}>
-        {streak > 0 && (
-          <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
-            <Text style={{ color: theme.accent, fontFamily: Fonts!.serif }}>{streak}</Text>
-            {' day streak'}
-          </Text>
-        )}
-        <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
-          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.today).value}</Text>
-          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.today).unit}</Text>
-          {' today'}
-        </Text>
-        <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
-          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.week).value}</Text>
-          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.week).unit}</Text>
-          {' this week'}
-        </Text>
-      </View>
-
-      <View style={historyStyles.weekSection}>
-        <Text style={[historyStyles.sectionTitle, { color: theme.textSecondary }]}>LAST 7 DAYS</Text>
-        <View style={historyStyles.weekGrid}>
-          {dailyStats.slice(0, 7).map((day: any) => {
-            const size = day.duration > 0 ? 16 + (day.duration / maxDuration) * 28 : 6;
-            return (
-              <View key={day.date} style={historyStyles.weekDayCol}>
-                <View style={{
-                  width: size, height: size, borderRadius: size / 2,
-                  backgroundColor: day.duration > 0 ? theme.accent : theme.border,
-                }} />
-                <Text style={[historyStyles.weekDayLabel, { color: theme.textTertiary }]}>
-                  {day.label.slice(0, 3)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      <Text style={[historyStyles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
-      {dailyStats.map((day: any) => (
-        <View key={day.date} style={[historyStyles.dayRow, { borderBottomColor: theme.border }]}>
-          <Text style={[historyStyles.dayLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>{day.label}</Text>
-          <Text style={[historyStyles.dayDuration, {
-            color: day.duration > 0 ? theme.text : theme.textTertiary,
-            fontFamily: Fonts!.serif,
-          }]}>
-            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
-          </Text>
-        </View>
-      ))}
-
-      <View style={historyStyles.quoteContainer}>
-        <Text style={[historyStyles.quoteText, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-          {quote}
-        </Text>
-      </View>
-    </AnimatedScrollView>
-  );
-}
-
-const historyStyles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
-  closeButton: { padding: 4 },
-  closeText: { fontSize: 20, fontWeight: '300' },
-  heroSection: { alignItems: 'center', marginBottom: 20 },
-  heroLabel: { fontSize: 13, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
-  heroValueRow: { flexDirection: 'row', alignItems: 'baseline' },
-  heroValue: { fontSize: 64, fontWeight: '300' },
-  heroUnit: { fontSize: 20, fontWeight: '300', marginLeft: 4 },
-  inlineStats: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 32, paddingBottom: 24, borderBottomWidth: StyleSheet.hairlineWidth },
-  inlineStatText: { fontSize: 13, fontWeight: '300' },
-  weekSection: { marginBottom: 28 },
-  weekGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 60, paddingHorizontal: 8 },
-  weekDayCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1, gap: 8 },
-  weekDayLabel: { fontSize: 10, fontWeight: '400', letterSpacing: 0.5 },
-  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
-  dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  dayLabel: { fontSize: 16, fontWeight: '400' },
-  dayDuration: { fontSize: 16, fontWeight: '300' },
-  quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center' },
-  quoteText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22 },
-});
 
 const styles = StyleSheet.create({
   screenStack: {
@@ -1246,12 +856,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontStyle: 'italic',
     textAlign: 'center',
-  },
-  orbitContainer: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   orbitCenter: {
     position: 'absolute',
@@ -1436,7 +1040,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   messageSliderArea: {
-    width: 240,
+    width: 300,
     height: 40,
     marginTop: 12,
     justifyContent: 'center',
