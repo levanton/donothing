@@ -602,34 +602,44 @@ export default function DoNothingScreen() {
         faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
       />
 
-      {/* Stats — today and week, stacked above week dots */}
+      {/* Stats */}
       <Pressable onPress={handleHistory}>
-        <Animated.View style={[styles.statsRow, statsEntryStyle]}>
-          {([
-            { stat: formatTimeStat(stats.today + elapsed), label: 'today' },
-            { stat: formatTimeStat(stats.week + elapsed), label: 'week' },
-          ] as const).map((item) => (
-            <View key={item.label} style={styles.statItem}>
-              <View style={styles.statValueRow}>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: theme.text, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  {item.stat.value}
-                </Text>
-                <Text
-                  style={[styles.statUnit, { color: theme.textTertiary }]}
-                >
-                  {item.stat.unit}
-                </Text>
-              </View>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                {item.label}
+        <Animated.View style={[styles.statsColumn, statsEntryStyle]}>
+          <View style={styles.statRow}>
+            <Text
+              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
+            >
+              today:
+            </Text>
+            <View style={styles.statRowValueRow}>
+              <Text
+                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+              >
+                {formatTimeStat(stats.today + elapsed).value}
+              </Text>
+              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
+                {formatTimeStat(stats.today + elapsed).unit}
               </Text>
             </View>
-          ))}
+          </View>
+          <Text style={[styles.statDot, { color: theme.textTertiary }]}>·</Text>
+          <View style={styles.statRow}>
+            <Text
+              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
+            >
+              week:
+            </Text>
+            <View style={styles.statRowValueRow}>
+              <Text
+                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+              >
+                {formatTimeStat(stats.week + elapsed).value}
+              </Text>
+              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
+                {formatTimeStat(stats.week + elapsed).unit}
+              </Text>
+            </View>
+          </View>
         </Animated.View>
       </Pressable>
 
@@ -770,32 +780,35 @@ const styles = StyleSheet.create({
     height: RING_SIZE,
     marginTop: 24,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 32,
+  statsColumn: {
     marginTop: 36,
+    flexDirection: 'row',
+    gap: 24,
   },
-  statItem: {
-    alignItems: 'center',
+  statDot: {
+    fontSize: 18,
   },
-  statValueRow: {
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  statRowLabel: {
+    fontSize: 14,
+    fontWeight: '300',
+  },
+  statRowValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  statValue: {
-    fontSize: 28,
+  statRowValue: {
+    fontSize: 24,
     fontWeight: '300',
   },
-  statUnit: {
-    fontSize: 13,
+  statRowUnit: {
+    fontSize: 12,
     fontWeight: '300',
-    marginLeft: 2,
-  },
-  statLabel: {
-    fontSize: 10,
-    letterSpacing: 2,
-    fontWeight: '300',
-    marginTop: 4,
+    marginLeft: 3,
   },
   weekSection: {
     marginTop: 24,
