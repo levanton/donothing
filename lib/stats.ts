@@ -70,6 +70,65 @@ export function getStreak(sessions: Session[]): number {
   return streak;
 }
 
+export interface WeekDay {
+  date: string;
+  dayName: string;   // "Mon", "Tue", ...
+  duration: number;
+  isToday: boolean;
+}
+
+/** Returns current week with durations, respecting locale week start */
+export function getWeekStats(sessions: Session[], startsOnSunday?: boolean): WeekDay[] {
+  const now = new Date();
+  const todayKey = dateKey(now);
+
+  // Detect week start from device locale if not specified
+  const sundayStart = startsOnSunday ?? isSundayStartLocale();
+
+  // Find the first day of current week
+  const jsDay = now.getDay(); // 0=Sun, 1=Mon, ...
+  const offset = sundayStart ? jsDay : (jsDay === 0 ? 6 : jsDay - 1);
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - offset);
+
+  const byDay = new Map<string, number>();
+  for (const s of sessions) {
+    const key = dateKey(new Date(s.timestamp));
+    byDay.set(key, (byDay.get(key) || 0) + s.duration);
+  }
+
+  const dayNames = sundayStart
+    ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const result: WeekDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    const key = dateKey(d);
+    result.push({
+      date: key,
+      dayName: dayNames[i],
+      duration: byDay.get(key) || 0,
+      isToday: key === todayKey,
+    });
+  }
+  return result;
+}
+
+/** Heuristic: US, CA, JP, etc. start week on Sunday */
+function isSundayStartLocale(): boolean {
+  try {
+    // Intl weekInfo is not available everywhere, use locale-based heuristic
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const region = locale.split('-').pop()?.toUpperCase() ?? '';
+    const sundayCountries = ['US', 'CA', 'JP', 'IL', 'KR', 'TW', 'PH', 'SA', 'AE'];
+    return sundayCountries.includes(region);
+  } catch {
+    return false; // Default to Monday
+  }
+}
+
 export function getDailyStats(sessions: Session[], days: number = 30): DayStats[] {
   const now = new Date();
   const todayKey = dateKey(now);

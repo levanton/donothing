@@ -32,7 +32,7 @@ import {
   loadTheme,
   saveTheme,
 } from '@/lib/storage';
-import { getStats } from '@/lib/stats';
+import { getStats, getWeekStats, WeekDay } from '@/lib/stats';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -126,6 +126,7 @@ export default function DoNothingScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  const [weekStats, setWeekStats] = useState<WeekDay[]>([]);
   const [ready, setReady] = useState(false);
 
   // Focus lock state
@@ -241,6 +242,7 @@ export default function DoNothingScreen() {
         loadTheme(),
       ]);
       setSessions(loadedSessions);
+      setWeekStats(getWeekStats(loadedSessions));
       setThemeMode(loadedTheme);
       setReady(true);
       startTimer();
@@ -266,6 +268,7 @@ export default function DoNothingScreen() {
         isActiveRef.current = true;
         const loaded = await loadSessions();
         setSessions(loaded);
+        setWeekStats(getWeekStats(loaded));
         startTimer();
       }
     });
@@ -530,7 +533,7 @@ export default function DoNothingScreen() {
           { color: theme.text, fontFamily: Fonts!.serif },
         ]}
       >
-        Do Nothing
+        Doing nothing
       </Text>
 
       {/* Theme toggle — top right */}
@@ -619,8 +622,57 @@ export default function DoNothingScreen() {
         </Animated.View>
       </Pressable>
 
+      {/* Week dots */}
+      {weekStats.length > 0 && (
+        <Animated.View style={[styles.weekSection, shareEntryStyle]}>
+          <View style={styles.weekGrid}>
+            {weekStats.map((day) => {
+              const maxDur = Math.max(
+                ...weekStats.map((d) => d.duration),
+                1,
+              );
+              const size =
+                day.duration > 0
+                  ? 10 + (day.duration / maxDur) * 20
+                  : 4;
+              return (
+                <View key={day.date} style={styles.weekDayCol}>
+                  <View
+                    style={{
+                      width: size,
+                      height: size,
+                      borderRadius: size / 2,
+                      backgroundColor:
+                        day.duration > 0 ? theme.accent : theme.border,
+                    }}
+                  />
+                  <Text
+                    style={[
+                      styles.weekDayLabel,
+                      {
+                        color: day.isToday
+                          ? theme.text
+                          : theme.textTertiary,
+                      },
+                    ]}
+                  >
+                    {day.dayName}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </Animated.View>
+      )}
+
       {/* Bottom buttons */}
-      <Animated.View style={[styles.bottomButtons, shareEntryStyle]}>
+      <Animated.View
+        style={[
+          styles.bottomButtons,
+          { bottom: insets.bottom + 16 },
+          shareEntryStyle,
+        ]}
+      >
         <Pressable
           onPress={handleHistory}
           style={[styles.pillButton, { borderColor: theme.border }]}
@@ -650,13 +702,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingBottom: 24,
   },
   header: {
     fontSize: 28,
     letterSpacing: 1,
     opacity: 0.85,
     fontWeight: '400',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   lockButton: {
     position: 'absolute',
@@ -683,7 +736,7 @@ const styles = StyleSheet.create({
   messageContainer: {
     height: 24,
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 12,
   },
   message: {
     fontSize: 17,
@@ -696,7 +749,7 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 32,
+    marginTop: 24,
   },
   ringCenter: {
     width: 14,
@@ -706,7 +759,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     gap: 28,
-    marginTop: 48,
+    marginTop: 24,
     borderWidth: 1.2,
     borderRadius: 20,
     paddingVertical: 16,
@@ -734,10 +787,32 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     marginTop: 4,
   },
+  weekSection: {
+    marginTop: 24,
+    width: '100%',
+    maxWidth: 280,
+  },
+  weekGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 44,
+  },
+  weekDayCol: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
+    gap: 6,
+  },
+  weekDayLabel: {
+    fontSize: 9,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+  },
   bottomButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 48,
+    position: 'absolute',
   },
   pillButton: {
     borderWidth: 1.2,
