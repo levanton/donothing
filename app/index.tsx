@@ -22,9 +22,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import {
-  DeviceActivitySelectionView,
-} from 'react-native-device-activity';
 import { Fonts } from '@/constants/theme';
 import { themes, ThemeMode } from '@/lib/theme';
 import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
@@ -36,13 +33,6 @@ import {
   saveTheme,
 } from '@/lib/storage';
 import { getStats } from '@/lib/stats';
-import {
-  checkAvailable,
-  getAuth,
-  requestAuth,
-  blockApps,
-  unblockApps,
-} from '@/lib/screen-time';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -139,12 +129,10 @@ export default function DoNothingScreen() {
   const [ready, setReady] = useState(false);
 
   // Focus lock state
-  type FocusStep = 'hidden' | 'pickApps' | 'pickTime' | 'active';
+  type FocusStep = 'hidden' | 'pickTime' | 'active';
   const [focusStep, setFocusStep] = useState<FocusStep>('hidden');
   const [focusRemaining, setFocusRemaining] = useState(0);
   const [focusTotal, setFocusTotal] = useState(0);
-  const [screenTimeAvailable, setScreenTimeAvailable] = useState(false);
-  const [appSelection, setAppSelection] = useState<string | null>(null);
   const focusEndRef = useRef(0);
   const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -294,95 +282,42 @@ export default function DoNothingScreen() {
     });
   }, []);
 
-  // --- Screen Time availability check ---
-  useEffect(() => {
-    checkAvailable().then(setScreenTimeAvailable);
-  }, []);
-
   // --- Focus lock ---
-  const handleLockPress = useCallback(async () => {
+  const handleLockPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    if (!screenTimeAvailable) {
-      // Fallback: skip app picker, go straight to time picker
-      setFocusStep('pickTime');
-      return;
-    }
-
-    const auth = await getAuth();
-    if (auth === 'approved') {
-      setFocusStep('pickApps');
-    } else {
-      const result = await requestAuth();
-      if (result === 'approved') {
-        setFocusStep('pickApps');
-      } else {
-        // Denied — fallback to time-only focus
-        setFocusStep('pickTime');
-      }
-    }
-  }, [screenTimeAvailable]);
-
-  const handleAppsPicked = useCallback((selection: string) => {
-    setAppSelection(selection);
     setFocusStep('pickTime');
   }, []);
 
-  const startFocus = useCallback(
-    async (seconds: number) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setFocusTotal(seconds);
-      setFocusRemaining(seconds);
-      setFocusStep('active');
-      focusEndRef.current = Date.now() + seconds * 1000;
+  const startFocus = useCallback((seconds: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setFocusTotal(seconds);
+    setFocusRemaining(seconds);
+    setFocusStep('active');
+    focusEndRef.current = Date.now() + seconds * 1000;
 
-      // Block apps if selection exists
-      if (appSelection && screenTimeAvailable) {
-        try {
-          await blockApps(appSelection);
-        } catch {}
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = setInterval(() => {
+      const left = Math.max(
+        0,
+        Math.ceil((focusEndRef.current - Date.now()) / 1000),
+      );
+      setFocusRemaining(left);
+      if (left <= 0) {
+        if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+        focusIntervalRef.current = null;
+        setFocusStep('hidden');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+    }, 1000);
+  }, []);
 
-      if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
-      focusIntervalRef.current = setInterval(() => {
-        const left = Math.max(
-          0,
-          Math.ceil((focusEndRef.current - Date.now()) / 1000),
-        );
-        setFocusRemaining(left);
-        if (left <= 0) {
-          if (focusIntervalRef.current)
-            clearInterval(focusIntervalRef.current);
-          focusIntervalRef.current = null;
-          // Unblock apps
-          if (appSelection && screenTimeAvailable) {
-            unblockApps(appSelection).catch(() => {});
-          }
-          setFocusStep('hidden');
-          setAppSelection(null);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      }, 1000);
-    },
-    [appSelection, screenTimeAvailable],
-  );
-
-  const cancelFocus = useCallback(async () => {
+  const cancelFocus = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
     focusIntervalRef.current = null;
-
-    // Unblock apps
-    if (appSelection && screenTimeAvailable) {
-      try {
-        await unblockApps(appSelection);
-      } catch {}
-    }
-
     setFocusStep('hidden');
     setFocusRemaining(0);
-    setAppSelection(null);
-  }, [appSelection, screenTimeAvailable]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -436,12 +371,6 @@ export default function DoNothingScreen() {
         <Text style={[styles.focusLabel, { color: theme.textTertiary }]}>
           FOCUS MODE
         </Text>
-
-        {appSelection && (
-          <Text style={[styles.focusAppsNote, { color: theme.textTertiary }]}>
-            apps blocked
-          </Text>
-        )}
 
         {/* Circular progress */}
         <View style={{ width: ringSize, height: ringSize, marginTop: 24 }}>
@@ -513,66 +442,6 @@ export default function DoNothingScreen() {
   }
 
   // =========================================================================
-  // Focus — pick apps to block (Screen Time)
-  // =========================================================================
-  if (focusStep === 'pickApps') {
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <Text style={[styles.pickerTitle, { color: theme.text }]}>
-          Block apps
-        </Text>
-        <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
-          Select apps to block during focus
-        </Text>
-
-        <View style={styles.appPickerContainer}>
-          <DeviceActivitySelectionView
-            style={styles.appPicker}
-            onSelectionChange={(event) => {
-              const token = event.nativeEvent.familyActivitySelection;
-              if (token) handleAppsPicked(token);
-            }}
-          />
-        </View>
-
-        <View style={styles.appPickerButtons}>
-          <Pressable
-            onPress={() => {
-              // Skip app blocking, go to time picker
-              setAppSelection(null);
-              setFocusStep('pickTime');
-            }}
-            style={styles.pickerCancel}
-          >
-            <Text
-              style={[styles.pickerCancelText, { color: theme.textSecondary }]}
-            >
-              skip
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setFocusStep('hidden');
-            setAppSelection(null);
-          }}
-          style={styles.pickerCancel}
-        >
-          <Text
-            style={[styles.pickerCancelText, { color: theme.textSecondary }]}
-          >
-            cancel
-          </Text>
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  // =========================================================================
   // Focus — pick duration
   // =========================================================================
   if (focusStep === 'pickTime') {
@@ -580,13 +449,21 @@ export default function DoNothingScreen() {
       <Animated.View style={[styles.container, animatedContainerStyle]}>
         <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-        <Text style={[styles.pickerTitle, { color: theme.text }]}>
+        <Text
+          style={[
+            styles.pickerTitle,
+            { color: theme.text, fontFamily: Fonts!.serif },
+          ]}
+        >
           Lock yourself in
         </Text>
-        <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
-          {appSelection
-            ? 'Apps will be blocked. Choose duration.'
-            : 'Choose how long to do nothing'}
+        <Text
+          style={[
+            styles.pickerSubtitle,
+            { color: theme.textSecondary, fontFamily: Fonts!.serif },
+          ]}
+        >
+          Choose how long to do nothing
         </Text>
 
         <View style={styles.pickerOptions}>
@@ -607,7 +484,6 @@ export default function DoNothingScreen() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setFocusStep('hidden');
-            setAppSelection(null);
           }}
           style={styles.pickerCancel}
         >
@@ -640,7 +516,14 @@ export default function DoNothingScreen() {
       </Pressable>
 
       {/* Header */}
-      <Text style={[styles.header, { color: theme.text }]}>DO NOTHING</Text>
+      <Text
+        style={[
+          styles.header,
+          { color: theme.text, fontFamily: Fonts!.serif },
+        ]}
+      >
+        Do Nothing
+      </Text>
 
       {/* Theme toggle — top right */}
       <Pressable
@@ -669,7 +552,12 @@ export default function DoNothingScreen() {
 
       {/* Message */}
       <Animated.View style={[styles.messageContainer, messageFadeStyle]}>
-        <Text style={[styles.message, { color: theme.textSecondary }]}>
+        <Text
+          style={[
+            styles.message,
+            { color: theme.textSecondary, fontFamily: Fonts!.serif },
+          ]}
+        >
           {message}
         </Text>
       </Animated.View>
@@ -686,7 +574,12 @@ export default function DoNothingScreen() {
       <Pressable onPress={handleHistory}>
         <Animated.View style={[styles.statsRow, statsEntryStyle]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>
+            <Text
+              style={[
+                styles.statValue,
+                { color: theme.text, fontFamily: Fonts!.serif },
+              ]}
+            >
               {formatTimeStat(stats.today + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
@@ -694,7 +587,12 @@ export default function DoNothingScreen() {
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>
+            <Text
+              style={[
+                styles.statValue,
+                { color: theme.text, fontFamily: Fonts!.serif },
+              ]}
+            >
               {formatTimeStat(stats.week + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
@@ -702,7 +600,12 @@ export default function DoNothingScreen() {
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>
+            <Text
+              style={[
+                styles.statValue,
+                { color: theme.text, fontFamily: Fonts!.serif },
+              ]}
+            >
               {formatTimeStat(stats.year + elapsed)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
@@ -739,11 +642,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   header: {
-    fontSize: 10,
-    letterSpacing: 6,
-    opacity: 0.25,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontSize: 28,
+    letterSpacing: 1,
+    opacity: 0.85,
+    fontWeight: '400',
     marginBottom: 32,
   },
   lockButton: {
@@ -764,9 +666,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   timer: {
-    fontSize: 72,
+    fontSize: 64,
     fontWeight: '200',
-    letterSpacing: 2,
+    letterSpacing: 4,
   },
   messageContainer: {
     height: 24,
@@ -774,8 +676,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   message: {
-    fontSize: 16,
-    fontWeight: '300',
+    fontSize: 17,
+    fontWeight: '400',
+    fontStyle: 'italic',
     textAlign: 'center',
   },
   ringsContainer: {
@@ -786,9 +689,9 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   ringCenter: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   statsRow: {
     flexDirection: 'row',
@@ -814,25 +717,26 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   pillButton: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+    borderWidth: 1.2,
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
   },
   pillText: {
-    fontSize: 11,
-    letterSpacing: 3,
-    fontWeight: '500',
+    fontSize: 13,
+    letterSpacing: 2,
+    fontWeight: '400',
   },
   // --- Focus picker ---
   pickerTitle: {
-    fontSize: 24,
-    fontWeight: '200',
-    letterSpacing: 1,
+    fontSize: 28,
+    fontWeight: '400',
+    letterSpacing: 0.5,
   },
   pickerSubtitle: {
-    fontSize: 14,
-    fontWeight: '300',
+    fontSize: 15,
+    fontWeight: '400',
+    fontStyle: 'italic',
     marginTop: 8,
     marginBottom: 40,
   },
@@ -842,8 +746,8 @@ const styles = StyleSheet.create({
     maxWidth: 260,
   },
   pickerOption: {
-    borderWidth: 1,
-    borderRadius: 16,
+    borderWidth: 1.2,
+    borderRadius: 24,
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -860,28 +764,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '300',
   },
-  // --- App picker ---
-  appPickerContainer: {
-    width: '100%',
-    maxWidth: 300,
-    height: 340,
-    marginBottom: 16,
-  },
-  appPicker: {
-    flex: 1,
-  },
-  appPickerButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
   // --- Focus active ---
-  focusAppsNote: {
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: '400',
-    textTransform: 'uppercase',
-    marginTop: 6,
-  },
   focusLabel: {
     fontSize: 11,
     letterSpacing: 4,
@@ -912,14 +795,14 @@ const styles = StyleSheet.create({
   },
   quitButton: {
     marginTop: 48,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 10,
+    borderWidth: 1.2,
+    borderRadius: 24,
+    paddingVertical: 12,
     paddingHorizontal: 28,
   },
   quitText: {
-    fontSize: 13,
-    fontWeight: '300',
+    fontSize: 14,
+    fontWeight: '400',
     fontStyle: 'italic',
   },
 });

@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { Fonts } from '@/constants/theme';
 import { themes, ThemeMode } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { loadSessions, loadTheme } from '@/lib/storage';
@@ -82,28 +83,35 @@ export default function HistoryScreen() {
       </Pressable>
 
       {/* Title */}
-      <Text style={[styles.title, { color: theme.text }]}>History</Text>
+      <Text
+        style={[
+          styles.title,
+          { color: theme.text, fontFamily: Fonts!.serif },
+        ]}
+      >
+        History
+      </Text>
 
       {/* Summary cards */}
       <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
-          <Text style={[styles.summaryValue, { color: theme.text }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.today)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
             Today
           </Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
-          <Text style={[styles.summaryValue, { color: theme.text }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.week)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
             This Week
           </Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: theme.border }]}>
-          <Text style={[styles.summaryValue, { color: theme.text }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.year)}
           </Text>
           <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
@@ -162,9 +170,9 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '200',
-    letterSpacing: 1,
+    fontSize: 32,
+    fontWeight: '400',
+    letterSpacing: 0.5,
     marginTop: 8,
     marginBottom: 32,
   },
@@ -175,14 +183,15 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1.2,
     paddingVertical: 16,
     paddingHorizontal: 12,
     alignItems: 'center',
   },
   summaryValue: {
-    fontSize: 18,
-    fontWeight: '300',
+    fontSize: 20,
+    fontWeight: '400',
   },
   summaryLabel: {
     fontSize: 10,
