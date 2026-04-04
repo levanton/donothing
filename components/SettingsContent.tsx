@@ -92,13 +92,14 @@ function BlockPickerContent({ onConfirm, onCancel, theme }: {
   const [hour, setHour] = useState(14);
   const [minute, setMinute] = useState(0);
   const [duration, setDuration] = useState(15);
+  const MIN_DURATION = 15;
 
   const incHour = () => { Haptics.selectionAsync(); setHour((h) => (h + 1) % 24); };
   const decHour = () => { Haptics.selectionAsync(); setHour((h) => (h - 1 + 24) % 24); };
   const incMin = () => { Haptics.selectionAsync(); setMinute((m) => (m + 5) % 60); };
   const decMin = () => { Haptics.selectionAsync(); setMinute((m) => (m - 5 + 60) % 60); };
   const incDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.min(120, d + 5)); };
-  const decDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.max(5, d - 5)); };
+  const decDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.max(MIN_DURATION, d - 5)); };
 
   return (
     <View style={styles.sheetContent}>
