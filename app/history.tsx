@@ -94,7 +94,7 @@ export default function HistoryScreen() {
 
       {/* Summary cards */}
       <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
           <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.today)}
           </Text>
@@ -102,7 +102,7 @@ export default function HistoryScreen() {
             Today
           </Text>
         </View>
-        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
           <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.week)}
           </Text>
@@ -110,7 +110,7 @@ export default function HistoryScreen() {
             This Week
           </Text>
         </View>
-        <View style={[styles.summaryCard, { borderColor: theme.border }]}>
+        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
           <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatTimeStat(totalStats.year)}
           </Text>
@@ -135,13 +135,13 @@ export default function HistoryScreen() {
               {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
             </Text>
           </View>
-          <View style={[styles.barTrack, { backgroundColor: theme.border }]}>
+          <View style={[styles.barTrack, { backgroundColor: theme.subtle }]}>
             {day.duration > 0 && (
               <View
                 style={[
                   styles.barFill,
                   {
-                    backgroundColor: theme.dot,
+                    backgroundColor: theme.accent,
                     width: `${Math.max((day.duration / maxDuration) * 100, 2)}%`,
                   },
                 ]}

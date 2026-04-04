@@ -104,10 +104,10 @@ function ExpandingRing({ color, delay }: { color: string; delay: number }) {
     <Animated.View
       style={[
         {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          borderWidth: 1,
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          borderWidth: 1.5,
           borderColor: color,
           position: 'absolute',
         },
@@ -368,7 +368,7 @@ export default function DoNothingScreen() {
       <Animated.View style={[styles.container, animatedContainerStyle]}>
         <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-        <Text style={[styles.focusLabel, { color: theme.textTertiary }]}>
+        <Text style={[styles.focusLabel, { color: theme.accent }]}>
           FOCUS MODE
         </Text>
 
@@ -386,7 +386,7 @@ export default function DoNothingScreen() {
                 height: ringSize,
                 borderRadius: ringSize / 2,
                 borderWidth: strokeWidth,
-                borderColor: theme.border,
+                borderColor: theme.cardBorder,
                 position: 'absolute',
               }}
             />
@@ -409,13 +409,18 @@ export default function DoNothingScreen() {
         </View>
 
         {/* Focus message */}
-        <Text style={[styles.focusMessage, { color: theme.textSecondary }]}>
+        <Text
+          style={[
+            styles.focusMessage,
+            { color: theme.textSecondary, fontFamily: Fonts!.serif },
+          ]}
+        >
           {focusMsg}
         </Text>
 
         {/* Progress bar */}
         <View
-          style={[styles.progressTrack, { backgroundColor: theme.border }]}
+          style={[styles.progressTrack, { backgroundColor: theme.subtle }]}
         >
           <View
             style={[
@@ -431,9 +436,12 @@ export default function DoNothingScreen() {
         {/* Quit button */}
         <Pressable
           onPress={cancelFocus}
-          style={[styles.quitButton, { borderColor: theme.border }]}
+          style={[
+            styles.quitButton,
+            { backgroundColor: theme.accent, borderColor: theme.accent },
+          ]}
         >
-          <Text style={[styles.quitText, { color: theme.textSecondary }]}>
+          <Text style={[styles.quitText, { color: theme.accentText }]}>
             give up
           </Text>
         </Pressable>
@@ -471,7 +479,7 @@ export default function DoNothingScreen() {
             <Pressable
               key={opt.seconds}
               onPress={() => startFocus(opt.seconds)}
-              style={[styles.pickerOption, { borderColor: theme.border }]}
+              style={[styles.pickerOption, { borderColor: theme.cardBorder }]}
             >
               <Text style={[styles.pickerOptionText, { color: theme.text }]}>
                 {opt.label}
@@ -534,7 +542,7 @@ export default function DoNothingScreen() {
         <View
           style={[
             styles.themeCircle,
-            { backgroundColor: theme.text, opacity: 0.2 },
+            { backgroundColor: theme.accent, opacity: 0.25 },
           ]}
         />
       </Pressable>
@@ -564,10 +572,10 @@ export default function DoNothingScreen() {
 
       {/* Expanding rings */}
       <View style={styles.ringsContainer}>
-        <ExpandingRing color={theme.dot} delay={0} />
-        <ExpandingRing color={theme.dot} delay={1000} />
-        <ExpandingRing color={theme.dot} delay={2000} />
-        <View style={[styles.ringCenter, { backgroundColor: theme.dot }]} />
+        <ExpandingRing color={theme.accent} delay={0} />
+        <ExpandingRing color={theme.accent} delay={1000} />
+        <ExpandingRing color={theme.accent} delay={2000} />
+        <View style={[styles.ringCenter, { backgroundColor: theme.accent }]} />
       </View>
 
       {/* Stats */}
@@ -625,9 +633,15 @@ export default function DoNothingScreen() {
         </Pressable>
         <Pressable
           onPress={handleShare}
-          style={[styles.pillButton, { borderColor: theme.border }]}
+          style={[
+            styles.pillButton,
+            styles.pillButtonFilled,
+            { backgroundColor: theme.accent, borderColor: theme.accent },
+          ]}
         >
-          <Text style={[styles.pillText, { color: theme.text }]}>SHARE</Text>
+          <Text style={[styles.pillText, { color: theme.accentText }]}>
+            SHARE
+          </Text>
         </Pressable>
       </Animated.View>
     </Animated.View>
@@ -682,16 +696,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ringsContainer: {
-    width: 40,
-    height: 40,
+    width: 60,
+    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 32,
   },
   ringCenter: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
   statsRow: {
     flexDirection: 'row',
@@ -702,8 +716,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '300',
+    fontSize: 20,
+    fontWeight: '400',
   },
   statLabel: {
     fontSize: 10,
@@ -721,6 +735,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 12,
     paddingHorizontal: 28,
+  },
+  pillButtonFilled: {
+    borderWidth: 0,
   },
   pillText: {
     fontSize: 13,

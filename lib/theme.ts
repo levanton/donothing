@@ -3,10 +3,12 @@ export type ThemeMode = 'dark' | 'light';
 // ── Base palette ─────────────────────────────────────────────────────────
 // Change these values to re-skin the entire app in one place.
 export const palette = {
-  cream:      '#F5EFE6',
-  charcoal:   '#1C1A17',
+  cream:      '#F5EDDF',
+  charcoal:   '#3D3A36',
   brown:      '#2B2522',
   terracotta: '#C75B3A',
+  salmon:     '#E8A99A',
+  warmGray:   '#D9CFC2',
 } as const;
 
 // ── Opacity helpers ──────────────────────────────────────────────────────
@@ -25,6 +27,10 @@ export interface AppTheme {
   textTertiary: string;
   dot: string;
   border: string;
+  accent: string;
+  accentText: string;
+  cardBorder: string;
+  subtle: string;
 }
 
 export const themes: Record<ThemeMode, AppTheme> = {
@@ -35,6 +41,10 @@ export const themes: Record<ThemeMode, AppTheme> = {
     textTertiary:  alpha(palette.cream, 0.4),
     dot:           palette.terracotta,
     border:        alpha(palette.cream, 0.18),
+    accent:        palette.terracotta,
+    accentText:    palette.cream,
+    cardBorder:    alpha(palette.salmon, 0.3),
+    subtle:        alpha(palette.salmon, 0.12),
   },
   light: {
     bg:            palette.cream,
@@ -42,6 +52,10 @@ export const themes: Record<ThemeMode, AppTheme> = {
     textSecondary: alpha(palette.brown, 0.55),
     textTertiary:  alpha(palette.brown, 0.35),
     dot:           palette.terracotta,
-    border:        alpha(palette.brown, 0.25),
+    border:        alpha(palette.brown, 0.2),
+    accent:        palette.terracotta,
+    accentText:    palette.cream,
+    cardBorder:    alpha(palette.terracotta, 0.3),
+    subtle:        alpha(palette.salmon, 0.2),
   },
 };
