@@ -249,23 +249,44 @@ export default function DoNothingScreen() {
 
   // --- Goal picker (single element expands from button to card) ---
   const goalExpand = useSharedValue(0);
-  const GOAL_TX_COLLAPSED = 72; // offset right from orbitArea center
+  // Collapsed: right of play button (88/2 + 10 = 54 from orbitArea center)
+  const GOAL_LEFT = RING_SIZE / 2 + 44 + 10; // 102
+  const GOAL_TOP = (RING_SIZE - 34) / 2; // 31
+  const GOAL_W = 44;
+  const GOAL_H = 34;
+  const GOAL_EXP_W = 260;
+  const GOAL_EXP_H = 240;
+  // Center of collapsed: (102+22, 31+17) = (124, 48)
+  // Center of expanded should be orbitArea center: (48, 48)
+  // Expanded top-left without translate: (102, 31), center = (102+130, 31+120) = (232, 151)
+  // translateX = 48 - 232 = -184, translateY = 48 - 151 = -103
+  const GOAL_TX = -184;
+  const GOAL_TY = -103;
 
   const goalAnimStyle = useAnimatedStyle(() => {
     const t = goalExpand.value;
     return {
-      width: 44 + t * (260 - 44),
-      height: 34 + t * (240 - 34),
+      left: GOAL_LEFT,
+      top: GOAL_TOP,
+      width: GOAL_W + t * (GOAL_EXP_W - GOAL_W),
+      height: GOAL_H + t * (GOAL_EXP_H - GOAL_H),
       borderRadius: 17 + t * (20 - 17),
-      transform: [{ translateX: GOAL_TX_COLLAPSED * (1 - t) }],
+      transform: [
+        { translateX: t * GOAL_TX },
+        { translateY: t * GOAL_TY },
+      ],
     };
   });
 
-  const goalIconOpacityStyle = useAnimatedStyle(() => ({
-    opacity: 1 - goalExpand.value,
+  const goalNumberStyle = useAnimatedStyle(() => ({
+    fontSize: 13 + goalExpand.value * (56 - 13),
   }));
 
-  const goalContentOpacityStyle = useAnimatedStyle(() => ({
+  const goalMinStyle = useAnimatedStyle(() => ({
+    fontSize: 11 + goalExpand.value * (14 - 11),
+  }));
+
+  const goalExtrasStyle = useAnimatedStyle(() => ({
     opacity: goalExpand.value,
   }));
 
@@ -683,108 +704,112 @@ export default function DoNothingScreen() {
         </Animated.Text>
       </Animated.View>
 
-      {/* Orbit ring + unified button/dot + goal button */}
-      <View style={styles.orbitRow}>
-        <View style={styles.orbitSide} />
-        <View style={styles.orbitArea}>
-          <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
-            <OrbitRing
-              color={theme.accent}
-              faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
-              elapsed={elapsed}
-              onStop={handleStop}
-              dotProgress={dotProgress}
-            />
-          </Animated.View>
-          {/* Unified element: play button ↔ orbit dot */}
-          <Pressable
-            onPress={started ? handleStop : handleStart}
-            style={styles.orbitCenter}
+      {/* Orbit ring + unified button/dot */}
+      <View style={styles.orbitArea}>
+        <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
+          <OrbitRing
+            color={theme.accent}
+            faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
+            elapsed={elapsed}
+            onStop={handleStop}
+            dotProgress={dotProgress}
+          />
+        </Animated.View>
+        {/* Unified element: play button ↔ orbit dot */}
+        <Pressable
+          onPress={started ? handleStop : handleStart}
+          style={styles.orbitCenter}
+        >
+          <Animated.View
+            style={[
+              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
+              unifiedDotStyle,
+            ]}
           >
-            <Animated.View
-              style={[
-                { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
-                unifiedDotStyle,
-              ]}
-            >
-              <Animated.View style={{ opacity: playIconOpacity }}>
-                <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
-              </Animated.View>
+            <Animated.View style={{ opacity: playIconOpacity }}>
+              <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
             </Animated.View>
-          </Pressable>
-        </View>
-        <View style={styles.orbitSide} />
+          </Animated.View>
+        </Pressable>
 
-        {/* Goal button — lives inside orbitArea, absolute, expands to card */}
+        {/* Goal button — absolute, to the right of play button */}
         {!started && (
-          <View style={styles.goalWrapper} pointerEvents="box-none">
-            {goalExpanded && (
-              <Pressable style={styles.goalBackdrop} onPress={handleGoalClose} />
+          <Animated.View
+            style={[
+              styles.goalElement,
+              {
+                borderColor: themeMode === 'dark' ? palette.cream : palette.ink,
+                backgroundColor: theme.bg,
+              },
+              goalAnimStyle,
+            ]}
+          >
+            {/* Tap overlay for collapsed state */}
+            {!goalExpanded && (
+              <Pressable onPress={handleGoalOpen} style={StyleSheet.absoluteFill} hitSlop={16} />
             )}
+
+            {/* Title — fades in when expanded */}
+            {goalExpanded && (
+              <Animated.Text
+                style={[styles.goalTitle, { color: theme.text, fontFamily: Fonts!.serif }, goalExtrasStyle]}
+              >
+                Set timer
+              </Animated.Text>
+            )}
+
+            {/* Number + min — always visible, scales with container */}
             <Pressable
-              onPress={goalExpanded ? undefined : handleGoalOpen}
-              activeOpacity={1}
+              onPress={goalExpanded ? () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setPickerMinutes((m) => m < 60 ? m + 1 : m);
+              } : undefined}
+              onLongPress={goalExpanded ? () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setPickerMinutes((m) => Math.max(1, m - 1));
+              } : undefined}
+              style={styles.goalNumberRow}
             >
-              <Animated.View
+              <Animated.Text
                 style={[
-                  styles.goalElement,
-                  {
-                    borderColor: themeMode === 'dark' ? palette.cream : palette.ink,
-                    backgroundColor: theme.bg,
-                  },
-                  goalAnimStyle,
+                  { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '200' },
+                  goalNumberStyle,
                 ]}
               >
-                {/* Collapsed: icon */}
-                <Animated.View style={[styles.goalIconWrap, goalIconOpacityStyle]}>
-                  {goalSeconds > 0 ? (
-                    <Text style={[{ fontSize: 13, color: theme.text, fontFamily: Fonts!.serif }]}>
-                      {Math.floor(goalSeconds / 60)}m
-                    </Text>
-                  ) : (
-                    <Feather name="clock" size={14} color={themeMode === 'dark' ? palette.cream : palette.ink} />
-                  )}
-                </Animated.View>
-
-                {/* Expanded: content */}
-                {goalExpanded && (
-                  <Animated.View style={[styles.goalContent, goalContentOpacityStyle]}>
-                    <Text style={[styles.goalTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                      Set timer
-                    </Text>
-                    <Pressable
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setPickerMinutes((m) => m < 60 ? m + 1 : m);
-                      }}
-                      onLongPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setPickerMinutes((m) => Math.max(1, m - 1));
-                      }}
-                    >
-                      <Text style={[styles.goalBigNumber, { color: theme.text, fontFamily: Fonts!.mono }]}>
-                        {pickerMinutes}
-                      </Text>
-                    </Pressable>
-                    <Text style={[{ fontSize: 13, color: theme.textTertiary }]}>min</Text>
-                    <View style={styles.goalButtons}>
-                      <Pressable
-                        onPress={handleGoalSet}
-                        style={[styles.goalConfirm, { backgroundColor: theme.accent }]}
-                      >
-                        <Text style={[styles.goalConfirmText, { color: theme.accentText }]}>Set</Text>
-                      </Pressable>
-                      <Pressable onPress={handleGoalClose}>
-                        <Text style={[{ fontSize: 14, color: theme.textSecondary }]}>Cancel</Text>
-                      </Pressable>
-                    </View>
-                  </Animated.View>
-                )}
-              </Animated.View>
+                {pickerMinutes}
+              </Animated.Text>
+              <Animated.Text
+                style={[
+                  { color: theme.textTertiary },
+                  goalMinStyle,
+                ]}
+              >
+                {' '}min
+              </Animated.Text>
             </Pressable>
-          </View>
+
+            {/* Buttons — fade in when expanded */}
+            {goalExpanded && (
+              <Animated.View style={[styles.goalButtons, goalExtrasStyle]}>
+                <Pressable
+                  onPress={handleGoalSet}
+                  style={[styles.goalConfirm, { backgroundColor: theme.accent }]}
+                >
+                  <Text style={[styles.goalConfirmText, { color: theme.accentText }]}>Set</Text>
+                </Pressable>
+                <Pressable onPress={handleGoalClose}>
+                  <Text style={[{ fontSize: 14, color: theme.textSecondary }]}>Cancel</Text>
+                </Pressable>
+              </Animated.View>
+            )}
+          </Animated.View>
         )}
       </View>
+
+      {/* Goal backdrop — full screen */}
+      {goalExpanded && (
+        <Pressable style={styles.goalBackdrop} onPress={handleGoalClose} />
+      )}
 
       {/* Message */}
       <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
@@ -973,19 +998,10 @@ const styles = StyleSheet.create({
   orbitCenter: {
     position: 'absolute',
   },
-  orbitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  orbitSide: {
-    width: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   orbitArea: {
     width: RING_SIZE,
     height: RING_SIZE,
+    marginTop: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1143,36 +1159,22 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontStyle: 'italic',
   },
-  goalWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
   goalBackdrop: {
-    position: 'absolute',
-    width: 1000,
-    height: 1000,
-    left: -500,
-    top: -500,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.25)',
+    zIndex: 9,
   },
   goalElement: {
+    position: 'absolute',
     borderWidth: 1,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
-  goalIconWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goalContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    flex: 1,
+  goalNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   goalTitle: {
     fontSize: 16,
