@@ -27,7 +27,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, Path as SvgPath } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Fonts } from '@/constants/theme';
@@ -138,6 +138,81 @@ function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Wave slider — wavy progress indicator
+// ---------------------------------------------------------------------------
+const SLIDER_H = 24;
+const SLIDER_PAD = 10; // padding for thumb not to clip
+
+function GoalSliderBar({ progress, theme, width }: {
+  progress: Animated.SharedValue<number>;
+  theme: any;
+  width: number;
+}) {
+  const [p, setP] = useState(0);
+
+  useFrameCallback(() => {
+    const v = progress.value;
+    if (Math.abs(v - p) > 0.005) {
+      runOnJS(setP)(v);
+    }
+  });
+
+  const cy = SLIDER_H / 2;
+  const trackW = width - SLIDER_PAD * 2;
+  const fillX = SLIDER_PAD + p * trackW;
+  const ticks = [15, 30, 45];
+
+  return (
+    <View style={{ width, height: SLIDER_H + 20, alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width, paddingHorizontal: SLIDER_PAD - 2, marginBottom: 2 }}>
+        <Text style={{ fontSize: 12, color: theme.textTertiary }}>0</Text>
+        <Text style={{ fontSize: 12, color: theme.textTertiary }}>60</Text>
+      </View>
+      <Svg width={width} height={SLIDER_H}>
+        {/* Track */}
+        <SvgPath
+          d={`M ${SLIDER_PAD} ${cy} L ${width - SLIDER_PAD} ${cy}`}
+          stroke={theme.border}
+          strokeWidth={2}
+          strokeLinecap="round"
+        />
+        {/* Tick marks */}
+        {ticks.map((m) => {
+          const tx = SLIDER_PAD + (m / 60) * trackW;
+          return (
+            <SvgPath
+              key={m}
+              d={`M ${tx} ${cy - 4} L ${tx} ${cy + 4}`}
+              stroke={theme.border}
+              strokeWidth={1}
+            />
+          );
+        })}
+        {/* Fill */}
+        {p > 0 && (
+          <SvgPath
+            d={`M ${SLIDER_PAD} ${cy} L ${fillX} ${cy}`}
+            stroke={theme.textSecondary}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+        )}
+        {/* Thumb — hollow circle */}
+        <SvgCircle
+          cx={fillX}
+          cy={cy}
+          r={7}
+          fill={theme.bg}
+          stroke={theme.textSecondary}
+          strokeWidth={2}
+        />
+        <SvgCircle cx={fillX} cy={cy} r={2} fill={theme.textSecondary} />
+      </Svg>
+    </View>
+  );
+}
 
 // ===========================================================================
 // Main Screen
@@ -254,7 +329,7 @@ export default function DoNothingScreen() {
   // --- Goal slider ---
   const [showGoalSlider, setShowGoalSlider] = useState(false);
   const [sliderMinutes, setSliderMinutes] = useState(5);
-  const SLIDER_W = 240;
+  const SLIDER_W = 300;
   const goalSliderX = useSharedValue(0); // 0..1
 
   const updateSliderMin = useCallback((mins: number) => setSliderMinutes(mins), []);
@@ -266,7 +341,7 @@ export default function DoNothingScreen() {
   const goalSliderGesture = Gesture.Pan()
     .onUpdate((e) => {
       'worklet';
-      const x = Math.max(0, Math.min(1, (e.x) / SLIDER_W));
+      const x = Math.max(0, Math.min(1, (e.x - SLIDER_PAD) / (SLIDER_W - SLIDER_PAD * 2)));
       goalSliderX.value = x;
       const mins = Math.round(x * 60);
       runOnJS(updateSliderMin)(mins);
@@ -277,13 +352,6 @@ export default function DoNothingScreen() {
       runOnJS(setGoalFromSlider)(mins);
     });
 
-  const goalFillStyle = useAnimatedStyle(() => ({
-    width: `${goalSliderX.value * 100}%`,
-  }));
-
-  const goalThumbStyle = useAnimatedStyle(() => ({
-    left: goalSliderX.value * SLIDER_W - 10,
-  }));
 
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
@@ -827,12 +895,11 @@ export default function DoNothingScreen() {
         {showGoalSlider && !started && (
           <GestureDetector gesture={goalSliderGesture}>
             <View style={styles.goalSliderWrap}>
-              <View style={[styles.goalSliderTrack, { backgroundColor: theme.border }]}>
-                <Animated.View style={[styles.goalSliderFill, { backgroundColor: theme.accent }, goalFillStyle]} />
-              </View>
-              <Animated.View style={[styles.goalSliderThumb, goalThumbStyle]}>
-                <View style={[styles.goalSliderThumbInner, { backgroundColor: theme.accent }]} />
-              </Animated.View>
+              <GoalSliderBar
+                progress={goalSliderX}
+                theme={theme}
+                width={SLIDER_W}
+              />
             </View>
           </GestureDetector>
         )}
@@ -1378,27 +1445,6 @@ const styles = StyleSheet.create({
   goalSliderWrap: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
-  },
-  goalSliderTrack: {
-    width: '100%',
-    height: 3,
-    borderRadius: 1.5,
-  },
-  goalSliderFill: {
-    height: 3,
-    borderRadius: 1.5,
-  },
-  goalSliderThumb: {
-    position: 'absolute',
-    top: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  goalSliderThumbInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
   },
 });
