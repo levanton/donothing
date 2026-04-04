@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   type SharedValue,
   interpolateColor,
+  runOnJS,
   useAnimatedProps,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -137,6 +138,7 @@ function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: {
   );
 }
 
+
 // ===========================================================================
 // Main Screen
 // ===========================================================================
@@ -150,8 +152,6 @@ export default function DoNothingScreen() {
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [goalSeconds, setGoalSeconds] = useState(0);
-  const [goalExpanded, setGoalExpanded] = useState(false);
-  const [pickerMinutes, setPickerMinutes] = useState(5);
 
   // Focus lock state
   type FocusStep = 'hidden' | 'pickTime' | 'active';
@@ -251,52 +251,38 @@ export default function DoNothingScreen() {
     height: 28,
   }));
 
-  // --- Goal picker (single element expands from button to card) ---
-  const goalExpand = useSharedValue(0);
-  // Collapsed: right of play button (88/2 + 10 = 54 from orbitArea center)
-  // orbitArea starts at (280-96)/2 = 92 inside orbitWrap
-  // play button center = 92 + 48 = 140
-  // goal left = play center + play radius + gap = 140 + 44 + 16 = 200
-  const GOAL_LEFT = 200;
-  const GOAL_TOP = (RING_SIZE - 30) / 2; // 33
-  const GOAL_W = 52;
-  const GOAL_H = 30;
-  const GOAL_EXP_W = 260;
-  const GOAL_EXP_H = 240;
-  // Collapsed center: (200+26, 33+15) = (226, 48)
-  // Expanded center should be orbitWrap center: (140, 48)
-  // Expanded top-left without translate: (200, 33), center = (200+130, 33+120) = (330, 153)
-  // translateX = 140 - 330 = -190, translateY = 48 - 153 = -105
-  const GOAL_TX = -190;
-  const GOAL_TY = -105;
+  // --- Goal slider ---
+  const [showGoalSlider, setShowGoalSlider] = useState(false);
+  const [sliderMinutes, setSliderMinutes] = useState(5);
+  const SLIDER_W = 240;
+  const goalSliderX = useSharedValue(0); // 0..1
 
-  const goalAnimStyle = useAnimatedStyle(() => {
-    const t = goalExpand.value;
-    return {
-      left: GOAL_LEFT,
-      top: GOAL_TOP,
-      width: GOAL_W + t * (GOAL_EXP_W - GOAL_W),
-      height: GOAL_H + t * (GOAL_EXP_H - GOAL_H),
-      borderRadius: 10 + t * (20 - 10),
-      overflow: t > 0.5 ? 'hidden' : 'visible',
-      transform: [
-        { translateX: t * GOAL_TX },
-        { translateY: t * GOAL_TY },
-      ],
-    } as any;
-  });
+  const updateSliderMin = useCallback((mins: number) => setSliderMinutes(mins), []);
 
-  const goalNumberStyle = useAnimatedStyle(() => ({
-    fontSize: 15 + goalExpand.value * (56 - 15),
-    fontWeight: '400',
+  const setGoalFromSlider = useCallback((mins: number) => {
+    setGoalSeconds(mins * 60);
+  }, []);
+
+  const goalSliderGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      'worklet';
+      const x = Math.max(0, Math.min(1, (e.x) / SLIDER_W));
+      goalSliderX.value = x;
+      const mins = Math.round(x * 60);
+      runOnJS(updateSliderMin)(mins);
+    })
+    .onEnd(() => {
+      'worklet';
+      const mins = Math.round(goalSliderX.value * 60);
+      runOnJS(setGoalFromSlider)(mins);
+    });
+
+  const goalFillStyle = useAnimatedStyle(() => ({
+    width: `${goalSliderX.value * 100}%`,
   }));
 
-  const goalMinStyle = useAnimatedStyle(() => ({
-    fontSize: 12 + goalExpand.value * (18 - 12),
-  }));
-
-  const goalExtrasStyle = useAnimatedStyle(() => ({
-    opacity: goalExpand.value,
+  const goalThumbStyle = useAnimatedStyle(() => ({
+    left: goalSliderX.value * SLIDER_W - 10,
   }));
 
   // --- History slide ---
@@ -348,24 +334,22 @@ export default function DoNothingScreen() {
     },
   });
 
-  const handleGoalOpen = useCallback(() => {
+  const handleGoalToggle = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setGoalExpanded(true);
-    goalExpand.value = withTiming(1, { duration: 400 });
-  }, []);
-
-  const handleGoalClose = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    goalExpand.value = withTiming(0, { duration: 350 });
-    setTimeout(() => setGoalExpanded(false), 350);
-  }, []);
-
-  const handleGoalSet = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setGoalSeconds(pickerMinutes * 60);
-    goalExpand.value = withTiming(0, { duration: 350 });
-    setTimeout(() => setGoalExpanded(false), 350);
-  }, [pickerMinutes]);
+    if (showGoalSlider || goalSeconds > 0) {
+      // Cancel — hide slider and reset goal
+      setGoalSeconds(0);
+      setShowGoalSlider(false);
+      timerOpacity.value = withTiming(0.15, { duration: 300 });
+    } else {
+      // Open slider with default 5 min
+      goalSliderX.value = 5 / 60;
+      setSliderMinutes(5);
+      setGoalSeconds(5 * 60);
+      setShowGoalSlider(true);
+      timerOpacity.value = withTiming(0.75, { duration: 300 });
+    }
+  }, [showGoalSlider, goalSeconds]);
 
   // --- Message fade ---
   const messageOpacity = useSharedValue(0);
@@ -504,6 +488,7 @@ export default function DoNothingScreen() {
 
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowGoalSlider(false);
     setStarted(true);
     startedRef.current = true;
     startTimer();
@@ -765,7 +750,11 @@ export default function DoNothingScreen() {
             { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
           ]}
         >
-          {timerDisplay(elapsed)}
+          {showGoalSlider && !started
+            ? `${String(sliderMinutes).padStart(2, '0')}:00`
+            : goalSeconds > 0
+              ? timerDisplay(Math.max(0, goalSeconds - elapsed))
+              : timerDisplay(elapsed)}
         </Animated.Text>
       </Animated.View>
 
@@ -800,109 +789,56 @@ export default function DoNothingScreen() {
 
       </View>
 
-        {/* Goal tap area — large invisible hit target */}
-        {!started && !goalExpanded && (
-          <Pressable
-            onPress={handleGoalOpen}
-            style={{
-              position: 'absolute',
-              left: GOAL_LEFT - 16,
-              top: GOAL_TOP - 16,
-              width: GOAL_W + 32,
-              height: GOAL_H + 32,
-              zIndex: 11,
-            }}
-          />
-        )}
-
-        {/* Goal button — absolute inside orbitWrap */}
+        {/* Goal button — to the right of play */}
         {!started && (
-          <Animated.View
+          <Pressable
+            onPress={handleGoalToggle}
             style={[
-              styles.goalElement,
+              styles.goalButton,
               {
                 borderColor: theme.border,
-                backgroundColor: theme.bg,
+                backgroundColor: (showGoalSlider || goalSeconds > 0) ? theme.border : 'transparent',
               },
-              goalAnimStyle,
             ]}
+            hitSlop={20}
           >
-
-            {/* Title — fades in when expanded */}
-            {goalExpanded && (
-              <Animated.Text
-                style={[styles.goalTitle, { color: theme.text, fontFamily: Fonts!.serif }, goalExtrasStyle]}
-              >
-                Set timer
-              </Animated.Text>
-            )}
-
-            {/* Number + min — always visible, scales with container */}
-            <Pressable
-              onPress={goalExpanded ? () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setPickerMinutes((m) => m < 60 ? m + 1 : m);
-              } : undefined}
-              onLongPress={goalExpanded ? () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setPickerMinutes((m) => Math.max(1, m - 1));
-              } : undefined}
-              style={styles.goalNumberRow}
-            >
-              <Animated.Text
-                style={[
-                  { color: theme.text, fontFamily: Fonts!.mono },
-                  goalNumberStyle,
-                ]}
-              >
-                {pickerMinutes}
-              </Animated.Text>
-              <Animated.Text
-                style={[
-                  { color: theme.textTertiary },
-                  goalMinStyle,
-                ]}
-              >
-                {' '}min
-              </Animated.Text>
-            </Pressable>
-
-            {/* Buttons — fade in when expanded */}
-            {goalExpanded && (
-              <Animated.View style={[styles.goalButtons, goalExtrasStyle]}>
-                <Pressable
-                  onPress={handleGoalSet}
-                  style={[styles.goalConfirm, { backgroundColor: theme.accent }]}
-                >
-                  <Text style={[styles.goalConfirmText, { color: theme.accentText }]}>Set</Text>
-                </Pressable>
-                <Pressable onPress={handleGoalClose}>
-                  <Text style={[{ fontSize: 14, color: theme.textSecondary }]}>Cancel</Text>
-                </Pressable>
-              </Animated.View>
-            )}
-          </Animated.View>
+            <Text style={[styles.goalButtonText, {
+              color: theme.text,
+              fontFamily: Fonts!.serif,
+            }]}>
+              {(showGoalSlider || goalSeconds > 0) ? 'cancel' : 'goal'}
+            </Text>
+          </Pressable>
         )}
       </View>
 
-      {/* Goal backdrop — full screen */}
-      {goalExpanded && (
-        <Pressable style={styles.goalBackdrop} onPress={handleGoalClose} />
-      )}
+      {/* Message + goal slider overlay */}
+      <View style={styles.messageSliderArea}>
+        <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
+          <Text
+            style={[
+              styles.message,
+              { color: theme.textSecondary, fontFamily: Fonts!.serif },
+            ]}
+          >
+            {message}
+          </Text>
+        </Animated.View>
+        {showGoalSlider && !started && (
+          <GestureDetector gesture={goalSliderGesture}>
+            <View style={styles.goalSliderWrap}>
+              <View style={[styles.goalSliderTrack, { backgroundColor: theme.border }]}>
+                <Animated.View style={[styles.goalSliderFill, { backgroundColor: theme.accent }, goalFillStyle]} />
+              </View>
+              <Animated.View style={[styles.goalSliderThumb, goalThumbStyle]}>
+                <View style={[styles.goalSliderThumbInner, { backgroundColor: theme.accent }]} />
+              </Animated.View>
+            </View>
+          </GestureDetector>
+        )}
+      </View>
 
-      {/* Message */}
-      <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
-        <Text
-          style={[
-            styles.message,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          {message}
-        </Text>
-      </Animated.View>
-
-      {/* Stats */}
+      {/* Stats — with goal slider overlaid */}
       <Pressable onPress={handleHistory}>
         <View style={styles.statsColumn}>
           <View style={styles.statRow}>
@@ -1010,6 +946,7 @@ export default function DoNothingScreen() {
           </Text>
         </Pressable>
       </View>
+
     </Animated.View>
     </GestureDetector>
 
@@ -1236,7 +1173,6 @@ const styles = StyleSheet.create({
   messageContainer: {
     height: 24,
     justifyContent: 'center',
-    marginTop: 12,
   },
   message: {
     fontSize: 17,
@@ -1420,44 +1356,49 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontStyle: 'italic',
   },
-  goalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    zIndex: 9,
-  },
-  goalElement: {
+  goalButton: {
     position: 'absolute',
+    right: 15,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    zIndex: 10,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  goalNumberRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  goalTitle: {
-    fontSize: 16,
+  goalButtonText: {
+    fontSize: 13,
     fontWeight: '400',
   },
-  goalBigNumber: {
-    fontSize: 56,
-    fontWeight: '200',
-  },
-  goalButtons: {
-    flexDirection: 'row',
+  messageSliderArea: {
+    width: 240,
+    height: 40,
+    marginTop: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
-    marginTop: 8,
   },
-  goalConfirm: {
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
+  goalSliderWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
   },
-  goalConfirmText: {
-    fontSize: 15,
-    fontWeight: '500',
+  goalSliderTrack: {
+    width: '100%',
+    height: 3,
+    borderRadius: 1.5,
+  },
+  goalSliderFill: {
+    height: 3,
+    borderRadius: 1.5,
+  },
+  goalSliderThumb: {
+    position: 'absolute',
+    top: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goalSliderThumbInner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
 });
