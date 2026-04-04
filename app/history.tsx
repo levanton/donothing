@@ -107,11 +107,8 @@ export default function HistoryScreen() {
         </Pressable>
       </View>
 
-      {/* Hero — total time */}
-      <View style={[styles.heroCard, { borderColor: theme.border }]}>
-        <Text style={[styles.heroLabel, { color: theme.textTertiary }]}>
-          total stillness
-        </Text>
+      {/* Hero — total time, no card */}
+      <View style={styles.heroSection}>
         <View style={styles.heroValueRow}>
           <Text
             style={[
@@ -125,69 +122,44 @@ export default function HistoryScreen() {
             {totalAll.unit}
           </Text>
         </View>
+        <Text
+          style={[
+            styles.heroLabel,
+            { color: theme.textTertiary, fontFamily: Fonts!.serif },
+          ]}
+        >
+          total stillness
+        </Text>
       </View>
 
-      {/* Streak + stats row */}
-      <View style={styles.miniStatsRow}>
-        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
-          <Text
-            style={[
-              styles.miniStatValue,
-              { color: theme.accent, fontFamily: Fonts!.serif },
-            ]}
-          >
-            {streak}
+      {/* Inline stats */}
+      <View style={[styles.inlineStats, { borderColor: theme.border }]}>
+        {streak > 0 && (
+          <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
+            <Text style={{ color: theme.accent, fontFamily: Fonts!.serif }}>
+              {streak}
+            </Text>
+            {' day streak'}
           </Text>
-          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
-            day streak
+        )}
+        <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
+          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>
+            {formatTimeStat(totalStats.today).value}
           </Text>
-        </View>
-        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
-          {(() => {
-            const t = formatTimeStat(totalStats.today);
-            return (
-              <View style={styles.miniValueRow}>
-                <Text
-                  style={[
-                    styles.miniStatValue,
-                    { color: theme.text, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  {t.value}
-                </Text>
-                <Text style={[styles.miniStatUnit, { color: theme.textTertiary }]}>
-                  {t.unit}
-                </Text>
-              </View>
-            );
-          })()}
-          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
-            today
+          <Text style={{ color: theme.textTertiary }}>
+            {' '}{formatTimeStat(totalStats.today).unit}
           </Text>
-        </View>
-        <View style={[styles.miniStatCard, { borderColor: theme.border }]}>
-          {(() => {
-            const w = formatTimeStat(totalStats.week);
-            return (
-              <View style={styles.miniValueRow}>
-                <Text
-                  style={[
-                    styles.miniStatValue,
-                    { color: theme.text, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  {w.value}
-                </Text>
-                <Text style={[styles.miniStatUnit, { color: theme.textTertiary }]}>
-                  {w.unit}
-                </Text>
-              </View>
-            );
-          })()}
-          <Text style={[styles.miniStatLabel, { color: theme.textSecondary }]}>
-            this week
+          {' today'}
+        </Text>
+        <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
+          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>
+            {formatTimeStat(totalStats.week).value}
           </Text>
-        </View>
+          <Text style={{ color: theme.textTertiary }}>
+            {' '}{formatTimeStat(totalStats.week).unit}
+          </Text>
+          {' this week'}
+        </Text>
       </View>
 
       {/* Week dots */}
@@ -299,64 +271,41 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   // --- Hero ---
-  heroCard: {
-    borderWidth: 1.2,
-    borderRadius: 20,
-    paddingVertical: 28,
+  heroSection: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   heroLabel: {
-    fontSize: 11,
-    letterSpacing: 2,
+    fontSize: 13,
     fontWeight: '300',
-    marginBottom: 8,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   heroValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   heroValue: {
-    fontSize: 56,
+    fontSize: 64,
     fontWeight: '300',
   },
   heroUnit: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '300',
     marginLeft: 4,
   },
-  // --- Mini stats ---
-  miniStatsRow: {
+  // --- Inline stats ---
+  inlineStats: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 28,
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 32,
+    paddingBottom: 24,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  miniStatCard: {
-    flex: 1,
-    borderWidth: 1.2,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  miniValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  miniStatValue: {
-    fontSize: 22,
-    fontWeight: '400',
-  },
-  miniStatUnit: {
-    fontSize: 11,
+  inlineStatText: {
+    fontSize: 13,
     fontWeight: '300',
-    marginLeft: 2,
-  },
-  miniStatLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    fontWeight: '300',
-    marginTop: 4,
   },
   // --- Week dots ---
   weekSection: {
