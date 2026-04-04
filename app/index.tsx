@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   type SharedValue,
   interpolateColor,
-  runOnJS,
   useAnimatedProps,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -153,7 +152,6 @@ export default function DoNothingScreen() {
   const [goalSeconds, setGoalSeconds] = useState(0);
   const [goalExpanded, setGoalExpanded] = useState(false);
   const [pickerMinutes, setPickerMinutes] = useState(5);
-  const [showHistory, setShowHistory] = useState(false);
 
   // Focus lock state
   type FocusStep = 'hidden' | 'pickTime' | 'active';
@@ -315,15 +313,8 @@ export default function DoNothingScreen() {
   }));
 
   // Swipe up on main → open history
-  const showHistoryJS = useCallback(() => setShowHistory(true), []);
-  const hideHistoryJS = useCallback(() => setShowHistory(false), []);
-
   const mainPanGesture = Gesture.Pan()
     .activeOffsetY([-30, 10000])
-    .onStart(() => {
-      'worklet';
-      runOnJS(showHistoryJS)();
-    })
     .onUpdate((e) => {
       'worklet';
       const drag = -e.translationY / SCREEN_H;
@@ -332,12 +323,7 @@ export default function DoNothingScreen() {
     .onEnd((e) => {
       'worklet';
       const shouldOpen = historySlide.value > 0.3 || -e.velocityY > 500;
-      if (shouldOpen) {
-        historySlide.value = withTiming(1, { duration: 300 });
-      } else {
-        historySlide.value = withTiming(0, { duration: 300 });
-        runOnJS(hideHistoryJS)();
-      }
+      historySlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
     });
 
   // Swipe down on history → close (only when scrolled to top)
@@ -353,12 +339,7 @@ export default function DoNothingScreen() {
       'worklet';
       if (historyScrollY.value > 5) return;
       const shouldClose = historySlide.value < 0.7 || e.velocityY > 500;
-      if (shouldClose) {
-        historySlide.value = withTiming(0, { duration: 300 });
-        runOnJS(hideHistoryJS)();
-      } else {
-        historySlide.value = withTiming(1, { duration: 300 });
-      }
+      historySlide.value = withTiming(shouldClose ? 0 : 1, { duration: 300 });
     });
 
   const historyScrollHandler = useAnimatedScrollHandler({
@@ -555,14 +536,12 @@ export default function DoNothingScreen() {
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowHistory(true);
     historySlide.value = withTiming(1, { duration: 500 });
   }, []);
 
   const handleHistoryClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     historySlide.value = withTiming(0, { duration: 400 });
-    setTimeout(() => setShowHistory(false), 400);
   }, []);
 
   if (!ready) {
@@ -1034,21 +1013,19 @@ export default function DoNothingScreen() {
     </Animated.View>
     </GestureDetector>
 
-    {/* History screen — slides up from below, pushing main screen up */}
-    {showHistory && (
-      <GestureDetector gesture={historyPanGesture}>
-      <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
-        <HistoryContent
-          theme={theme}
-          themeMode={themeMode}
-          sessions={sessions}
-          onClose={handleHistoryClose}
-          insets={insets}
-          onScroll={historyScrollHandler}
-        />
-      </Animated.View>
-      </GestureDetector>
-    )}
+    {/* History screen — always rendered, positioned off-screen when hidden */}
+    <GestureDetector gesture={historyPanGesture}>
+    <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
+      <HistoryContent
+        theme={theme}
+        themeMode={themeMode}
+        sessions={sessions}
+        onClose={handleHistoryClose}
+        insets={insets}
+        onScroll={historyScrollHandler}
+      />
+    </Animated.View>
+    </GestureDetector>
     </GestureHandlerRootView>
   );
 }
