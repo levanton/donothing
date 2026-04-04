@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     marginLeft: 3,
   },
   weekSection: {
-    marginTop: 24,
+    marginTop: 32,
     width: '100%',
     maxWidth: 280,
   },
