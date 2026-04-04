@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  type SharedValue,
   interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
@@ -71,12 +72,13 @@ const RING_STROKE = 3;
 const RING_CIRC = 2 * Math.PI * RING_R;
 const RING_PERIOD = 15; // seconds per full revolution
 
-function OrbitRing({ color, faintColor, elapsed, onStop }: { color: string; faintColor: string; elapsed: number; onStop?: () => void }) {
+function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: {
+  color: string; faintColor: string; elapsed: number;
+  onStop?: () => void; dotProgress: SharedValue<number>;
+}) {
   const cx = RING_SIZE / 2;
   const cy = RING_SIZE / 2;
 
-  // Smooth sub-second interpolation via frame callback
-  const smoothProgress = useSharedValue(0);
   const smoothLap = useSharedValue(0);
   const lastElapsed = useSharedValue(elapsed);
 
@@ -85,10 +87,9 @@ function OrbitRing({ color, faintColor, elapsed, onStop }: { color: string; fain
   }, [elapsed]);
 
   useFrameCallback((info) => {
-    // Interpolate between whole seconds for smooth motion
     const fracSecond = (info.timeSinceFirstFrame % 1000) / 1000;
     const totalSeconds = lastElapsed.value + fracSecond;
-    smoothProgress.value = (totalSeconds % RING_PERIOD) / RING_PERIOD;
+    dotProgress.value = (totalSeconds % RING_PERIOD) / RING_PERIOD;
     smoothLap.value = Math.floor(totalSeconds / RING_PERIOD);
   });
 
@@ -98,21 +99,8 @@ function OrbitRing({ color, faintColor, elapsed, onStop }: { color: string; fain
 
   const leadingProps = useAnimatedProps(() => ({
     stroke: smoothLap.value % 2 === 0 ? color : faintColor,
-    strokeDashoffset: RING_CIRC * (1 - smoothProgress.value),
+    strokeDashoffset: RING_CIRC * (1 - dotProgress.value),
   }));
-
-  const dotStyle = useAnimatedStyle(() => {
-    const rad = smoothProgress.value * 2 * Math.PI;
-    return {
-      position: 'absolute',
-      left: cx + Math.cos(rad - Math.PI / 2) * RING_R - 6,
-      top: cy + Math.sin(rad - Math.PI / 2) * RING_R - 6,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: color,
-    };
-  });
 
   return (
     <Pressable onPress={onStop} style={styles.orbitContainer}>
@@ -138,7 +126,6 @@ function OrbitRing({ color, faintColor, elapsed, onStop }: { color: string; fain
           animatedProps={leadingProps}
         />
       </Svg>
-      <Animated.View style={dotStyle} />
       <View style={styles.orbitCenter}>
         <Feather name="square" size={16} color={color} style={{ opacity: 0.2 }} />
       </View>
@@ -195,22 +182,28 @@ export default function DoNothingScreen() {
 
   // --- Entry animations ---
   const timerOpacity = useSharedValue(0);
-  const startButtonOpacity = useSharedValue(1);
+  const dotProgress = useSharedValue(0);
+  const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
+  const buttonSize = useSharedValue(88);     // 88 = button, 12 = dot
+  const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
-  const hideOpacity = useSharedValue(1);    // "Ready to " and "?"
-  const hideWidth = useSharedValue(1);      // 1 = natural, 0 = collapsed
-  const showOpacity = useSharedValue(0);    // "ing"
+  const hideOpacity = useSharedValue(1);
+  const hideWidth = useSharedValue(1);
+  const showOpacity = useSharedValue(0);
   const showWidth = useSharedValue(0);
 
   useEffect(() => {
     if (!started) return;
-    startButtonOpacity.value = withTiming(0, { duration: 900 });
+    // Button shrinks to dot and starts orbiting
+    buttonSize.value = withTiming(12, { duration: 600 });
+    playIconOpacity.value = withTiming(0, { duration: 300 });
+    orbitAmount.value = withTiming(1, { duration: 600 });
+    // Timer and ring appear
     timerOpacity.value = withTiming(1, { duration: 1150 });
-    // Phase 1: disappearing — fade out, then collapse
+    // Header text morph
     hideOpacity.value = withTiming(0, { duration: 400 });
     hideWidth.value = withTiming(0, { duration: 860 });
-    // Phase 2: appearing — expand then fade in
     showWidth.value = withTiming(1, { duration: 690 });
     showOpacity.value = withTiming(1, { duration: 1150 });
   }, [started]);
@@ -219,9 +212,21 @@ export default function DoNothingScreen() {
     opacity: timerOpacity.value,
   }));
 
-  const startButtonStyle = useAnimatedStyle(() => ({
-    opacity: startButtonOpacity.value,
-  }));
+  const unifiedDotStyle = useAnimatedStyle(() => {
+    const rad = dotProgress.value * 2 * Math.PI;
+    const orbitX = Math.sin(rad) * RING_R;
+    const orbitY = -Math.cos(rad) * RING_R;
+    const s = buttonSize.value;
+    return {
+      width: s,
+      height: s,
+      borderRadius: s / 2,
+      transform: [
+        { translateX: orbitAmount.value * orbitX },
+        { translateY: orbitAmount.value * orbitY },
+      ],
+    };
+  });
 
   // "Ready to " and "?" — fade then collapse
   const hideStyle = useAnimatedStyle(() => ({
@@ -389,8 +394,11 @@ export default function DoNothingScreen() {
     startedRef.current = false;
     setElapsed(0);
     // Reverse: same durations, opposite direction
-    timerOpacity.value = withTiming(0, { duration: 1150 });
-    startButtonOpacity.value = withTiming(1, { duration: 900 });
+    // Dot grows back to button
+    orbitAmount.value = withTiming(0, { duration: 600 });
+    buttonSize.value = withTiming(88, { duration: 600 });
+    playIconOpacity.value = withTiming(1, { duration: 900 });
+    timerOpacity.value = withTiming(0, { duration: 700 });
     // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
@@ -618,48 +626,58 @@ export default function DoNothingScreen() {
         />
       </Pressable>
 
-      <View style={styles.centerArea}>
-        {/* Timer + message + ring */}
-        <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-          <Animated.Text
-            style={[
-              styles.timer,
-              { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
-            ]}
-          >
-            {timerDisplay(elapsed)}
-          </Animated.Text>
+      {/* Timer */}
+      <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+        <Animated.Text
+          style={[
+            styles.timer,
+            { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
+          ]}
+        >
+          {timerDisplay(elapsed)}
+        </Animated.Text>
+      </Animated.View>
 
-          <Animated.View style={[styles.messageContainer, messageFadeStyle]}>
-            <Text
-              style={[
-                styles.message,
-                { color: theme.textSecondary, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {message}
-            </Text>
-          </Animated.View>
-
+      {/* Orbit ring + unified button/dot */}
+      <View style={styles.orbitArea}>
+        <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
           <OrbitRing
             color={theme.accent}
             faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
             elapsed={elapsed}
             onStop={handleStop}
+            dotProgress={dotProgress}
           />
         </Animated.View>
-
-        {/* Start button — overlaid on same area */}
-        {!started && (
-          <Animated.View style={[styles.startOverlay, startButtonStyle]}>
-            <Pressable onPress={handleStart}>
-              <View style={[styles.startButton, { backgroundColor: theme.accent }]}>
-                <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
-              </View>
-            </Pressable>
+        {/* Unified element: play button ↔ orbit dot */}
+        <Pressable
+          onPress={started ? handleStop : handleStart}
+          style={styles.orbitCenter}
+        >
+          <Animated.View
+            style={[
+              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
+              unifiedDotStyle,
+            ]}
+          >
+            <Animated.View style={{ opacity: playIconOpacity }}>
+              <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
+            </Animated.View>
           </Animated.View>
-        )}
+        </Pressable>
       </View>
+
+      {/* Message */}
+      <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
+        <Text
+          style={[
+            styles.message,
+            { color: theme.textSecondary, fontFamily: Fonts!.serif },
+          ]}
+        >
+          {message}
+        </Text>
+      </Animated.View>
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
@@ -830,29 +848,20 @@ const styles = StyleSheet.create({
   orbitContainer: {
     width: RING_SIZE,
     height: RING_SIZE,
-    marginTop: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   orbitCenter: {
     position: 'absolute',
   },
-  centerArea: {
+  orbitArea: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    marginTop: 24,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   centerContent: {
-    alignItems: 'center',
-  },
-  startOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  startButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    justifyContent: 'center',
     alignItems: 'center',
   },
   statsColumn: {
