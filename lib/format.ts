@@ -25,9 +25,12 @@ export function formatTimeShort(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
-/** For stats display — always show hours and minutes, e.g. "0h 0m", "1h 23m" */
-export function formatTimeStat(seconds: number): string {
+/** For stats display — returns { value, unit } for split rendering */
+export function formatTimeStat(seconds: number): { value: string; unit: string } {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return `${h}h ${m}m`;
+
+  if (h === 0) return { value: `${m}`, unit: 'min' };
+  if (m === 0) return { value: `${h}`, unit: 'hr' };
+  return { value: `${h}:${String(m).padStart(2, '0')}`, unit: 'hr' };
 }

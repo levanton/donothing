@@ -94,30 +94,25 @@ export default function HistoryScreen() {
 
       {/* Summary cards */}
       <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
-          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {formatTimeStat(totalStats.today)}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-            Today
-          </Text>
-        </View>
-        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
-          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {formatTimeStat(totalStats.week)}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-            This Week
-          </Text>
-        </View>
-        <View style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
-          <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {formatTimeStat(totalStats.year)}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-            This Year
-          </Text>
-        </View>
+        {([
+          { stat: formatTimeStat(totalStats.today), label: 'Today' },
+          { stat: formatTimeStat(totalStats.week), label: 'This Week' },
+          { stat: formatTimeStat(totalStats.year), label: 'This Year' },
+        ] as const).map((item) => (
+          <View key={item.label} style={[styles.summaryCard, { borderColor: theme.cardBorder }]}>
+            <View style={styles.summaryValueRow}>
+              <Text style={[styles.summaryValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                {item.stat.value}
+              </Text>
+              <Text style={[styles.summaryUnit, { color: theme.textTertiary }]}>
+                {item.stat.unit}
+              </Text>
+            </View>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              {item.label}
+            </Text>
+          </View>
+        ))}
       </View>
 
       {/* Daily list */}
@@ -189,9 +184,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
   },
+  summaryValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
   summaryValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '400',
+  },
+  summaryUnit: {
+    fontSize: 11,
+    fontWeight: '300',
+    marginLeft: 2,
   },
   summaryLabel: {
     fontSize: 10,

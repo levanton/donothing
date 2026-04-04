@@ -580,46 +580,42 @@ export default function DoNothingScreen() {
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
-        <Animated.View style={[styles.statsRow, statsEntryStyle]}>
-          <View style={styles.statItem}>
-            <Text
-              style={[
-                styles.statValue,
-                { color: theme.text, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {formatTimeStat(stats.today + elapsed)}
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Today
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text
-              style={[
-                styles.statValue,
-                { color: theme.text, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {formatTimeStat(stats.week + elapsed)}
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              This Week
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text
-              style={[
-                styles.statValue,
-                { color: theme.text, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {formatTimeStat(stats.year + elapsed)}
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              This Year
-            </Text>
-          </View>
+        <Animated.View
+          style={[
+            styles.statsContainer,
+            { borderColor: theme.border },
+            statsEntryStyle,
+          ]}
+        >
+          {([
+            { stat: formatTimeStat(stats.today + elapsed), label: 'today' },
+            { stat: formatTimeStat(stats.week + elapsed), label: 'week' },
+            { stat: formatTimeStat(stats.year + elapsed), label: 'year' },
+          ] as const).map((item) => (
+            <View key={item.label} style={styles.statItem}>
+              <View style={styles.statValueRow}>
+                <Text
+                  style={[
+                    styles.statValue,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  {item.stat.value}
+                </Text>
+                <Text
+                  style={[
+                    styles.statUnit,
+                    { color: theme.textTertiary },
+                  ]}
+                >
+                  {item.stat.unit}
+                </Text>
+              </View>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                {item.label}
+              </Text>
+            </View>
+          ))}
         </Animated.View>
       </Pressable>
 
@@ -707,23 +703,36 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
   },
-  statsRow: {
+  statsContainer: {
     flexDirection: 'row',
-    gap: 32,
+    gap: 28,
     marginTop: 48,
+    borderWidth: 1.2,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   statItem: {
     alignItems: 'center',
   },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
   statValue: {
-    fontSize: 20,
-    fontWeight: '400',
+    fontSize: 28,
+    fontWeight: '300',
+  },
+  statUnit: {
+    fontSize: 13,
+    fontWeight: '300',
+    marginLeft: 2,
   },
   statLabel: {
     fontSize: 10,
     letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: 6,
+    fontWeight: '300',
+    marginTop: 4,
   },
   bottomButtons: {
     flexDirection: 'row',
