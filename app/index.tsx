@@ -145,6 +145,9 @@ export default function DoNothingScreen() {
   const [weekStats, setWeekStats] = useState<WeekDay[]>([]);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
+  const [goalSeconds, setGoalSeconds] = useState(0);
+  const [goalExpanded, setGoalExpanded] = useState(false);
+  const [pickerMinutes, setPickerMinutes] = useState(5);
 
   // Focus lock state
   type FocusStep = 'hidden' | 'pickTime' | 'active';
@@ -243,6 +246,47 @@ export default function DoNothingScreen() {
     overflow: 'hidden' as const,
     height: 28,
   }));
+
+  // --- Goal picker (single element expands from button to card) ---
+  const goalExpand = useSharedValue(0);
+  const GOAL_TX_COLLAPSED = 72; // offset right from orbitArea center
+
+  const goalAnimStyle = useAnimatedStyle(() => {
+    const t = goalExpand.value;
+    return {
+      width: 44 + t * (260 - 44),
+      height: 34 + t * (240 - 34),
+      borderRadius: 17 + t * (20 - 17),
+      transform: [{ translateX: GOAL_TX_COLLAPSED * (1 - t) }],
+    };
+  });
+
+  const goalIconOpacityStyle = useAnimatedStyle(() => ({
+    opacity: 1 - goalExpand.value,
+  }));
+
+  const goalContentOpacityStyle = useAnimatedStyle(() => ({
+    opacity: goalExpand.value,
+  }));
+
+  const handleGoalOpen = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setGoalExpanded(true);
+    goalExpand.value = withTiming(1, { duration: 400 });
+  }, []);
+
+  const handleGoalClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    goalExpand.value = withTiming(0, { duration: 350 });
+    setTimeout(() => setGoalExpanded(false), 350);
+  }, []);
+
+  const handleGoalSet = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGoalSeconds(pickerMinutes * 60);
+    goalExpand.value = withTiming(0, { duration: 350 });
+    setTimeout(() => setGoalExpanded(false), 350);
+  }, [pickerMinutes]);
 
   // --- Message fade ---
   const messageOpacity = useSharedValue(0);
@@ -639,33 +683,107 @@ export default function DoNothingScreen() {
         </Animated.Text>
       </Animated.View>
 
-      {/* Orbit ring + unified button/dot */}
-      <View style={styles.orbitArea}>
-        <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
-          <OrbitRing
-            color={theme.accent}
-            faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
-            elapsed={elapsed}
-            onStop={handleStop}
-            dotProgress={dotProgress}
-          />
-        </Animated.View>
-        {/* Unified element: play button ↔ orbit dot */}
-        <Pressable
-          onPress={started ? handleStop : handleStart}
-          style={styles.orbitCenter}
-        >
-          <Animated.View
-            style={[
-              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
-              unifiedDotStyle,
-            ]}
-          >
-            <Animated.View style={{ opacity: playIconOpacity }}>
-              <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
-            </Animated.View>
+      {/* Orbit ring + unified button/dot + goal button */}
+      <View style={styles.orbitRow}>
+        <View style={styles.orbitSide} />
+        <View style={styles.orbitArea}>
+          <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
+            <OrbitRing
+              color={theme.accent}
+              faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
+              elapsed={elapsed}
+              onStop={handleStop}
+              dotProgress={dotProgress}
+            />
           </Animated.View>
-        </Pressable>
+          {/* Unified element: play button ↔ orbit dot */}
+          <Pressable
+            onPress={started ? handleStop : handleStart}
+            style={styles.orbitCenter}
+          >
+            <Animated.View
+              style={[
+                { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
+                unifiedDotStyle,
+              ]}
+            >
+              <Animated.View style={{ opacity: playIconOpacity }}>
+                <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
+              </Animated.View>
+            </Animated.View>
+          </Pressable>
+        </View>
+        <View style={styles.orbitSide} />
+
+        {/* Goal button — lives inside orbitArea, absolute, expands to card */}
+        {!started && (
+          <View style={styles.goalWrapper} pointerEvents="box-none">
+            {goalExpanded && (
+              <Pressable style={styles.goalBackdrop} onPress={handleGoalClose} />
+            )}
+            <Pressable
+              onPress={goalExpanded ? undefined : handleGoalOpen}
+              activeOpacity={1}
+            >
+              <Animated.View
+                style={[
+                  styles.goalElement,
+                  {
+                    borderColor: themeMode === 'dark' ? palette.cream : palette.ink,
+                    backgroundColor: theme.bg,
+                  },
+                  goalAnimStyle,
+                ]}
+              >
+                {/* Collapsed: icon */}
+                <Animated.View style={[styles.goalIconWrap, goalIconOpacityStyle]}>
+                  {goalSeconds > 0 ? (
+                    <Text style={[{ fontSize: 13, color: theme.text, fontFamily: Fonts!.serif }]}>
+                      {Math.floor(goalSeconds / 60)}m
+                    </Text>
+                  ) : (
+                    <Feather name="clock" size={14} color={themeMode === 'dark' ? palette.cream : palette.ink} />
+                  )}
+                </Animated.View>
+
+                {/* Expanded: content */}
+                {goalExpanded && (
+                  <Animated.View style={[styles.goalContent, goalContentOpacityStyle]}>
+                    <Text style={[styles.goalTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                      Set timer
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setPickerMinutes((m) => m < 60 ? m + 1 : m);
+                      }}
+                      onLongPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setPickerMinutes((m) => Math.max(1, m - 1));
+                      }}
+                    >
+                      <Text style={[styles.goalBigNumber, { color: theme.text, fontFamily: Fonts!.mono }]}>
+                        {pickerMinutes}
+                      </Text>
+                    </Pressable>
+                    <Text style={[{ fontSize: 13, color: theme.textTertiary }]}>min</Text>
+                    <View style={styles.goalButtons}>
+                      <Pressable
+                        onPress={handleGoalSet}
+                        style={[styles.goalConfirm, { backgroundColor: theme.accent }]}
+                      >
+                        <Text style={[styles.goalConfirmText, { color: theme.accentText }]}>Set</Text>
+                      </Pressable>
+                      <Pressable onPress={handleGoalClose}>
+                        <Text style={[{ fontSize: 14, color: theme.textSecondary }]}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  </Animated.View>
+                )}
+              </Animated.View>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {/* Message */}
@@ -855,10 +973,19 @@ const styles = StyleSheet.create({
   orbitCenter: {
     position: 'absolute',
   },
+  orbitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  orbitSide: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   orbitArea: {
     width: RING_SIZE,
     height: RING_SIZE,
-    marginTop: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1015,5 +1142,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     fontStyle: 'italic',
+  },
+  goalWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  goalBackdrop: {
+    position: 'absolute',
+    width: 1000,
+    height: 1000,
+    left: -500,
+    top: -500,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  goalElement: {
+    borderWidth: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalIconWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  goalTitle: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  goalBigNumber: {
+    fontSize: 56,
+    fontWeight: '200',
+  },
+  goalButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    marginTop: 8,
+  },
+  goalConfirm: {
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+  },
+  goalConfirmText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
