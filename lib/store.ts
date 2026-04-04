@@ -66,6 +66,7 @@ export interface AppState {
   startFocus: (seconds: number) => void;
   cancelFocus: () => void;
   unlockFocus: () => void;
+  showUnlock: () => void;
 
   // Settings actions
   openSettings: () => void;
@@ -208,6 +209,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   unlockFocus: () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     set({ focusStep: 'hidden', focusRemaining: 0 });
+  },
+
+  showUnlock: () => {
+    set({ focusStep: 'done', focusRemaining: 0 });
   },
 
   // --- Settings ---

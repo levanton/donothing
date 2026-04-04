@@ -8,6 +8,8 @@ import {
   startMonitoring,
   stopMonitoring,
   configureActions,
+  getActivities,
+  isShieldActive,
 } from 'react-native-device-activity';
 
 export type AuthStatus = 'notDetermined' | 'denied' | 'approved';
@@ -80,9 +82,17 @@ export async function unblockAppsById(selectionId: string): Promise<void> {
 
 const SHIELD_CONFIG = {
   title: 'Do Nothing',
-  subtitle: 'Time to do nothing. Put your phone down.',
-  primaryButtonLabel: '',
-  secondaryButtonLabel: '',
+  titleColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 1.0 },
+  subtitle: 'Put your phone down.\nOpen Do Nothing to unlock.',
+  subtitleColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 0.6 },
+  backgroundColor: { red: 0.976, green: 0.953, blue: 0.878, alpha: 1.0 },
+  primaryButtonLabel: 'Open Do Nothing',
+  primaryButtonLabelColor: { red: 0.976, green: 0.953, blue: 0.878, alpha: 1.0 },
+  primaryButtonBackgroundColor: { red: 0.78, green: 0.36, blue: 0.23, alpha: 1.0 },
+  secondaryButtonLabel: 'Close',
+  secondaryButtonLabelColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 0.5 },
+  iconSystemName: 'leaf.fill',
+  iconTint: { red: 0.78, green: 0.36, blue: 0.23, alpha: 1.0 },
 };
 
 const SHIELD_ACTIONS = {
@@ -106,6 +116,9 @@ export async function scheduleBlock(
   endMinute = endMinute % 60;
   endHour = endHour % 24;
 
+  // Ensure authorization
+  await requestAuth();
+
   // Configure what happens when interval starts: block apps
   configureActions({
     activityName,
@@ -125,14 +138,7 @@ export async function scheduleBlock(
     ],
   });
 
-  // Configure what happens when interval ends: unblock
-  configureActions({
-    activityName,
-    callbackName: 'intervalDidEnd',
-    actions: [
-      { type: 'resetBlocks' },
-    ],
-  });
+  // No action on intervalDidEnd — user must unlock manually via the app
 
   // Update shield appearance
   await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
@@ -147,6 +153,23 @@ export async function scheduleBlock(
     },
     [],
   );
+
+  // Debug: verify monitoring is active
+  const active = getActivities();
+  console.log('[ScreenTime] Active monitors:', active);
+  console.log(`[ScreenTime] Scheduled: ${activityName} from ${hour}:${String(minute).padStart(2, '0')} to ${endHour}:${String(endMinute).padStart(2, '0')}`);
+}
+
+export function getActiveMonitors(): string[] {
+  return getActivities();
+}
+
+export function isBlockActive(): boolean {
+  try {
+    return isShieldActive();
+  } catch {
+    return false;
+  }
 }
 
 export function unscheduleBlock(blockId: string): void {

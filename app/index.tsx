@@ -30,7 +30,7 @@ import { themes, palette } from '@/lib/theme';
 import { timerDisplay, formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
-import { blockAppsById, unblockAppsById } from '@/lib/screen-time';
+import { blockAppsById, unblockAppsById, isBlockActive } from '@/lib/screen-time';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
@@ -299,18 +299,22 @@ export default function DoNothingScreen() {
     opacity: messageOpacity.value,
   }));
 
-  // Deactivate keep awake and unblock apps when focus ends
+  // Deactivate keep awake when focus ends (unblock only happens on explicit unlock)
   useEffect(() => {
     if (focusStep === 'hidden') {
       deactivateKeepAwake('focus');
       deactivateKeepAwake('scheduled-block');
-      unblockAppsById('donothing-scheduled-block').catch(() => {});
     }
   }, [focusStep]);
 
   // --- Init ---
   useEffect(() => {
-    useAppStore.getState().init();
+    useAppStore.getState().init().then(() => {
+      // Check if a block is currently active (app was closed during block)
+      if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
+        useAppStore.getState().showUnlock();
+      }
+    });
   }, []);
 
   // --- Notification listener for scheduled blocks ---
@@ -347,6 +351,10 @@ export default function DoNothingScreen() {
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
         await useAppStore.getState().handleForeground();
+        // Check if block is active when returning to foreground
+        if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
+          useAppStore.getState().showUnlock();
+        }
       }
     });
     return () => sub.remove();
@@ -444,32 +452,38 @@ export default function DoNothingScreen() {
         <Text
           style={[
             styles.focusMessage,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif, fontSize: 20, marginBottom: 32 },
+            { color: theme.text, fontFamily: Fonts!.serif, fontSize: 22, marginBottom: 12 },
           ]}
         >
-          well done.
+          your apps are blocked.
         </Text>
 
         <Text
           style={[
             styles.focusMessage,
-            { color: theme.textTertiary, fontFamily: Fonts!.serif },
+            { color: theme.textTertiary, fontFamily: Fonts!.serif, marginBottom: 48 },
           ]}
         >
-          you did nothing successfully.
+          do nothing to unlock them.
         </Text>
 
-        <Pressable
-          onPress={handleUnlock}
-          style={[
-            styles.quitButton,
-            { backgroundColor: theme.accent, borderColor: theme.accent, marginTop: 48 },
-          ]}
-        >
-          <Text style={[styles.quitText, { color: theme.accentText, fontStyle: 'normal', fontWeight: '500' }]}>
-            unlock
-          </Text>
-        </Pressable>
+        <View style={{ gap: 12, width: '100%', maxWidth: 260 }}>
+          <PillButton
+            label="do nothing"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              useAppStore.getState().startFocus(15 * 60);
+              activateKeepAwakeAsync('focus');
+            }}
+            color={theme.accent}
+            filled
+          />
+          <PillButton
+            label="unlock"
+            onPress={handleUnlock}
+            color={theme.textSecondary}
+          />
+        </View>
       </Animated.View>
     );
   }

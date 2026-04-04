@@ -54,6 +54,13 @@
         {
           "sounds": []
         }
+      ],
+      [
+        "react-native-device-activity",
+        {
+          "appleTeamId": "45DBHDBF45",
+          "appGroup": "group.com.levanton.donothing"
+        }
       ]
     ],
     "experiments": {
