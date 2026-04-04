@@ -205,14 +205,14 @@ export default function DoNothingScreen() {
 
   useEffect(() => {
     if (!started) return;
-    startButtonOpacity.value = withTiming(0, { duration: 800 });
-    timerOpacity.value = withTiming(1, { duration: 1000 });
+    startButtonOpacity.value = withTiming(0, { duration: 900 });
+    timerOpacity.value = withTiming(1, { duration: 1150 });
     // Phase 1: disappearing — fade out, then collapse
-    hideOpacity.value = withTiming(0, { duration: 350 });
-    hideWidth.value = withTiming(0, { duration: 750 });
+    hideOpacity.value = withTiming(0, { duration: 400 });
+    hideWidth.value = withTiming(0, { duration: 860 });
     // Phase 2: appearing — expand then fade in
-    showWidth.value = withTiming(1, { duration: 600 });
-    showOpacity.value = withTiming(1, { duration: 1000 });
+    showWidth.value = withTiming(1, { duration: 690 });
+    showOpacity.value = withTiming(1, { duration: 1150 });
   }, [started]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
@@ -388,12 +388,15 @@ export default function DoNothingScreen() {
     setStarted(false);
     startedRef.current = false;
     setElapsed(0);
-    timerOpacity.value = 0;
-    hideOpacity.value = 1;
-    hideWidth.value = 1;
-    showOpacity.value = 0;
-    showWidth.value = 0;
-    startButtonOpacity.value = 1;
+    // Reverse: same durations, opposite direction
+    timerOpacity.value = withTiming(0, { duration: 1150 });
+    startButtonOpacity.value = withTiming(1, { duration: 900 });
+    // "ing" disappears
+    showOpacity.value = withTiming(0, { duration: 400 });
+    showWidth.value = withTiming(0, { duration: 860 });
+    // "Ready to " and "?" reappear
+    hideWidth.value = withTiming(1, { duration: 690 });
+    hideOpacity.value = withTiming(1, { duration: 1150 });
     const updated = await addSession(duration);
     setSessions(updated);
     setWeekStats(getWeekStats(updated));
