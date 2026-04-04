@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { DeviceActivitySelectionViewPersisted } from 'react-native-device-activity';
+import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
 
 import { Fonts } from '@/constants/theme';
 import { AppTheme, themes } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
+import { requestAuth } from '@/lib/screen-time';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
 
@@ -150,6 +151,8 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
+  const [showAppPicker, setShowAppPicker] = useState(false);
+  const [appCount, setAppCount] = useState(0);
 
   const store = useAppStore.getState;
 
@@ -267,17 +270,34 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
             APPS TO BLOCK
           </Text>
-          <Text style={[styles.sectionHint, { color: theme.textTertiary, marginTop: -8, marginBottom: 12 }]}>
-            Select which apps to block during scheduled sessions
-          </Text>
-          <View style={[styles.pickerContainer, { borderColor: theme.border }]}>
-            <DeviceActivitySelectionViewPersisted
+          <Pressable
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              const status = await requestAuth();
+              if (status === 'approved') {
+                setShowAppPicker(true);
+              }
+            }}
+            style={[styles.selectAppsBtn, { borderColor: theme.border }]}
+          >
+            <Feather name="smartphone" size={18} color={theme.textSecondary} />
+            <Text style={[styles.selectAppsText, { color: theme.textSecondary }]}>
+              {appCount > 0 ? `${appCount} selected — tap to change` : 'Select apps'}
+            </Text>
+          </Pressable>
+          {showAppPicker && (
+            <DeviceActivitySelectionSheetViewPersisted
               familyActivitySelectionId={BLOCK_SELECTION_ID}
               headerText="Choose apps to block"
               footerText=""
-              style={{ height: 60 }}
+              onSelectionChange={(e) => {
+                const meta = e.nativeEvent;
+                setAppCount((meta.applicationCount ?? 0) + (meta.categoryCount ?? 0));
+              }}
+              onDismissRequest={() => setShowAppPicker(false)}
+              style={{ height: 1, width: 1, position: 'absolute', top: -9999 }}
             />
-          </View>
+          )}
         </>
       )}
 
@@ -401,10 +421,15 @@ const styles = StyleSheet.create({
   pickerActions: { marginLeft: 16, gap: 8, alignItems: 'center' },
   pickerCancel: { fontSize: 13, fontWeight: '300' },
   pickerConfirm: { fontSize: 14, fontWeight: '500' },
-  pickerContainer: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    overflow: 'hidden',
+  selectAppsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderRadius: 12,
     marginBottom: 4,
   },
+  selectAppsText: { fontSize: 15, fontWeight: '300' },
 });

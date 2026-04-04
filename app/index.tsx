@@ -209,11 +209,11 @@ export default function DoNothingScreen() {
   const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
   const historyScrollY = useSharedValue(0);
 
-  // --- Settings slide ---
+  // --- Settings slide (from left) ---
+  const SCREEN_W = Dimensions.get('window').width;
   const settingsSlide = useSharedValue(0); // 0 = hidden, 1 = visible
   const settingsSlideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: (1 - settingsSlide.value) * SCREEN_H }],
-    opacity: settingsSlide.value,
+    transform: [{ translateX: (settingsSlide.value - 1) * SCREEN_W }],
   }));
 
   const mainSlideStyle = useAnimatedStyle(() => ({
