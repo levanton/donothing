@@ -35,6 +35,7 @@ import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
+import PillButton from '@/components/PillButton';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -812,22 +813,11 @@ export default function DoNothingScreen() {
           { bottom: insets.bottom + 16 },
         ]}
       >
-        <Pressable
+        <PillButton
+          label="History"
           onPress={handleHistory}
-          style={[
-            styles.pillButton,
-            { borderColor: themeMode === 'dark' ? palette.cream : palette.ink },
-          ]}
-        >
-          <Text
-            style={[
-              styles.pillText,
-              { color: themeMode === 'dark' ? palette.cream : palette.ink },
-            ]}
-          >
-            History
-          </Text>
-        </Pressable>
+          color={themeMode === 'dark' ? palette.cream : palette.ink}
+        />
       </View>
 
     </Animated.View>
@@ -999,15 +989,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     position: 'absolute',
-  },
-  pillButton: {
-    borderWidth: 1.5,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-  },
-  pillButtonFilled: {
-    borderWidth: 0,
   },
   pillText: {
     fontSize: 15,

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
@@ -8,6 +9,7 @@ import { Fonts } from '@/constants/theme';
 import { AppTheme, themes } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
 import { requestAuth } from '@/lib/screen-time';
+import PillButton from '@/components/PillButton';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
 
@@ -26,8 +28,10 @@ function formatTime12(hour: number, minute: number) {
   return `${h}:${pad(minute)} ${ampm}`;
 }
 
-// Simple inline time picker with increment/decrement
-function TimePicker({ onConfirm, onCancel, theme }: {
+// No custom BottomSheet needed — using @gorhom/bottom-sheet
+
+// Time picker content for bottom sheet
+function TimePickerContent({ onConfirm, onCancel, theme }: {
   onConfirm: (hour: number, minute: number) => void;
   onCancel: () => void;
   theme: AppTheme;
@@ -41,44 +45,45 @@ function TimePicker({ onConfirm, onCancel, theme }: {
   const decMin = () => { Haptics.selectionAsync(); setMinute((m) => (m - 5 + 60) % 60); };
 
   return (
-    <View style={[styles.pickerRow, { borderColor: theme.border }]}>
-      <View style={styles.pickerCol}>
-        <Pressable onPress={incHour} hitSlop={8}>
-          <Feather name="chevron-up" size={20} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.pickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-          {pad(hour)}
-        </Text>
-        <Pressable onPress={decHour} hitSlop={8}>
-          <Feather name="chevron-down" size={20} color={theme.textSecondary} />
-        </Pressable>
+    <View style={styles.sheetContent}>
+      <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Add reminder
+      </Text>
+      <View style={styles.sheetPickerRow}>
+        <View style={styles.sheetPickerCol}>
+          <Pressable onPress={incHour} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+            {pad(hour)}
+          </Text>
+          <Pressable onPress={decHour} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+        <Text style={[styles.sheetColon, { color: theme.textTertiary }]}>:</Text>
+        <View style={styles.sheetPickerCol}>
+          <Pressable onPress={incMin} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+            {pad(minute)}
+          </Text>
+          <Pressable onPress={decMin} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
-      <Text style={[styles.pickerColon, { color: theme.textTertiary }]}>:</Text>
-      <View style={styles.pickerCol}>
-        <Pressable onPress={incMin} hitSlop={8}>
-          <Feather name="chevron-up" size={20} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.pickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-          {pad(minute)}
-        </Text>
-        <Pressable onPress={decMin} hitSlop={8}>
-          <Feather name="chevron-down" size={20} color={theme.textSecondary} />
-        </Pressable>
-      </View>
-      <View style={styles.pickerActions}>
-        <Pressable onPress={onCancel} hitSlop={8}>
-          <Text style={[styles.pickerCancel, { color: theme.textTertiary }]}>cancel</Text>
-        </Pressable>
-        <Pressable onPress={() => onConfirm(hour, minute)} hitSlop={8}>
-          <Text style={[styles.pickerConfirm, { color: theme.accent }]}>add</Text>
-        </Pressable>
+      <View style={styles.sheetButtons}>
+        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
+        <PillButton label="add" onPress={() => onConfirm(hour, minute)} color={theme.accent} filled flex />
       </View>
     </View>
   );
 }
 
-// Duration picker for scheduled blocks
-function DurationBlockPicker({ onConfirm, onCancel, theme }: {
+// Duration block picker content for bottom sheet
+function BlockPickerContent({ onConfirm, onCancel, theme }: {
   onConfirm: (hour: number, minute: number, duration: number) => void;
   onCancel: () => void;
   theme: AppTheme;
@@ -95,48 +100,53 @@ function DurationBlockPicker({ onConfirm, onCancel, theme }: {
   const decDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.max(5, d - 5)); };
 
   return (
-    <View style={[styles.pickerRow, { borderColor: theme.border }]}>
-      <View style={styles.pickerCol}>
-        <Pressable onPress={incHour} hitSlop={8}>
-          <Feather name="chevron-up" size={20} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.pickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-          {pad(hour)}
-        </Text>
-        <Pressable onPress={decHour} hitSlop={8}>
-          <Feather name="chevron-down" size={20} color={theme.textSecondary} />
-        </Pressable>
+    <View style={styles.sheetContent}>
+      <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Add screen block
+      </Text>
+      <View style={styles.sheetPickerRow}>
+        <View style={styles.sheetPickerCol}>
+          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>hour</Text>
+          <Pressable onPress={incHour} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+            {pad(hour)}
+          </Text>
+          <Pressable onPress={decHour} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+        <Text style={[styles.sheetColon, { color: theme.textTertiary }]}>:</Text>
+        <View style={styles.sheetPickerCol}>
+          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>min</Text>
+          <Pressable onPress={incMin} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+            {pad(minute)}
+          </Text>
+          <Pressable onPress={decMin} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+        <View style={{ width: 20 }} />
+        <View style={styles.sheetPickerCol}>
+          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>duration</Text>
+          <Pressable onPress={incDur} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+            {duration}m
+          </Text>
+          <Pressable onPress={decDur} hitSlop={12} style={styles.sheetArrow}>
+            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
-      <Text style={[styles.pickerColon, { color: theme.textTertiary }]}>:</Text>
-      <View style={styles.pickerCol}>
-        <Pressable onPress={incMin} hitSlop={8}>
-          <Feather name="chevron-up" size={20} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.pickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-          {pad(minute)}
-        </Text>
-        <Pressable onPress={decMin} hitSlop={8}>
-          <Feather name="chevron-down" size={20} color={theme.textSecondary} />
-        </Pressable>
-      </View>
-      <View style={[styles.pickerCol, { marginLeft: 12 }]}>
-        <Pressable onPress={incDur} hitSlop={8}>
-          <Feather name="chevron-up" size={20} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.pickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-          {duration}m
-        </Text>
-        <Pressable onPress={decDur} hitSlop={8}>
-          <Feather name="chevron-down" size={20} color={theme.textSecondary} />
-        </Pressable>
-      </View>
-      <View style={styles.pickerActions}>
-        <Pressable onPress={onCancel} hitSlop={8}>
-          <Text style={[styles.pickerCancel, { color: theme.textTertiary }]}>cancel</Text>
-        </Pressable>
-        <Pressable onPress={() => onConfirm(hour, minute, duration)} hitSlop={8}>
-          <Text style={[styles.pickerConfirm, { color: theme.accent }]}>add</Text>
-        </Pressable>
+      <View style={styles.sheetButtons}>
+        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
+        <PillButton label="add" onPress={() => onConfirm(hour, minute, duration)} color={theme.accent} filled flex />
       </View>
     </View>
   );
@@ -154,6 +164,14 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [showAppPicker, setShowAppPicker] = useState(false);
   const [appCount, setAppCount] = useState(0);
 
+  const reminderSheetRef = useRef<BottomSheet>(null);
+  const blockSheetRef = useRef<BottomSheet>(null);
+
+  const renderBackdrop = useCallback(
+    (props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.3} />,
+    [],
+  );
+
   const store = useAppStore.getState;
 
   const handleGoalChange = (delta: number) => {
@@ -165,16 +183,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const handleAddReminder = (hour: number, minute: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     store().addReminder(hour, minute);
-    setShowReminderPicker(false);
+    reminderSheetRef.current?.close();
   };
 
   const handleAddBlock = (hour: number, minute: number, duration: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     store().addScheduledBlock(hour, minute, duration);
-    setShowBlockPicker(false);
+    blockSheetRef.current?.close();
   };
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1 }}
       bounces={false}
@@ -218,11 +237,16 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         REMINDERS
       </Text>
       {reminders.map((r) => (
-        <View key={r.id} style={[styles.itemRow, { borderColor: theme.border }]}>
-          <Text style={[styles.itemTime, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {formatTime12(r.hour, r.minute)}
-          </Text>
-          <View style={styles.itemActions}>
+        <View key={r.id} style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.border }]}>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
+              {formatTime12(r.hour, r.minute)}
+            </Text>
+            <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
+              daily reminder
+            </Text>
+          </View>
+          <View style={styles.cardActions}>
             <Switch
               value={r.enabled}
               onValueChange={() => {
@@ -240,29 +264,22 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               }}
               hitSlop={12}
             >
-              <Feather name="trash-2" size={16} color={theme.textTertiary} />
+              <Feather name="x" size={16} color={theme.textTertiary} />
             </Pressable>
           </View>
         </View>
       ))}
-      {showReminderPicker ? (
-        <TimePicker
-          theme={theme}
-          onConfirm={handleAddReminder}
-          onCancel={() => setShowReminderPicker(false)}
-        />
-      ) : (
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowReminderPicker(true);
-          }}
-          style={[styles.addButton, { borderColor: theme.border }]}
-        >
-          <Feather name="plus" size={16} color={theme.textSecondary} />
-          <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add reminder</Text>
-        </Pressable>
-      )}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowReminderPicker(true);
+          reminderSheetRef.current?.expand();
+        }}
+        style={[styles.addButton, { borderColor: theme.border }]}
+      >
+        <Feather name="plus" size={16} color={theme.textSecondary} />
+        <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add reminder</Text>
+      </Pressable>
 
       {/* App selection for blocking */}
       {Platform.OS === 'ios' && (
@@ -278,10 +295,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 setShowAppPicker(true);
               }
             }}
-            style={[styles.selectAppsBtn, { borderColor: theme.border }]}
+            style={[styles.selectAppsBtn, {
+              borderColor: appCount > 0 ? theme.text : theme.border,
+              backgroundColor: appCount > 0 ? theme.text : 'transparent',
+            }]}
           >
-            <Feather name="smartphone" size={18} color={theme.textSecondary} />
-            <Text style={[styles.selectAppsText, { color: theme.textSecondary }]}>
+            <Feather name="smartphone" size={18} color={appCount > 0 ? theme.bg : theme.textSecondary} />
+            <Text style={[styles.selectAppsText, { color: appCount > 0 ? theme.bg : theme.textSecondary }]}>
               {appCount > 0 ? `${appCount} selected — tap to change` : 'Select apps'}
             </Text>
           </Pressable>
@@ -305,20 +325,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
         SCREEN BLOCK
       </Text>
-      <Text style={[styles.sectionHint, { color: theme.textTertiary, marginTop: -8, marginBottom: 12 }]}>
-        Block apps at set times every day
-      </Text>
       {scheduledBlocks.map((b) => (
-        <View key={b.id} style={[styles.itemRow, { borderColor: theme.border }]}>
-          <View>
-            <Text style={[styles.itemTime, { color: theme.text, fontFamily: Fonts!.mono }]}>
+        <View key={b.id} style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.border }]}>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTime, { color: b.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
               {formatTime12(b.hour, b.minute)}
             </Text>
-            <Text style={[styles.itemSub, { color: theme.textTertiary }]}>
-              {b.durationMinutes} min
+            <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
+              {b.durationMinutes} min block
             </Text>
           </View>
-          <View style={styles.itemActions}>
+          <View style={styles.cardActions}>
             <Switch
               value={b.enabled}
               onValueChange={() => {
@@ -336,30 +353,64 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               }}
               hitSlop={12}
             >
-              <Feather name="trash-2" size={16} color={theme.textTertiary} />
+              <Feather name="x" size={16} color={theme.textTertiary} />
             </Pressable>
           </View>
         </View>
       ))}
-      {showBlockPicker ? (
-        <DurationBlockPicker
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowBlockPicker(true);
+          blockSheetRef.current?.expand();
+        }}
+        style={[styles.addButton, { borderColor: theme.border }]}
+      >
+        <Feather name="plus" size={16} color={theme.textSecondary} />
+        <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add block</Text>
+      </Pressable>
+    </ScrollView>
+
+    {/* Bottom sheet for reminder picker */}
+    <BottomSheet
+      ref={reminderSheetRef}
+      index={-1}
+      enableDynamicSizing
+      enablePanDownToClose
+      onChange={(i) => { if (i === -1) setShowReminderPicker(false); }}
+      backdropComponent={renderBackdrop}
+      handleIndicatorStyle={{ backgroundColor: theme.border }}
+      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 0 }}
+    >
+      <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
+        <TimePickerContent
+          theme={theme}
+          onConfirm={handleAddReminder}
+          onCancel={() => reminderSheetRef.current?.close()}
+        />
+      </BottomSheetView>
+    </BottomSheet>
+
+    {/* Bottom sheet for block picker */}
+    <BottomSheet
+      ref={blockSheetRef}
+      index={-1}
+      enableDynamicSizing
+      enablePanDownToClose
+      onChange={(i) => { if (i === -1) setShowBlockPicker(false); }}
+      backdropComponent={renderBackdrop}
+      handleIndicatorStyle={{ backgroundColor: theme.border }}
+      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 0 }}
+    >
+      <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
+        <BlockPickerContent
           theme={theme}
           onConfirm={handleAddBlock}
-          onCancel={() => setShowBlockPicker(false)}
+          onCancel={() => blockSheetRef.current?.close()}
         />
-      ) : (
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowBlockPicker(true);
-          }}
-          style={[styles.addButton, { borderColor: theme.border }]}
-        >
-          <Feather name="plus" size={16} color={theme.textSecondary} />
-          <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add block</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+      </BottomSheetView>
+    </BottomSheet>
+    </>
   );
 }
 
@@ -376,60 +427,96 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 24,
     paddingVertical: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1.2,
     borderRadius: 16,
     marginBottom: 8,
   },
   stepperBtn: { padding: 8 },
   goalValue: { fontSize: 22, fontWeight: '300', minWidth: 80, textAlign: 'center' },
-  itemRow: {
+
+  // Card style for reminders & blocks
+  card: {
+    borderWidth: 1.2,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  itemTime: { fontSize: 17, fontWeight: '300' },
-  itemSub: { fontSize: 12, fontWeight: '300', marginTop: 2 },
-  itemActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    borderStyle: 'dashed',
-  },
-  addButtonText: { fontSize: 14, fontWeight: '300' },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-  },
-  pickerCol: { alignItems: 'center', gap: 4 },
-  pickerValue: { fontSize: 22, fontWeight: '300' },
-  pickerColon: { fontSize: 22, fontWeight: '300', marginBottom: 2 },
-  pickerActions: { marginLeft: 16, gap: 8, alignItems: 'center' },
-  pickerCancel: { fontSize: 13, fontWeight: '300' },
-  pickerConfirm: { fontSize: 14, fontWeight: '500' },
+  cardContent: { gap: 4 },
+  cardTime: { fontSize: 20, fontWeight: '300' },
+  cardLabel: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+
+
   selectAppsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderRadius: 12,
     marginBottom: 4,
   },
   selectAppsText: { fontSize: 15, fontWeight: '300' },
+
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    borderStyle: 'dashed',
+  },
+  addButtonText: { fontSize: 14, fontWeight: '300' },
+
+  // Bottom sheet content
+  sheetContent: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '400',
+    marginBottom: 24,
+  },
+  sheetPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 32,
+  },
+  sheetPickerCol: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  sheetArrow: {
+    padding: 4,
+  },
+  sheetPickerValue: {
+    fontSize: 36,
+    fontWeight: '200',
+  },
+  sheetColon: {
+    fontSize: 36,
+    fontWeight: '200',
+  },
+  sheetLabel: {
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  sheetButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
 });
