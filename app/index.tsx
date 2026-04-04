@@ -61,66 +61,33 @@ function getFocusMessage(remaining: number, total: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Breathing orb — inhale/exhale pulse
+// Slow orbit — a small dot tracing a gentle circular path
 // ---------------------------------------------------------------------------
-function BreathingOrb({ color }: { color: string }) {
-  const scale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0.15);
+function OrbitDot({ color }: { color: string }) {
+  const rotation = useSharedValue(0);
 
   useEffect(() => {
-    // 4s inhale, 4s exhale — natural breathing rhythm
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.35, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.3, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
-      ),
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 10000, easing: Easing.linear }),
       -1,
       false,
     );
   }, []);
 
-  const glowStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: glowOpacity.value,
-  }));
-
-  const coreStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.9 + (scale.value - 1) * 0.3 }],
+  const orbitStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   return (
-    <View style={styles.breathContainer}>
-      <Animated.View
-        style={[
-          {
-            width: 80,
-            height: 80,
-            borderRadius: 40,
-            backgroundColor: color,
-            position: 'absolute',
-          },
-          glowStyle,
-        ]}
+    <View style={styles.orbitContainer}>
+      {/* Static ring */}
+      <View
+        style={[styles.orbitRing, { borderColor: color }]}
       />
-      <Animated.View
-        style={[
-          {
-            width: 14,
-            height: 14,
-            borderRadius: 7,
-            backgroundColor: color,
-          },
-          coreStyle,
-        ]}
-      />
+      {/* Rotating arm with dot */}
+      <Animated.View style={[styles.orbitArm, orbitStyle]}>
+        <View style={[styles.orbitDot, { backgroundColor: color }]} />
+      </Animated.View>
     </View>
   );
 }
@@ -581,8 +548,8 @@ export default function DoNothingScreen() {
         </Text>
       </Animated.View>
 
-      {/* Breathing orb */}
-      <BreathingOrb color={theme.accent} />
+      {/* Orbit */}
+      <OrbitDot color={theme.accent} />
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
@@ -747,12 +714,32 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  breathContainer: {
-    width: 80,
-    height: 80,
+  orbitContainer: {
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 24,
+  },
+  orbitRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    opacity: 0.2,
+    position: 'absolute',
+  },
+  orbitArm: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    position: 'absolute',
+  },
+  orbitDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    top: -4,
   },
   statsContainer: {
     flexDirection: 'row',
