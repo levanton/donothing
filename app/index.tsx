@@ -46,7 +46,7 @@ function getMessage(seconds: number): string {
   if (seconds < 10) return '';
   if (seconds < 30) return 'breathe.';
   if (seconds < 60) return 'good. keep going.';
-  if (seconds < 180) return "you're doing great.";
+  if (seconds < 180) return "you're doing nothing great.";
   if (seconds < 300) return 'the world can wait.';
   return 'just be.';
 }
@@ -602,19 +602,12 @@ export default function DoNothingScreen() {
         faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
       />
 
-      {/* Stats */}
+      {/* Stats — today and week, stacked above week dots */}
       <Pressable onPress={handleHistory}>
-        <Animated.View
-          style={[
-            styles.statsContainer,
-            { borderColor: theme.border },
-            statsEntryStyle,
-          ]}
-        >
+        <Animated.View style={[styles.statsRow, statsEntryStyle]}>
           {([
             { stat: formatTimeStat(stats.today + elapsed), label: 'today' },
             { stat: formatTimeStat(stats.week + elapsed), label: 'week' },
-            { stat: formatTimeStat(stats.year + elapsed), label: 'year' },
           ] as const).map((item) => (
             <View key={item.label} style={styles.statItem}>
               <View style={styles.statValueRow}>
@@ -627,10 +620,7 @@ export default function DoNothingScreen() {
                   {item.stat.value}
                 </Text>
                 <Text
-                  style={[
-                    styles.statUnit,
-                    { color: theme.textTertiary },
-                  ]}
+                  style={[styles.statUnit, { color: theme.textTertiary }]}
                 >
                   {item.stat.unit}
                 </Text>
@@ -780,14 +770,10 @@ const styles = StyleSheet.create({
     height: RING_SIZE,
     marginTop: 24,
   },
-  statsContainer: {
+  statsRow: {
     flexDirection: 'row',
-    gap: 28,
-    marginTop: 24,
-    borderWidth: 1.2,
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    gap: 32,
+    marginTop: 36,
   },
   statItem: {
     alignItems: 'center',
@@ -829,7 +815,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   weekDayLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '400',
     letterSpacing: 0.5,
   },
