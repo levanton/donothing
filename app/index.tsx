@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  Dimensions,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -27,7 +29,7 @@ import Svg, { Circle as SvgCircle } from 'react-native-svg';
 const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Fonts } from '@/constants/theme';
 import { themes, palette, ThemeMode } from '@/lib/theme';
-import { timerDisplay, formatTimeStat } from '@/lib/format';
+import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
 import {
   Session,
   loadSessions,
@@ -35,7 +37,7 @@ import {
   loadTheme,
   saveTheme,
 } from '@/lib/storage';
-import { getStats, getWeekStats, WeekDay } from '@/lib/stats';
+import { getStats, getWeekStats, getDailyStats, getStreak, WeekDay } from '@/lib/stats';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -148,6 +150,7 @@ export default function DoNothingScreen() {
   const [goalSeconds, setGoalSeconds] = useState(0);
   const [goalExpanded, setGoalExpanded] = useState(false);
   const [pickerMinutes, setPickerMinutes] = useState(5);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Focus lock state
   type FocusStep = 'hidden' | 'pickTime' | 'active';
@@ -293,6 +296,18 @@ export default function DoNothingScreen() {
 
   const goalExtrasStyle = useAnimatedStyle(() => ({
     opacity: goalExpand.value,
+  }));
+
+  // --- History slide ---
+  const SCREEN_H = Dimensions.get('window').height;
+  const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
+
+  const mainSlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -historySlide.value * SCREEN_H }],
+  }));
+
+  const historySlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - historySlide.value) * SCREEN_H }],
   }));
 
   const handleGoalOpen = useCallback(() => {
@@ -483,7 +498,14 @@ export default function DoNothingScreen() {
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/history');
+    setShowHistory(true);
+    historySlide.value = withTiming(1, { duration: 500 });
+  }, []);
+
+  const handleHistoryClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    historySlide.value = withTiming(0, { duration: 400 });
+    setTimeout(() => setShowHistory(false), 400);
   }, []);
 
   if (!ready) {
@@ -646,7 +668,8 @@ export default function DoNothingScreen() {
   // Main screen
   // =========================================================================
   return (
-    <Animated.View style={[styles.container, animatedContainerStyle]}>
+    <View style={styles.screenStack}>
+    <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
       {/* Lock button — top left */}
@@ -951,16 +974,184 @@ export default function DoNothingScreen() {
         </Pressable>
       </View>
     </Animated.View>
+
+    {/* History screen — slides up from below, pushing main screen up */}
+    {showHistory && (
+      <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
+        <HistoryContent
+          theme={theme}
+          themeMode={themeMode}
+          sessions={sessions}
+          onClose={handleHistoryClose}
+          insets={insets}
+        />
+      </Animated.View>
+    )}
+    </View>
   );
 }
 
+// ===========================================================================
+// History Content (inline, not a separate route)
+// ===========================================================================
+function HistoryContent({ theme, themeMode, sessions, onClose, insets }: {
+  theme: any; themeMode: ThemeMode; sessions: any[]; onClose: () => void; insets: any;
+}) {
+  const dailyStats = getDailyStats(sessions);
+  const totalStats = getStats(sessions);
+  const streak = getStreak(sessions);
+  const maxDuration = Math.max(...dailyStats.map((d: any) => d.duration), 1);
+  const totalAll = formatTimeStat(totalStats.year);
+
+  const ZEN_QUOTES = [
+    'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
+    'the quieter you become, the more you can hear.',
+    'in the midst of movement and chaos, keep stillness inside of you.',
+    'silence is the sleep that nourishes wisdom.',
+    'do nothing, and everything is done.',
+  ];
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
+  );
+  const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        paddingHorizontal: 24,
+        paddingTop: insets.top + 8,
+        paddingBottom: insets.bottom + 40,
+      }}
+    >
+      <View style={historyStyles.headerRow}>
+        <Text style={[historyStyles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          History
+        </Text>
+        <Pressable onPress={onClose} hitSlop={16} style={historyStyles.closeButton}>
+          <Text style={[historyStyles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
+        </Pressable>
+      </View>
+
+      <View style={historyStyles.heroSection}>
+        <View style={historyStyles.heroValueRow}>
+          <Text style={[historyStyles.heroValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            {totalAll.value}
+          </Text>
+          <Text style={[historyStyles.heroUnit, { color: theme.textTertiary }]}>
+            {totalAll.unit}
+          </Text>
+        </View>
+        <Text style={[historyStyles.heroLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
+          total stillness
+        </Text>
+      </View>
+
+      <View style={[historyStyles.inlineStats, { borderColor: theme.border }]}>
+        {streak > 0 && (
+          <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
+            <Text style={{ color: theme.accent, fontFamily: Fonts!.serif }}>{streak}</Text>
+            {' day streak'}
+          </Text>
+        )}
+        <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
+          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.today).value}</Text>
+          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.today).unit}</Text>
+          {' today'}
+        </Text>
+        <Text style={[historyStyles.inlineStatText, { color: theme.textSecondary }]}>
+          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.week).value}</Text>
+          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.week).unit}</Text>
+          {' this week'}
+        </Text>
+      </View>
+
+      <View style={historyStyles.weekSection}>
+        <Text style={[historyStyles.sectionTitle, { color: theme.textSecondary }]}>LAST 7 DAYS</Text>
+        <View style={historyStyles.weekGrid}>
+          {dailyStats.slice(0, 7).map((day: any) => {
+            const size = day.duration > 0 ? 16 + (day.duration / maxDuration) * 28 : 6;
+            return (
+              <View key={day.date} style={historyStyles.weekDayCol}>
+                <View style={{
+                  width: size, height: size, borderRadius: size / 2,
+                  backgroundColor: day.duration > 0 ? theme.accent : theme.border,
+                }} />
+                <Text style={[historyStyles.weekDayLabel, { color: theme.textTertiary }]}>
+                  {day.label.slice(0, 3)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      <Text style={[historyStyles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
+      {dailyStats.map((day: any) => (
+        <View key={day.date} style={[historyStyles.dayRow, { borderBottomColor: theme.border }]}>
+          <Text style={[historyStyles.dayLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>{day.label}</Text>
+          <Text style={[historyStyles.dayDuration, {
+            color: day.duration > 0 ? theme.text : theme.textTertiary,
+            fontFamily: Fonts!.serif,
+          }]}>
+            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
+          </Text>
+        </View>
+      ))}
+
+      <View style={historyStyles.quoteContainer}>
+        <Text style={[historyStyles.quoteText, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
+          {quote}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+const historyStyles = StyleSheet.create({
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
+  closeButton: { padding: 4 },
+  closeText: { fontSize: 20, fontWeight: '300' },
+  heroSection: { alignItems: 'center', marginBottom: 20 },
+  heroLabel: { fontSize: 13, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
+  heroValueRow: { flexDirection: 'row', alignItems: 'baseline' },
+  heroValue: { fontSize: 64, fontWeight: '300' },
+  heroUnit: { fontSize: 20, fontWeight: '300', marginLeft: 4 },
+  inlineStats: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 32, paddingBottom: 24, borderBottomWidth: StyleSheet.hairlineWidth },
+  inlineStatText: { fontSize: 13, fontWeight: '300' },
+  weekSection: { marginBottom: 28 },
+  weekGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 60, paddingHorizontal: 8 },
+  weekDayCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1, gap: 8 },
+  weekDayLabel: { fontSize: 10, fontWeight: '400', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
+  dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  dayLabel: { fontSize: 16, fontWeight: '400' },
+  dayDuration: { fontSize: 16, fontWeight: '300' },
+  quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center' },
+  quoteText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22 },
+});
+
 const styles = StyleSheet.create({
+  screenStack: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
     paddingBottom: 24,
+  },
+  historyContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
