@@ -12,7 +12,7 @@ import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
 import {
   configureNotifications, requestPermission,
-  syncReminders, syncScheduledBlocks, cancelNotification,
+  syncReminders, cancelNotification,
 } from './notifications';
 
 // Module-level refs (not state, not serializable)
@@ -115,9 +115,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       loadScheduledBlocks(),
     ]);
     const reminders = await syncReminders(rawReminders);
-    const scheduledBlocks = await syncScheduledBlocks(rawBlocks);
     await saveReminders(reminders);
-    await saveScheduledBlocks(scheduledBlocks);
+    // Re-register native scheduled blocks
+    try {
+      const { scheduleBlock } = await import('./screen-time');
+      for (const b of rawBlocks) {
+        if (b.enabled) {
+          await scheduleBlock(b.id, 'donothing-scheduled-block', b.hour, b.minute, b.durationMinutes);
+        }
+      }
+    } catch {}
+    const scheduledBlocks = rawBlocks;
     set({
       sessions,
       themeMode,
@@ -254,45 +262,47 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addScheduledBlock: async (hour, minute, durationMinutes) => {
-    const status = await requestPermission();
-    if (status === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'Enable notifications in Settings for scheduled blocking.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ],
-      );
-      return;
+    const id = Date.now().toString();
+    const block = { id, hour, minute, durationMinutes, enabled: true };
+    try {
+      const { scheduleBlock } = await import('./screen-time');
+      await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+    } catch (e) {
+      console.warn('Failed to schedule native block:', e);
     }
-    if (status !== 'granted') return;
-    const blocks = [...get().scheduledBlocks, {
-      id: Date.now().toString(),
-      hour, minute, durationMinutes, enabled: true,
-    }];
-    const synced = await syncScheduledBlocks(blocks);
-    set({ scheduledBlocks: synced });
-    await saveScheduledBlocks(synced);
+    const blocks = [...get().scheduledBlocks, block];
+    set({ scheduledBlocks: blocks });
+    await saveScheduledBlocks(blocks);
   },
 
   removeScheduledBlock: async (id) => {
-    const old = get().scheduledBlocks.find((b) => b.id === id);
-    if (old?.notificationId) {
-      try { await cancelNotification(old.notificationId); } catch {}
-    }
+    try {
+      const { unscheduleBlock } = await import('./screen-time');
+      unscheduleBlock(id);
+    } catch {}
     const blocks = get().scheduledBlocks.filter((b) => b.id !== id);
     set({ scheduledBlocks: blocks });
     await saveScheduledBlocks(blocks);
   },
 
   toggleScheduledBlock: async (id) => {
+    const block = get().scheduledBlocks.find((b) => b.id === id);
+    if (!block) return;
+    const nowEnabled = !block.enabled;
+    try {
+      if (nowEnabled) {
+        const { scheduleBlock } = await import('./screen-time');
+        await scheduleBlock(id, 'donothing-scheduled-block', block.hour, block.minute, block.durationMinutes);
+      } else {
+        const { unscheduleBlock } = await import('./screen-time');
+        unscheduleBlock(id);
+      }
+    } catch {}
     const blocks = get().scheduledBlocks.map((b) =>
-      b.id === id ? { ...b, enabled: !b.enabled } : b,
+      b.id === id ? { ...b, enabled: nowEnabled } : b,
     );
-    const synced = await syncScheduledBlocks(blocks);
-    set({ scheduledBlocks: synced });
-    await saveScheduledBlocks(synced);
+    set({ scheduledBlocks: blocks });
+    await saveScheduledBlocks(blocks);
   },
 
   // --- AppState ---

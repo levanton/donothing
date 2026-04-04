@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { activitySelectionMetadata } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
@@ -162,7 +163,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [showAppPicker, setShowAppPicker] = useState(false);
-  const [appCount, setAppCount] = useState(0);
+  const [appCount, setAppCount] = useState(() => {
+    if (Platform.OS !== 'ios') return 0;
+    try {
+      const meta = activitySelectionMetadata({ activitySelectionId: BLOCK_SELECTION_ID });
+      return (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0);
+    } catch { return 0; }
+  });
 
   const reminderSheetRef = useRef<BottomSheet>(null);
   const blockSheetRef = useRef<BottomSheet>(null);
@@ -377,6 +384,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       index={-1}
       enableDynamicSizing
       enablePanDownToClose
+      enableOverDrag={false}
       onChange={(i) => { if (i === -1) setShowReminderPicker(false); }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
@@ -397,6 +405,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       index={-1}
       enableDynamicSizing
       enablePanDownToClose
+      enableOverDrag={false}
       onChange={(i) => { if (i === -1) setShowBlockPicker(false); }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}

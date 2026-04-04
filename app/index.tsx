@@ -315,16 +315,26 @@ export default function DoNothingScreen() {
 
   // --- Notification listener for scheduled blocks ---
   useEffect(() => {
-    const sub = Notifications.addNotificationReceivedListener((notification) => {
-      const data = notification.request.content.data;
+    const handleScheduledBlock = (data: Record<string, unknown>) => {
       if (data?.type === 'scheduledBlock' && data?.durationMinutes) {
         const durationSec = (data.durationMinutes as number) * 60;
         blockAppsById('donothing-scheduled-block').catch(() => {});
         activateKeepAwakeAsync('scheduled-block');
         useAppStore.getState().startFocus(durationSec);
       }
+    };
+
+    // When notification received while app is in foreground
+    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
+      handleScheduledBlock(notification.request.content.data ?? {});
     });
-    return () => sub.remove();
+
+    // When user taps notification (app was in background)
+    const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleScheduledBlock(response.notification.request.content.data ?? {});
+    });
+
+    return () => { sub1.remove(); sub2.remove(); };
   }, []);
 
   // --- AppState ---
