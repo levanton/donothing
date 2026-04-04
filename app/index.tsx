@@ -12,14 +12,11 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
-  withDelay,
-  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -29,7 +26,7 @@ import Svg, { Circle as SvgCircle } from 'react-native-svg';
 const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Fonts } from '@/constants/theme';
 import { themes, palette, ThemeMode } from '@/lib/theme';
-import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
+import { timerDisplay, formatTimeStat } from '@/lib/format';
 import {
   Session,
   loadSessions,
@@ -74,7 +71,7 @@ const RING_STROKE = 3;
 const RING_CIRC = 2 * Math.PI * RING_R;
 const RING_PERIOD = 15; // seconds per full revolution
 
-function OrbitRing({ color, faintColor, elapsed }: { color: string; faintColor: string; elapsed: number }) {
+function OrbitRing({ color, faintColor, elapsed, onStop }: { color: string; faintColor: string; elapsed: number; onStop?: () => void }) {
   const cx = RING_SIZE / 2;
   const cy = RING_SIZE / 2;
 
@@ -118,7 +115,7 @@ function OrbitRing({ color, faintColor, elapsed }: { color: string; faintColor: 
   });
 
   return (
-    <View style={styles.orbitContainer}>
+    <Pressable onPress={onStop} style={styles.orbitContainer}>
       <Svg width={RING_SIZE} height={RING_SIZE}>
         <AnimatedCircle
           cx={cx}
@@ -142,7 +139,10 @@ function OrbitRing({ color, faintColor, elapsed }: { color: string; faintColor: 
         />
       </Svg>
       <Animated.View style={dotStyle} />
-    </View>
+      <View style={styles.orbitCenter}>
+        <Feather name="square" size={16} color={color} style={{ opacity: 0.2 }} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -157,6 +157,7 @@ export default function DoNothingScreen() {
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [weekStats, setWeekStats] = useState<WeekDay[]>([]);
   const [ready, setReady] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // Focus lock state
   type FocusStep = 'hidden' | 'pickTime' | 'active';
@@ -169,6 +170,7 @@ export default function DoNothingScreen() {
   const sessionStartRef = useRef(Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isActiveRef = useRef(true);
+  const startedRef = useRef(false);
 
   const theme = themes[themeMode];
   const stats = getStats(sessions);
@@ -193,35 +195,48 @@ export default function DoNothingScreen() {
 
   // --- Entry animations ---
   const timerOpacity = useSharedValue(0);
-  const timerTranslateY = useSharedValue(8);
-  const statsOpacity = useSharedValue(0);
-  const statsTranslateY = useSharedValue(16);
-  const shareOpacity = useSharedValue(0);
-  const shareTranslateY = useSharedValue(16);
+  const startButtonOpacity = useSharedValue(1);
+
+  // Header morph: "Ready to Do|ing| nothing|?|"
+  const hideOpacity = useSharedValue(1);    // "Ready to " and "?"
+  const hideWidth = useSharedValue(1);      // 1 = natural, 0 = collapsed
+  const showOpacity = useSharedValue(0);    // "ing"
+  const showWidth = useSharedValue(0);
 
   useEffect(() => {
-    if (!ready) return;
-    timerOpacity.value = withTiming(1, { duration: 800 });
-    timerTranslateY.value = withTiming(0, { duration: 800 });
-    statsOpacity.value = withDelay(200, withTiming(1, { duration: 800 }));
-    statsTranslateY.value = withDelay(200, withTiming(0, { duration: 800 }));
-    shareOpacity.value = withDelay(400, withTiming(1, { duration: 800 }));
-    shareTranslateY.value = withDelay(400, withTiming(0, { duration: 800 }));
-  }, [ready]);
+    if (!started) return;
+    startButtonOpacity.value = withTiming(0, { duration: 800 });
+    timerOpacity.value = withTiming(1, { duration: 1000 });
+    // Phase 1: disappearing — fade out, then collapse
+    hideOpacity.value = withTiming(0, { duration: 350 });
+    hideWidth.value = withTiming(0, { duration: 750 });
+    // Phase 2: appearing — expand then fade in
+    showWidth.value = withTiming(1, { duration: 600 });
+    showOpacity.value = withTiming(1, { duration: 1000 });
+  }, [started]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
-    transform: [{ translateY: timerTranslateY.value }],
   }));
 
-  const statsEntryStyle = useAnimatedStyle(() => ({
-    opacity: statsOpacity.value,
-    transform: [{ translateY: statsTranslateY.value }],
+  const startButtonStyle = useAnimatedStyle(() => ({
+    opacity: startButtonOpacity.value,
   }));
 
-  const shareEntryStyle = useAnimatedStyle(() => ({
-    opacity: shareOpacity.value,
-    transform: [{ translateY: shareTranslateY.value }],
+  // "Ready to " and "?" — fade then collapse
+  const hideStyle = useAnimatedStyle(() => ({
+    opacity: hideOpacity.value,
+    maxWidth: hideWidth.value * 150,
+    overflow: 'hidden' as const,
+    height: 28,
+  }));
+
+  // "ing" — expand then fade in
+  const showStyle = useAnimatedStyle(() => ({
+    opacity: showOpacity.value,
+    maxWidth: showWidth.value * 50,
+    overflow: 'hidden' as const,
+    height: 28,
   }));
 
   // --- Message fade ---
@@ -274,7 +289,6 @@ export default function DoNothingScreen() {
       setWeekStats(getWeekStats(loadedSessions));
       setThemeMode(loadedTheme);
       setReady(true);
-      startTimer();
     })();
     return () => stopTimer();
   }, []);
@@ -287,18 +301,21 @@ export default function DoNothingScreen() {
         isActiveRef.current
       ) {
         isActiveRef.current = false;
-        const duration = Math.floor(
-          (Date.now() - sessionStartRef.current) / 1000,
-        );
-        stopTimer();
-        const updated = await addSession(duration);
-        setSessions(updated);
+        if (startedRef.current) {
+          const duration = Math.floor(
+            (Date.now() - sessionStartRef.current) / 1000,
+          );
+          stopTimer();
+          setStarted(false);
+          startedRef.current = false;
+          const updated = await addSession(duration);
+          setSessions(updated);
+        }
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
         const loaded = await loadSessions();
         setSessions(loaded);
         setWeekStats(getWeekStats(loaded));
-        startTimer();
       }
     });
     return () => sub.remove();
@@ -356,6 +373,31 @@ export default function DoNothingScreen() {
       if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
     };
   }, []);
+
+  const handleStart = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setStarted(true);
+    startedRef.current = true;
+    startTimer();
+  }, [startTimer]);
+
+  const handleStop = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const duration = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+    stopTimer();
+    setStarted(false);
+    startedRef.current = false;
+    setElapsed(0);
+    timerOpacity.value = 0;
+    hideOpacity.value = 1;
+    hideWidth.value = 1;
+    showOpacity.value = 0;
+    showWidth.value = 0;
+    startButtonOpacity.value = 1;
+    const updated = await addSession(duration);
+    setSessions(updated);
+    setWeekStats(getWeekStats(updated));
+  }, [stopTimer]);
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -534,15 +576,30 @@ export default function DoNothingScreen() {
         <Feather name="lock" size={24} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
 
-      {/* Header */}
-      <Text
-        style={[
-          styles.header,
-          { color: theme.text, fontFamily: Fonts!.serif },
-        ]}
-      >
-        Doing nothing
-      </Text>
+      {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
+      <View style={styles.headerRow}>
+        <Animated.View style={hideStyle}>
+          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            Ready to{' '}
+          </Text>
+        </Animated.View>
+        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          Do
+        </Text>
+        <Animated.View style={showStyle}>
+          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            ing
+          </Text>
+        </Animated.View>
+        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          {' '}nothing
+        </Text>
+        <Animated.View style={hideStyle}>
+          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            ?
+          </Text>
+        </Animated.View>
+      </View>
 
       {/* Theme toggle — top right */}
       <Pressable
@@ -558,39 +615,52 @@ export default function DoNothingScreen() {
         />
       </Pressable>
 
-      {/* Timer */}
-      <Animated.Text
-        style={[
-          styles.timer,
-          timerEntryStyle,
-          { color: theme.text, fontFamily: Fonts!.mono },
-        ]}
-      >
-        {timerDisplay(elapsed)}
-      </Animated.Text>
+      <View style={styles.centerArea}>
+        {/* Timer + message + ring */}
+        <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+          <Animated.Text
+            style={[
+              styles.timer,
+              { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
+            ]}
+          >
+            {timerDisplay(elapsed)}
+          </Animated.Text>
 
-      {/* Message */}
-      <Animated.View style={[styles.messageContainer, messageFadeStyle]}>
-        <Text
-          style={[
-            styles.message,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          {message}
-        </Text>
-      </Animated.View>
+          <Animated.View style={[styles.messageContainer, messageFadeStyle]}>
+            <Text
+              style={[
+                styles.message,
+                { color: theme.textSecondary, fontFamily: Fonts!.serif },
+              ]}
+            >
+              {message}
+            </Text>
+          </Animated.View>
 
-      {/* Orbit ring */}
-      <OrbitRing
-        color={theme.accent}
-        faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
-        elapsed={elapsed}
-      />
+          <OrbitRing
+            color={theme.accent}
+            faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
+            elapsed={elapsed}
+            onStop={handleStop}
+          />
+        </Animated.View>
+
+        {/* Start button — overlaid on same area */}
+        {!started && (
+          <Animated.View style={[styles.startOverlay, startButtonStyle]}>
+            <Pressable onPress={handleStart}>
+              <View style={[styles.startButton, { backgroundColor: theme.accent }]}>
+                <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
+              </View>
+            </Pressable>
+          </Animated.View>
+        )}
+      </View>
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
-        <Animated.View style={[styles.statsColumn, statsEntryStyle]}>
+        <View style={styles.statsColumn}>
           <View style={styles.statRow}>
             <Text
               style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
@@ -626,12 +696,12 @@ export default function DoNothingScreen() {
               </Text>
             </View>
           </View>
-        </Animated.View>
+        </View>
       </Pressable>
 
       {/* Week dots */}
       {weekStats.length > 0 && (
-        <Animated.View style={[styles.weekSection, shareEntryStyle]}>
+        <View style={styles.weekSection}>
           <View style={styles.weekGrid}>
             {weekStats.map((day) => {
               const maxDur = Math.max(
@@ -669,15 +739,14 @@ export default function DoNothingScreen() {
               );
             })}
           </View>
-        </Animated.View>
+        </View>
       )}
 
       {/* Bottom buttons */}
-      <Animated.View
+      <View
         style={[
           styles.bottomButtons,
           { bottom: insets.bottom + 16 },
-          shareEntryStyle,
         ]}
       >
         <Pressable
@@ -696,7 +765,7 @@ export default function DoNothingScreen() {
             History
           </Text>
         </Pressable>
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 }
@@ -709,12 +778,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingBottom: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 24,
+  },
   header: {
     fontSize: 22,
     letterSpacing: 1,
     opacity: 0.85,
     fontWeight: '400',
-    marginBottom: 24,
   },
   lockButton: {
     position: 'absolute',
@@ -753,6 +828,29 @@ const styles = StyleSheet.create({
     width: RING_SIZE,
     height: RING_SIZE,
     marginTop: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  orbitCenter: {
+    position: 'absolute',
+  },
+  centerArea: {
+    alignItems: 'center',
+  },
+  centerContent: {
+    alignItems: 'center',
+  },
+  startOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  startButton: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsColumn: {
     marginTop: 36,
