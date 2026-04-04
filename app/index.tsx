@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -15,7 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   interpolateColor,
+  useAnimatedProps,
   useAnimatedStyle,
+  useFrameCallback,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -24,6 +25,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
+
+const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 import { Fonts } from '@/constants/theme';
 import { themes, palette, ThemeMode } from '@/lib/theme';
 import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
@@ -69,74 +72,76 @@ const RING_SIZE = 96;
 const RING_R = 42;
 const RING_STROKE = 3;
 const RING_CIRC = 2 * Math.PI * RING_R;
-const RING_MS = 10000;
+const RING_PERIOD = 15; // seconds per full revolution
 
-function OrbitRing({ color, faintColor }: { color: string; faintColor: string }) {
-  const [state, setState] = useState({ progress: 0, lap: 0 });
-  const startRef = useRef(Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const total = Date.now() - startRef.current;
-      setState({
-        progress: (total % RING_MS) / RING_MS,
-        lap: Math.floor(total / RING_MS),
-      });
-    }, 40);
-    return () => clearInterval(id);
-  }, []);
-
-  const { progress, lap } = state;
-  const isEven = lap % 2 === 0;
-  const trailingStroke = isEven ? faintColor : color;
-  const leadingStroke = isEven ? color : faintColor;
-
-  const dotAngle = progress * 360 - 90;
-  const dotRad = (dotAngle + 90) * (Math.PI / 180);
+function OrbitRing({ color, faintColor, elapsed }: { color: string; faintColor: string; elapsed: number }) {
   const cx = RING_SIZE / 2;
   const cy = RING_SIZE / 2;
-  const dotX = cx + Math.cos(dotRad - Math.PI / 2) * RING_R - 6;
-  const dotY = cy + Math.sin(dotRad - Math.PI / 2) * RING_R - 6;
+
+  // Smooth sub-second interpolation via frame callback
+  const smoothProgress = useSharedValue(0);
+  const smoothLap = useSharedValue(0);
+  const lastElapsed = useSharedValue(elapsed);
+
+  useEffect(() => {
+    lastElapsed.value = elapsed;
+  }, [elapsed]);
+
+  useFrameCallback((info) => {
+    // Interpolate between whole seconds for smooth motion
+    const fracSecond = (info.timeSinceFirstFrame % 1000) / 1000;
+    const totalSeconds = lastElapsed.value + fracSecond;
+    smoothProgress.value = (totalSeconds % RING_PERIOD) / RING_PERIOD;
+    smoothLap.value = Math.floor(totalSeconds / RING_PERIOD);
+  });
+
+  const trailingProps = useAnimatedProps(() => ({
+    stroke: smoothLap.value % 2 === 0 ? faintColor : color,
+  }));
+
+  const leadingProps = useAnimatedProps(() => ({
+    stroke: smoothLap.value % 2 === 0 ? color : faintColor,
+    strokeDashoffset: RING_CIRC * (1 - smoothProgress.value),
+  }));
+
+  const dotStyle = useAnimatedStyle(() => {
+    const rad = smoothProgress.value * 2 * Math.PI;
+    return {
+      position: 'absolute',
+      left: cx + Math.cos(rad - Math.PI / 2) * RING_R - 6,
+      top: cy + Math.sin(rad - Math.PI / 2) * RING_R - 6,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: color,
+    };
+  });
 
   return (
     <View style={styles.orbitContainer}>
       <Svg width={RING_SIZE} height={RING_SIZE}>
-        {/* Full ring — color from previous lap */}
-        <SvgCircle
+        <AnimatedCircle
           cx={cx}
           cy={cy}
           r={RING_R}
-          stroke={trailingStroke}
           strokeWidth={RING_STROKE}
           fill="none"
+          animatedProps={trailingProps}
         />
-        {/* Progress ring — current lap fills over */}
-        <SvgCircle
+        <AnimatedCircle
           cx={cx}
           cy={cy}
           r={RING_R}
-          stroke={leadingStroke}
           strokeWidth={RING_STROKE}
           fill="none"
           strokeDasharray={`${RING_CIRC}`}
-          strokeDashoffset={RING_CIRC * (1 - progress)}
           strokeLinecap="round"
           rotation={-90}
           origin={`${cx}, ${cy}`}
+          animatedProps={leadingProps}
         />
       </Svg>
-      {/* Dot */}
-      <View
-        style={{
-          position: 'absolute',
-          left: dotX,
-          top: dotY,
-          width: 12,
-          height: 12,
-          borderRadius: 6,
-          backgroundColor: color,
-        }}
-      />
+      <Animated.View style={dotStyle} />
     </View>
   );
 }
@@ -351,25 +356,6 @@ export default function DoNothingScreen() {
       if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
     };
   }, []);
-
-  // --- Share ---
-  const handleShare = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const currentStats = getStats(sessions);
-    const text = [
-      `I did nothing for ${formatTimeShort(elapsed)}.`,
-      '',
-      `Today: ${formatTimeShort(currentStats.today + elapsed)}`,
-      `This week: ${formatTimeShort(currentStats.week + elapsed)}`,
-      '',
-      '\u2601\ufe0f Do Nothing',
-    ].join('\n');
-
-    try {
-      await Share.share({ message: text });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
-  }, [elapsed, sessions]);
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -599,6 +585,7 @@ export default function DoNothingScreen() {
       <OrbitRing
         color={theme.accent}
         faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
+        elapsed={elapsed}
       />
 
       {/* Stats */}
