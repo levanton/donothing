@@ -3,12 +3,13 @@ export type ThemeMode = 'dark' | 'light';
 // ── Base palette ─────────────────────────────────────────────────────────
 // Change these values to re-skin the entire app in one place.
 export const palette = {
-  cream:      '#F5EDDF',
-  charcoal:   '#3D3A36',
+  cream:      '#F9F3E0',
+  charcoal:   '#444444',
   brown:      '#2B2522',
   terracotta: '#C75B3A',
   salmon:     '#E8A99A',
   warmGray:   '#D9CFC2',
+  sage:       '#B5C4A8',
   ink:        '#353235',
 } as const;
 

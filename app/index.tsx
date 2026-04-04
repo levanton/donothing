@@ -22,6 +22,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { Fonts } from '@/constants/theme';
 import { themes, palette, ThemeMode } from '@/lib/theme';
 import { timerDisplay, formatTimeShort, formatTimeStat } from '@/lib/format';
@@ -61,33 +62,80 @@ function getFocusMessage(remaining: number, total: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Slow orbit — a small dot tracing a gentle circular path
+// Orbit ring — dot traces a circle, colored stroke fills behind it
 // ---------------------------------------------------------------------------
-function OrbitDot({ color }: { color: string }) {
-  const rotation = useSharedValue(0);
+const RING_SIZE = 96;
+const RING_R = 42;
+const RING_STROKE = 3;
+const RING_CIRC = 2 * Math.PI * RING_R;
+const RING_MS = 10000;
+
+function OrbitRing({ color, faintColor }: { color: string; faintColor: string }) {
+  const [state, setState] = useState({ progress: 0, lap: 0 });
+  const startRef = useRef(Date.now());
 
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 10000, easing: Easing.linear }),
-      -1,
-      false,
-    );
+    const id = setInterval(() => {
+      const total = Date.now() - startRef.current;
+      setState({
+        progress: (total % RING_MS) / RING_MS,
+        lap: Math.floor(total / RING_MS),
+      });
+    }, 40);
+    return () => clearInterval(id);
   }, []);
 
-  const orbitStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  const { progress, lap } = state;
+  const isEven = lap % 2 === 0;
+  const trailingStroke = isEven ? faintColor : color;
+  const leadingStroke = isEven ? color : faintColor;
+
+  const dotAngle = progress * 360 - 90;
+  const dotRad = (dotAngle + 90) * (Math.PI / 180);
+  const cx = RING_SIZE / 2;
+  const cy = RING_SIZE / 2;
+  const dotX = cx + Math.cos(dotRad - Math.PI / 2) * RING_R - 6;
+  const dotY = cy + Math.sin(dotRad - Math.PI / 2) * RING_R - 6;
 
   return (
     <View style={styles.orbitContainer}>
-      {/* Static ring */}
+      <Svg width={RING_SIZE} height={RING_SIZE}>
+        {/* Full ring — color from previous lap */}
+        <SvgCircle
+          cx={cx}
+          cy={cy}
+          r={RING_R}
+          stroke={trailingStroke}
+          strokeWidth={RING_STROKE}
+          fill="none"
+        />
+        {/* Progress ring — current lap fills over */}
+        <SvgCircle
+          cx={cx}
+          cy={cy}
+          r={RING_R}
+          stroke={leadingStroke}
+          strokeWidth={RING_STROKE}
+          fill="none"
+          strokeDasharray={`${RING_CIRC}`}
+          strokeDashoffset={RING_CIRC * (1 - progress)}
+          strokeLinecap="round"
+          rotation={-90}
+          origin={`${cx}, ${cy}`}
+        />
+      </Svg>
+      {/* Dot */}
       <View
-        style={[styles.orbitRing, { borderColor: color }]}
+        style={{
+          position: 'absolute',
+          left: dotX,
+          top: dotY,
+          width: 12,
+          height: 12,
+          borderRadius: 6,
+          backgroundColor: color,
+        }}
       />
-      {/* Rotating arm with dot */}
-      <Animated.View style={[styles.orbitArm, orbitStyle]}>
-        <View style={[styles.orbitDot, { backgroundColor: color }]} />
-      </Animated.View>
     </View>
   );
 }
@@ -548,8 +596,11 @@ export default function DoNothingScreen() {
         </Text>
       </Animated.View>
 
-      {/* Orbit */}
-      <OrbitDot color={theme.accent} />
+      {/* Orbit ring */}
+      <OrbitRing
+        color={theme.accent}
+        faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
+      />
 
       {/* Stats */}
       <Pressable onPress={handleHistory}>
@@ -645,9 +696,19 @@ export default function DoNothingScreen() {
       >
         <Pressable
           onPress={handleHistory}
-          style={[styles.pillButton, { borderColor: palette.ink }]}
+          style={[
+            styles.pillButton,
+            { borderColor: themeMode === 'dark' ? palette.cream : palette.ink },
+          ]}
         >
-          <Text style={[styles.pillText, { color: palette.ink }]}>History</Text>
+          <Text
+            style={[
+              styles.pillText,
+              { color: themeMode === 'dark' ? palette.cream : palette.ink },
+            ]}
+          >
+            History
+          </Text>
         </Pressable>
         <Pressable
           onPress={handleShare}
@@ -715,31 +776,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   orbitContainer: {
-    width: 64,
-    height: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: RING_SIZE,
+    height: RING_SIZE,
     marginTop: 24,
-  },
-  orbitRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    opacity: 0.2,
-    position: 'absolute',
-  },
-  orbitArm: {
-    width: 64,
-    height: 64,
-    alignItems: 'center',
-    position: 'absolute',
-  },
-  orbitDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    top: -4,
   },
   statsContainer: {
     flexDirection: 'row',
