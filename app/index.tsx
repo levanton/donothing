@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -544,9 +545,7 @@ export default function DoNothingScreen() {
         style={[styles.lockButton, { top: insets.top + 12 }]}
         hitSlop={16}
       >
-        <Text style={[styles.lockIcon, { color: theme.text }]}>
-          {'\uD83D\uDD12'}
-        </Text>
+        <Feather name="lock" size={24} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
 
       {/* Header */}
@@ -710,18 +709,6 @@ export default function DoNothingScreen() {
             History
           </Text>
         </Pressable>
-        <Pressable
-          onPress={handleShare}
-          style={[
-            styles.pillButton,
-            styles.pillButtonFilled,
-            { backgroundColor: theme.accent, borderColor: theme.accent },
-          ]}
-        >
-          <Text style={[styles.pillText, { color: theme.accentText }]}>
-            Share
-          </Text>
-        </Pressable>
       </Animated.View>
     </Animated.View>
   );
@@ -838,7 +825,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   pillButton: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderRadius: 28,
     paddingVertical: 14,
     paddingHorizontal: 32,

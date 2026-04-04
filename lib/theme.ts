@@ -51,8 +51,8 @@ export const themes: Record<ThemeMode, AppTheme> = {
   light: {
     bg:            palette.cream,
     text:          palette.brown,
-    textSecondary: alpha(palette.brown, 0.55),
-    textTertiary:  alpha(palette.brown, 0.35),
+    textSecondary: alpha(palette.brown, 0.7),
+    textTertiary:  alpha(palette.brown, 0.65),
     dot:           palette.terracotta,
     border:        alpha(palette.brown, 0.2),
     accent:        palette.terracotta,
