@@ -161,9 +161,9 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
               ]}>
                 {duration > 0 && (
                   <View style={[styles.activityBubble, {
-                    width: Math.max(28, 8 + intensity * 28),
-                    height: Math.max(28, 8 + intensity * 28),
-                    borderRadius: Math.max(28, 8 + intensity * 28) / 2,
+                    width: Math.max(24, 8 + intensity * 28),
+                    height: Math.max(24, 8 + intensity * 28),
+                    borderRadius: Math.max(24, 8 + intensity * 28) / 2,
                     backgroundColor: theme.accent,
                   }]} />
                 )}
