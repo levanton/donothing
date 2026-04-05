@@ -248,10 +248,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             Haptics.selectionAsync();
             store().toggleReminder(r.id);
           }}
-          style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.border }]}
+          style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.textTertiary }]}
         >
           <View style={styles.cardContent}>
-            <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
+            <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime12(r.hour, r.minute)}
             </Text>
             <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
@@ -265,8 +265,9 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 Haptics.selectionAsync();
                 store().toggleReminder(r.id);
               }}
-              trackColor={{ false: theme.border, true: theme.accent }}
+              trackColor={{ false: theme.textTertiary, true: theme.accent }}
               thumbColor="#fff"
+              ios_backgroundColor={r.enabled ? theme.accent : theme.textTertiary}
               style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
             <Pressable
@@ -344,10 +345,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             Haptics.selectionAsync();
             store().toggleScheduledBlock(b.id);
           }}
-          style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.border }]}
+          style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.textTertiary }]}
         >
           <View style={styles.cardContent}>
-            <Text style={[styles.cardTime, { color: b.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
+            <Text style={[styles.cardTime, { color: b.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime12(b.hour, b.minute)}
             </Text>
             <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
@@ -361,8 +362,9 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 Haptics.selectionAsync();
                 store().toggleScheduledBlock(b.id);
               }}
-              trackColor={{ false: theme.border, true: theme.accent }}
+              trackColor={{ false: theme.textTertiary, true: theme.accent }}
               thumbColor="#fff"
+              ios_backgroundColor={b.enabled ? theme.accent : theme.textTertiary}
               style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
             <Pressable
