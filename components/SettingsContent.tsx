@@ -288,10 +288,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           setShowReminderPicker(true);
           reminderSheetRef.current?.expand();
         }}
-        style={[styles.addButton, { borderColor: theme.border }]}
+        style={[styles.addButton, { borderColor: theme.textTertiary }]}
       >
-        <Feather name="plus" size={16} color={theme.textSecondary} />
-        <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add reminder</Text>
+        <Feather name="plus" size={14} color={theme.text} />
+        <Text style={[styles.addButtonText, { color: theme.text }]}>add reminder</Text>
       </Pressable>
 
       {/* App selection for blocking */}
@@ -385,10 +385,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
-        style={[styles.addButton, { borderColor: theme.border }]}
+        style={[styles.addButton, { borderColor: theme.textTertiary }]}
       >
-        <Feather name="plus" size={16} color={theme.textSecondary} />
-        <Text style={[styles.addButtonText, { color: theme.textSecondary }]}>add block</Text>
+        <Feather name="plus" size={14} color={theme.text} />
+        <Text style={[styles.addButtonText, { color: theme.text }]}>add block</Text>
       </Pressable>
     </ScrollView>
 
@@ -490,12 +490,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'flex-end',
     gap: 6,
     marginTop: 4,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
     borderWidth: 1,
-    borderRadius: 12,
-    borderStyle: 'dashed',
+    borderRadius: 100,
   },
   addButtonText: { fontSize: 14, fontWeight: '300' },
 
