@@ -36,6 +36,7 @@ function formatTime12(hour: number, minute: number) {
 
 // Weekday helpers — Expo convention: 1=Sun … 7=Sat, display Mon-first
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const WEEKDAY_SHORT = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 const WEEKDAY_VALUES = [2, 3, 4, 5, 6, 7, 1]; // Mon…Sun in Expo weekday numbers
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
@@ -384,18 +385,19 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime12(r.hour, r.minute)}
             </Text>
-            <View style={styles.cardDots}>
-              {WEEKDAY_VALUES.map((day) => {
+            <View style={styles.cardDays}>
+              {WEEKDAY_VALUES.map((day, i) => {
                 const active = !r.weekdays?.length || r.weekdays.includes(day);
                 return (
-                  <View
-                    key={day}
-                    style={[
-                      styles.cardDot,
-                      { backgroundColor: active ? theme.text : 'transparent',
-                        borderColor: active ? theme.text : theme.textTertiary },
-                    ]}
-                  />
+                  <View key={day} style={styles.cardDayCol}>
+                    <View style={[styles.cardDot, {
+                      backgroundColor: active ? theme.text : 'transparent',
+                      borderColor: active ? theme.text : theme.textTertiary,
+                    }]} />
+                    <Text style={[styles.cardDayText, { color: active ? theme.text : theme.textTertiary }]}>
+                      {WEEKDAY_SHORT[i]}
+                    </Text>
+                  </View>
                 );
               })}
             </View>
@@ -542,18 +544,19 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
                 do nothing for {b.durationMinutes} min
               </Text>
-              <View style={styles.cardDots}>
-                {WEEKDAY_VALUES.map((day) => {
+              <View style={styles.cardDays}>
+                {WEEKDAY_VALUES.map((day, i) => {
                   const dayActive = !b.weekdays?.length || b.weekdays.includes(day);
                   return (
-                    <View
-                      key={day}
-                      style={[
-                        styles.cardDot,
-                        { backgroundColor: dayActive ? theme.text : 'transparent',
-                          borderColor: dayActive ? theme.text : theme.textTertiary },
-                      ]}
-                    />
+                    <View key={day} style={styles.cardDayCol}>
+                      <View style={[styles.cardDot, {
+                        backgroundColor: dayActive ? theme.text : 'transparent',
+                        borderColor: dayActive ? theme.text : theme.textTertiary,
+                      }]} />
+                      <Text style={[styles.cardDayText, { color: dayActive ? theme.text : theme.textTertiary }]}>
+                        {WEEKDAY_SHORT[i]}
+                      </Text>
+                    </View>
                   );
                 })}
               </View>
@@ -809,16 +812,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
-  cardDots: {
+  cardDays: {
     flexDirection: 'row',
-    gap: 4,
-    marginTop: 2,
+    gap: 6,
+    marginTop: 4,
+  },
+  cardDayCol: {
+    alignItems: 'center',
+    gap: 2,
   },
   cardDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     borderWidth: 1,
+  },
+  cardDayText: {
+    fontSize: 8,
+    fontWeight: '400',
   },
   dayHint: {
     fontSize: 12,
