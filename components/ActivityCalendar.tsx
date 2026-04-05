@@ -157,8 +157,7 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
             >
               <View style={[
                 styles.dayCircle,
-                isToday && { borderWidth: 1, borderColor: theme.accent },
-                isSelected && !isToday && { borderWidth: 1, borderColor: theme.text },
+                isSelected && { borderWidth: 1, borderColor: theme.text },
               ]}>
                 {duration > 0 && (
                   <View style={[styles.activityBubble, {
