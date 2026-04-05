@@ -27,9 +27,14 @@ export function formatTimeShort(seconds: number): string {
 
 /** For stats display — returns { value, unit } for split rendering */
 export function formatTimeStat(seconds: number): { value: string; unit: string } {
-  const h = Math.floor(seconds / 3600);
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
 
+  if (d > 0) {
+    if (h === 0) return { value: `${d}`, unit: d === 1 ? 'day' : 'days' };
+    return { value: `${d}d ${h}h`, unit: '' };
+  }
   if (h === 0) return { value: `${m}`, unit: 'min' };
   if (m === 0) return { value: `${h}`, unit: 'hr' };
   return { value: `${h}:${String(m).padStart(2, '0')}`, unit: 'hr' };

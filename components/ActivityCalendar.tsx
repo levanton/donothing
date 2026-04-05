@@ -41,14 +41,17 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
     return map;
   }, [sessions]);
 
-  // Find max duration for intensity scaling
+  // Find max duration for the viewed month (for proportional intensity)
   const maxDuration = useMemo(() => {
     let max = 0;
-    for (const d of durationMap.values()) {
-      if (d > max) max = d;
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dur = durationMap.get(key) || 0;
+      if (dur > max) max = dur;
     }
     return max || 1;
-  }, [durationMap]);
+  }, [durationMap, viewYear, viewMonth]);
 
   // Build calendar grid for current month
   const calendarDays = useMemo(() => {
@@ -154,24 +157,26 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
             >
               <View style={[
                 styles.dayCircle,
-                isToday && { borderWidth: 1.5, borderColor: theme.accent },
-                isSelected && !isToday && { borderWidth: 1.5, borderColor: theme.text },
+                isToday && { borderWidth: 1, borderColor: theme.accent },
+                isSelected && !isToday && { borderWidth: 1, borderColor: theme.text },
               ]}>
+                {duration > 0 && (
+                  <View style={[styles.activityBubble, {
+                    width: 8 + intensity * 28,
+                    height: 8 + intensity * 28,
+                    borderRadius: (8 + intensity * 28) / 2,
+                    backgroundColor: theme.accent,
+                  }]} />
+                )}
                 <Text style={[
                   styles.dayNumber,
                   {
-                    color: isFuture ? theme.border : theme.text,
+                    color: isFuture ? theme.border : intensity > 0.4 ? '#fff' : theme.text,
                     fontFamily: Fonts!.serif,
                   },
                 ]}>
                   {cell.day}
                 </Text>
-                {duration > 0 && (
-                  <View style={[
-                    styles.activityDot,
-                    { backgroundColor: theme.accent, opacity: intensity },
-                  ]} />
-                )}
               </View>
             </Pressable>
           );
@@ -191,6 +196,12 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
       )}
     </View>
   );
+}
+
+/** Convert 0..1 intensity to hex alpha suffix (e.g. 0.3 → "4D") */
+function alphaHex(intensity: number): string {
+  const alpha = Math.round(Math.max(0.15, Math.min(1, intensity)) * 255);
+  return alpha.toString(16).padStart(2, '0').toUpperCase();
 }
 
 function formatSelectedDate(key: string): string {
@@ -248,13 +259,10 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 15,
     fontWeight: '300',
+    zIndex: 1,
   },
-  activityDot: {
+  activityBubble: {
     position: 'absolute',
-    bottom: 4,
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
   },
   selectedDetail: {
     flexDirection: 'row',

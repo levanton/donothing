@@ -39,6 +39,9 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   const avgSession = sessions.length > 0
     ? formatTimeStat(Math.round(totalStats.year / sessions.length))
     : { value: '0', unit: 'min' };
+  const longestSession = formatTimeStat(
+    sessions.length > 0 ? Math.max(...sessions.map((s) => s.duration)) : 0,
+  );
 
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
@@ -107,9 +110,10 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
           </View>
           <View style={styles.statCell}>
             <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              {sessions.length}
+              {longestSession.value}
+              <Text style={[styles.statUnit, { color: theme.textTertiary }]}> {longestSession.unit}</Text>
             </Text>
-            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>sessions</Text>
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>longest</Text>
           </View>
         </View>
       </View>
