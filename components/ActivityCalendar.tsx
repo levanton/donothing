@@ -259,6 +259,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '300',
     zIndex: 1,
+    position: 'absolute',
   },
   activityBubble: {
     position: 'absolute',
