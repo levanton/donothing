@@ -185,7 +185,7 @@ export default function GoalSliderBar({
         {/* Track */}
         <SvgLine
           x1={pad} y1={cy} x2={width - pad} y2={cy}
-          stroke={theme.border}
+          stroke={theme.textTertiary}
           strokeWidth={2}
           strokeLinecap="round"
         />
@@ -196,7 +196,7 @@ export default function GoalSliderBar({
             <SvgLine
               key={m}
               x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
-              stroke={theme.border}
+              stroke={theme.textTertiary}
               strokeWidth={1}
             />
           );
