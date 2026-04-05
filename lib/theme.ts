@@ -4,6 +4,7 @@ export type ThemeMode = 'dark' | 'light';
 // Change these values to re-skin the entire app in one place.
 export const palette = {
   cream:      '#F9F3E0',
+  white:      '#FFFFFF',
   charcoal:   '#444444',
   brown:      '#2B2522',
   terracotta: '#C75B3A',
@@ -11,6 +12,7 @@ export const palette = {
   warmGray:   '#D9CFC2',
   sage:       '#B5C4A8',
   ink:        '#353235',
+  danger:     '#D94040',
 } as const;
 
 // ── Opacity helpers ──────────────────────────────────────────────────────
@@ -39,8 +41,8 @@ export const themes: Record<ThemeMode, AppTheme> = {
   dark: {
     bg:            palette.charcoal,
     text:          palette.cream,
-    textSecondary: alpha(palette.cream, 0.75),
-    textTertiary:  alpha(palette.cream, 0.55),
+    textSecondary: alpha(palette.cream, 0.85),
+    textTertiary:  alpha(palette.cream, 0.75),
     dot:           palette.terracotta,
     border:        alpha(palette.cream, 0.18),
     accent:        palette.terracotta,
@@ -51,8 +53,8 @@ export const themes: Record<ThemeMode, AppTheme> = {
   light: {
     bg:            palette.cream,
     text:          palette.brown,
-    textSecondary: alpha(palette.brown, 0.7),
-    textTertiary:  alpha(palette.brown, 0.65),
+    textSecondary: alpha(palette.brown, 0.75),
+    textTertiary:  alpha(palette.brown, 0.7),
     dot:           palette.terracotta,
     border:        alpha(palette.brown, 0.2),
     accent:        palette.terracotta,

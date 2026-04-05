@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { Fonts } from '@/constants/theme';
+import { palette } from '@/lib/theme';
 import { formatTimeShort } from '@/lib/format';
 import type { Session } from '@/lib/storage';
 
@@ -170,7 +171,7 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
                 <Text style={[
                   styles.dayNumber,
                   {
-                    color: isFuture ? theme.border : duration > 0 ? '#fff' : theme.text,
+                    color: isFuture ? theme.border : duration > 0 ? palette.white : theme.text,
                     fontFamily: Fonts!.serif,
                   },
                 ]}>

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { palette } from '@/lib/theme';
 
 interface PillButtonProps {
   label: string;
@@ -28,7 +29,7 @@ export default function PillButton({ label, onPress, color, filled, fillColor, f
       <Text style={[
         styles.text,
         small && styles.textSmall,
-        { color: filled ? '#fff' : color },
+        { color: filled ? palette.white : color },
       ]}>
         {label}
       </Text>

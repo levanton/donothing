@@ -545,7 +545,7 @@ export default function DoNothingScreen() {
               activateKeepAwakeAsync('focus');
             }}
           >
-            <Text style={{ color: '#fff', fontFamily: Fonts!.serif, fontSize: 17, fontWeight: '400' }}>
+            <Text style={{ color: palette.white, fontFamily: Fonts!.serif, fontSize: 17, fontWeight: '400' }}>
               do nothing for {doNothingMins} min
             </Text>
           </Pressable>

@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 const SCREEN_W = Dimensions.get('window').width;
 
 import { Fonts } from '@/constants/theme';
-import { themes } from '@/lib/theme';
+import { themes, palette } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { getDailyStats, getStats, getStreak } from '@/lib/stats';
 import ActivityCalendar from './ActivityCalendar';
@@ -54,7 +54,7 @@ function SwipeableDayRow({ day, theme, onDelete }: {
   return (
     <View style={styles.swipeContainer}>
       <Pressable
-        style={[styles.deleteBtn, { backgroundColor: '#D94040' }]}
+        style={[styles.deleteBtn, { backgroundColor: palette.danger }]}
         onPress={() => {
           translateX.value = withTiming(0, { duration: 200 });
           onDelete();
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteBtnText: {
-    color: '#fff',
+    color: palette.white,
     fontSize: 14,
     fontWeight: '500',
   },

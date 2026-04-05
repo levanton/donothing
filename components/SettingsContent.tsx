@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
 
 import { Fonts } from '@/constants/theme';
-import { AppTheme, themes } from '@/lib/theme';
+import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
 import { useAppStore } from '@/lib/store';
 import { requestAuth } from '@/lib/screen-time';
@@ -277,7 +277,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime12(r.hour, r.minute)}
             </Text>
-            <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
+            <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
               daily reminder
             </Text>
           </View>
@@ -289,7 +289,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 store().toggleReminder(r.id);
               }}
               trackColor={{ false: theme.textTertiary, true: theme.accent }}
-              thumbColor="#fff"
+              thumbColor={palette.white}
               ios_backgroundColor={r.enabled ? theme.accent : theme.textTertiary}
               style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
@@ -418,7 +418,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
                 {formatTime12(b.hour, b.minute)}
               </Text>
-              <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
+              <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
                 do nothing for {b.durationMinutes} min
               </Text>
             </View>
@@ -431,7 +431,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                   store().toggleScheduledBlock(b.id);
                 }}
                 trackColor={{ false: theme.textTertiary, true: theme.accent }}
-                thumbColor="#fff"
+                thumbColor={palette.white}
                 ios_backgroundColor={active ? theme.accent : theme.textTertiary}
                 style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
               />
