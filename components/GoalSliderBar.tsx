@@ -19,31 +19,43 @@ export const SLIDER_PAD = 10;
 
 // Non-linear snap points: 0–10 by 1, then 15,20,25,30, then by 10 to 60, then by 15 to 120
 const SNAP_POINTS = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-  15, 20, 25, 30,
-  40, 50, 60,
-  75, 90, 105, 120,
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+  20, 25, 30, 35, 40, 45, 50, 55, 60,
+  65, 70, 75, 80, 85, 90,
 ];
 
-/** Map a 0–1 slider position to a snap value */
-function positionToValue(x: number): number {
+// Piecewise linear: 0–15 → 0–0.375, 15–60 → 0.375–0.85, 60–90 → 0.85–1.0
+const B1_VAL = 15;
+const B1_POS = 0.375;
+const B2_VAL = 60;
+const B2_POS = 0.8;
+
+/** value → visual position (0–1) */
+function valueToPos(v: number, max: number): number {
   'worklet';
-  const idx = Math.round(x * (SNAP_POINTS.length - 1));
-  return SNAP_POINTS[Math.max(0, Math.min(SNAP_POINTS.length - 1, idx))];
+  if (v <= B1_VAL) return (v / B1_VAL) * B1_POS;
+  if (v <= B2_VAL) return B1_POS + ((v - B1_VAL) / (B2_VAL - B1_VAL)) * (B2_POS - B1_POS);
+  return B2_POS + ((v - B2_VAL) / (max - B2_VAL)) * (1 - B2_POS);
 }
 
-/** Map a snap value to a 0–1 slider position */
-function valueToPosition(v: number): number {
+/** visual position (0–1) → value */
+function posToValue(p: number, max: number): number {
   'worklet';
-  const idx = SNAP_POINTS.indexOf(v);
-  if (idx >= 0) return idx / (SNAP_POINTS.length - 1);
-  // Fallback: find closest
-  let closest = 0;
-  for (let i = 1; i < SNAP_POINTS.length; i++) {
-    if (Math.abs(SNAP_POINTS[i] - v) < Math.abs(SNAP_POINTS[closest] - v)) closest = i;
-  }
-  return closest / (SNAP_POINTS.length - 1);
+  if (p <= B1_POS) return (p / B1_POS) * B1_VAL;
+  if (p <= B2_POS) return B1_VAL + ((p - B1_POS) / (B2_POS - B1_POS)) * (B2_VAL - B1_VAL);
+  return B2_VAL + ((p - B2_POS) / (1 - B2_POS)) * (max - B2_VAL);
 }
+
+/** Snap a raw minute value to the nearest allowed snap point */
+function snapToNearest(raw: number): number {
+  'worklet';
+  let best = SNAP_POINTS[0];
+  for (let i = 1; i < SNAP_POINTS.length; i++) {
+    if (Math.abs(SNAP_POINTS[i] - raw) < Math.abs(best - raw)) best = SNAP_POINTS[i];
+  }
+  return best;
+}
+
 
 interface GoalSliderBarProps {
   theme: any;
@@ -109,8 +121,9 @@ export default function GoalSliderBar({
       const twVal = trackW.value;
       if (twVal === 0) return;
       const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
-      const snapped = positionToValue(x);
-      internalProgress.value = valueToPosition(snapped);
+      const raw = posToValue(x, maxMinutes);
+      const snapped = snapToNearest(raw);
+      internalProgress.value = valueToPos(snapped, maxMinutes);
       runOnJS(handleChange)(snapped);
     });
 
@@ -120,13 +133,13 @@ export default function GoalSliderBar({
     const t = w - pad * 2;
     trackW.value = t;
     if (value !== undefined) {
-      internalProgress.value = valueToPosition(value);
+      internalProgress.value = valueToPos(value, maxMinutes);
     }
-  }, [value]);
+  }, [value, maxMinutes]);
 
   // Sync external value changes (interactive mode)
   if (isInteractive && lastSnap.current !== value && width > 0) {
-    internalProgress.value = valueToPosition(value);
+    internalProgress.value = valueToPos(value, maxMinutes);
     lastSnap.current = value;
   }
 
@@ -178,7 +191,7 @@ export default function GoalSliderBar({
         />
         {/* Tick marks */}
         {ticks.map((m) => {
-          const tx = pad + (isInteractive ? valueToPosition(m) : m / maxMinutes) * tw;
+          const tx = pad + (isInteractive ? valueToPos(m, maxMinutes) : m / maxMinutes) * tw;
           return (
             <SvgLine
               key={m}
@@ -210,22 +223,26 @@ export default function GoalSliderBar({
           animatedProps={thumbDotProps}
         />
       </Svg>
-      {isInteractive ? (
+      {isInteractive && scaleLabels.length > 2 ? (
         <View style={[styles.scaleRow, { width, height: 16 }]}>
           {scaleLabels.map((label, i) => {
             const val = Number(label);
-            const pos = valueToPosition(val);
+            const pos = valueToPos(val, maxMinutes);
             return (
-              <Text
+              <View
                 key={i}
-                style={[styles.scaleLabel, {
-                  color: theme.textTertiary,
+                style={{
                   position: 'absolute',
-                  left: pad + pos * tw - 8,
-                }]}
+                  left: pad + pos * tw,
+                  alignItems: 'center',
+                  transform: [{ translateX: -20 }],
+                  width: 40,
+                }}
               >
-                {label}
-              </Text>
+                <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>
+                  {label}
+                </Text>
+              </View>
             );
           })}
         </View>

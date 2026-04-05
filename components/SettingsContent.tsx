@@ -231,9 +231,9 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         value={dailyGoalMinutes}
         onChange={handleGoalChange}
         theme={theme}
-        maxMinutes={120}
-        ticks={[15, 30, 45, 60, 90]}
-        scaleLabels={['0', '60', '120']}
+        maxMinutes={90}
+        ticks={[5, 10, 15, 30, 45, 60]}
+        scaleLabels={['0', '5', '10', '15', '30', '45', '60', '90']}
         accentColor={theme.accent}
       />
 
