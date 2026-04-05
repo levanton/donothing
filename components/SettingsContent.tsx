@@ -402,7 +402,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       onChange={(i) => { if (i === -1) setShowReminderPicker(false); }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
-      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 0 }}
+      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 24 }}
     >
       <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
         <TimePickerContent
@@ -423,7 +423,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       onChange={(i) => { if (i === -1) setShowBlockPicker(false); }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
-      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 0 }}
+      backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 24 }}
     >
       <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
         <BlockPickerContent
@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
   sheetContent: {
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingTop: 8,
   },
   sheetTitle: {
     fontSize: 20,
