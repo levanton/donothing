@@ -154,13 +154,13 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
             >
               <View style={[
                 styles.dayCircle,
-                isToday && { borderWidth: 1.5, borderColor: theme.accent },
-                isSelected && { borderWidth: 1.5, borderColor: theme.text },
+                isToday && !isSelected && { borderWidth: 1.5, borderColor: theme.accent },
+                isSelected && { backgroundColor: theme.accent },
               ]}>
                 <Text style={[
                   styles.dayNumber,
                   {
-                    color: isFuture ? theme.border : theme.text,
+                    color: isSelected ? '#fff' : isFuture ? theme.border : theme.text,
                     fontFamily: Fonts!.serif,
                   },
                 ]}>
@@ -180,11 +180,11 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
 
       {/* Selected day detail */}
       {selectedDate && (
-        <View style={[styles.selectedDetail, { borderColor: theme.border }]}>
-          <Text style={[styles.selectedDate, { color: theme.textSecondary }]}>
+        <View style={[styles.selectedDetail, { backgroundColor: theme.accent + '15', borderColor: theme.accent + '30' }]}>
+          <Text style={[styles.selectedDate, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {formatSelectedDate(selectedDate)}
           </Text>
-          <Text style={[styles.selectedDuration, { color: selectedDuration > 0 ? theme.text : theme.textTertiary, fontFamily: Fonts!.serif }]}>
+          <Text style={[styles.selectedDuration, { color: selectedDuration > 0 ? theme.accent : theme.textTertiary, fontFamily: Fonts!.serif }]}>
             {selectedDuration > 0 ? formatTimeShort(selectedDuration) : 'no sessions'}
           </Text>
         </View>
@@ -260,16 +260,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   selectedDate: {
-    fontSize: 14,
-    fontWeight: '300',
+    fontSize: 16,
+    fontWeight: '400',
   },
   selectedDuration: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '300',
   },
 });
