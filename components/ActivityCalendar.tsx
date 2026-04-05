@@ -154,13 +154,13 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
             >
               <View style={[
                 styles.dayCircle,
-                isToday && !isSelected && { borderWidth: 1.5, borderColor: theme.accent },
-                isSelected && { backgroundColor: theme.accent },
+                isToday && { borderWidth: 1.5, borderColor: theme.accent },
+                isSelected && !isToday && { borderWidth: 1.5, borderColor: theme.text },
               ]}>
                 <Text style={[
                   styles.dayNumber,
                   {
-                    color: isSelected ? '#fff' : isFuture ? theme.border : theme.text,
+                    color: isFuture ? theme.border : theme.text,
                     fontFamily: Fonts!.serif,
                   },
                 ]}>
