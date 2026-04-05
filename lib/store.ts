@@ -79,6 +79,9 @@ export interface AppState {
   removeScheduledBlock: (id: string) => Promise<void>;
   toggleScheduledBlock: (id: string) => Promise<void>;
 
+  // Session actions
+  deleteSessionsByDate: (dateKey: string) => Promise<void>;
+
   // AppState
   handleBackground: () => Promise<void>;
   handleForeground: () => Promise<void>;
@@ -160,6 +163,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
+
+  deleteSessionsByDate: async (dateKey: string) => {
+    const sessions = get().sessions.filter((s) => {
+      const d = new Date(s.timestamp);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return key !== dateKey;
+    });
+    set({ sessions, weekStats: getWeekStats(sessions) });
+    await saveSessions(sessions);
+  },
 
   // --- Theme ---
   toggleTheme: () => {

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +16,67 @@ import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+const DELETE_BTN_W = 80;
+
+function SwipeableDayRow({ day, theme, onDelete }: {
+  day: { date: string; label: string; duration: number };
+  theme: any;
+  onDelete: () => void;
+}) {
+  const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
+
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-5, 5])
+    .onStart(() => {
+      startX.value = translateX.value;
+    })
+    .onUpdate((e) => {
+      'worklet';
+      const next = startX.value + e.translationX;
+      translateX.value = Math.max(-DELETE_BTN_W, Math.min(0, next));
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX < -40 || e.velocityX < -500) {
+        translateX.value = withTiming(-DELETE_BTN_W, { duration: 200 });
+      } else {
+        translateX.value = withTiming(0, { duration: 200 });
+      }
+    });
+
+  const rowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  return (
+    <View style={styles.swipeContainer}>
+      <Pressable
+        style={[styles.deleteBtn, { backgroundColor: '#D94040' }]}
+        onPress={() => {
+          translateX.value = withTiming(0, { duration: 200 });
+          onDelete();
+        }}
+      >
+        <Text style={styles.deleteBtnText}>Delete</Text>
+      </Pressable>
+      <GestureDetector gesture={day.duration > 0 ? swipe : Gesture.Manual()}>
+        <Animated.View style={[styles.swipeRow, { borderBottomColor: theme.border, backgroundColor: theme.bg }, rowStyle]}>
+          <Text style={[styles.dayLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>{day.label}</Text>
+          <Text style={[styles.dayDuration, {
+            color: day.duration > 0 ? theme.text : theme.textTertiary,
+            fontFamily: Fonts!.serif,
+          }]}>
+            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
+          </Text>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
+
 
 const ZEN_QUOTES = [
   'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
@@ -34,6 +95,7 @@ interface HistoryContentProps {
 
 export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
   const sessions = useAppStore((s) => s.sessions);
+  const deleteSessionsByDate = useAppStore((s) => s.deleteSessionsByDate);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
 
@@ -219,15 +281,12 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
 
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
       {dailyStats.map((day) => (
-        <View key={day.date} style={[styles.dayRow, { borderBottomColor: theme.border }]}>
-          <Text style={[styles.dayLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>{day.label}</Text>
-          <Text style={[styles.dayDuration, {
-            color: day.duration > 0 ? theme.text : theme.textTertiary,
-            fontFamily: Fonts!.serif,
-          }]}>
-            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
-          </Text>
-        </View>
+        <SwipeableDayRow
+          key={day.date}
+          day={day}
+          theme={theme}
+          onDelete={() => deleteSessionsByDate(day.date)}
+        />
       ))}
 
       <View style={styles.quoteContainer}>
@@ -304,8 +363,34 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 13, fontWeight: '300', marginTop: 3 },
   sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  swipeContainer: {
+    marginHorizontal: -24,
+    overflow: 'hidden',
+  },
+  swipeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   dayLabel: { fontSize: 16, fontWeight: '400' },
   dayDuration: { fontSize: 16, fontWeight: '300' },
+  deleteBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: DELETE_BTN_W,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center' },
   quoteText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22 },
 });
