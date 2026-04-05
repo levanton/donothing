@@ -138,10 +138,10 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
             <View style={styles.statsRow}>
               <View style={styles.totalSection}>
                 <View style={styles.totalValueRow}>
-                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{totalAll.value}</Text>
-                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{totalAll.unit}</Text>
+                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{thisMonthStat.value}</Text>
+                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{thisMonthStat.unit}</Text>
                 </View>
-                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>total stillness</Text>
+                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>this month</Text>
               </View>
               <View style={styles.statsGrid}>
                 <View style={styles.statCell}>
@@ -175,10 +175,10 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
             <View style={styles.statsRow}>
               <View style={styles.totalSection}>
                 <View style={styles.totalValueRow}>
-                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{thisMonthStat.value}</Text>
-                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{thisMonthStat.unit}</Text>
+                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{totalAll.value}</Text>
+                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{totalAll.unit}</Text>
                 </View>
-                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>this month</Text>
+                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>total stillness</Text>
               </View>
               <View style={styles.statsGrid}>
                 <View style={styles.statCell}>
@@ -286,9 +286,9 @@ const styles = StyleSheet.create({
   },
   totalSection: { flex: 1 },
   totalValueRow: { flexDirection: 'row', alignItems: 'baseline' },
-  totalValue: { fontSize: 52, fontWeight: '300' },
-  totalUnit: { fontSize: 18, fontWeight: '300', marginLeft: 4 },
-  totalLabel: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
+  totalValue: { fontSize: 56, fontWeight: '300' },
+  totalUnit: { fontSize: 20, fontWeight: '300', marginLeft: 4 },
+  totalLabel: { fontSize: 15, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
   statsGrid: {
     flex: 1,
     flexDirection: 'row',
@@ -296,12 +296,12 @@ const styles = StyleSheet.create({
   },
   statCell: {
     width: '50%',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingLeft: 12,
   },
-  statValue: { fontSize: 22, fontWeight: '300' },
-  statUnit: { fontSize: 14, fontWeight: '300' },
-  statLabel: { fontSize: 13, fontWeight: '300', marginTop: 2 },
+  statValue: { fontSize: 24, fontWeight: '300' },
+  statUnit: { fontSize: 15, fontWeight: '300' },
+  statLabel: { fontSize: 13, fontWeight: '300', marginTop: 3 },
   sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   dayLabel: { fontSize: 16, fontWeight: '400' },
