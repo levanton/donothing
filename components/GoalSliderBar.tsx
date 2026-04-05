@@ -192,11 +192,12 @@ export default function GoalSliderBar({
         {/* Tick marks */}
         {ticks.map((m) => {
           const tx = pad + (isInteractive ? valueToPos(m, maxMinutes) : m / maxMinutes) * tw;
+          const filled = isInteractive ? (value ?? 0) >= m : false;
           return (
             <SvgLine
               key={m}
               x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
-              stroke={theme.textTertiary}
+              stroke={filled ? color : theme.textTertiary}
               strokeWidth={1}
             />
           );

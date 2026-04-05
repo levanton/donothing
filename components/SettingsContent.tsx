@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { activitySelectionMetadata } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
@@ -183,6 +185,87 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const store = useAppStore.getState;
 
+  // Slide-to-block gesture
+  const THUMB_W = 52;
+  const [slideTrackW, setSlideTrackW] = useState(0);
+  const slideX = useSharedValue(0);
+
+  const openAppPicker = useCallback(async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const status = await requestAuth();
+    if (status === 'approved') {
+      setShowAppPicker(true);
+    }
+  }, []);
+
+  const slideGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      'worklet';
+      const maxX = slideTrackW - THUMB_W;
+      slideX.value = Math.max(0, Math.min(maxX, e.translationX));
+    })
+    .onEnd(() => {
+      'worklet';
+      const maxX = slideTrackW - THUMB_W;
+      if (slideX.value > maxX * 0.75) {
+        slideX.value = withTiming(maxX, { duration: 150 });
+        runOnJS(openAppPicker)();
+        slideX.value = withTiming(0, { duration: 400 });
+      } else {
+        slideX.value = withTiming(0, { duration: 250 });
+      }
+    });
+
+  const slideProgress = useAnimatedStyle(() => {
+    const maxX = slideTrackW - THUMB_W;
+    const progress = maxX > 0 ? slideX.value / maxX : 0;
+    return {
+      opacity: interpolate(progress, [0, 1], [0, 1]),
+    };
+  });
+
+  const thumbTextColor = theme.text;
+  const thumbBgColor = theme.bg;
+
+  const slideThumbStyle = useAnimatedStyle(() => {
+    const maxX = (slideTrackW - THUMB_W) || 1;
+    const progress = slideX.value / maxX;
+    return {
+      transform: [{ translateX: slideX.value }],
+      backgroundColor: interpolateColor(progress, [0, 1], [thumbTextColor, thumbBgColor]),
+    };
+  });
+
+  const slideThumbIconLight = useAnimatedStyle(() => {
+    const maxX = (slideTrackW - THUMB_W) || 1;
+    const progress = slideX.value / maxX;
+    return { opacity: interpolate(progress, [0, 1], [1, 0]) };
+  });
+
+  const slideThumbIconDark = useAnimatedStyle(() => {
+    const maxX = (slideTrackW - THUMB_W) || 1;
+    const progress = slideX.value / maxX;
+    return { opacity: interpolate(progress, [0, 1], [0, 1]) };
+  });
+
+  const slideTrackBorderColor = theme.textTertiary;
+  const slideTrackFillColor = theme.text;
+
+  const slideTrackStyle = useAnimatedStyle(() => {
+    const maxX = (slideTrackW - THUMB_W) || 1;
+    const progress = slideX.value / maxX;
+    return {
+      borderColor: interpolateColor(progress, [0, 1], [slideTrackBorderColor, slideTrackFillColor]),
+    };
+  });
+
+  const slideTextStyle = useAnimatedStyle(() => {
+    const maxX = slideTrackW - THUMB_W;
+    return {
+      opacity: maxX > 0 ? interpolate(slideX.value, [0, maxX * 0.5], [1, 0]) : 1,
+    };
+  });
+
   const handleGoalChange = (minutes: number) => {
     store().setDailyGoal(minutes);
   };
@@ -300,24 +383,51 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
             APPS TO BLOCK
           </Text>
-          <Pressable
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              const status = await requestAuth();
-              if (status === 'approved') {
-                setShowAppPicker(true);
-              }
-            }}
-            style={[styles.selectAppsBtn, {
-              borderColor: appCount > 0 ? theme.text : theme.border,
-              backgroundColor: appCount > 0 ? theme.text : 'transparent',
-            }]}
-          >
-            <Feather name="smartphone" size={18} color={appCount > 0 ? theme.bg : theme.textSecondary} />
-            <Text style={[styles.selectAppsText, { color: appCount > 0 ? theme.bg : theme.textSecondary }]}>
-              {appCount > 0 ? `${appCount} selected — tap to change` : 'Select apps'}
-            </Text>
-          </Pressable>
+          {appCount > 0 ? (
+            <Pressable
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                const status = await requestAuth();
+                if (status === 'approved') setShowAppPicker(true);
+              }}
+            >
+              <View
+                style={[styles.slideTrack, { borderColor: 'transparent', backgroundColor: theme.accent }]}
+                onLayout={(e) => setSlideTrackW(e.nativeEvent.layout.width)}
+              >
+                <View style={[styles.slideThumb, { backgroundColor: theme.bg, right: 3 }]}>
+                  <Feather name="lock" size={20} color={theme.accent} />
+                </View>
+                <Text style={[styles.slideLabel, { color: theme.bg }]}>
+                  {appCount} apps blocked
+                </Text>
+              </View>
+            </Pressable>
+          ) : (
+            <GestureDetector gesture={slideGesture}>
+              <Animated.View
+                style={[styles.slideTrack, slideTrackStyle]}
+                onLayout={(e) => setSlideTrackW(e.nativeEvent.layout.width)}
+              >
+                <Animated.View style={[styles.slideFill, { backgroundColor: theme.text }, slideProgress]} />
+                <Animated.View
+                  style={[styles.slideThumb, { left: 3 }, slideThumbStyle]}
+                >
+                  <View style={{ width: 20, height: 20 }}>
+                    <Animated.View style={[{ position: 'absolute' }, slideThumbIconLight]}>
+                      <Feather name="unlock" size={20} color={theme.bg} />
+                    </Animated.View>
+                    <Animated.View style={[{ position: 'absolute' }, slideThumbIconDark]}>
+                      <Feather name="unlock" size={20} color={theme.text} />
+                    </Animated.View>
+                  </View>
+                </Animated.View>
+                <Animated.Text style={[styles.slideLabel, { color: theme.textSecondary }, slideTextStyle]}>
+                  slide to select apps
+                </Animated.Text>
+              </Animated.View>
+            </GestureDetector>
+          )}
           {showAppPicker && (
             <DeviceActivitySelectionSheetViewPersisted
               familyActivitySelectionId={BLOCK_SELECTION_ID}
@@ -478,13 +588,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderWidth: 1.2,
-    borderRadius: 12,
+    gap: 10,
+    paddingVertical: 16,
+    borderWidth: 1.5,
+    borderRadius: 16,
     marginBottom: 4,
   },
-  selectAppsText: { fontSize: 15, fontWeight: '300' },
+  selectAppsText: { fontSize: 16 },
+  selectAppsSub: { fontSize: 12, fontWeight: '300', opacity: 0.7, marginTop: 2 },
+  slideTrack: {
+    height: 56,
+    borderWidth: 1.5,
+    borderRadius: 28,
+    marginBottom: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  slideFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    right: 0,
+    borderRadius: 28,
+  },
+  slideThumb: {
+    position: 'absolute',
+    width: 49,
+    height: 49,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  slideLabel: {
+    fontSize: 15,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
+  },
 
   addButton: {
     flexDirection: 'row',
