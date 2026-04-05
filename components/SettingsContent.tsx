@@ -8,6 +8,7 @@ import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-a
 
 import { Fonts } from '@/constants/theme';
 import { AppTheme, themes } from '@/lib/theme';
+import GoalSliderBar from './GoalSliderBar';
 import { useAppStore } from '@/lib/store';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
@@ -182,10 +183,8 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const store = useAppStore.getState;
 
-  const handleGoalChange = (delta: number) => {
-    Haptics.selectionAsync();
-    const next = Math.max(0, Math.min(120, dailyGoalMinutes + delta));
-    store().setDailyGoal(next);
+  const handleGoalChange = (minutes: number) => {
+    store().setDailyGoal(minutes);
   };
 
   const handleAddReminder = (hour: number, minute: number) => {
@@ -223,17 +222,15 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
       {/* Daily Goal */}
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DAILY GOAL</Text>
-      <View style={[styles.goalRow, { borderColor: theme.border }]}>
-        <Pressable onPress={() => handleGoalChange(-5)} hitSlop={12} style={styles.stepperBtn}>
-          <Feather name="minus" size={18} color={theme.textSecondary} />
-        </Pressable>
-        <Text style={[styles.goalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          {dailyGoalMinutes === 0 ? 'not set' : `${dailyGoalMinutes} min`}
-        </Text>
-        <Pressable onPress={() => handleGoalChange(5)} hitSlop={12} style={styles.stepperBtn}>
-          <Feather name="plus" size={18} color={theme.textSecondary} />
-        </Pressable>
-      </View>
+      <GoalSliderBar
+        value={dailyGoalMinutes}
+        onChange={handleGoalChange}
+        theme={theme}
+        maxMinutes={120}
+        ticks={[15, 30, 45, 60, 90]}
+        scaleLabels={['0', '60', '120']}
+        accentColor={theme.accent}
+      />
       <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
         {dailyGoalMinutes > 0
           ? `Do nothing for ${dailyGoalMinutes} min every day`
