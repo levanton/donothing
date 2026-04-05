@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -329,6 +329,21 @@ export default function DoNothingScreen() {
   const messageOpacity = useSharedValue(0);
   const prevMessageRef = useRef('');
 
+  // --- Unlock slider ---
+  const UNLOCK_TRACK_W = SCREEN_W * 0.75;
+  const UNLOCK_THUMB = 56;
+  const UNLOCK_MAX = UNLOCK_TRACK_W - UNLOCK_THUMB - 8;
+  const unlockX = useSharedValue(0);
+  const unlockStartX = useSharedValue(0);
+
+  const unlockThumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: unlockX.value }],
+  }));
+
+  const unlockTextStyle = useAnimatedStyle(() => ({
+    opacity: 1 - unlockX.value / UNLOCK_MAX,
+  }));
+
   useEffect(() => {
     if (message !== prevMessageRef.current) {
       if (prevMessageRef.current === '') {
@@ -493,45 +508,57 @@ export default function DoNothingScreen() {
   // Focus done — unlock screen
   // =========================================================================
   if (focusStep === 'done') {
+    const doNothingMins = focusTotal > 0 ? Math.round(focusTotal / 60) : 15;
+
     return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
+      <Animated.View style={[styles.container, animatedContainerStyle, { justifyContent: 'space-between', paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }]}>
         <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-        <Text
-          style={[
-            styles.focusMessage,
-            { color: theme.text, fontFamily: Fonts!.serif, fontSize: 22, marginBottom: 12 },
-          ]}
-        >
-          your apps are blocked.
-        </Text>
+        <View />
 
-        <Text
-          style={[
-            styles.focusMessage,
-            { color: theme.textTertiary, fontFamily: Fonts!.serif, marginBottom: 48 },
-          ]}
-        >
-          do nothing to unlock them.
-        </Text>
+        <View style={{ alignItems: 'center' }}>
+          <Feather name="lock" size={40} color={theme.textTertiary} style={{ marginBottom: 32 }} />
 
-        <View style={{ gap: 12, width: '100%', maxWidth: 260 }}>
-          <PillButton
-            label="do nothing"
+          <Text
+            style={[
+              styles.focusMessage,
+              { color: theme.text, fontFamily: Fonts!.serif, fontSize: 22, marginBottom: 12 },
+            ]}
+          >
+            your apps are blocked.
+          </Text>
+
+          <Text
+            style={[
+              styles.focusMessage,
+              { color: theme.textTertiary, fontFamily: Fonts!.serif, marginBottom: 48 },
+            ]}
+          >
+            do nothing to unlock them.
+          </Text>
+
+          <Pressable
+            style={[styles.doNothingBtn, { backgroundColor: theme.accent }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              useAppStore.getState().startFocus(15 * 60);
+              useAppStore.getState().startFocus(doNothingMins * 60);
               activateKeepAwakeAsync('focus');
             }}
-            color={theme.accent}
-            filled
-          />
-          <PillButton
-            label="unlock"
-            onPress={handleUnlock}
-            color={theme.textSecondary}
-          />
+          >
+            <Text style={{ color: '#fff', fontFamily: Fonts!.serif, fontSize: 17, fontWeight: '400' }}>
+              do nothing for {doNothingMins} min
+            </Text>
+          </Pressable>
         </View>
+
+        <Pressable
+          onPress={handleUnlock}
+          hitSlop={16}
+        >
+          <Text style={{ color: theme.textTertiary, fontFamily: Fonts!.serif, fontSize: 14, fontWeight: '300' }}>
+            unlock now
+          </Text>
+        </Pressable>
       </Animated.View>
     );
   }
@@ -690,7 +717,7 @@ export default function DoNothingScreen() {
   // Main screen
   // =========================================================================
   return (
-    <GestureHandlerRootView style={[styles.screenStack, { backgroundColor: theme.bg }]}>
+    <View style={[styles.screenStack, { backgroundColor: theme.bg }]}>
     <GestureDetector gesture={mainPanGesture}>
     <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
@@ -965,7 +992,7 @@ export default function DoNothingScreen() {
       />
     </Animated.View>
     </GestureDetector>
-    </GestureHandlerRootView>
+    </View>
   );
 }
 
@@ -1196,6 +1223,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     fontStyle: 'italic',
+  },
+  doNothingBtn: {
+    borderWidth: 1.2,
+    borderRadius: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+  },
+  unlockTrack: {
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  unlockLabel: {
+    fontSize: 16,
+    fontWeight: '300',
+    letterSpacing: 1,
+    position: 'absolute',
+  },
+  unlockThumb: {
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    left: 4,
   },
   goalButton: {
     position: 'absolute',
