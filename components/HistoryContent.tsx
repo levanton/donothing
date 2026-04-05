@@ -1,5 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import type { GestureType } from 'react-native-gesture-handler';
 
 import { Fonts } from '@/constants/theme';
 import { themes } from '@/lib/theme';
@@ -21,9 +23,10 @@ interface HistoryContentProps {
   onClose: () => void;
   insets: { top: number; bottom: number };
   onScroll?: any;
+  nativeScrollGesture?: GestureType;
 }
 
-export default function HistoryContent({ onClose, insets, onScroll }: HistoryContentProps) {
+export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
   const sessions = useAppStore((s) => s.sessions);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
@@ -39,7 +42,7 @@ export default function HistoryContent({ onClose, insets, onScroll }: HistoryCon
   );
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
 
-  return (
+  const scrollView = (
     <AnimatedScrollView
       style={{ flex: 1 }}
       bounces={false}
@@ -134,6 +137,11 @@ export default function HistoryContent({ onClose, insets, onScroll }: HistoryCon
       </View>
     </AnimatedScrollView>
   );
+
+  if (nativeScrollGesture) {
+    return <GestureDetector gesture={nativeScrollGesture}>{scrollView}</GestureDetector>;
+  }
+  return scrollView;
 }
 
 const styles = StyleSheet.create({

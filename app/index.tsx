@@ -242,9 +242,13 @@ export default function DoNothingScreen() {
       historySlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
     });
 
+  // Native gesture for the history ScrollView — lets Pan and Scroll coexist
+  const historyScrollNativeGesture = Gesture.Native();
+
   // Swipe down on history → close (only when scrolled to top)
   const historyPanGesture = Gesture.Pan()
     .activeOffsetY([-10000, 20])
+    .simultaneousWithExternalGesture(historyScrollNativeGesture)
     .onUpdate((e) => {
       'worklet';
       if (historyScrollY.value > 5) return;
@@ -903,6 +907,7 @@ export default function DoNothingScreen() {
         onClose={handleHistoryClose}
         insets={insets}
         onScroll={historyScrollHandler}
+        nativeScrollGesture={historyScrollNativeGesture}
       />
     </Animated.View>
     </GestureDetector>
