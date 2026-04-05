@@ -222,6 +222,11 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
       {/* Daily Goal */}
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DAILY GOAL</Text>
+      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+        {dailyGoalMinutes > 0
+          ? `Do nothing for ${dailyGoalMinutes} min every day`
+          : 'Set a daily goal to track your progress'}
+      </Text>
       <GoalSliderBar
         value={dailyGoalMinutes}
         onChange={handleGoalChange}
@@ -231,18 +236,20 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         scaleLabels={['0', '60', '120']}
         accentColor={theme.accent}
       />
-      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
-        {dailyGoalMinutes > 0
-          ? `Do nothing for ${dailyGoalMinutes} min every day`
-          : 'Set a daily goal to track your progress'}
-      </Text>
 
       {/* Reminders */}
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
         REMINDERS
       </Text>
       {reminders.map((r) => (
-        <View key={r.id} style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.border }]}>
+        <Pressable
+          key={r.id}
+          onPress={() => {
+            Haptics.selectionAsync();
+            store().toggleReminder(r.id);
+          }}
+          style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.border }]}
+        >
           <View style={styles.cardContent}>
             <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
               {formatTime12(r.hour, r.minute)}
@@ -272,7 +279,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Feather name="x" size={16} color={theme.textTertiary} />
             </Pressable>
           </View>
-        </View>
+        </Pressable>
       ))}
       <Pressable
         onPress={() => {
@@ -331,7 +338,14 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         SCREEN BLOCK
       </Text>
       {scheduledBlocks.map((b) => (
-        <View key={b.id} style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.border }]}>
+        <Pressable
+          key={b.id}
+          onPress={() => {
+            Haptics.selectionAsync();
+            store().toggleScheduledBlock(b.id);
+          }}
+          style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.border }]}
+        >
           <View style={styles.cardContent}>
             <Text style={[styles.cardTime, { color: b.enabled ? theme.accent : theme.textTertiary, fontFamily: Fonts!.mono }]}>
               {formatTime12(b.hour, b.minute)}
@@ -361,7 +375,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Feather name="x" size={16} color={theme.textTertiary} />
             </Pressable>
           </View>
-        </View>
+        </Pressable>
       ))}
       <Pressable
         onPress={() => {

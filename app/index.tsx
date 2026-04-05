@@ -229,8 +229,9 @@ export default function DoNothingScreen() {
   }));
 
   // Swipe up on main → open history
-  const mainPanGesture = Gesture.Pan()
-    .activeOffsetY([-30, 10000])
+  const mainVerticalPan = Gesture.Pan()
+    .activeOffsetY(-20)
+    .failOffsetX([-15, 15])
     .onUpdate((e) => {
       'worklet';
       const drag = -e.translationY / SCREEN_H;
@@ -240,6 +241,49 @@ export default function DoNothingScreen() {
       'worklet';
       const shouldOpen = historySlide.value > 0.3 || -e.velocityY > 500;
       historySlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
+    });
+
+  // Swipe left on main → open settings
+  const openSettingsJS = useCallback(() => {
+    useAppStore.getState().openSettings();
+  }, []);
+  const mainHorizontalPan = Gesture.Pan()
+    .activeOffsetX(20)
+    .failOffsetY([-15, 15])
+    .onUpdate((e) => {
+      'worklet';
+      const drag = e.translationX / SCREEN_W;
+      settingsSlide.value = Math.max(0, Math.min(1, drag));
+    })
+    .onEnd((e) => {
+      'worklet';
+      const shouldOpen = settingsSlide.value > 0.3 || e.velocityX > 500;
+      settingsSlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
+      if (shouldOpen) runOnJS(openSettingsJS)();
+    });
+
+  const mainPanGesture = Gesture.Exclusive(mainVerticalPan, mainHorizontalPan);
+
+  // Swipe right on settings → close settings (only active when settings is open)
+  const closeSettingsJS = useCallback(() => {
+    useAppStore.getState().closeSettings();
+  }, []);
+  const settingsSwipeBack = Gesture.Pan()
+    .enabled(settingsOpen)
+    .activeOffsetX(-20)
+    .failOffsetY([-20, 20])
+    .onUpdate((e) => {
+      'worklet';
+      const drag = -e.translationX / SCREEN_W;
+      settingsSlide.value = Math.max(0, Math.min(1, 1 - Math.max(0, drag)));
+    })
+    .onEnd((e) => {
+      'worklet';
+      const shouldClose = settingsSlide.value < 0.7 || -e.velocityX > 500;
+      settingsSlide.value = withTiming(shouldClose ? 0 : 1, { duration: 300 });
+      if (shouldClose) {
+        runOnJS(closeSettingsJS)();
+      }
     });
 
   // Native gesture for the history ScrollView — lets Pan and Scroll coexist
@@ -913,12 +957,14 @@ export default function DoNothingScreen() {
     </GestureDetector>
 
     {/* Settings screen */}
+    <GestureDetector gesture={settingsSwipeBack}>
     <Animated.View style={[styles.historyContainer, animatedContainerStyle, settingsSlideStyle]}>
       <SettingsContent
         onClose={handleSettingsClose}
         insets={insets}
       />
     </Animated.View>
+    </GestureDetector>
     </GestureHandlerRootView>
   );
 }

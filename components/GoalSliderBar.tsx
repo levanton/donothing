@@ -17,6 +17,34 @@ const AnimatedLine = Animated.createAnimatedComponent(SvgLine);
 const SLIDER_H = 24;
 export const SLIDER_PAD = 10;
 
+// Non-linear snap points: 0–10 by 1, then 15,20,25,30, then by 10 to 60, then by 15 to 120
+const SNAP_POINTS = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  15, 20, 25, 30,
+  40, 50, 60,
+  75, 90, 105, 120,
+];
+
+/** Map a 0–1 slider position to a snap value */
+function positionToValue(x: number): number {
+  'worklet';
+  const idx = Math.round(x * (SNAP_POINTS.length - 1));
+  return SNAP_POINTS[Math.max(0, Math.min(SNAP_POINTS.length - 1, idx))];
+}
+
+/** Map a snap value to a 0–1 slider position */
+function valueToPosition(v: number): number {
+  'worklet';
+  const idx = SNAP_POINTS.indexOf(v);
+  if (idx >= 0) return idx / (SNAP_POINTS.length - 1);
+  // Fallback: find closest
+  let closest = 0;
+  for (let i = 1; i < SNAP_POINTS.length; i++) {
+    if (Math.abs(SNAP_POINTS[i] - v) < Math.abs(SNAP_POINTS[closest] - v)) closest = i;
+  }
+  return closest / (SNAP_POINTS.length - 1);
+}
+
 interface GoalSliderBarProps {
   theme: any;
   /** Max value in minutes */
@@ -81,8 +109,8 @@ export default function GoalSliderBar({
       const twVal = trackW.value;
       if (twVal === 0) return;
       const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
-      const snapped = Math.round((x * maxMinutes) / step) * step;
-      internalProgress.value = snapped / maxMinutes;
+      const snapped = positionToValue(x);
+      internalProgress.value = valueToPosition(snapped);
       runOnJS(handleChange)(snapped);
     });
 
@@ -92,13 +120,13 @@ export default function GoalSliderBar({
     const t = w - pad * 2;
     trackW.value = t;
     if (value !== undefined) {
-      internalProgress.value = value / maxMinutes;
+      internalProgress.value = valueToPosition(value);
     }
-  }, [value, maxMinutes]);
+  }, [value]);
 
   // Sync external value changes (interactive mode)
   if (isInteractive && lastSnap.current !== value && width > 0) {
-    internalProgress.value = value / maxMinutes;
+    internalProgress.value = valueToPosition(value);
     lastSnap.current = value;
   }
 
@@ -124,9 +152,20 @@ export default function GoalSliderBar({
     <View style={{ width: fixedWidth, alignItems: isInteractive ? undefined : 'center' }} onLayout={isInteractive ? onLayout : undefined}>
       {isInteractive && (
         <View style={styles.labelRow}>
-          <Text style={[styles.labelValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {value === 0 ? 'not set' : `${value} min`}
-          </Text>
+          {value === 0 ? (
+            <Text style={[styles.labelValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              not set
+            </Text>
+          ) : (
+            <View style={styles.labelParts}>
+              <Text style={[styles.labelNumber, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                {value}
+              </Text>
+              <Text style={[styles.labelUnit, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                {' '}min
+              </Text>
+            </View>
+          )}
         </View>
       )}
       <Svg width={width} height={SLIDER_H}>
@@ -139,7 +178,7 @@ export default function GoalSliderBar({
         />
         {/* Tick marks */}
         {ticks.map((m) => {
-          const tx = pad + (m / maxMinutes) * tw;
+          const tx = pad + (isInteractive ? valueToPosition(m) : m / maxMinutes) * tw;
           return (
             <SvgLine
               key={m}
@@ -171,11 +210,32 @@ export default function GoalSliderBar({
           animatedProps={thumbDotProps}
         />
       </Svg>
-      <View style={[styles.scaleRow, { width, paddingHorizontal: pad - 4 }]}>
-        {scaleLabels.map((label, i) => (
-          <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }]}>{label}</Text>
-        ))}
-      </View>
+      {isInteractive ? (
+        <View style={[styles.scaleRow, { width, height: 16 }]}>
+          {scaleLabels.map((label, i) => {
+            const val = Number(label);
+            const pos = valueToPosition(val);
+            return (
+              <Text
+                key={i}
+                style={[styles.scaleLabel, {
+                  color: theme.textTertiary,
+                  position: 'absolute',
+                  left: pad + pos * tw - 8,
+                }]}
+              >
+                {label}
+              </Text>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={[styles.scaleRow, { width, paddingHorizontal: pad - 4 }]}>
+          {scaleLabels.map((label, i) => (
+            <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }]}>{label}</Text>
+          ))}
+        </View>
+      )}
     </View>
   );
 
@@ -192,10 +252,24 @@ export default function GoalSliderBar({
 
 const styles = StyleSheet.create({
   labelRow: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    height: 56,
     marginBottom: 12,
   },
   labelValue: {
+    fontSize: 22,
+    fontWeight: '300',
+  },
+  labelParts: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  labelNumber: {
+    fontSize: 48,
+    fontWeight: '300',
+  },
+  labelUnit: {
     fontSize: 22,
     fontWeight: '300',
   },
