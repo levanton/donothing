@@ -161,16 +161,16 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
               ]}>
                 {duration > 0 && (
                   <View style={[styles.activityBubble, {
-                    width: 8 + intensity * 28,
-                    height: 8 + intensity * 28,
-                    borderRadius: (8 + intensity * 28) / 2,
+                    width: Math.max(28, 8 + intensity * 28),
+                    height: Math.max(28, 8 + intensity * 28),
+                    borderRadius: Math.max(28, 8 + intensity * 28) / 2,
                     backgroundColor: theme.accent,
                   }]} />
                 )}
                 <Text style={[
                   styles.dayNumber,
                   {
-                    color: isFuture ? theme.border : intensity > 0.4 ? '#fff' : theme.text,
+                    color: isFuture ? theme.border : duration > 0 ? '#fff' : theme.text,
                     fontFamily: Fonts!.serif,
                   },
                 ]}>
