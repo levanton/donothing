@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -99,7 +99,7 @@ export default function GoalSliderBar({
   const [displayMins, setDisplayMins] = useState(value ?? 0);
   const internalProgress = useSharedValue(0);
   const trackW = useSharedValue(0);
-  const lastSnap = useRef(value ?? 0);
+  const lastSnap = useSharedValue(value ?? 0);
 
   const progress = externalProgress ?? internalProgress;
   const width = fixedWidth ?? measuredWidth;
@@ -109,8 +109,8 @@ export default function GoalSliderBar({
 
   // --- Interactive gesture ---
   const handleDisplayUpdate = useCallback((mins: number) => {
-    if (mins !== lastSnap.current) {
-      lastSnap.current = mins;
+    if (mins !== lastSnap.value) {
+      lastSnap.value = mins;
       Haptics.selectionAsync();
     }
     setDisplayMins(mins);
@@ -133,7 +133,7 @@ export default function GoalSliderBar({
     })
     .onEnd(() => {
       'worklet';
-      runOnJS(handleGestureEnd)(lastSnap.current);
+      runOnJS(handleGestureEnd)(lastSnap.value);
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -147,11 +147,13 @@ export default function GoalSliderBar({
   }, [value, maxMinutes]);
 
   // Sync external value changes (interactive mode)
-  if (isInteractive && lastSnap.current !== value && width > 0) {
-    internalProgress.value = valueToPos(value, maxMinutes);
-    lastSnap.current = value;
-    setDisplayMins(value);
-  }
+  useEffect(() => {
+    if (isInteractive && lastSnap.value !== value && width > 0) {
+      internalProgress.value = valueToPos(value!, maxMinutes);
+      lastSnap.value = value!;
+      setDisplayMins(value!);
+    }
+  }, [value, width]);
 
   // --- Animated props (UI thread) ---
   const fillProps = useAnimatedProps(() => ({
