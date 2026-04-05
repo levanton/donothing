@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { useCallback, useState } from 'react';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -69,13 +69,39 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   const daysActive = byDay.size;
 
   const [statsPage, setStatsPage] = useState(0);
-  const statsScrollRef = useRef<ScrollView>(null);
-  const statsPageW = SCREEN_W;
+  const statsTranslateX = useSharedValue(0);
 
-  const onStatsScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const page = Math.round(e.nativeEvent.contentOffset.x / statsPageW);
-    setStatsPage(page);
-  }, [statsPageW]);
+  const setPage = useCallback((p: number) => {
+    setStatsPage(p);
+    Haptics.selectionAsync();
+  }, []);
+
+  const statsSwipe = Gesture.Pan()
+    .activeOffsetX([-30, 30])
+    .failOffsetY([-15, 15])
+    .onUpdate((e) => {
+      'worklet';
+      const base = statsPage === 0 ? 0 : -SCREEN_W;
+      statsTranslateX.value = base + e.translationX;
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX < -50 && statsPage === 0) {
+        statsTranslateX.value = withTiming(-SCREEN_W, { duration: 250 });
+        runOnJS(setPage)(1);
+      } else if (e.translationX > 50 && statsPage === 1) {
+        statsTranslateX.value = withTiming(0, { duration: 250 });
+        runOnJS(setPage)(0);
+      } else {
+        statsTranslateX.value = withTiming(statsPage === 0 ? 0 : -SCREEN_W, { duration: 250 });
+      }
+    });
+
+  const statsSlideStyle = useAnimatedStyle(() => ({
+    flexDirection: 'row',
+    width: SCREEN_W * 2,
+    transform: [{ translateX: statsTranslateX.value }],
+  }));
 
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
@@ -105,16 +131,10 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
       </View>
 
       <View style={[styles.statsOuter, { borderColor: theme.border }]}>
-        <ScrollView
-          ref={statsScrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onStatsScroll}
-          style={styles.statsScroll}
-        >
+        <GestureDetector gesture={statsSwipe}>
+          <Animated.View style={[styles.statsScroll, statsSlideStyle]}>
           {/* Page 1 */}
-          <View style={[styles.statsPage, { width: statsPageW }]}>
+          <View style={[styles.statsPage, { width: SCREEN_W }]}>
             <View style={styles.statsRow}>
               <View style={styles.totalSection}>
                 <View style={styles.totalValueRow}>
@@ -148,16 +168,10 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
                 </View>
               </View>
             </View>
-            <View style={styles.statsArrow}>
-              <Feather name="chevron-right" size={18} color={theme.textTertiary} />
-            </View>
           </View>
 
           {/* Page 2 */}
-          <View style={[styles.statsPage, { width: statsPageW }]}>
-            <View style={[styles.statsArrow, { left: 0, right: undefined }]}>
-              <Feather name="chevron-left" size={18} color={theme.textTertiary} />
-            </View>
+          <View style={[styles.statsPage, { width: SCREEN_W }]}>
             <View style={styles.statsRow}>
               <View style={styles.totalSection}>
                 <View style={styles.totalValueRow}>
@@ -184,15 +198,17 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
                 <View style={styles.statCell}>
                   <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
                     {formatTimeStat(totalStats.today).value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {formatTimeStat(totalStats.today).unit}</Text>
-                </Text>
-                <Text style={[styles.statLabel, { color: theme.textTertiary }]}>today</Text>
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>today</Text>
+                </View>
               </View>
             </View>
-            </View>
           </View>
-        </ScrollView>
+          </Animated.View>
+        </GestureDetector>
 
-        {/* Dots — bottom right */}
+
+{/* Dots — bottom left */}
         <View style={styles.pageDots}>
           <View style={[styles.dot, { backgroundColor: statsPage === 0 ? theme.text : theme.border }]} />
           <View style={[styles.dot, { backgroundColor: statsPage === 1 ? theme.text : theme.border }]} />
@@ -252,11 +268,9 @@ const styles = StyleSheet.create({
   },
   statsArrow: {
     position: 'absolute',
-    right: 4,
     top: 0,
-    bottom: 0,
+    bottom: 16,
     justifyContent: 'center',
-    zIndex: 1,
   },
   pageDots: {
     flexDirection: 'row',
