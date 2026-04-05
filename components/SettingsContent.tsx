@@ -375,54 +375,64 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
         SCREEN BLOCK
       </Text>
-      {scheduledBlocks.map((b) => (
-        <Pressable
-          key={b.id}
-          onPress={() => {
-            Haptics.selectionAsync();
-            store().toggleScheduledBlock(b.id);
-          }}
-          style={[styles.card, { borderColor: b.enabled ? theme.accent : theme.textTertiary }]}
-        >
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardTime, { color: b.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
-              {formatTime12(b.hour, b.minute)}
-            </Text>
-            <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
-              do nothing for {b.durationMinutes} min
-            </Text>
-          </View>
-          <View style={styles.cardActions}>
-            <Switch
-              value={b.enabled}
-              onValueChange={() => {
-                Haptics.selectionAsync();
-                store().toggleScheduledBlock(b.id);
-              }}
-              trackColor={{ false: theme.textTertiary, true: theme.accent }}
-              thumbColor="#fff"
-              ios_backgroundColor={b.enabled ? theme.accent : theme.textTertiary}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                store().removeScheduledBlock(b.id);
-              }}
-              hitSlop={12}
-            >
-              <Feather name="x" size={16} color={theme.textTertiary} />
-            </Pressable>
-          </View>
-        </Pressable>
-      ))}
+      {scheduledBlocks.map((b) => {
+        const disabled = appCount === 0;
+        const active = b.enabled && !disabled;
+        return (
+          <Pressable
+            key={b.id}
+            onPress={() => {
+              if (disabled) return;
+              Haptics.selectionAsync();
+              store().toggleScheduledBlock(b.id);
+            }}
+            style={[styles.card, {
+              borderColor: active ? theme.accent : theme.border,
+              opacity: disabled ? 0.4 : 1,
+            }]}
+          >
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
+                {formatTime12(b.hour, b.minute)}
+              </Text>
+              <Text style={[styles.cardLabel, { color: theme.textTertiary }]}>
+                do nothing for {b.durationMinutes} min
+              </Text>
+            </View>
+            <View style={styles.cardActions}>
+              <Switch
+                value={active}
+                disabled={disabled}
+                onValueChange={() => {
+                  Haptics.selectionAsync();
+                  store().toggleScheduledBlock(b.id);
+                }}
+                trackColor={{ false: theme.textTertiary, true: theme.accent }}
+                thumbColor="#fff"
+                ios_backgroundColor={active ? theme.accent : theme.textTertiary}
+                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+              />
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  store().removeScheduledBlock(b.id);
+                }}
+                hitSlop={12}
+              >
+                <Feather name="x" size={16} color={theme.textTertiary} />
+              </Pressable>
+            </View>
+          </Pressable>
+        );
+      })}
       <Pressable
         onPress={() => {
+          if (appCount === 0) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
-        style={[styles.addButton, { borderColor: theme.textTertiary }]}
+        style={[styles.addButton, { borderColor: theme.textTertiary, opacity: appCount === 0 ? 0.4 : 1 }]}
       >
         <Feather name="plus" size={14} color={theme.text} />
         <Text style={[styles.addButtonText, { color: theme.text }]}>add block</Text>
