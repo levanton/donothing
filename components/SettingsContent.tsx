@@ -253,6 +253,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
         REMINDERS
       </Text>
+      {reminders.length === 0 && (
+        <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
+          <Feather name="bell-off" size={22} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+            No reminders yet
+          </Text>
+          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
+            Add one to remember to pause
+          </Text>
+        </View>
+      )}
       {reminders.map((r) => (
         <Pressable
           key={r.id}
@@ -375,6 +386,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
         SCREEN BLOCK
       </Text>
+      {scheduledBlocks.length === 0 && (
+        <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
+          <Feather name="smartphone" size={22} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+            No scheduled blocks yet
+          </Text>
+          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
+            Schedule time to block distractions
+          </Text>
+        </View>
+      )}
       {scheduledBlocks.map((b) => {
         const disabled = appCount === 0;
         const active = b.enabled && !disabled;
@@ -562,6 +584,19 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   addButtonText: { fontSize: 14, fontWeight: '300' },
+  emptyCard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 18,
+    marginBottom: 10,
+    alignItems: 'center',
+    gap: 6,
+    opacity: 0.85,
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '400' },
+  emptySub: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
 
   // Bottom sheet content
   sheetContent: {
