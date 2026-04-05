@@ -76,7 +76,8 @@ export interface AppState {
   editReminder: (id: string, hour: number, minute: number, weekdays: number[]) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   toggleReminder: (id: string) => Promise<void>;
-  addScheduledBlock: (hour: number, minute: number, durationMinutes: number) => Promise<void>;
+  addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
+  editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
   removeScheduledBlock: (id: string) => Promise<void>;
   toggleScheduledBlock: (id: string) => Promise<void>;
 
@@ -293,9 +294,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     await saveReminders(synced);
   },
 
-  addScheduledBlock: async (hour, minute, durationMinutes) => {
+  addScheduledBlock: async (hour, minute, durationMinutes, weekdays) => {
     const id = Date.now().toString();
-    const block = { id, hour, minute, durationMinutes, enabled: true };
+    const block = { id, hour, minute, durationMinutes, weekdays, enabled: true };
     try {
       const { scheduleBlock } = await import('./screen-time');
       await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
@@ -303,6 +304,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.warn('Failed to schedule native block:', e);
     }
     const blocks = [...get().scheduledBlocks, block];
+    set({ scheduledBlocks: blocks });
+    await saveScheduledBlocks(blocks);
+  },
+
+  editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays) => {
+    try {
+      const { unscheduleBlock, scheduleBlock } = await import('./screen-time');
+      unscheduleBlock(id);
+      await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+    } catch {}
+    const blocks = get().scheduledBlocks.map((b) =>
+      b.id === id ? { ...b, hour, minute, durationMinutes, weekdays } : b,
+    );
     set({ scheduledBlocks: blocks });
     await saveScheduledBlocks(blocks);
   },

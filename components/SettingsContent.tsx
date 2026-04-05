@@ -11,7 +11,7 @@ import { Fonts } from '@/constants/theme';
 import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
 import { useAppStore } from '@/lib/store';
-import type { Reminder } from '@/lib/storage';
+import type { Reminder, ScheduledBlock } from '@/lib/storage';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 
@@ -141,15 +141,32 @@ function TimePickerContent({ onConfirm, onCancel, theme, title, initialHour, ini
 }
 
 // Duration block picker content for bottom sheet
-function BlockPickerContent({ onConfirm, onCancel, theme }: {
-  onConfirm: (hour: number, minute: number, duration: number) => void;
+function BlockPickerContent({ onConfirm, onCancel, theme, title, initialHour, initialMinute, initialDuration, initialDays }: {
+  onConfirm: (hour: number, minute: number, duration: number, weekdays: number[]) => void;
   onCancel: () => void;
   theme: AppTheme;
+  title?: string;
+  initialHour?: number;
+  initialMinute?: number;
+  initialDuration?: number;
+  initialDays?: number[];
 }) {
-  const [hour, setHour] = useState(14);
-  const [minute, setMinute] = useState(0);
-  const [duration, setDuration] = useState(15);
+  const [hour, setHour] = useState(initialHour ?? 14);
+  const [minute, setMinute] = useState(initialMinute ?? 0);
+  const [duration, setDuration] = useState(initialDuration ?? 15);
+  const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
   const MIN_DURATION = 15;
+
+  const toggleDay = (day: number) => {
+    Haptics.selectionAsync();
+    setSelectedDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((d) => d !== day);
+      }
+      return [...prev, day];
+    });
+  };
 
   const incHour = () => { Haptics.selectionAsync(); setHour((h) => (h + 1) % 24); };
   const decHour = () => { Haptics.selectionAsync(); setHour((h) => (h - 1 + 24) % 24); };
@@ -161,7 +178,7 @@ function BlockPickerContent({ onConfirm, onCancel, theme }: {
   return (
     <View style={styles.sheetContent}>
       <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        Add screen block
+        {title ?? 'Add screen block'}
       </Text>
       <View style={styles.sheetPickerRow}>
         <View style={styles.sheetPickerCol}>
@@ -203,9 +220,33 @@ function BlockPickerContent({ onConfirm, onCancel, theme }: {
           </Pressable>
         </View>
       </View>
+      <View style={styles.dayRow}>
+        {WEEKDAY_LABELS.map((label, i) => {
+          const day = WEEKDAY_VALUES[i];
+          const active = selectedDays.includes(day);
+          return (
+            <Pressable key={day} onPress={() => toggleDay(day)} hitSlop={4}>
+              <View style={[
+                styles.dayCircle,
+                active
+                  ? { backgroundColor: theme.text, borderColor: theme.text }
+                  : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
+              ]}>
+                <Text style={[
+                  styles.dayLabel,
+                  { color: active ? theme.bg : theme.textSecondary },
+                ]}>
+                  {label}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={{ height: 24 }} />
       <View style={styles.sheetButtons}>
         <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
-        <PillButton label="add" onPress={() => onConfirm(hour, minute, duration)} color={theme.accent} filled flex />
+        <PillButton label="add" onPress={() => onConfirm(hour, minute, duration, selectedDays)} color={theme.accent} filled flex />
       </View>
     </View>
   );
@@ -221,6 +262,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [showAppPicker, setShowAppPicker] = useState(false);
   const [appCount, setAppCount] = useState(() => {
     if (Platform.OS !== 'ios') return 0;
@@ -265,9 +307,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     reminderSheetRef.current?.close();
   };
 
-  const handleAddBlock = (hour: number, minute: number, duration: number) => {
+  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    store().addScheduledBlock(hour, minute, duration);
+    if (editingBlock) {
+      store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays);
+    } else {
+      store().addScheduledBlock(hour, minute, duration, weekdays);
+    }
     blockSheetRef.current?.close();
   };
 
@@ -481,7 +527,8 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             onPress={() => {
               if (disabled) return;
               Haptics.selectionAsync();
-              store().toggleScheduledBlock(b.id);
+              setEditingBlock(b);
+              blockSheetRef.current?.expand();
             }}
             style={[styles.card, {
               borderColor: active ? theme.accent : theme.border,
@@ -495,6 +542,21 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
                 do nothing for {b.durationMinutes} min
               </Text>
+              <View style={styles.cardDots}>
+                {WEEKDAY_VALUES.map((day) => {
+                  const dayActive = !b.weekdays?.length || b.weekdays.includes(day);
+                  return (
+                    <View
+                      key={day}
+                      style={[
+                        styles.cardDot,
+                        { backgroundColor: dayActive ? theme.text : 'transparent',
+                          borderColor: dayActive ? theme.text : theme.textTertiary },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
             </View>
             <View style={styles.cardActions}>
               <Switch
@@ -526,6 +588,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         onPress={() => {
           if (appCount === 0) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setEditingBlock(null);
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
@@ -569,15 +632,21 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       enableDynamicSizing
       enablePanDownToClose
       enableOverDrag={false}
-      onChange={(i) => { if (i === -1) setShowBlockPicker(false); }}
+      onChange={(i) => { if (i === -1) { setShowBlockPicker(false); setEditingBlock(null); } }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
       backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 24 }}
     >
       <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
         <BlockPickerContent
+          key={editingBlock?.id ?? 'new'}
           theme={theme}
-          onConfirm={handleAddBlock}
+          title={editingBlock ? 'Edit screen block' : 'Add screen block'}
+          initialHour={editingBlock?.hour}
+          initialMinute={editingBlock?.minute}
+          initialDuration={editingBlock?.durationMinutes}
+          initialDays={editingBlock?.weekdays}
+          onConfirm={handleConfirmBlock}
           onCancel={() => blockSheetRef.current?.close()}
         />
       </BottomSheetView>

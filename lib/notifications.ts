@@ -98,19 +98,30 @@ export async function syncReminders(reminders: Reminder[]): Promise<Reminder[]> 
 export async function syncScheduledBlocks(blocks: ScheduledBlock[]): Promise<ScheduledBlock[]> {
   const updated: ScheduledBlock[] = [];
   for (const b of blocks) {
-    if (b.notificationId) {
-      try { await cancelNotification(b.notificationId); } catch {}
+    if (b.notificationIds) {
+      for (const nid of b.notificationIds) {
+        try { await cancelNotification(nid); } catch {}
+      }
+    }
+    // Legacy: cancel old single notificationId
+    if ((b as any).notificationId) {
+      try { await cancelNotification((b as any).notificationId); } catch {}
     }
     if (b.enabled) {
-      const notificationId = await scheduleDailyNotification(
-        b.hour, b.minute,
-        'Do Nothing',
-        `Screen block for ${b.durationMinutes} min starts now.`,
-        { type: 'scheduledBlock', id: b.id, durationMinutes: b.durationMinutes },
-      );
-      updated.push({ ...b, notificationId });
+      const days = b.weekdays?.length ? b.weekdays : ALL_WEEKDAYS;
+      const notificationIds: string[] = [];
+      for (const day of days) {
+        const nid = await scheduleWeeklyNotification(
+          b.hour, b.minute, day,
+          'Do Nothing',
+          `Screen block for ${b.durationMinutes} min starts now.`,
+          { type: 'scheduledBlock', id: b.id, durationMinutes: b.durationMinutes },
+        );
+        notificationIds.push(nid);
+      }
+      updated.push({ ...b, notificationIds });
     } else {
-      updated.push({ ...b, notificationId: undefined });
+      updated.push({ ...b, notificationIds: undefined });
     }
   }
   return updated;

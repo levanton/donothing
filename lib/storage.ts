@@ -22,8 +22,10 @@ export interface ScheduledBlock {
   hour: number;
   minute: number;
   durationMinutes: number;
+  /** Selected weekdays, Expo convention: 1=Sun 2=Mon … 7=Sat. Empty = every day. */
+  weekdays: number[];
   enabled: boolean;
-  notificationId?: string;
+  notificationIds?: string[];
 }
 
 const SESSIONS_KEY = '@donothing/sessions';
