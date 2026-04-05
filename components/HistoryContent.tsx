@@ -7,6 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { themes } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { getDailyStats, getStats, getStreak } from '@/lib/stats';
+import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
@@ -34,7 +35,6 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   const dailyStats = getDailyStats(sessions);
   const totalStats = getStats(sessions);
   const streak = getStreak(sessions);
-  const maxDuration = Math.max(...dailyStats.map((d) => d.duration), 1);
   const totalAll = formatTimeStat(totalStats.year);
   const avgSession = sessions.length > 0
     ? formatTimeStat(Math.round(totalStats.year / sessions.length))
@@ -114,25 +114,7 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         </View>
       </View>
 
-      <View style={styles.weekSection}>
-        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>LAST 7 DAYS</Text>
-        <View style={styles.weekGrid}>
-          {dailyStats.slice(0, 7).map((day) => {
-            const size = day.duration > 0 ? 16 + (day.duration / maxDuration) * 28 : 6;
-            return (
-              <View key={day.date} style={styles.weekDayCol}>
-                <View style={{
-                  width: size, height: size, borderRadius: size / 2,
-                  backgroundColor: day.duration > 0 ? theme.accent : theme.border,
-                }} />
-                <Text style={[styles.weekDayLabel, { color: theme.textTertiary }]}>
-                  {day.label.slice(0, 3)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
+      <ActivityCalendar sessions={sessions} theme={theme} />
 
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
       {dailyStats.map((day) => (
@@ -191,10 +173,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 22, fontWeight: '300' },
   statUnit: { fontSize: 14, fontWeight: '300' },
   statLabel: { fontSize: 13, fontWeight: '300', marginTop: 2 },
-  weekSection: { marginBottom: 28 },
-  weekGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 60, paddingHorizontal: 8 },
-  weekDayCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1, gap: 8 },
-  weekDayLabel: { fontSize: 10, fontWeight: '400', letterSpacing: 0.5 },
   sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   dayLabel: { fontSize: 16, fontWeight: '400' },
