@@ -11,6 +11,7 @@ import { Fonts } from '@/constants/theme';
 import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
 import { useAppStore } from '@/lib/store';
+import type { Reminder } from '@/lib/storage';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 
@@ -33,14 +34,44 @@ function formatTime12(hour: number, minute: number) {
 
 // No custom BottomSheet needed — using @gorhom/bottom-sheet
 
+// Weekday helpers — Expo convention: 1=Sun … 7=Sat, display Mon-first
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const WEEKDAY_VALUES = [2, 3, 4, 5, 6, 7, 1]; // Mon…Sun in Expo weekday numbers
+const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7];
+
+function weekdaysLabel(days: number[]): string {
+  if (!days.length || days.length === 7) return 'every day';
+  const set = new Set(days);
+  if (days.length === 5 && [2, 3, 4, 5, 6].every((d) => set.has(d))) return 'weekdays';
+  if (days.length === 2 && set.has(1) && set.has(7)) return 'weekends';
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return WEEKDAY_VALUES.filter((d) => set.has(d)).map((d) => names[d - 1]).join(', ');
+}
+
 // Time picker content for bottom sheet
-function TimePickerContent({ onConfirm, onCancel, theme }: {
-  onConfirm: (hour: number, minute: number) => void;
+function TimePickerContent({ onConfirm, onCancel, theme, title, initialHour, initialMinute, initialDays }: {
+  onConfirm: (hour: number, minute: number, weekdays: number[]) => void;
   onCancel: () => void;
   theme: AppTheme;
+  title?: string;
+  initialHour?: number;
+  initialMinute?: number;
+  initialDays?: number[];
 }) {
-  const [hour, setHour] = useState(9);
-  const [minute, setMinute] = useState(0);
+  const [hour, setHour] = useState(initialHour ?? 9);
+  const [minute, setMinute] = useState(initialMinute ?? 0);
+  const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
+
+  const toggleDay = (day: number) => {
+    Haptics.selectionAsync();
+    setSelectedDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((d) => d !== day);
+      }
+      return [...prev, day];
+    });
+  };
 
   const incHour = () => { Haptics.selectionAsync(); setHour((h) => (h + 1) % 24); };
   const decHour = () => { Haptics.selectionAsync(); setHour((h) => (h - 1 + 24) % 24); };
@@ -50,7 +81,7 @@ function TimePickerContent({ onConfirm, onCancel, theme }: {
   return (
     <View style={styles.sheetContent}>
       <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        Add reminder
+        {title ?? 'Add reminder'}
       </Text>
       <View style={styles.sheetPickerRow}>
         <View style={styles.sheetPickerCol}>
@@ -77,9 +108,33 @@ function TimePickerContent({ onConfirm, onCancel, theme }: {
           </Pressable>
         </View>
       </View>
+      <View style={styles.dayRow}>
+        {WEEKDAY_LABELS.map((label, i) => {
+          const day = WEEKDAY_VALUES[i];
+          const active = selectedDays.includes(day);
+          return (
+            <Pressable key={day} onPress={() => toggleDay(day)} hitSlop={4}>
+              <View style={[
+                styles.dayCircle,
+                active
+                  ? { backgroundColor: theme.text, borderColor: theme.text }
+                  : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
+              ]}>
+                <Text style={[
+                  styles.dayLabel,
+                  { color: active ? theme.bg : theme.textSecondary },
+                ]}>
+                  {label}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={{ height: 24 }} />
       <View style={styles.sheetButtons}>
         <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
-        <PillButton label="add" onPress={() => onConfirm(hour, minute)} color={theme.accent} filled flex />
+        <PillButton label="add" onPress={() => onConfirm(hour, minute, selectedDays)} color={theme.accent} filled flex />
       </View>
     </View>
   );
@@ -164,6 +219,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const theme = themes[themeMode];
 
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [showAppPicker, setShowAppPicker] = useState(false);
   const [appCount, setAppCount] = useState(() => {
@@ -199,9 +255,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     store().setDailyGoal(minutes);
   };
 
-  const handleAddReminder = (hour: number, minute: number) => {
+  const handleConfirmReminder = (hour: number, minute: number, weekdays: number[]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    store().addReminder(hour, minute);
+    if (editingReminder) {
+      store().editReminder(editingReminder.id, hour, minute, weekdays);
+    } else {
+      store().addReminder(hour, minute, weekdays);
+    }
     reminderSheetRef.current?.close();
   };
 
@@ -269,7 +329,8 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           key={r.id}
           onPress={() => {
             Haptics.selectionAsync();
-            store().toggleReminder(r.id);
+            setEditingReminder(r);
+            reminderSheetRef.current?.expand();
           }}
           style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.textTertiary }]}
         >
@@ -277,9 +338,21 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime12(r.hour, r.minute)}
             </Text>
-            <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-              daily reminder
-            </Text>
+            <View style={styles.cardDots}>
+              {WEEKDAY_VALUES.map((day) => {
+                const active = !r.weekdays?.length || r.weekdays.includes(day);
+                return (
+                  <View
+                    key={day}
+                    style={[
+                      styles.cardDot,
+                      { backgroundColor: active ? theme.text : 'transparent',
+                        borderColor: active ? theme.text : theme.textTertiary },
+                    ]}
+                  />
+                );
+              })}
+            </View>
           </View>
           <View style={styles.cardActions}>
             <Switch
@@ -308,6 +381,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setEditingReminder(null);
           setShowReminderPicker(true);
           reminderSheetRef.current?.expand();
         }}
@@ -469,15 +543,20 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       enableDynamicSizing
       enablePanDownToClose
       enableOverDrag={false}
-      onChange={(i) => { if (i === -1) setShowReminderPicker(false); }}
+      onChange={(i) => { if (i === -1) { setShowReminderPicker(false); setEditingReminder(null); } }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
       backgroundStyle={{ backgroundColor: theme.bg, borderRadius: 24 }}
     >
       <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}>
         <TimePickerContent
+          key={editingReminder?.id ?? 'new'}
           theme={theme}
-          onConfirm={handleAddReminder}
+          title={editingReminder ? 'Edit reminder' : 'Add reminder'}
+          initialHour={editingReminder?.hour}
+          initialMinute={editingReminder?.minute}
+          initialDays={editingReminder?.weekdays}
+          onConfirm={handleConfirmReminder}
           onCancel={() => reminderSheetRef.current?.close()}
         />
       </BottomSheetView>
@@ -643,5 +722,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     width: '100%',
+  },
+  dayRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  dayCircle: {
+    width: 40,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  cardDots: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+  },
+  cardDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 1,
+  },
+  dayHint: {
+    fontSize: 12,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginBottom: 24,
   },
 });

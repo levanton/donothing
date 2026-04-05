@@ -11,8 +11,10 @@ export interface Reminder {
   id: string;
   hour: number;
   minute: number;
+  /** Selected weekdays, Expo convention: 1=Sun 2=Mon … 7=Sat. Empty = every day. */
+  weekdays: number[];
   enabled: boolean;
-  notificationId?: string;
+  notificationIds?: string[];
 }
 
 export interface ScheduledBlock {

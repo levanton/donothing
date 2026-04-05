@@ -72,7 +72,8 @@ export interface AppState {
   openSettings: () => void;
   closeSettings: () => void;
   setDailyGoal: (minutes: number) => Promise<void>;
-  addReminder: (hour: number, minute: number) => Promise<void>;
+  addReminder: (hour: number, minute: number, weekdays: number[]) => Promise<void>;
+  editReminder: (id: string, hour: number, minute: number, weekdays: number[]) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   toggleReminder: (id: string) => Promise<void>;
   addScheduledBlock: (hour: number, minute: number, durationMinutes: number) => Promise<void>;
@@ -237,7 +238,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await saveDailyGoal(minutes);
   },
 
-  addReminder: async (hour, minute) => {
+  addReminder: async (hour, minute, weekdays) => {
     const status = await requestPermission();
     if (status === 'denied') {
       Alert.alert(
@@ -253,8 +254,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (status !== 'granted') return;
     const reminders = [...get().reminders, {
       id: Date.now().toString(),
-      hour, minute, enabled: true,
+      hour, minute, weekdays, enabled: true,
     }];
+    const synced = await syncReminders(reminders);
+    set({ reminders: synced });
+    await saveReminders(synced);
+  },
+
+  editReminder: async (id, hour, minute, weekdays) => {
+    const reminders = get().reminders.map((r) =>
+      r.id === id ? { ...r, hour, minute, weekdays } : r,
+    );
     const synced = await syncReminders(reminders);
     set({ reminders: synced });
     await saveReminders(synced);
@@ -262,8 +272,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeReminder: async (id) => {
     const old = get().reminders.find((r) => r.id === id);
-    if (old?.notificationId) {
-      try { await cancelNotification(old.notificationId); } catch {}
+    if (old?.notificationIds) {
+      for (const nid of old.notificationIds) {
+        try { await cancelNotification(nid); } catch {}
+      }
     }
     const reminders = get().reminders.filter((r) => r.id !== id);
     set({ reminders });

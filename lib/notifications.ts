@@ -41,22 +41,55 @@ export async function cancelNotification(notificationId: string): Promise<void> 
   await Notifications.cancelScheduledNotificationAsync(notificationId);
 }
 
+const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
+
+export async function scheduleWeeklyNotification(
+  hour: number,
+  minute: number,
+  weekday: number,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: { title, body, sound: 'default', data },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      hour,
+      minute,
+      weekday,
+    },
+  });
+}
+
 export async function syncReminders(reminders: Reminder[]): Promise<Reminder[]> {
   const updated: Reminder[] = [];
   for (const r of reminders) {
-    if (r.notificationId) {
-      try { await cancelNotification(r.notificationId); } catch {}
+    // Cancel all existing notifications for this reminder
+    if (r.notificationIds) {
+      for (const nid of r.notificationIds) {
+        try { await cancelNotification(nid); } catch {}
+      }
+    }
+    // Legacy: cancel old single notificationId
+    if ((r as any).notificationId) {
+      try { await cancelNotification((r as any).notificationId); } catch {}
     }
     if (r.enabled) {
-      const notificationId = await scheduleDailyNotification(
-        r.hour, r.minute,
-        'Do Nothing',
-        'Time to do nothing.',
-        { type: 'reminder', id: r.id },
-      );
-      updated.push({ ...r, notificationId });
+      const days = r.weekdays?.length ? r.weekdays : ALL_WEEKDAYS;
+      const notificationIds: string[] = [];
+      for (const day of days) {
+        const nid = await scheduleWeeklyNotification(
+          r.hour, r.minute, day,
+          'Do Nothing',
+          'Time to do nothing.',
+          { type: 'reminder', id: r.id },
+        );
+        notificationIds.push(nid);
+      }
+      updated.push({ ...r, notificationIds });
     } else {
-      updated.push({ ...r, notificationId: undefined });
+      updated.push({ ...r, notificationIds: undefined });
     }
   }
   return updated;
