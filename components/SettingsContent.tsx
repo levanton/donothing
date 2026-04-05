@@ -320,7 +320,8 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       {/* App selection for blocking */}
       {Platform.OS === 'ios' && (
         <>
-          <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
             APPS TO BLOCK
           </Text>
           <View style={styles.blockRow}>
@@ -584,6 +585,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   addButtonText: { fontSize: 14, fontWeight: '300' },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 28 },
   emptyCard: {
     borderWidth: 1,
     borderStyle: 'dashed',
