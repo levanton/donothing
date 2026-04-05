@@ -96,6 +96,7 @@ export default function GoalSliderBar({
 
   // --- Interactive mode state ---
   const [measuredWidth, setMeasuredWidth] = useState(0);
+  const [displayMins, setDisplayMins] = useState(value ?? 0);
   const internalProgress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const lastSnap = useRef(value ?? 0);
@@ -107,12 +108,16 @@ export default function GoalSliderBar({
   const tw = width - pad * 2;
 
   // --- Interactive gesture ---
-  const handleChange = useCallback((mins: number) => {
+  const handleDisplayUpdate = useCallback((mins: number) => {
     if (mins !== lastSnap.current) {
       lastSnap.current = mins;
       Haptics.selectionAsync();
-      onChange?.(mins);
     }
+    setDisplayMins(mins);
+  }, []);
+
+  const handleGestureEnd = useCallback((mins: number) => {
+    onChange?.(mins);
   }, [onChange]);
 
   const gesture = Gesture.Pan()
@@ -124,7 +129,11 @@ export default function GoalSliderBar({
       const raw = posToValue(x, maxMinutes);
       const snapped = snapToNearest(raw);
       internalProgress.value = valueToPos(snapped, maxMinutes);
-      runOnJS(handleChange)(snapped);
+      runOnJS(handleDisplayUpdate)(snapped);
+    })
+    .onEnd(() => {
+      'worklet';
+      runOnJS(handleGestureEnd)(lastSnap.current);
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -141,6 +150,7 @@ export default function GoalSliderBar({
   if (isInteractive && lastSnap.current !== value && width > 0) {
     internalProgress.value = valueToPos(value, maxMinutes);
     lastSnap.current = value;
+    setDisplayMins(value);
   }
 
   // --- Animated props (UI thread) ---
@@ -165,14 +175,14 @@ export default function GoalSliderBar({
     <View style={{ width: fixedWidth, alignItems: isInteractive ? undefined : 'center' }} onLayout={isInteractive ? onLayout : undefined}>
       {isInteractive && (
         <View style={styles.labelRow}>
-          {value === 0 ? (
+          {displayMins === 0 ? (
             <Text style={[styles.labelValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
               not set
             </Text>
           ) : (
             <View style={styles.labelParts}>
               <Text style={[styles.labelNumber, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                {value}
+                {displayMins}
               </Text>
               <Text style={[styles.labelUnit, { color: theme.text, fontFamily: Fonts!.serif }]}>
                 {' '}min
@@ -192,7 +202,7 @@ export default function GoalSliderBar({
         {/* Tick marks */}
         {ticks.map((m) => {
           const tx = pad + (isInteractive ? valueToPos(m, maxMinutes) : m / maxMinutes) * tw;
-          const filled = isInteractive ? (value ?? 0) >= m : false;
+          const filled = isInteractive ? displayMins >= m : false;
           return (
             <SvgLine
               key={m}
