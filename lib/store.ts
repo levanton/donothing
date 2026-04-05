@@ -261,6 +261,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const reminders = get().reminders.map((r) =>
       r.id === id ? { ...r, enabled: !r.enabled } : r,
     );
+    // Optimistically update UI before async sync
+    set({ reminders });
     const synced = await syncReminders(reminders);
     set({ reminders: synced });
     await saveReminders(synced);
@@ -294,6 +296,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const block = get().scheduledBlocks.find((b) => b.id === id);
     if (!block) return;
     const nowEnabled = !block.enabled;
+    // Optimistically update UI before async scheduling
+    const blocks = get().scheduledBlocks.map((b) =>
+      b.id === id ? { ...b, enabled: nowEnabled } : b,
+    );
+    set({ scheduledBlocks: blocks });
     try {
       if (nowEnabled) {
         const { scheduleBlock } = await import('./screen-time');
@@ -303,10 +310,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         unscheduleBlock(id);
       }
     } catch {}
-    const blocks = get().scheduledBlocks.map((b) =>
-      b.id === id ? { ...b, enabled: nowEnabled } : b,
-    );
-    set({ scheduledBlocks: blocks });
     await saveScheduledBlocks(blocks);
   },
 
