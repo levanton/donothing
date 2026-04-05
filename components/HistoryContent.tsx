@@ -36,6 +36,9 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   const streak = getStreak(sessions);
   const maxDuration = Math.max(...dailyStats.map((d) => d.duration), 1);
   const totalAll = formatTimeStat(totalStats.year);
+  const avgSession = sessions.length > 0
+    ? formatTimeStat(Math.round(totalStats.year / sessions.length))
+    : { value: '0', unit: 'min' };
 
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
@@ -64,37 +67,51 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         </Pressable>
       </View>
 
-      <View style={styles.heroSection}>
-        <View style={styles.heroValueRow}>
-          <Text style={[styles.heroValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {totalAll.value}
-          </Text>
-          <Text style={[styles.heroUnit, { color: theme.textTertiary }]}>
-            {totalAll.unit}
+      <View style={[styles.statsRow, { borderColor: theme.border }]}>
+        {/* Left — total time */}
+        <View style={styles.totalSection}>
+          <View style={styles.totalValueRow}>
+            <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {totalAll.value}
+            </Text>
+            <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>
+              {totalAll.unit}
+            </Text>
+          </View>
+          <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
+            total stillness
           </Text>
         </View>
-        <Text style={[styles.heroLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-          total stillness
-        </Text>
-      </View>
 
-      <View style={[styles.inlineStats, { borderColor: theme.border }]}>
-        {streak > 0 && (
-          <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
-            <Text style={{ color: theme.accent, fontFamily: Fonts!.serif }}>{streak}</Text>
-            {' day streak'}
-          </Text>
-        )}
-        <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
-          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.today).value}</Text>
-          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.today).unit}</Text>
-          {' today'}
-        </Text>
-        <Text style={[styles.inlineStatText, { color: theme.textSecondary }]}>
-          <Text style={{ color: theme.text, fontFamily: Fonts!.serif }}>{formatTimeStat(totalStats.week).value}</Text>
-          <Text style={{ color: theme.textTertiary }}> {formatTimeStat(totalStats.week).unit}</Text>
-          {' this week'}
-        </Text>
+        {/* Right — 2x2 grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCell}>
+            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {formatTimeStat(totalStats.week).value}
+              <Text style={[styles.statUnit, { color: theme.textTertiary }]}> {formatTimeStat(totalStats.week).unit}</Text>
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>this week</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={[styles.statValue, { color: streak > 0 ? theme.accent : theme.text, fontFamily: Fonts!.serif }]}>
+              {streak}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>day streak</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {avgSession.value}
+              <Text style={[styles.statUnit, { color: theme.textTertiary }]}> {avgSession.unit}</Text>
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>avg session</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {sessions.length}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>sessions</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.weekSection}>
@@ -149,13 +166,31 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  heroSection: { alignItems: 'center', marginBottom: 20 },
-  heroLabel: { fontSize: 13, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
-  heroValueRow: { flexDirection: 'row', alignItems: 'baseline' },
-  heroValue: { fontSize: 64, fontWeight: '300' },
-  heroUnit: { fontSize: 20, fontWeight: '300', marginLeft: 4 },
-  inlineStats: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 32, paddingBottom: 24, borderBottomWidth: StyleSheet.hairlineWidth },
-  inlineStatText: { fontSize: 13, fontWeight: '300' },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingBottom: 24,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  totalSection: { flex: 1 },
+  totalValueRow: { flexDirection: 'row', alignItems: 'baseline' },
+  totalValue: { fontSize: 52, fontWeight: '300' },
+  totalUnit: { fontSize: 18, fontWeight: '300', marginLeft: 4 },
+  totalLabel: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
+  statsGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  statCell: {
+    width: '50%',
+    paddingVertical: 8,
+    paddingLeft: 12,
+  },
+  statValue: { fontSize: 22, fontWeight: '300' },
+  statUnit: { fontSize: 14, fontWeight: '300' },
+  statLabel: { fontSize: 13, fontWeight: '300', marginTop: 2 },
   weekSection: { marginBottom: 28 },
   weekGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 60, paddingHorizontal: 8 },
   weekDayCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1, gap: 8 },
