@@ -10,7 +10,10 @@ import {
   configureActions,
   getActivities,
   isShieldActive,
+  getAppGroupFileDirectory,
+  copyFile,
 } from 'react-native-device-activity';
+import { Asset } from 'expo-asset';
 
 export type AuthStatus = 'notDetermined' | 'denied' | 'approved';
 
@@ -48,15 +51,7 @@ export async function requestAuth(): Promise<AuthStatus> {
 
 export async function blockApps(selectionToken: string): Promise<void> {
   await blockSelection({ activitySelectionToken: selectionToken });
-  await updateShield({
-    title: 'Do Nothing',
-    subtitle: 'This app is blocked during your focus session.',
-    primaryButtonLabel: '',
-    secondaryButtonLabel: '',
-  }, {
-    primary: { behavior: 'close' },
-    secondary: { behavior: 'close' },
-  });
+  await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
 }
 
 export async function unblockApps(selectionToken: string): Promise<void> {
@@ -65,38 +60,58 @@ export async function unblockApps(selectionToken: string): Promise<void> {
 
 export async function blockAppsById(selectionId: string): Promise<void> {
   await blockSelection({ activitySelectionId: selectionId });
-  await updateShield({
-    title: 'Do Nothing',
-    subtitle: 'This app is blocked during your scheduled session.',
-    primaryButtonLabel: '',
-    secondaryButtonLabel: '',
-  }, {
-    primary: { behavior: 'close' },
-    secondary: { behavior: 'close' },
-  });
+  await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
 }
 
 export async function unblockAppsById(selectionId: string): Promise<void> {
   await unblockSelection({ activitySelectionId: selectionId });
 }
 
+const SHIELD_ICON_FILENAME = 'shield-icon.png';
+
+export async function copyShieldIcon(): Promise<void> {
+  try {
+    const [asset] = await Asset.loadAsync(require('@/assets/Icon.icon/Assets/enso_D8522E_transparent.png'));
+    const appGroupDir = getAppGroupFileDirectory();
+    if (asset.localUri && appGroupDir) {
+      copyFile(asset.localUri, `${appGroupDir}/${SHIELD_ICON_FILENAME}`, true);
+    }
+  } catch (e) {
+    console.warn('Failed to copy shield icon:', e);
+  }
+}
+
+// Colors in 0-255 range (native getColor divides by 255)
 const SHIELD_CONFIG = {
   title: 'Do Nothing',
-  titleColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 1.0 },
-  subtitle: 'Put your phone down.\nOpen Do Nothing to unlock.',
-  subtitleColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 0.6 },
-  backgroundColor: { red: 0.976, green: 0.953, blue: 0.878, alpha: 1.0 },
+  titleColor: { red: 43, green: 37, blue: 34, alpha: 1.0 },
+  subtitle: 'time to do nothing.',
+  subtitleColor: { red: 43, green: 37, blue: 34, alpha: 0.55 },
+  backgroundColor: { red: 249, green: 243, blue: 224, alpha: 1.0 },
   primaryButtonLabel: 'Open Do Nothing',
-  primaryButtonLabelColor: { red: 0.976, green: 0.953, blue: 0.878, alpha: 1.0 },
-  primaryButtonBackgroundColor: { red: 0.78, green: 0.36, blue: 0.23, alpha: 1.0 },
+  primaryButtonLabelColor: { red: 255, green: 255, blue: 255, alpha: 1.0 },
+  primaryButtonBackgroundColor: { red: 199, green: 91, blue: 58, alpha: 1.0 },
   secondaryButtonLabel: 'Close',
-  secondaryButtonLabelColor: { red: 0.17, green: 0.15, blue: 0.13, alpha: 0.5 },
-  iconSystemName: 'leaf.fill',
-  iconTint: { red: 0.78, green: 0.36, blue: 0.23, alpha: 1.0 },
+  secondaryButtonLabelColor: { red: 43, green: 37, blue: 34, alpha: 0.4 },
+  iconAppGroupRelativePath: SHIELD_ICON_FILENAME,
 };
 
 const SHIELD_ACTIONS = {
-  primary: { behavior: 'close' as const },
+  primary: {
+    behavior: 'close' as const,
+    actions: [
+      { type: 'openApp' as const },
+      {
+        type: 'sendNotification' as const,
+        payload: {
+          title: 'Do Nothing',
+          body: 'Tap to open Do Nothing',
+          sound: 'default',
+          interruptionLevel: 'timeSensitive',
+        },
+      },
+    ],
+  },
   secondary: { behavior: 'close' as const },
 };
 

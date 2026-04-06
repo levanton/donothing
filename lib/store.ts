@@ -113,6 +113,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Init ---
   init: async () => {
     configureNotifications();
+    // Copy shield icon to app group (fire and forget)
+    import('./screen-time').then(({ copyShieldIcon }) => copyShieldIcon()).catch(() => {});
     const [sessions, themeMode, dailyGoalMinutes, rawReminders, rawBlocks] = await Promise.all([
       loadSessions(),
       loadTheme(),

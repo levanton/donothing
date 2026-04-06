@@ -11,21 +11,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.levanton.donothing",
-      "appleTeamId": "45DBHDBF45"
+      "appleTeamId": "45DBHDBF45",
+      "icon": "./assets/Icon.icon"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.levanton.donothing"
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
@@ -35,9 +30,10 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0a0a0a",
+          "backgroundColor": "#F9F3E0",
           "dark": {
-            "backgroundColor": "#0a0a0a"
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#444444"
           }
         }
       ],
@@ -61,7 +57,8 @@
           "appleTeamId": "45DBHDBF45",
           "appGroup": "group.com.levanton.donothing"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

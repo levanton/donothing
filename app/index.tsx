@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   Dimensions,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -463,6 +464,19 @@ export default function DoNothingScreen() {
     useAppStore.getState().unlockFocus();
   }, []);
 
+  // --- Debug: manual block toggle ---
+  const [debugBlocked, setDebugBlocked] = useState(false);
+  const handleDebugBlock = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (debugBlocked) {
+      await unblockAppsById('donothing-scheduled-block').catch(() => {});
+      setDebugBlocked(false);
+    } else {
+      await blockAppsById('donothing-scheduled-block').catch(() => {});
+      setDebugBlocked(true);
+    }
+  }, [debugBlocked]);
+
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     activateKeepAwakeAsync('session');
@@ -730,6 +744,22 @@ export default function DoNothingScreen() {
       >
         <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
+
+      {/* Debug block button — top right (iOS only) */}
+      {Platform.OS === 'ios' && (
+        <Pressable
+          onPress={handleDebugBlock}
+          style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 60 }]}
+          hitSlop={16}
+        >
+          <Feather
+            name={debugBlocked ? 'unlock' : 'lock'}
+            size={20}
+            color={debugBlocked ? theme.accent : theme.text}
+            style={{ opacity: 0.9 }}
+          />
+        </Pressable>
+      )}
 
       {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
       <View style={styles.headerRow}>
