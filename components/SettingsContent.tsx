@@ -11,7 +11,7 @@ import { Fonts } from '@/constants/theme';
 import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
 import { useAppStore } from '@/lib/store';
-import type { Reminder, ScheduledBlock } from '@/lib/storage';
+import type { Reminder, ScheduledBlock } from '@/lib/db/types';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 

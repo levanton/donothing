@@ -58,7 +58,8 @@
           "appGroup": "group.com.levanton.donothing"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

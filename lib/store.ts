@@ -1,13 +1,31 @@
 import { create } from 'zustand';
 import { Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { initDatabase } from './db';
 import {
-  loadSessions, addSession, loadTheme, saveTheme, Session,
-  Reminder, ScheduledBlock,
-  loadDailyGoal, saveDailyGoal,
-  loadReminders, saveReminders,
-  loadScheduledBlocks, saveScheduledBlocks,
-} from './storage';
+  addSession as dbAddSession,
+  deleteSessionsByDateKey,
+} from './db/sessions';
+import {
+  getAllReminders,
+  insertReminder,
+  updateReminder as dbUpdateReminder,
+  deleteReminder as dbDeleteReminder,
+  toggleReminder as dbToggleReminder,
+} from './db/reminders';
+import {
+  getAllScheduledBlocks,
+  insertScheduledBlock,
+  updateScheduledBlock as dbUpdateScheduledBlock,
+  deleteScheduledBlock as dbDeleteScheduledBlock,
+  toggleScheduledBlock as dbToggleScheduledBlock,
+} from './db/scheduled-blocks';
+import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/settings';
+import {
+  getNotificationIds,
+  clearNotificationIds,
+} from './db/notification-state';
+import type { Reminder, ScheduledBlock } from './db/types';
 import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
 import {
@@ -25,7 +43,6 @@ export interface AppState {
   // Timer / Session
   elapsed: number;
   started: boolean;
-  sessions: Session[];
   weekStats: WeekDay[];
   ready: boolean;
 
@@ -86,14 +103,13 @@ export interface AppState {
 
   // AppState
   handleBackground: () => Promise<void>;
-  handleForeground: () => Promise<void>;
+  handleForeground: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial values
   elapsed: 0,
   started: false,
-  sessions: [],
   weekStats: [],
   ready: false,
   themeMode: 'dark',
@@ -112,35 +128,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // --- Init ---
   init: async () => {
+    await initDatabase();
     configureNotifications();
     // Copy shield icon to app group (fire and forget)
     import('./screen-time').then(({ copyShieldIcon }) => copyShieldIcon()).catch(() => {});
-    const [sessions, themeMode, dailyGoalMinutes, rawReminders, rawBlocks] = await Promise.all([
-      loadSessions(),
-      loadTheme(),
-      loadDailyGoal(),
-      loadReminders(),
-      loadScheduledBlocks(),
-    ]);
-    const reminders = await syncReminders(rawReminders);
-    await saveReminders(reminders);
+
+    // Load from SQLite (synchronous reads)
+    const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
+    const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
+    const reminders = getAllReminders();
+    const scheduledBlocks = getAllScheduledBlocks();
+
+    // Sync notifications (async)
+    await syncReminders(reminders);
+
     // Re-register native scheduled blocks
     try {
       const { scheduleBlock } = await import('./screen-time');
-      for (const b of rawBlocks) {
+      for (const b of scheduledBlocks) {
         if (b.enabled) {
           await scheduleBlock(b.id, 'donothing-scheduled-block', b.hour, b.minute, b.durationMinutes);
         }
       }
     } catch {}
-    const scheduledBlocks = rawBlocks;
+
     set({
-      sessions,
       themeMode,
       dailyGoalMinutes,
       reminders,
       scheduledBlocks,
-      weekStats: getWeekStats(sessions),
+      weekStats: getWeekStats(),
       ready: true,
     });
   },
@@ -162,27 +179,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
     set({ started: false });
-    const updated = await addSession(duration);
-    set({ sessions: updated, weekStats: getWeekStats(updated) });
+    dbAddSession(duration);
+    set({ weekStats: getWeekStats() });
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
 
   deleteSessionsByDate: async (dateKey: string) => {
-    const sessions = get().sessions.filter((s) => {
-      const d = new Date(s.timestamp);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return key !== dateKey;
-    });
-    set({ sessions, weekStats: getWeekStats(sessions) });
-    await saveSessions(sessions);
+    deleteSessionsByDateKey(dateKey);
+    set({ weekStats: getWeekStats() });
   },
 
   // --- Theme ---
   toggleTheme: () => {
     const next = get().themeMode === 'dark' ? 'light' : 'dark';
     set({ themeMode: next });
-    saveTheme(next);
+    setDeviceState('theme', next);
   },
 
   // --- Goal ---
@@ -238,7 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setDailyGoal: async (minutes) => {
     set({ dailyGoalMinutes: minutes });
-    await saveDailyGoal(minutes);
+    setSetting('dailyGoal', String(minutes));
   },
 
   addReminder: async (hour, minute, weekdays) => {
@@ -255,59 +267,48 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     if (status !== 'granted') return;
-    const reminders = [...get().reminders, {
-      id: Date.now().toString(),
-      hour, minute, weekdays, enabled: true,
-    }];
-    const synced = await syncReminders(reminders);
-    set({ reminders: synced });
-    await saveReminders(synced);
+    const reminder = insertReminder(hour, minute, weekdays);
+    const reminders = getAllReminders();
+    await syncReminders(reminders);
+    set({ reminders });
   },
 
   editReminder: async (id, hour, minute, weekdays) => {
-    const reminders = get().reminders.map((r) =>
-      r.id === id ? { ...r, hour, minute, weekdays } : r,
-    );
-    const synced = await syncReminders(reminders);
-    set({ reminders: synced });
-    await saveReminders(synced);
+    dbUpdateReminder(id, hour, minute, weekdays);
+    const reminders = getAllReminders();
+    await syncReminders(reminders);
+    set({ reminders });
   },
 
   removeReminder: async (id) => {
-    const old = get().reminders.find((r) => r.id === id);
-    if (old?.notificationIds) {
-      for (const nid of old.notificationIds) {
-        try { await cancelNotification(nid); } catch {}
-      }
+    // Cancel notifications before deleting
+    const notifIds = getNotificationIds('reminder', id);
+    for (const nid of notifIds) {
+      try { await cancelNotification(nid); } catch {}
     }
-    const reminders = get().reminders.filter((r) => r.id !== id);
-    set({ reminders });
-    await saveReminders(reminders);
+    clearNotificationIds('reminder', id);
+    dbDeleteReminder(id);
+    set({ reminders: getAllReminders() });
   },
 
   toggleReminder: async (id) => {
-    const reminders = get().reminders.map((r) =>
-      r.id === id ? { ...r, enabled: !r.enabled } : r,
-    );
-    // Optimistically update UI before async sync
+    dbToggleReminder(id);
+    const reminders = getAllReminders();
+    // Optimistically update UI
     set({ reminders });
-    const synced = await syncReminders(reminders);
-    set({ reminders: synced });
-    await saveReminders(synced);
+    await syncReminders(reminders);
+    set({ reminders: getAllReminders() });
   },
 
   addScheduledBlock: async (hour, minute, durationMinutes, weekdays) => {
-    const id = Date.now().toString();
-    const block = { id, hour, minute, durationMinutes, weekdays, enabled: true };
+    const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays);
     try {
       const { scheduleBlock } = await import('./screen-time');
-      await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+      await scheduleBlock(block.id, 'donothing-scheduled-block', hour, minute, durationMinutes);
     } catch (e) {
       console.warn('Failed to schedule native block:', e);
     }
-    const blocks = [...get().scheduledBlocks, block];
-    set({ scheduledBlocks: blocks });
-    await saveScheduledBlocks(blocks);
+    set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
   editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays) => {
@@ -316,11 +317,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       unscheduleBlock(id);
       await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
     } catch {}
-    const blocks = get().scheduledBlocks.map((b) =>
-      b.id === id ? { ...b, hour, minute, durationMinutes, weekdays } : b,
-    );
-    set({ scheduledBlocks: blocks });
-    await saveScheduledBlocks(blocks);
+    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays);
+    set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
   removeScheduledBlock: async (id) => {
@@ -328,30 +326,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { unscheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
     } catch {}
-    const blocks = get().scheduledBlocks.filter((b) => b.id !== id);
-    set({ scheduledBlocks: blocks });
-    await saveScheduledBlocks(blocks);
+    clearNotificationIds('scheduledBlock', id);
+    dbDeleteScheduledBlock(id);
+    set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
   toggleScheduledBlock: async (id) => {
-    const block = get().scheduledBlocks.find((b) => b.id === id);
-    if (!block) return;
-    const nowEnabled = !block.enabled;
-    // Optimistically update UI before async scheduling
-    const blocks = get().scheduledBlocks.map((b) =>
-      b.id === id ? { ...b, enabled: nowEnabled } : b,
-    );
+    const nowEnabled = dbToggleScheduledBlock(id);
+    const blocks = getAllScheduledBlocks();
     set({ scheduledBlocks: blocks });
-    try {
-      if (nowEnabled) {
-        const { scheduleBlock } = await import('./screen-time');
-        await scheduleBlock(id, 'donothing-scheduled-block', block.hour, block.minute, block.durationMinutes);
-      } else {
-        const { unscheduleBlock } = await import('./screen-time');
-        unscheduleBlock(id);
-      }
-    } catch {}
-    await saveScheduledBlocks(blocks);
+    const block = blocks.find(b => b.id === id);
+    if (block) {
+      try {
+        if (nowEnabled) {
+          const { scheduleBlock } = await import('./screen-time');
+          await scheduleBlock(id, 'donothing-scheduled-block', block.hour, block.minute, block.durationMinutes);
+        } else {
+          const { unscheduleBlock } = await import('./screen-time');
+          unscheduleBlock(id);
+        }
+      } catch {}
+    }
   },
 
   // --- AppState ---
@@ -364,13 +359,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         timerInterval = null;
       }
       set({ started: false });
-      const updated = await addSession(duration);
-      set({ sessions: updated });
+      dbAddSession(duration);
     }
   },
 
-  handleForeground: async () => {
-    const sessions = await loadSessions();
-    set({ sessions, weekStats: getWeekStats(sessions) });
+  handleForeground: () => {
+    set({ weekStats: getWeekStats() });
   },
 }));

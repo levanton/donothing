@@ -6,7 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { formatTimeShort } from '@/lib/format';
-import type { Session } from '@/lib/storage';
+import { getMonthDurations } from '@/lib/db/sessions';
+import { useAppStore } from '@/lib/store';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -19,40 +20,35 @@ function dateKey(d: Date): string {
 }
 
 interface ActivityCalendarProps {
-  sessions: Session[];
   theme: any;
 }
 
-export default function ActivityCalendar({ sessions, theme }: ActivityCalendarProps) {
+export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Subscribe to weekStats so calendar re-renders when session data changes
+  const weekStats = useAppStore((s) => s.weekStats);
 
   const todayKey = dateKey(today);
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
-  // Build session duration map
+  // Build session duration map from DB
+  // weekStats in deps ensures recalculation when sessions change
   const durationMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const s of sessions) {
-      const key = dateKey(new Date(s.timestamp));
-      map.set(key, (map.get(key) || 0) + s.duration);
-    }
-    return map;
-  }, [sessions]);
+    return getMonthDurations(viewYear, viewMonth + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewYear, viewMonth, weekStats]);
 
   // Find max duration for the viewed month (for proportional intensity)
   const maxDuration = useMemo(() => {
     let max = 0;
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    for (let d = 1; d <= daysInMonth; d++) {
-      const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dur = durationMap.get(key) || 0;
+    for (const dur of durationMap.values()) {
       if (dur > max) max = dur;
     }
     return max || 1;
-  }, [durationMap, viewYear, viewMonth]);
+  }, [durationMap]);
 
   // Build calendar grid for current month
   const calendarDays = useMemo(() => {
@@ -196,12 +192,6 @@ export default function ActivityCalendar({ sessions, theme }: ActivityCalendarPr
       )}
     </View>
   );
-}
-
-/** Convert 0..1 intensity to hex alpha suffix (e.g. 0.3 → "4D") */
-function alphaHex(intensity: number): string {
-  const alpha = Math.round(Math.max(0.15, Math.min(1, intensity)) * 255);
-  return alpha.toString(16).padStart(2, '0').toUpperCase();
 }
 
 function formatSelectedDate(key: string): string {

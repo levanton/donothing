@@ -73,7 +73,6 @@ export default function DoNothingScreen() {
   const insets = useSafeAreaInsets();
 
   const elapsed = useAppStore((s) => s.elapsed);
-  const sessions = useAppStore((s) => s.sessions);
   const themeMode = useAppStore((s) => s.themeMode);
   const weekStats = useAppStore((s) => s.weekStats);
   const ready = useAppStore((s) => s.ready);
@@ -90,7 +89,7 @@ export default function DoNothingScreen() {
   const isActiveRef = useRef(true);
 
   const theme = themes[themeMode];
-  const stats = getStats(sessions);
+  const stats = getStats();
   const message = getMessage(elapsed);
 
   // --- Theme animation ---

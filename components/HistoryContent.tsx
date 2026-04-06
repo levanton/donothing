@@ -12,6 +12,7 @@ import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
 import { getDailyStats, getStats, getStreak } from '@/lib/stats';
+import { getDurationSince, getSessionCount, getLongestSessionDuration, getActiveDaysCount, getBestDayDuration } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
@@ -94,41 +95,30 @@ interface HistoryContentProps {
 }
 
 export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
-  const sessions = useAppStore((s) => s.sessions);
   const deleteSessionsByDate = useAppStore((s) => s.deleteSessionsByDate);
+  // Subscribe to weekStats to trigger re-render when session data changes
+  useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
 
-  const dailyStats = getDailyStats(sessions);
-  const totalStats = getStats(sessions);
-  const streak = getStreak(sessions);
+  const dailyStats = getDailyStats();
+  const totalStats = getStats();
+  const streak = getStreak();
   const totalAll = formatTimeStat(totalStats.year);
-  const avgSession = sessions.length > 0
-    ? formatTimeStat(Math.round(totalStats.year / sessions.length))
+  const totalSessions = getSessionCount();
+  const avgSession = totalSessions > 0
+    ? formatTimeStat(Math.round(totalStats.year / totalSessions))
     : { value: '0', unit: 'min' };
-  const longestSession = formatTimeStat(
-    sessions.length > 0 ? Math.max(...sessions.map((s) => s.duration)) : 0,
-  );
 
-  // Extra stats for page 2
-  const totalSessions = sessions.length;
+  const bestDayStat = formatTimeStat(getBestDayDuration());
+  const daysActive = getActiveDaysCount();
+  const longestSession = formatTimeStat(getLongestSessionDuration());
+
+  // This month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const thisMonth = sessions
-    .filter((s) => s.timestamp >= startOfMonth)
-    .reduce((sum, s) => sum + s.duration, 0);
+  const thisMonth = getDurationSince(startOfMonth);
   const thisMonthStat = formatTimeStat(thisMonth);
-
-  // Best day
-  const byDay = new Map<string, number>();
-  for (const s of sessions) {
-    const d = new Date(s.timestamp);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    byDay.set(key, (byDay.get(key) || 0) + s.duration);
-  }
-  const bestDayDuration = byDay.size > 0 ? Math.max(...byDay.values()) : 0;
-  const bestDayStat = formatTimeStat(bestDayDuration);
-  const daysActive = byDay.size;
 
   const [statsPage, setStatsPage] = useState(0);
   const statsTranslateX = useSharedValue(0);
@@ -277,7 +267,7 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         </View>
       </View>
 
-      <ActivityCalendar sessions={sessions} theme={theme} />
+      <ActivityCalendar theme={theme} />
 
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
       {dailyStats.map((day) => (
