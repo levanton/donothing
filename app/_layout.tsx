@@ -9,6 +9,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.charcoal }}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.charcoal } }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </GestureHandlerRootView>
   );

@@ -65,6 +65,10 @@ export interface AppState {
   reminders: Reminder[];
   scheduledBlocks: ScheduledBlock[];
 
+  // Onboarding
+  onboardingComplete: boolean;
+  setOnboardingComplete: () => void;
+
   // Actions
   init: () => Promise<void>;
   startSession: () => void;
@@ -126,6 +130,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   reminders: [],
   scheduledBlocks: [],
 
+  // Onboarding
+  onboardingComplete: false,
+  setOnboardingComplete: () => {
+    setSetting('onboardingComplete', '1');
+    set({ onboardingComplete: true });
+  },
+
   // --- Init ---
   init: async () => {
     await initDatabase();
@@ -135,6 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Load from SQLite (synchronous reads)
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
+    const onboardingComplete = getSetting('onboardingComplete') === '1';
     const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
     const reminders = getAllReminders();
     const scheduledBlocks = getAllScheduledBlocks();
@@ -155,6 +167,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       themeMode,
       dailyGoalMinutes,
+      onboardingComplete,
       reminders,
       scheduledBlocks,
       weekStats: getWeekStats(),

@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
+import { useRouter } from 'expo-router';
 import { themes, palette } from '@/lib/theme';
 import { timerDisplay, formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
@@ -71,6 +72,7 @@ const RING_R = 42;
 // ===========================================================================
 export default function DoNothingScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const elapsed = useAppStore((s) => s.elapsed);
   const themeMode = useAppStore((s) => s.themeMode);
@@ -742,6 +744,15 @@ export default function DoNothingScreen() {
         hitSlop={16}
       >
         <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
+      </Pressable>
+
+      {/* Onboarding test button — top right */}
+      <Pressable
+        onPress={() => router.push('/onboarding')}
+        style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 96 }]}
+        hitSlop={16}
+      >
+        <Feather name="play" size={20} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
 
       {/* Debug block button — top right (iOS only) */}
