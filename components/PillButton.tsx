@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     letterSpacing: 0.5,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   textSmall: {
     fontSize: 13,
