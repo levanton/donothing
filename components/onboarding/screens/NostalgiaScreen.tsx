@@ -10,29 +10,24 @@ import Animated, {
 import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 
-const PHRASES = [
-  'Lying in the grass.',
-  'Staring at clouds.',
-  'Dreaming about nothing.',
-  '\nTime just... stopped.',
-];
+const BODY_TEXT = 'Lying in the grass. Staring at clouds. Dreaming about nothing.\nTime just... stopped.';
+const WORDS = BODY_TEXT.split(' ');
+const WORD_DELAY = 150; // ms between each word
 
 const grassImage = require('@/assets/images/grass.png');
 
-function Phrase({ text, visible, bold }: { text: string; visible: boolean; bold?: boolean }) {
+function Word({ text, delay }: { text: string; delay: number }) {
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    if (visible) {
-      opacity.value = withTiming(1, { duration: 800 });
-    }
-  }, [visible]);
+    opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
+  }, []);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
 
-  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text}</Animated.Text>;
+  return <Animated.Text style={animStyle}>{text} </Animated.Text>;
 }
 
 interface Props {
@@ -43,52 +38,38 @@ interface Props {
 
 export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
-  const [phase, setPhase] = useState<'title' | 'image' | 'body'>('title');
-  const [visiblePhrases, setVisiblePhrases] = useState(0);
+  const [showBody, setShowBody] = useState(false);
 
   const titleOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
+  const imageOpacity = useSharedValue(0);
   const buttonOpacity = useSharedValue(0);
+
+  const totalWordsDuration = WORDS.length * WORD_DELAY + 400;
 
   useEffect(() => {
     if (!isActive) return;
-    titleOpacity.value = withDelay(200, withTiming(1, { duration: 800 }));
+    titleOpacity.value = withDelay(150, withTiming(1, { duration: 500 }));
 
     const t1 = setTimeout(() => {
-      titleOpacity.value = withTiming(0, { duration: 600 });
-    }, 2200);
+      titleOpacity.value = withTiming(0, { duration: 400 });
+    }, 1600);
     const t2 = setTimeout(() => {
-      setPhase('image');
-      contentOpacity.value = withTiming(1, { duration: 800 });
-    }, 3000);
+      setShowBody(true);
+      imageOpacity.value = withTiming(1, { duration: 600 });
+    }, 2200);
+    // Show button after all words have appeared
     const t3 = setTimeout(() => {
-      setPhase('body');
-    }, 4000);
+      buttonOpacity.value = withTiming(1, { duration: 500 });
+    }, 2200 + totalWordsDuration + 300);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [isActive]);
-
-  useEffect(() => {
-    if (phase !== 'body') return;
-    let count = 0;
-    const timer = setInterval(() => {
-      count++;
-      setVisiblePhrases(count);
-      if (count >= PHRASES.length) {
-        clearInterval(timer);
-        setTimeout(() => {
-          buttonOpacity.value = withTiming(1, { duration: 800 });
-        }, 600);
-      }
-    }, 1200);
-    return () => clearInterval(timer);
-  }, [phase]);
 
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
   }));
 
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
+  const imageStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
   }));
 
   const buttonAnimStyle = useAnimatedStyle(() => ({
@@ -104,33 +85,28 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
         </Text>
       </Animated.View>
 
-      {/* Image + text */}
-      <Animated.View style={[styles.content, { paddingTop: insets.top + 20 }, contentStyle]}>
-        <View style={styles.imageArea}>
-          <Image source={grassImage} style={styles.image} />
-        </View>
-
-        <View style={styles.textArea}>
-          {phase === 'body' && (
+      {/* Text first, then image below */}
+      {showBody && (
+        <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+          <View style={styles.textArea}>
             <Text style={[styles.body, { color: theme.text }]}>
-              {PHRASES.map((phrase, i) => (
-                <Phrase
-                  key={i}
-                  text={phrase + (i < PHRASES.length - 1 ? ' ' : '')}
-                  visible={i < visiblePhrases}
-                  bold={i === PHRASES.length - 1}
-                />
+              {WORDS.map((word, i) => (
+                <Word key={i} text={word} delay={i * WORD_DELAY} />
               ))}
             </Text>
-          )}
-        </View>
+          </View>
 
-        <Animated.View
-          style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
-        >
-          <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
-        </Animated.View>
-      </Animated.View>
+          <Animated.View style={[styles.imageArea, imageStyle]}>
+            <Image source={grassImage} style={styles.image} />
+          </Animated.View>
+
+          <Animated.View
+            style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
+          >
+            <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }
@@ -147,10 +123,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts?.serif,
-    fontSize: 48,
+    fontSize: 38,
     fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 58,
+    lineHeight: 48,
   },
   content: {
     flex: 1,
@@ -158,7 +134,7 @@ const styles = StyleSheet.create({
   },
   imageArea: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   image: {
@@ -167,10 +143,9 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   textArea: {
-    flex: 1,
-    justifyContent: 'flex-start',
+    flex: 0.7,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 24,
   },
   body: {
     fontFamily: Fonts?.serif,

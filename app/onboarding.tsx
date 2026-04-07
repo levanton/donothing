@@ -36,9 +36,6 @@ const TOTAL_PAGES = SCREENS.length; // 12
 export default function OnboardingRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const themeMode = useAppStore((s) => s.themeMode);
-  const theme = themes[themeMode];
-
   const [currentPage, setCurrentPage] = useState(0);
 
   // Quiz state
@@ -49,10 +46,10 @@ export default function OnboardingRoute() {
 
   const currentScreen = SCREENS[currentPage];
 
-  // Some screens override the theme (dark bg regardless of phone setting)
+  // Onboarding always uses custom themes, independent of phone setting
   const darkScreenIds = ['painQuiz', 'screenTimeQuiz'];
   const isDarkOverride = darkScreenIds.includes(currentScreen?.id ?? '');
-  const screenTheme = isDarkOverride ? themes.dark : theme;
+  const screenTheme = isDarkOverride ? themes.dark : themes.light;
 
   // Can advance: quiz/setup screens require selection
   const canAdvance = (() => {
@@ -141,14 +138,14 @@ export default function OnboardingRoute() {
       case 8: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
       case 9: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
       case 10: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
-      case 11: return <LetsGoScreen isActive onFinish={handleFinish} theme={theme} />;
+      case 11: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: screenTheme.bg }]}>
-      <StatusBar style={isDarkOverride || themeMode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={isDarkOverride ? 'light' : 'dark'} />
 
       <Animated.View
         key={currentPage}
