@@ -161,6 +161,19 @@ export default function OnboardingRoute() {
           />
         </View>
       )}
+
+      {/* Progress bar */}
+      <View style={[styles.progressTrack, { top: insets.top + 12, backgroundColor: 'rgba(68,68,68,0.15)' }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: palette.terracotta,
+              width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%`,
+            },
+          ]}
+        />
+      </View>
     </View>
   );
 }
@@ -178,5 +191,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  progressTrack: {
+    position: 'absolute',
+    left: 23,
+    right: 23,
+    height: 5,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 5,
+    borderRadius: 5,
   },
 });
