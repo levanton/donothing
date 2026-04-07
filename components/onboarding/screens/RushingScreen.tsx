@@ -1,9 +1,42 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import WordByWord from '../WordByWord';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
+import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
-import { palette } from '@/lib/theme';
+
+const rushImage = require('@/assets/images/rush.png');
+
+const PHRASES = [
+  'Now you rush to work.',
+  'Start a task.',
+  'Run to the store.',
+  'Cook. Clean. Fix. Reply.',
+  'Pick up kids.',
+  'Rush somewhere else.',
+  '\nEven when you\'re not scrolling — you\'re rushing.',
+];
+
+function Phrase({ text, visible, bold }: { text: string; visible: boolean; bold?: boolean }) {
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      opacity.value = withTiming(1, { duration: 800 });
+    }
+  }, [visible]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text}</Animated.Text>;
+}
 
 interface Props {
   isActive: boolean;
@@ -12,37 +45,91 @@ interface Props {
 }
 
 export default function RushingScreen({ isActive, onNext, theme }: Props) {
-  const [showBody, setShowBody] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [phase, setPhase] = useState<'title' | 'image' | 'body'>('title');
+  const [visiblePhrases, setVisiblePhrases] = useState(0);
+
+  const titleOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
+  const buttonOpacity = useSharedValue(0);
 
   useEffect(() => {
-    setShowBody(false);
+    if (!isActive) return;
+    titleOpacity.value = withDelay(200, withTiming(1, { duration: 800 }));
+
+    const t1 = setTimeout(() => {
+      titleOpacity.value = withTiming(0, { duration: 600 });
+    }, 2000);
+    const t2 = setTimeout(() => {
+      setPhase('image');
+      contentOpacity.value = withTiming(1, { duration: 800 });
+    }, 2800);
+    const t3 = setTimeout(() => {
+      setPhase('body');
+    }, 3800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [isActive]);
 
-  const handleWordsComplete = () => {
-    setTimeout(() => setShowBody(true), 1000);
-  };
+  useEffect(() => {
+    if (phase !== 'body') return;
+    let count = 0;
+    const timer = setInterval(() => {
+      count++;
+      setVisiblePhrases(count);
+      if (count >= PHRASES.length) {
+        clearInterval(timer);
+        setTimeout(() => {
+          buttonOpacity.value = withTiming(1, { duration: 800 });
+        }, 400);
+      }
+    }, 700);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleOpacity.value,
+  }));
+
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
+
+  const buttonAnimStyle = useAnimatedStyle(() => ({
+    opacity: buttonOpacity.value,
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={styles.textContainer}>
-        {isActive && (
-          <WordByWord
-            text="Now you rush to work. Start a task. Run to the store. Cook. Clean. Fix. Reply. Pick up kids. Rush somewhere else."
-            intervalMs={100}
-            accelerate
-            style={{ color: palette.brown, fontFamily: Fonts?.serif, fontSize: 26, fontWeight: '300' }}
-            onComplete={handleWordsComplete}
-          />
-        )}
-        {showBody && (
-          <Animated.Text
-            entering={FadeIn.duration(800)}
-            style={styles.body}
-          >
-            Even when you're not scrolling — you're rushing.
-          </Animated.Text>
-        )}
-      </View>
+      <Animated.View style={[styles.titleOverlay, titleStyle]}>
+        <Text style={[styles.title, { color: theme.text }]}>Now?</Text>
+      </Animated.View>
+
+      <Animated.View style={[styles.content, { paddingTop: insets.top + 20 }, contentStyle]}>
+        <View style={styles.imageArea}>
+          <Image source={rushImage} style={styles.image} />
+        </View>
+
+        <View style={styles.textArea}>
+          {phase === 'body' && (
+            <Text style={[styles.body, { color: theme.text }]}>
+              {PHRASES.map((phrase, i) => (
+                <Phrase
+                  key={i}
+                  text={phrase + (i < PHRASES.length - 1 ? ' ' : '')}
+                  visible={i < visiblePhrases}
+                  bold={i === PHRASES.length - 1}
+                />
+              ))}
+            </Text>
+          )}
+        </View>
+
+        <Animated.View
+          style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
+        >
+          <PillButton label="Continue" onPress={onNext} color={theme.text} blur />
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -50,19 +137,47 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  titleOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontFamily: Fonts?.serif,
+    fontSize: 48,
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
     paddingHorizontal: 32,
   },
-  textContainer: {
-    minHeight: 200,
+  imageArea: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  image: {
+    width: 300,
+    height: 300,
+    resizeMode: 'contain',
+  },
+  textArea: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 24,
   },
   body: {
-    marginTop: 32,
-    fontSize: 18,
-    fontWeight: '400',
-    color: palette?.brown,
-    opacity: 0.8,
-    textAlign: 'center',
     fontFamily: Fonts?.serif,
+    fontSize: 23,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 34,
+    paddingHorizontal: 8,
+  },
+  buttonArea: {
+    alignItems: 'center',
   },
 });

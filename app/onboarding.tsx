@@ -119,15 +119,15 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentScreen?.id === 'letsGo';
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['nostalgia', 'painQuiz', 'screenTimeQuiz', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
+  const hasOwnButton = ['nostalgia', 'rushing', 'painQuiz', 'screenTimeQuiz', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
   const showBottomButton = !isLastScreen && !hasOwnButton;
 
   const renderScreen = () => {
     const props = { isActive: true, onNext: goNext, theme };
     switch (currentPage) {
       case 0: return <NostalgiaScreen {...props} />;
-      case 1: return <EvidenceScreen {...props} />;
-      case 2: return <RushingScreen {...props} />;
+      case 1: return <RushingScreen {...props} />;
+      case 2: return <EvidenceScreen {...props} />;
       case 3: return <PhoneSymptomScreen {...props} />;
       case 4: return <PainQuizScreen {...props} selected={painPoints} onSelect={setPainPoints} />;
       case 5: return <ScreenTimeQuizScreen {...props} selected={screenTime} onSelect={setScreenTime} />;
