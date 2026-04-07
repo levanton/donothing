@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -44,9 +44,11 @@ export default function TheTurnScreen({ isActive, onNext, theme }: Props) {
           </Animated.Text>
         )}
         {phase >= 3 && (
-          <Animated.Text entering={FadeIn.duration(600)} style={[styles.sub, { color: theme.text }]}>
-            Like you used to.
-          </Animated.Text>
+          <Animated.View entering={FadeIn.duration(600)} style={styles.sub}>
+            <Text style={[styles.subText, { color: theme.text }]}>
+              Like you used to.
+            </Text>
+          </Animated.View>
         )}
         {phase >= 4 && (
           <Animated.Text entering={FadeIn.duration(600)} style={styles.bold}>
@@ -81,9 +83,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts?.serif,
   },
   sub: {
+    opacity: 0.7,
+  },
+  subText: {
     fontSize: 18,
     fontWeight: '400',
-    opacity: 0.7,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
   },

@@ -67,12 +67,16 @@ export default function OnboardingRoute() {
     }
   })();
 
-  const goNext = useCallback(() => {
+  const goNext = useCallback(async () => {
     if (currentPage < TOTAL_PAGES - 1) {
+      // Request notification permission when leaving schedule screen
+      if (currentScreen?.id === 'schedule') {
+        await requestPermission();
+      }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setCurrentPage(currentPage + 1);
     }
-  }, [currentPage]);
+  }, [currentPage, currentScreen]);
 
   const handleFinish = useCallback(async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

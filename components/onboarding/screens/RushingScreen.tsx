@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
@@ -12,30 +13,27 @@ import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
 
-const PHRASES = [
-  'Now you rush to work.',
-  'Start a task.',
-  'Run to the store.',
-  'Cook. Clean. Fix. Reply.',
-  'Pick up kids.',
-  'Rush somewhere else.',
-  '\nEven when you\'re not scrolling — you\'re rushing.',
-];
+const BODY_TEXT = 'Now you rush to work. Start a task. Run to the store. Cook. Clean. Fix. Reply. Pick up kids. Rush somewhere else.\nEven when you\'re not scrolling — you\'re rushing.';
+const WORDS = BODY_TEXT.split(' ');
+const WORD_DELAY = 200;
 
-function Phrase({ text, visible, bold }: { text: string; visible: boolean; bold?: boolean }) {
+const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
+
+function Word({ text, delay }: { text: string; delay: number }) {
   const opacity = useSharedValue(0);
+  const translateY = useSharedValue(8);
 
   useEffect(() => {
-    if (visible) {
-      opacity.value = withTiming(1, { duration: 800 });
-    }
-  }, [visible]);
+    opacity.value = withDelay(delay, withTiming(1, { duration: 600, easing: EASE_OUT }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: 600, easing: EASE_OUT }));
+  }, []);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
   }));
 
-  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text}</Animated.Text>;
+  return <Animated.Text style={animStyle}>{text} </Animated.Text>;
 }
 
 interface Props {
@@ -46,90 +44,90 @@ interface Props {
 
 export default function RushingScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
-  const [phase, setPhase] = useState<'title' | 'image' | 'body'>('title');
-  const [visiblePhrases, setVisiblePhrases] = useState(0);
+  const [showBody, setShowBody] = useState(false);
 
   const titleOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
+  const titleScale = useSharedValue(0.92);
+  const imageOpacity = useSharedValue(0);
+  const imageScale = useSharedValue(0.92);
   const buttonOpacity = useSharedValue(0);
+  const buttonTranslateY = useSharedValue(12);
+
+  const totalWordsDuration = WORDS.length * WORD_DELAY + 600;
 
   useEffect(() => {
     if (!isActive) return;
-    titleOpacity.value = withDelay(200, withTiming(1, { duration: 800 }));
+    // Title: fade in + scale up
+    titleOpacity.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
+    titleScale.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
 
+    // Title: fade out + scale down
     const t1 = setTimeout(() => {
-      titleOpacity.value = withTiming(0, { duration: 600 });
-    }, 2000);
+      titleOpacity.value = withTiming(0, { duration: 700, easing: EASE_OUT });
+      titleScale.value = withTiming(0.92, { duration: 700, easing: EASE_OUT });
+    }, 1800);
+    // Show image + words
     const t2 = setTimeout(() => {
-      setPhase('image');
-      contentOpacity.value = withTiming(1, { duration: 800 });
-    }, 2800);
+      setShowBody(true);
+      imageOpacity.value = withTiming(1, { duration: 1200, easing: EASE_OUT });
+      imageScale.value = withTiming(1, { duration: 1200, easing: EASE_OUT });
+    }, 2500);
+    // Button
     const t3 = setTimeout(() => {
-      setPhase('body');
-    }, 3800);
+      buttonOpacity.value = withTiming(1, { duration: 600, easing: EASE_OUT });
+      buttonTranslateY.value = withTiming(0, { duration: 600, easing: EASE_OUT });
+    }, 2500 + totalWordsDuration + 400);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [isActive]);
 
-  useEffect(() => {
-    if (phase !== 'body') return;
-    let count = 0;
-    const timer = setInterval(() => {
-      count++;
-      setVisiblePhrases(count);
-      if (count >= PHRASES.length) {
-        clearInterval(timer);
-        setTimeout(() => {
-          buttonOpacity.value = withTiming(1, { duration: 800 });
-        }, 400);
-      }
-    }, 700);
-    return () => clearInterval(timer);
-  }, [phase]);
-
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
+    transform: [{ scale: titleScale.value }],
   }));
 
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
+  const imageStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
+    transform: [{ scale: imageScale.value }],
   }));
 
   const buttonAnimStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
+    transform: [{ translateY: buttonTranslateY.value }],
   }));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Animated.View style={[styles.titleOverlay, titleStyle]}>
-        <Text style={[styles.title, { color: theme.text }]}>Now?</Text>
-      </Animated.View>
+      {/* Title */}
+      {!showBody && (
+        <Animated.View style={[styles.titleOverlay, titleStyle]}>
+          <Text style={[styles.title, { color: theme.text }]}>Now?</Text>
+        </Animated.View>
+      )}
 
-      <Animated.View style={[styles.content, { paddingTop: insets.top + 20 }, contentStyle]}>
-        <View style={styles.imageArea}>
-          <Image source={rushImage} style={styles.image} />
-        </View>
+      {/* Image on top, text below */}
+      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom, opacity: showBody ? 1 : 0 }]}>
+        <View style={styles.centerArea}>
+          <Animated.View style={[styles.imageArea, imageStyle]}>
+            <Image source={rushImage} style={styles.image} fadeDuration={0} />
+          </Animated.View>
 
-        <View style={styles.textArea}>
-          {phase === 'body' && (
-            <Text style={[styles.body, { color: theme.text }]}>
-              {PHRASES.map((phrase, i) => (
-                <Phrase
-                  key={i}
-                  text={phrase + (i < PHRASES.length - 1 ? ' ' : '')}
-                  visible={i < visiblePhrases}
-                  bold={i === PHRASES.length - 1}
-                />
-              ))}
-            </Text>
-          )}
+          <View style={styles.textArea}>
+            {showBody && (
+              <Text style={[styles.body, { color: theme.text }]}>
+                {WORDS.map((word, i) => (
+                  <Word key={i} text={word} delay={i * WORD_DELAY} />
+                ))}
+              </Text>
+            )}
+          </View>
         </View>
 
         <Animated.View
-          style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
+          style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}
         >
           <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
         </Animated.View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -145,7 +143,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts?.serif,
-    fontSize: 48,
+    fontSize: 38,
     fontWeight: '400',
     textAlign: 'center',
   },
@@ -153,29 +151,26 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 32,
   },
-  imageArea: {
+  centerArea: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+  },
+  imageArea: {
     alignItems: 'center',
+    marginBottom: 24,
   },
   image: {
-    width: 300,
-    height: 300,
+    width: 260,
+    height: 260,
     resizeMode: 'contain',
   },
-  textArea: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 24,
-  },
+  textArea: {},
   body: {
     fontFamily: Fonts?.serif,
     fontSize: 23,
     fontWeight: '400',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 34,
-    paddingHorizontal: 8,
   },
   buttonArea: {
     alignItems: 'center',

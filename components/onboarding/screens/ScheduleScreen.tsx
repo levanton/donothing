@@ -1,8 +1,11 @@
+import { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import ChipSelect from '../ChipSelect';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import { SCREENS } from '@/lib/onboarding-data';
+import { requestPermission } from '@/lib/notifications';
 
 const screen = SCREENS.find((s) => s.id === 'schedule')!;
 
@@ -15,6 +18,11 @@ interface Props {
 }
 
 export default function ScheduleScreen({ isActive, onNext, selected, onSelect, theme }: Props) {
+  const handleContinue = useCallback(async () => {
+    await requestPermission();
+    onNext();
+  }, [onNext]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts?.serif }]}>
@@ -36,6 +44,13 @@ export default function ScheduleScreen({ isActive, onNext, selected, onSelect, t
         )}
       </View>
 
+      {selected.length > 0 && (
+        <Animated.View entering={FadeIn.duration(400)} style={styles.permissionHint}>
+          <Text style={[styles.hintText, { color: theme.text }]}>
+            We'll need your permission to send a gentle reminder.
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -60,5 +75,14 @@ const styles = StyleSheet.create({
   },
   chips: {
     minHeight: 140,
+  },
+  permissionHint: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  hintText: {
+    fontSize: 14,
+    opacity: 0.5,
+    textAlign: 'center',
   },
 });
