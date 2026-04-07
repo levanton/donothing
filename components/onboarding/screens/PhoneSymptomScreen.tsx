@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import PlaceholderBg from '../PlaceholderBg';
-import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
+import { palette } from '@/lib/theme';
 
 interface Props {
   isActive: boolean;
@@ -31,7 +30,6 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
 
   return (
     <View style={styles.container}>
-      <PlaceholderBg colors={[palette.charcoal, '#2a2a2a']} />
       <View style={styles.textContainer}>
         {phase >= 1 && (
           <Animated.Text entering={FadeIn.duration(600)} style={styles.line}>

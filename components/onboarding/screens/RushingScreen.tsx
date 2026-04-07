@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import WordByWord from '../WordByWord';
-import PlaceholderBg from '../PlaceholderBg';
-import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
+import { palette } from '@/lib/theme';
 
 interface Props {
   isActive: boolean;
@@ -25,7 +24,6 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <PlaceholderBg colors={[palette.cream, '#B8C4C8']} />
       <View style={styles.textContainer}>
         {isActive && (
           <WordByWord

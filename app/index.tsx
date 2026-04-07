@@ -1004,7 +1004,7 @@ export default function DoNothingScreen() {
         <PillButton
           label="History"
           onPress={handleHistory}
-          color={themeMode === 'dark' ? palette.cream : palette.ink}
+          color={themeMode === 'dark' ? palette.cream : palette.brown}
         />
       </View>
 

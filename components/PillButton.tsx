@@ -40,9 +40,9 @@ export default function PillButton({ label, onPress, color, filled, fillColor, f
 const styles = StyleSheet.create({
   pill: {
     borderWidth: 1.5,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 25,
     alignItems: 'center',
   },
   pillSmall: {
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   text: {
-    fontSize: 15,
+    fontSize: 16,
     letterSpacing: 0.5,
     fontWeight: '500',
   },

@@ -9,9 +9,6 @@ export const palette = {
   brown:      '#333431',
   terracotta: '#CF644D',
   salmon:     '#E8A99A',
-  warmGray:   '#D9CFC2',
-  sage:       '#B5C4A8',
-  ink:        '#353235',
   danger:     '#D94040',
 } as const;
 
