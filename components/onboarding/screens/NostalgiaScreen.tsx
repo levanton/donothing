@@ -15,7 +15,7 @@ const PHRASES = [
   'Lying in the grass.',
   'Staring at clouds.',
   'Dreaming about nothing.',
-  'Time just... stopped.',
+  '\nTime just... stopped.',
 ];
 
 const grassImage = require('@/assets/images/grass.png');
@@ -109,7 +109,7 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
       <Animated.View
         style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
       >
-        <PillButton label="Continue" onPress={onNext} color={theme.text} />
+        <PillButton label="Continue" onPress={onNext} color={theme.text} blur />
       </Animated.View>
     </View>
   );

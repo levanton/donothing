@@ -19,6 +19,7 @@ import PillButton from '@/components/PillButton';
 
 // Screens
 import NostalgiaScreen from '@/components/onboarding/screens/NostalgiaScreen';
+import EvidenceScreen from '@/components/onboarding/screens/EvidenceScreen';
 import RushingScreen from '@/components/onboarding/screens/RushingScreen';
 import PhoneSymptomScreen from '@/components/onboarding/screens/PhoneSymptomScreen';
 import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
@@ -30,7 +31,7 @@ import ScheduleScreen from '@/components/onboarding/screens/ScheduleScreen';
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
 import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
-const TOTAL_PAGES = SCREENS.length; // 11
+const TOTAL_PAGES = SCREENS.length; // 12
 
 export default function OnboardingRoute() {
   const router = useRouter();
@@ -125,16 +126,17 @@ export default function OnboardingRoute() {
     const props = { isActive: true, onNext: goNext, theme };
     switch (currentPage) {
       case 0: return <NostalgiaScreen {...props} />;
-      case 1: return <RushingScreen {...props} />;
-      case 2: return <PhoneSymptomScreen {...props} />;
-      case 3: return <PainQuizScreen {...props} selected={painPoints} onSelect={setPainPoints} />;
-      case 4: return <ScreenTimeQuizScreen {...props} selected={screenTime} onSelect={setScreenTime} />;
-      case 5: return <TheTurnScreen {...props} />;
-      case 6: return <HowItWorksScreen {...props} />;
-      case 7: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 8: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
-      case 9: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
-      case 10: return <LetsGoScreen isActive onFinish={handleFinish} theme={theme} />;
+      case 1: return <EvidenceScreen {...props} />;
+      case 2: return <RushingScreen {...props} />;
+      case 3: return <PhoneSymptomScreen {...props} />;
+      case 4: return <PainQuizScreen {...props} selected={painPoints} onSelect={setPainPoints} />;
+      case 5: return <ScreenTimeQuizScreen {...props} selected={screenTime} onSelect={setScreenTime} />;
+      case 6: return <TheTurnScreen {...props} />;
+      case 7: return <HowItWorksScreen {...props} />;
+      case 8: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
+      case 9: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
+      case 10: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
+      case 11: return <LetsGoScreen isActive onFinish={handleFinish} theme={theme} />;
       default: return null;
     }
   };
@@ -159,6 +161,7 @@ export default function OnboardingRoute() {
             label="Continue"
             onPress={goNext}
             color={theme.text}
+            blur
           />
         </View>
       )}

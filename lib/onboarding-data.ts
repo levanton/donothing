@@ -18,6 +18,11 @@ export const SCREENS: OnboardingScreen[] = [
     heading: 'Remember being a kid? Lying in the grass. Staring at clouds. Dreaming. Time just... stopped.',
   },
   {
+    id: 'evidence',
+    type: 'story',
+    heading: 'The Evidence',
+  },
+  {
     id: 'rushing',
     type: 'story',
     heading: 'Now you rush to work. Start a task. Run to the store. Cook. Clean. Fix. Reply. Pick up kids. Rush somewhere else.',
