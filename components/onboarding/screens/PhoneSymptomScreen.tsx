@@ -28,21 +28,23 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
     };
   }, [isActive]);
 
+  const lineStyle = [styles.line, { color: theme.text }];
+
   return (
     <View style={styles.container}>
       <View style={styles.textContainer}>
         {phase >= 1 && (
-          <Animated.Text entering={FadeIn.duration(600)} style={styles.line}>
+          <Animated.Text entering={FadeIn.duration(600)} style={lineStyle}>
             And in between — you scroll.
           </Animated.Text>
         )}
         {phase >= 2 && (
-          <Animated.Text entering={FadeIn.duration(600)} style={[styles.line, styles.dim]}>
+          <Animated.Text entering={FadeIn.duration(600)} style={[...lineStyle, styles.dim]}>
             Not because you want to.
           </Animated.Text>
         )}
         {phase >= 3 && (
-          <Animated.Text entering={FadeIn.duration(800)} style={styles.line}>
+          <Animated.Text entering={FadeIn.duration(800)} style={lineStyle}>
             Because your brain forgot how to just...{'\n'}
             <Animated.Text entering={FadeIn.delay(1500).duration(600)} style={styles.stop}>
               stop.
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
   line: {
     fontSize: 26,
     fontWeight: '300',
-    color: palette?.cream,
+    color: palette?.charcoal,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
   },

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
-import PlaceholderBg from '../PlaceholderBg';
-import { palette } from '@/lib/theme';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Fonts } from '@/constants/theme';
+import { palette } from '@/lib/theme';
 
 interface Props {
   isActive: boolean;
@@ -13,7 +12,6 @@ interface Props {
 
 export default function TheTurnScreen({ isActive, onNext, theme }: Props) {
   const [phase, setPhase] = useState(0);
-  const dotScale = useSharedValue(1);
 
   useEffect(() => {
     if (!isActive) {
@@ -32,40 +30,21 @@ export default function TheTurnScreen({ isActive, onNext, theme }: Props) {
     };
   }, [isActive]);
 
-  useEffect(() => {
-    dotScale.value = withRepeat(
-      withTiming(1.3, { duration: 2000 }),
-      -1,
-      true,
-    );
-  }, []);
-
-  const breathingStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: dotScale.value }],
-  }));
-
   return (
     <View style={styles.container}>
-      <PlaceholderBg colors={[palette.cream, palette.salmon]} />
-
-      {/* Breathing dot */}
-      {phase >= 4 && (
-        <Animated.View style={[styles.dot, breathingStyle]} entering={FadeIn.duration(1000)} />
-      )}
-
       <View style={styles.textContainer}>
         {phase >= 1 && (
-          <Animated.Text entering={FadeIn.duration(800)} style={styles.intro}>
+          <Animated.Text entering={FadeIn.duration(800)} style={[styles.intro, { color: theme.text }]}>
             What if you just...
           </Animated.Text>
         )}
         {phase >= 2 && (
-          <Animated.Text entering={FadeIn.duration(800)} style={styles.main}>
+          <Animated.Text entering={FadeIn.duration(800)} style={[styles.main, { color: theme.text }]}>
             did nothing?
           </Animated.Text>
         )}
         {phase >= 3 && (
-          <Animated.Text entering={FadeIn.duration(600)} style={styles.sub}>
+          <Animated.Text entering={FadeIn.duration(600)} style={[styles.sub, { color: theme.text }]}>
             Like you used to.
           </Animated.Text>
         )}
@@ -92,21 +71,18 @@ const styles = StyleSheet.create({
   intro: {
     fontSize: 22,
     fontWeight: '300',
-    color: palette.brown,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
   },
   main: {
     fontSize: 40,
     fontWeight: '300',
-    color: palette.brown,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
   },
   sub: {
     fontSize: 18,
     fontWeight: '400',
-    color: palette.brown,
     opacity: 0.7,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
@@ -117,13 +93,5 @@ const styles = StyleSheet.create({
     color: palette.terracotta,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
-  },
-  dot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: palette.terracotta,
-    alignSelf: 'center',
-    marginBottom: 40,
   },
 });

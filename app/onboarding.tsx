@@ -49,6 +49,11 @@ export default function OnboardingRoute() {
 
   const currentScreen = SCREENS[currentPage];
 
+  // Some screens override the theme (dark bg regardless of phone setting)
+  const darkScreenIds = ['painQuiz', 'screenTimeQuiz'];
+  const isDarkOverride = darkScreenIds.includes(currentScreen?.id ?? '');
+  const screenTheme = isDarkOverride ? themes.dark : theme;
+
   // Can advance: quiz/setup screens require selection
   const canAdvance = (() => {
     switch (currentScreen?.id) {
@@ -119,11 +124,11 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentScreen?.id === 'letsGo';
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['nostalgia', 'rushing', 'painQuiz', 'screenTimeQuiz', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
-  const showBottomButton = !isLastScreen && !hasOwnButton;
+  const hasOwnButton = ['nostalgia', 'rushing', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
+  const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
 
   const renderScreen = () => {
-    const props = { isActive: true, onNext: goNext, theme };
+    const props = { isActive: true, onNext: goNext, theme: screenTheme };
     switch (currentPage) {
       case 0: return <NostalgiaScreen {...props} />;
       case 1: return <RushingScreen {...props} />;
@@ -142,8 +147,8 @@ export default function OnboardingRoute() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+    <View style={[styles.container, { backgroundColor: screenTheme.bg }]}>
+      <StatusBar style={isDarkOverride || themeMode === 'dark' ? 'light' : 'dark'} />
 
       <Animated.View
         key={currentPage}
@@ -156,14 +161,17 @@ export default function OnboardingRoute() {
 
       {/* Bottom Continue button */}
       {showBottomButton && (
-        <View style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}>
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
+        >
           <PillButton
             label="Continue"
             onPress={goNext}
-            color={theme.text}
-            blur
+            color={screenTheme.text}
+            outline
           />
-        </View>
+        </Animated.View>
       )}
 
       {/* Top bar: back button + progress */}
@@ -174,7 +182,7 @@ export default function OnboardingRoute() {
             style={styles.backButton}
             hitSlop={16}
           >
-            <Feather name="chevron-left" size={22} color={theme.text} style={{ opacity: 0.6 }} />
+            <Feather name="chevron-left" size={22} color={screenTheme.text} style={{ opacity: 0.6 }} />
           </Pressable>
         ) : (
           <View style={styles.backPlaceholder} />

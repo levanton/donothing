@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { palette } from '@/lib/theme';
 
 interface PillButtonProps {
@@ -10,42 +9,43 @@ interface PillButtonProps {
   fillColor?: string;
   flex?: boolean;
   small?: boolean;
-  blur?: boolean;
+  outline?: boolean;
   style?: ViewStyle;
 }
 
-export default function PillButton({ label, onPress, color, filled, fillColor, flex, small, blur, style }: PillButtonProps) {
-  if (blur) {
+export default function PillButton({ label, onPress, color, filled, fillColor, flex, small, outline, style }: PillButtonProps) {
+  // Outline pill — border + text in `color`, transparent bg
+  if (outline) {
     return (
       <Pressable
         onPress={onPress}
-        style={[styles.blurPill, small && styles.pillSmall, flex && { flex: 1 }, { borderColor: color }, style]}
+        style={[styles.pill, small && styles.chipSmall, flex && { flex: 1 }, { borderColor: color }, style]}
       >
-        <BlurView intensity={40} tint="default" style={StyleSheet.absoluteFill} />
-        <Text style={[styles.text, small && styles.textSmall, { color }]}>
+        <Text style={[styles.pillText, small && styles.textSmall, { color }]}>
           {label}
         </Text>
       </Pressable>
     );
   }
 
+  // Chip — filled bg, rounded rect
   return (
     <Pressable
       onPress={onPress}
       style={[
-        styles.pill,
-        small && styles.pillSmall,
+        styles.chip,
+        small && styles.chipSmall,
         flex && { flex: 1 },
         filled
           ? { backgroundColor: fillColor ?? color, borderColor: fillColor ?? color }
-          : { borderColor: color },
+          : { backgroundColor: palette.cream, borderColor: palette.cream },
         style,
       ]}
     >
       <Text style={[
         styles.text,
         small && styles.textSmall,
-        { color: filled ? palette.white : color },
+        { color: filled ? palette.cream : palette.charcoal },
       ]}>
         {label}
       </Text>
@@ -54,31 +54,35 @@ export default function PillButton({ label, onPress, color, filled, fillColor, f
 }
 
 const styles = StyleSheet.create({
-  pill: {
-    borderWidth: 1.5,
-    borderRadius: 100,
-    paddingVertical: 16,
-    paddingHorizontal: 25,
+  chip: {
+    borderWidth: 0,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     alignItems: 'center',
   },
-  pillSmall: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  chipSmall: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   text: {
-    fontSize: 16,
-    letterSpacing: 0.5,
+    fontSize: 14,
+    letterSpacing: 0.3,
     fontWeight: '400',
   },
   textSmall: {
-    fontSize: 13,
+    fontSize: 12,
   },
-  blurPill: {
+  pill: {
     borderWidth: 1.5,
     borderRadius: 100,
-    paddingVertical: 16,
-    paddingHorizontal: 25,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
     alignItems: 'center',
-    overflow: 'hidden',
+  },
+  pillText: {
+    fontSize: 16,
+    letterSpacing: 0.3,
+    fontWeight: '400',
   },
 });

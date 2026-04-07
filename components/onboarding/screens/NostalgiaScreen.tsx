@@ -128,7 +128,7 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
         <Animated.View
           style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
         >
-          <PillButton label="Continue" onPress={onNext} color={theme.text} blur />
+          <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
         </Animated.View>
       </Animated.View>
     </View>
