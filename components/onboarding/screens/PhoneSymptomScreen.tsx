@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   line: {
     fontSize: 26,
     fontWeight: '300',
-    color: palette.cream,
+    color: palette?.cream,
     textAlign: 'center',
     fontFamily: Fonts?.serif,
   },

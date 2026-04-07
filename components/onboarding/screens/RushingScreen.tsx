@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
     fontSize: 18,
     fontWeight: '400',
-    color: palette.brown,
+    color: palette?.brown,
     opacity: 0.8,
     textAlign: 'center',
     fontFamily: Fonts?.serif,

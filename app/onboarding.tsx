@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
 
 import { themes, palette } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
@@ -117,7 +118,7 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentScreen?.id === 'letsGo';
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['painQuiz', 'screenTimeQuiz', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
+  const hasOwnButton = ['nostalgia', 'painQuiz', 'screenTimeQuiz', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
   const showBottomButton = !isLastScreen && !hasOwnButton;
 
   const renderScreen = () => {
@@ -162,17 +163,30 @@ export default function OnboardingRoute() {
         </View>
       )}
 
-      {/* Progress bar */}
-      <View style={[styles.progressTrack, { top: insets.top + 12, backgroundColor: 'rgba(68,68,68,0.15)' }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              backgroundColor: palette.terracotta,
-              width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%`,
-            },
-          ]}
-        />
+      {/* Top bar: back button + progress */}
+      <View style={[styles.topBar, { top: insets.top + 10 }]}>
+        {currentPage > 0 ? (
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPage(currentPage - 1); }}
+            style={styles.backButton}
+            hitSlop={16}
+          >
+            <Feather name="chevron-left" size={22} color={theme.text} style={{ opacity: 0.6 }} />
+          </Pressable>
+        ) : (
+          <View style={styles.backPlaceholder} />
+        )}
+        <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: palette.terracotta,
+                width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%`,
+              },
+            ]}
+          />
+        </View>
       </View>
     </View>
   );
@@ -192,10 +206,25 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
-  progressTrack: {
+  topBar: {
     position: 'absolute',
-    left: 23,
+    left: 16,
     right: 23,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  backButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backPlaceholder: {
+    width: 28,
+  },
+  progressTrack: {
+    flex: 1,
     height: 5,
     borderRadius: 5,
     overflow: 'hidden',
