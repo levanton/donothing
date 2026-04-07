@@ -7,13 +7,14 @@ interface PillButtonProps {
   color: string;
   filled?: boolean;
   fillColor?: string;
+  chipBg?: string;
   flex?: boolean;
   small?: boolean;
   outline?: boolean;
   style?: ViewStyle;
 }
 
-export default function PillButton({ label, onPress, color, filled, fillColor, flex, small, outline, style }: PillButtonProps) {
+export default function PillButton({ label, onPress, color, filled, fillColor, chipBg, flex, small, outline, style }: PillButtonProps) {
   // Outline pill — border + text in `color`, transparent bg
   if (outline) {
     return (
@@ -38,7 +39,7 @@ export default function PillButton({ label, onPress, color, filled, fillColor, f
         flex && { flex: 1 },
         filled
           ? { backgroundColor: fillColor ?? color, borderColor: fillColor ?? color }
-          : { backgroundColor: palette.cream, borderColor: palette.cream },
+          : { backgroundColor: chipBg ?? palette.cream, borderColor: chipBg ?? palette.cream },
         style,
       ]}
     >

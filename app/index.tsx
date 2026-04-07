@@ -1005,6 +1005,7 @@ export default function DoNothingScreen() {
           label="History"
           onPress={handleHistory}
           color={themeMode === 'dark' ? palette.cream : palette.brown}
+          outline
         />
       </View>
 

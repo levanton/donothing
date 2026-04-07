@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import ChipSelect from '../ChipSelect';
-import PillButton from '@/components/PillButton';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import { SCREENS, GOAL_BY_SCREEN_TIME } from '@/lib/onboarding-data';
@@ -52,21 +50,11 @@ export default function SetGoalScreen({
             selected={selected}
             onSelect={onSelect}
             color={theme.text}
+            chipBg={palette.white}
           />
         )}
       </View>
 
-      {selected.length > 0 && (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.buttonWrap}>
-          <PillButton
-            label="Continue"
-            onPress={onNext}
-            color={palette.terracotta}
-            filled
-            fillColor={palette.terracotta}
-          />
-        </Animated.View>
-      )}
     </View>
   );
 }
@@ -91,9 +79,5 @@ const styles = StyleSheet.create({
   },
   chips: {
     minHeight: 80,
-  },
-  buttonWrap: {
-    marginTop: 32,
-    alignItems: 'center',
   },
 });

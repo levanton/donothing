@@ -39,9 +39,11 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
           </Animated.Text>
         )}
         {phase >= 2 && (
-          <Animated.Text entering={FadeIn.duration(600)} style={[...lineStyle, styles.dim]}>
-            Not because you want to.
-          </Animated.Text>
+          <Animated.View entering={FadeIn.duration(600)} style={styles.dim}>
+            <Animated.Text style={lineStyle}>
+              Not because you want to.
+            </Animated.Text>
+          </Animated.View>
         )}
         {phase >= 3 && (
           <Animated.Text entering={FadeIn.duration(800)} style={lineStyle}>

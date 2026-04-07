@@ -124,7 +124,7 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentScreen?.id === 'letsGo';
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['nostalgia', 'rushing', 'setGoal', 'schedule'].includes(currentScreen?.id ?? '');
+  const hasOwnButton = ['nostalgia', 'rushing'].includes(currentScreen?.id ?? '');
   const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
 
   const renderScreen = () => {

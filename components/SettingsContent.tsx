@@ -134,7 +134,7 @@ function TimePickerContent({ onConfirm, onCancel, theme, title, initialHour, ini
       </View>
       <View style={{ height: 24 }} />
       <View style={styles.sheetButtons}>
-        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
+        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} outline flex />
         <PillButton label="add" onPress={() => onConfirm(hour, minute, selectedDays)} color={theme.accent} filled flex />
       </View>
     </View>
@@ -246,7 +246,7 @@ function BlockPickerContent({ onConfirm, onCancel, theme, title, initialHour, in
       </View>
       <View style={{ height: 24 }} />
       <View style={styles.sheetButtons}>
-        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} flex />
+        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} outline flex />
         <PillButton label="add" onPress={() => onConfirm(hour, minute, duration, selectedDays)} color={theme.accent} filled flex />
       </View>
     </View>

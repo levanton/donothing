@@ -11,6 +11,7 @@ interface Props {
   onSelect: (selected: string[]) => void;
   multi?: boolean;
   color: string;
+  chipBg?: string;
   small?: boolean;
 }
 
@@ -20,6 +21,7 @@ export default function ChipSelect({
   onSelect,
   multi = false,
   color,
+  chipBg,
   small = false,
 }: Props) {
   const handlePress = (opt: string) => {
@@ -47,6 +49,7 @@ export default function ChipSelect({
             color={color}
             filled={selected.includes(opt)}
             fillColor={palette.terracotta}
+            chipBg={chipBg}
             small={small}
             style={styles.chip}
           />
