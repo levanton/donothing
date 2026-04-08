@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { palette, themes } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import ReminderCard from '@/components/ReminderCard';
+import AddButton from '@/components/AddButton';
 import { ALL_DAYS } from '@/components/TimePicker';
 
 export interface ReminderDraft {
@@ -91,13 +91,7 @@ export default function ScheduleScreen({
             />
           ))}
 
-          <Pressable
-            onPress={() => onEditReminder(null)}
-            style={[styles.addButton, { borderColor: fullTheme.textTertiary }]}
-          >
-            <Feather name="plus" size={14} color={theme.text} />
-            <Text style={[styles.addButtonText, { color: theme.text }]}>add reminder</Text>
-          </Pressable>
+          <AddButton label="add reminder" onPress={() => onEditReminder(null)} theme={fullTheme} />
         </Animated.View>
       )}
 
@@ -139,19 +133,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     marginBottom: 12,
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-end',
-    gap: 6,
-    marginTop: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderRadius: 100,
-  },
-  addButtonText: { fontSize: 14, fontWeight: '300' },
   hint: {
     marginTop: 24,
   },

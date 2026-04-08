@@ -16,6 +16,7 @@ import type { Reminder, ScheduledBlock } from '@/lib/db/types';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 import ReminderCard from '@/components/ReminderCard';
+import AddButton from '@/components/AddButton';
 import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
@@ -278,18 +279,16 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           }}
         />
       ))}
-      <Pressable
+      <AddButton
+        label="add reminder"
+        theme={theme}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setEditingReminder(null);
           setShowReminderPicker(true);
           reminderSheetRef.current?.expand();
         }}
-        style={[styles.addButton, { borderColor: theme.textTertiary }]}
-      >
-        <Feather name="plus" size={14} color={theme.text} />
-        <Text style={[styles.addButtonText, { color: theme.text }]}>add reminder</Text>
-      </Pressable>
+      />
 
       {/* App selection for blocking */}
       {Platform.OS === 'ios' && (
@@ -439,7 +438,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           </Pressable>
         );
       })}
-      <Pressable
+      <AddButton
+        label="add block"
+        theme={theme}
+        disabled={appCount === 0}
         onPress={() => {
           if (appCount === 0) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -447,11 +449,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
-        style={[styles.addButton, { borderColor: theme.textTertiary, opacity: appCount === 0 ? 0.4 : 1 }]}
-      >
-        <Feather name="plus" size={14} color={theme.text} />
-        <Text style={[styles.addButtonText, { color: theme.text }]}>add block</Text>
-      </Pressable>
+      />
     </ScrollView>
 
     {/* Bottom sheet for reminder picker */}
@@ -559,19 +557,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-end',
-    gap: 6,
-    marginTop: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderRadius: 100,
-  },
-  addButtonText: { fontSize: 14, fontWeight: '300' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 28 },
   emptyCard: {
     borderWidth: 1,
