@@ -8,7 +8,6 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
@@ -122,8 +121,10 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
-            <Feather name="arrow-right" size={22} color={theme.text} />
+          <Pressable onPress={onNext} style={styles.ctaButton}>
+            <Text style={styles.ctaText}>
+              Bring my minute back
+            </Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -152,14 +153,18 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   buttonArea: {
-    alignItems: 'flex-end',
-  },
-  circleButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  ctaButton: {
+    backgroundColor: palette.terracotta,
+    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+  },
+  ctaText: {
+    fontFamily: Fonts?.serif,
+    fontSize: 18,
+    fontWeight: '400',
+    color: palette.cream,
   },
 });

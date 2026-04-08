@@ -24,15 +24,16 @@ import RushingScreen from '@/components/onboarding/screens/RushingScreen';
 import PhoneSymptomScreen from '@/components/onboarding/screens/PhoneSymptomScreen';
 import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
 import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuizScreen';
-import TheTurnScreen from '@/components/onboarding/screens/TheTurnScreen';
 import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
 import SetGoalScreen from '@/components/onboarding/screens/SetGoalScreen';
 import ScheduleScreen from '@/components/onboarding/screens/ScheduleScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
+import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
+import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
 import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
-const TOTAL_PAGES = SCREENS.length + 1; // +1 for ScreenTimeStats (not in SCREENS)
+const TOTAL_PAGES = SCREENS.length + 2; // +2 for ScreenTimeStats, TryNothing (FirstMinuteDone replaces TheTurn)
 
 export default function OnboardingRoute() {
   const router = useRouter();
@@ -45,8 +46,15 @@ export default function OnboardingRoute() {
   const [goal, setGoal] = useState<string[]>([]);
   const [scheduleSlot, setScheduleSlot] = useState<string[]>([]);
 
-  // Page 6 is ScreenTimeStats (not in SCREENS array), so offset by 1 after that
-  const currentScreen = currentPage <= 5 ? SCREENS[currentPage] : currentPage === 6 ? null : SCREENS[currentPage - 1];
+  // Pages 6, 7, 8 are extra screens not in SCREENS array
+  const screenIndex = (() => {
+    if (currentPage <= 5) return currentPage;
+    if (currentPage === 6) return -1; // ScreenTimeStats
+    if (currentPage === 7) return -1; // TryNothing
+    if (currentPage === 8) return -1; // FirstMinuteDone
+    return currentPage - 2;           // rest offset by 2 (TheTurn removed, 3 extra - 1 removed = 2)
+  })();
+  const currentScreen = screenIndex >= 0 ? SCREENS[screenIndex] : null;
 
   // Onboarding always uses custom themes, independent of phone setting
   const darkScreenIds = ['painQuiz', 'screenTimeQuiz'];
@@ -127,7 +135,9 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentPage === TOTAL_PAGES - 1;
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['nostalgia', 'rushing', 'evidence', 'phoneSymptom'].includes(currentScreen?.id ?? '') || currentPage === 6;
+  // Screens with their own navigation buttons (no shared Continue)
+  const extraOwnButton = [6, 7, 8]; // ScreenTimeStats, TryNothing, FirstMinuteDone
+  const hasOwnButton = ['nostalgia', 'rushing', 'evidence', 'phoneSymptom'].includes(currentScreen?.id ?? '') || extraOwnButton.includes(currentPage);
   const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
 
   const renderScreen = () => {
@@ -140,12 +150,13 @@ export default function OnboardingRoute() {
       case 4: return <PainQuizScreen {...props} selected={painPoints} onSelect={setPainPoints} />;
       case 5: return <ScreenTimeQuizScreen {...props} selected={screenTime} onSelect={setScreenTime} />;
       case 6: return <ScreenTimeStatsScreen {...props} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 7: return <TheTurnScreen {...props} />;
-      case 8: return <HowItWorksScreen {...props} />;
-      case 9: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 10: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
-      case 11: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
-      case 12: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
+      case 7: return <TryNothingScreen {...props} />;
+      case 8: return <FirstMinuteDoneScreen {...props} />;
+      case 9: return <HowItWorksScreen {...props} />;
+      case 10: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
+      case 11: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
+      case 12: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
+      case 13: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
     }
   };
