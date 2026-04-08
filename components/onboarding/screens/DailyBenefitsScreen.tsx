@@ -78,8 +78,8 @@ export default function DailyBenefitsScreen({ isActive, onNext }: Props) {
     if (!isActive) return;
     headerOpacity.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
     headerTranslateY.value = withDelay(200, withTiming(0, { duration: 700, easing: EASE_OUT }));
-    buttonOpacity.value = withDelay(2800, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    buttonTranslateY.value = withDelay(2800, withTiming(0, { duration: 600, easing: EASE_OUT }));
+    buttonOpacity.value = withDelay(3700, withTiming(1, { duration: 600, easing: EASE_OUT }));
+    buttonTranslateY.value = withDelay(3700, withTiming(0, { duration: 600, easing: EASE_OUT }));
   }, [isActive]);
 
   const headerStyle = useAnimatedStyle(() => ({
