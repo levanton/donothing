@@ -89,7 +89,7 @@ const SIZE_STYLES = {
     outline: { borderWidth: 1, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end' },
     filled: { borderWidth: 0, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end' },
     chip: { borderWidth: 0, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-end' },
-    text: { fontSize: 14, fontWeight: '300' },
+    text: { fontSize: 14, fontWeight: '400' },
   }),
   medium: StyleSheet.create({
     outline: { borderWidth: 1.5, borderRadius: 100, paddingVertical: 14, paddingHorizontal: 28 },
