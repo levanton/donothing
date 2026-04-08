@@ -13,13 +13,19 @@ import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
 
-const BODY_TEXT = 'Now you rush to work. Start a task. Run to the store. Cook. Clean. Fix. Reply. Pick up kids. Rush somewhere else.\nEven when you\'re not scrolling — you\'re rushing.';
-const WORDS = BODY_TEXT.split(' ');
-const WORD_DELAY = 200;
+const LINES = [
+  { text: 'We have things to do.', bold: false },
+  { text: '\nWork. Home. Errands. Meetings. Chores. Repeat.', bold: false },
+  { text: '\nIn between — we scroll. To unwind. To escape.', bold: false },
+  { text: '\nBut it never helps. We swap one task for another and never stop to think about who we are or where we\'re going.', bold: false },
+  { text: '\nWe\'re exhausted.', bold: true },
+  { text: '\nDays, months, years — gone in a blur.', bold: true },
+];
+const WORD_DELAY = 180;
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-function Word({ text, delay }: { text: string; delay: number }) {
+function Word({ text, delay, bold }: { text: string; delay: number; bold?: boolean }) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(8);
 
@@ -33,7 +39,7 @@ function Word({ text, delay }: { text: string; delay: number }) {
     transform: [{ translateY: translateY.value }],
   }));
 
-  return <Animated.Text style={animStyle}>{text} </Animated.Text>;
+  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text} </Animated.Text>;
 }
 
 interface Props {
@@ -53,7 +59,8 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
 
-  const totalWordsDuration = WORDS.length * WORD_DELAY + 600;
+  const allWords = LINES.flatMap(l => l.text.split(' ').map(w => ({ word: w, bold: l.bold })));
+  const totalWordsDuration = allWords.length * WORD_DELAY + 600;
 
   useEffect(() => {
     if (!isActive) return;
@@ -100,7 +107,7 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
       {/* Title */}
       {!showBody && (
         <Animated.View style={[styles.titleOverlay, titleStyle]}>
-          <Text style={[styles.title, { color: theme.text }]}>Now?</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Now.</Text>
         </Animated.View>
       )}
 
@@ -114,8 +121,8 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
           <View style={styles.textArea}>
             {showBody && (
               <Text style={[styles.body, { color: theme.text }]}>
-                {WORDS.map((word, i) => (
-                  <Word key={i} text={word} delay={i * WORD_DELAY} />
+                {allWords.map((w, i) => (
+                  <Word key={i} text={w.word} delay={i * WORD_DELAY} bold={w.bold} />
                 ))}
               </Text>
             )}
