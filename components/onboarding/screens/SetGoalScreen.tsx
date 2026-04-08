@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
@@ -25,6 +26,7 @@ export default function SetGoalScreen({
   screenTimeAnswer,
   theme,
 }: Props) {
+  const insets = useSafeAreaInsets();
   // Parse initial value from parent's string[] state
   const [localMinutes, setLocalMinutes] = useState(() => {
     if (selected.length > 0) return parseInt(selected[0]) || 0;
@@ -52,29 +54,27 @@ export default function SetGoalScreen({
   }, [onSelect]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      {/* Center section: heading + value */}
-      <View style={styles.center}>
+    <View style={[styles.container, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 120 }]}>
+      {/* Middle: heading + value centered */}
+      <View style={styles.valueRow}>
         <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts?.serif }]}>
           {screen.heading}
         </Text>
         <Text style={[styles.body, { color: theme.text }]}>
           {screen.body}
         </Text>
-        <View style={styles.valueRow}>
-          <View style={styles.valueParts}>
-            <Text style={[styles.valueNumber, { color: theme.text, fontFamily: Fonts?.serif }]}>
-              {localMinutes}
-            </Text>
-            <Text style={[styles.valueUnit, { color: theme.text, fontFamily: Fonts?.serif }]}>
-              {' '}min
-            </Text>
-          </View>
+        <View style={styles.valueParts}>
+          <Text style={[styles.valueNumber, { color: theme.text, fontFamily: Fonts?.serif }]}>
+            {localMinutes}
+          </Text>
+          <Text style={[styles.valueUnit, { color: theme.text, fontFamily: Fonts?.serif }]}>
+            {' '}min
+          </Text>
         </View>
       </View>
 
-      {/* Bottom section: slider */}
-      <View style={styles.slider}>
+      {/* Bottom: slider right above Continue button */}
+      <View>
         {isActive && (
           <GoalSliderBar
             value={localMinutes}
@@ -99,10 +99,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  center: {
-    alignItems: 'center',
   },
   heading: {
     fontSize: 28,
@@ -114,25 +110,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     opacity: 0.6,
+    marginBottom: 72,
   },
   valueRow: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 40,
+    justifyContent: 'center',
   },
   valueParts: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   valueNumber: {
-    fontSize: 72,
+    fontSize: 96,
     fontWeight: '300',
   },
   valueUnit: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '300',
-  },
-  slider: {
-    marginTop: 80,
-    paddingBottom: 40,
   },
 });
