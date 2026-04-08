@@ -24,7 +24,7 @@ export default function PersonalizedResultScreen({
   scheduleSlot,
   theme,
 }: Props) {
-  const goalMinutes = GOAL_MINUTES[goal] ?? 5;
+  const goalMinutes = GOAL_MINUTES[goal] ?? (parseInt(goal) || 5);
   const scheduleInfo = SCHEDULE_HOURS[scheduleSlot];
   const scheduleLabel = scheduleSlot ? scheduleSlot.split(' — ')[0] : 'Morning';
 

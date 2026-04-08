@@ -24,26 +24,28 @@ const SNAP_POINTS = [
   65, 70, 75, 80, 85, 90,
 ];
 
-// Piecewise linear: 0–15 → 0–0.375, 15–60 → 0.375–0.85, 60–90 → 0.85–1.0
-const B1_VAL = 15;
-const B1_POS = 0.375;
-const B2_VAL = 60;
-const B2_POS = 0.8;
+// Piecewise linear: 0–15 → 0–0.375, 15–60 → 0.375–0.8, 60–90 → 0.8–1.0
+const DEFAULT_BP = { b1Val: 15, b1Pos: 0.375, b2Val: 60, b2Pos: 0.8 };
+
+export interface PiecewiseBreakpoints {
+  b1Val: number; b1Pos: number;
+  b2Val: number; b2Pos: number;
+}
 
 /** value → visual position (0–1) */
-function valueToPos(v: number, max: number): number {
+function valueToPos(v: number, max: number, bp: PiecewiseBreakpoints = DEFAULT_BP): number {
   'worklet';
-  if (v <= B1_VAL) return (v / B1_VAL) * B1_POS;
-  if (v <= B2_VAL) return B1_POS + ((v - B1_VAL) / (B2_VAL - B1_VAL)) * (B2_POS - B1_POS);
-  return B2_POS + ((v - B2_VAL) / (max - B2_VAL)) * (1 - B2_POS);
+  if (v <= bp.b1Val) return (v / bp.b1Val) * bp.b1Pos;
+  if (v <= bp.b2Val) return bp.b1Pos + ((v - bp.b1Val) / (bp.b2Val - bp.b1Val)) * (bp.b2Pos - bp.b1Pos);
+  return bp.b2Pos + ((v - bp.b2Val) / (max - bp.b2Val)) * (1 - bp.b2Pos);
 }
 
 /** visual position (0–1) → value */
-function posToValue(p: number, max: number): number {
+function posToValue(p: number, max: number, bp: PiecewiseBreakpoints = DEFAULT_BP): number {
   'worklet';
-  if (p <= B1_POS) return (p / B1_POS) * B1_VAL;
-  if (p <= B2_POS) return B1_VAL + ((p - B1_POS) / (B2_POS - B1_POS)) * (B2_VAL - B1_VAL);
-  return B2_VAL + ((p - B2_POS) / (1 - B2_POS)) * (max - B2_VAL);
+  if (p <= bp.b1Pos) return (p / bp.b1Pos) * bp.b1Val;
+  if (p <= bp.b2Pos) return bp.b1Val + ((p - bp.b1Pos) / (bp.b2Pos - bp.b1Pos)) * (bp.b2Val - bp.b1Val);
+  return bp.b2Val + ((p - bp.b2Pos) / (1 - bp.b2Pos)) * (max - bp.b2Val);
 }
 
 /** Snap a raw minute value to the nearest allowed snap point */
@@ -69,6 +71,16 @@ interface GoalSliderBarProps {
   scaleLabels?: string[];
   /** Fill/thumb color — defaults to theme.textSecondary */
   accentColor?: string;
+  /** Override piecewise mapping breakpoints for different value ranges */
+  breakpoints?: PiecewiseBreakpoints;
+  /** Hide the built-in value label above the slider */
+  hideLabel?: boolean;
+  /** Override slider track height (default 24) */
+  sliderHeight?: number;
+  /** Override thumb radius (default 8 interactive / 7 controlled) */
+  thumbRadius?: number;
+  /** Override track stroke width (default 2.5 fill / 2 bg) */
+  trackStrokeWidth?: number;
 
   // --- Controlled mode (main screen): pass progress + width, gesture is external ---
   progress?: Animated.SharedValue<number>;
@@ -86,6 +98,11 @@ export default function GoalSliderBar({
   ticks = [15, 30, 45],
   scaleLabels = ['0', String(maxMinutes)],
   accentColor,
+  breakpoints: bp = DEFAULT_BP,
+  hideLabel = false,
+  sliderHeight,
+  thumbRadius: thumbR,
+  trackStrokeWidth,
   progress: externalProgress,
   width: fixedWidth,
   value,
@@ -93,6 +110,11 @@ export default function GoalSliderBar({
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
   const color = accentColor ?? theme.textSecondary;
+  const sH = sliderHeight ?? SLIDER_H;
+  const tR = thumbR ?? (isInteractive ? 8 : 7);
+  const tDotR = thumbR ? thumbR * 0.3 : (isInteractive ? 2.5 : 2);
+  const fillSW = trackStrokeWidth ?? 2.5;
+  const bgSW = trackStrokeWidth ? trackStrokeWidth * 0.8 : 2;
 
   // --- Interactive mode state ---
   const [measuredWidth, setMeasuredWidth] = useState(0);
@@ -103,8 +125,8 @@ export default function GoalSliderBar({
 
   const progress = externalProgress ?? internalProgress;
   const width = fixedWidth ?? measuredWidth;
-  const pad = SLIDER_PAD;
-  const cy = SLIDER_H / 2;
+  const pad = Math.max(SLIDER_PAD, tR + 2);
+  const cy = sH / 2;
   const tw = width - pad * 2;
 
   // --- Interactive gesture ---
@@ -114,9 +136,6 @@ export default function GoalSliderBar({
       Haptics.selectionAsync();
     }
     setDisplayMins(mins);
-  }, []);
-
-  const handleGestureEnd = useCallback((mins: number) => {
     onChange?.(mins);
   }, [onChange]);
 
@@ -126,33 +145,34 @@ export default function GoalSliderBar({
       const twVal = trackW.value;
       if (twVal === 0) return;
       const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
-      const raw = posToValue(x, maxMinutes);
+      const raw = posToValue(x, maxMinutes, bp);
       const snapped = snapToNearest(raw);
-      internalProgress.value = valueToPos(snapped, maxMinutes);
+      internalProgress.value = valueToPos(snapped, maxMinutes, bp);
       runOnJS(handleDisplayUpdate)(snapped);
-    })
-    .onEnd(() => {
-      'worklet';
-      runOnJS(handleGestureEnd)(lastSnap.value);
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
     setMeasuredWidth(w);
     const t = w - pad * 2;
-    trackW.value = t;
-    if (value !== undefined) {
-      internalProgress.value = valueToPos(value, maxMinutes);
-    }
+    requestAnimationFrame(() => {
+      trackW.value = t;
+      if (value !== undefined) {
+        internalProgress.value = valueToPos(value, maxMinutes, bp);
+      }
+    });
   }, [value, maxMinutes]);
 
   // Sync external value changes (interactive mode)
   useEffect(() => {
-    if (isInteractive && lastSnap.value !== value && width > 0) {
-      internalProgress.value = valueToPos(value!, maxMinutes);
-      lastSnap.value = value!;
-      setDisplayMins(value!);
-    }
+    if (!isInteractive || width <= 0) return;
+    requestAnimationFrame(() => {
+      if (lastSnap.value !== value) {
+        internalProgress.value = valueToPos(value!, maxMinutes, bp);
+        lastSnap.value = value!;
+        setDisplayMins(value!);
+      }
+    });
   }, [value, width]);
 
   // --- Animated props (UI thread) ---
@@ -170,12 +190,12 @@ export default function GoalSliderBar({
 
   // Wait for layout in interactive mode
   if (isInteractive && width === 0) {
-    return <View onLayout={onLayout} style={{ height: SLIDER_H + 44 }} />;
+    return <View onLayout={onLayout} style={{ height: sH + 44 }} />;
   }
 
   const slider = (
     <View style={{ width: fixedWidth, alignItems: isInteractive ? undefined : 'center' }} onLayout={isInteractive ? onLayout : undefined}>
-      {isInteractive && (
+      {isInteractive && !hideLabel && (
         <View style={styles.labelRow}>
           {displayMins === 0 ? (
             <Text style={[styles.labelValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
@@ -193,17 +213,17 @@ export default function GoalSliderBar({
           )}
         </View>
       )}
-      <Svg width={width} height={SLIDER_H}>
+      <Svg width={width} height={sH}>
         {/* Track */}
         <SvgLine
           x1={pad} y1={cy} x2={width - pad} y2={cy}
           stroke={theme.textTertiary}
-          strokeWidth={2}
+          strokeWidth={bgSW}
           strokeLinecap="round"
         />
         {/* Tick marks */}
         {ticks.map((m) => {
-          const tx = pad + (isInteractive ? valueToPos(m, maxMinutes) : m / maxMinutes) * tw;
+          const tx = pad + (isInteractive ? valueToPos(m, maxMinutes, bp) : m / maxMinutes) * tw;
           const filled = isInteractive ? displayMins >= m : false;
           return (
             <SvgLine
@@ -218,20 +238,20 @@ export default function GoalSliderBar({
         <AnimatedLine
           x1={pad} y1={cy} y2={cy}
           stroke={color}
-          strokeWidth={2.5}
+          strokeWidth={fillSW}
           strokeLinecap="round"
           animatedProps={fillProps}
         />
         {/* Thumb */}
         <AnimatedCircle
-          cy={cy} r={isInteractive ? 8 : 7}
+          cy={cy} r={tR}
           fill={theme.bg}
           stroke={color}
           strokeWidth={2}
           animatedProps={thumbProps}
         />
         <AnimatedCircle
-          cy={cy} r={isInteractive ? 2.5 : 2}
+          cy={cy} r={tDotR}
           fill={color}
           animatedProps={thumbDotProps}
         />
@@ -240,7 +260,7 @@ export default function GoalSliderBar({
         <View style={[styles.scaleRow, { width, height: 16 }]}>
           {scaleLabels.map((label, i) => {
             const val = Number(label);
-            const pos = valueToPos(val, maxMinutes);
+            const pos = valueToPos(val, maxMinutes, bp);
             return (
               <View
                 key={i}

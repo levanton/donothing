@@ -122,7 +122,7 @@ export default function OnboardingRoute() {
 
     // Set daily goal
     if (goal.length > 0) {
-      const minutes = GOAL_MINUTES[goal[0]] ?? 5;
+      const minutes = GOAL_MINUTES[goal[0]] ?? (parseInt(goal[0]) || 5);
       await useAppStore.getState().setDailyGoal(minutes);
     }
 
