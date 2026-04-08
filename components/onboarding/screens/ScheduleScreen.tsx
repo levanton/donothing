@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { palette, themes } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import ReminderCard from '@/components/ReminderCard';
-import AddButton from '@/components/AddButton';
+import PillButton from '@/components/PillButton';
 import { ALL_DAYS } from '@/components/TimePicker';
 
 export interface ReminderDraft {
@@ -91,7 +91,7 @@ export default function ScheduleScreen({
             />
           ))}
 
-          <AddButton label="add reminder" onPress={() => onEditReminder(null)} theme={fullTheme} />
+          <PillButton label="+ add reminder" onPress={() => onEditReminder(null)} color={theme.text} variant="outline" size="small" />
         </Animated.View>
       )}
 

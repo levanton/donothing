@@ -16,7 +16,6 @@ import type { Reminder, ScheduledBlock } from '@/lib/db/types';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 import ReminderCard from '@/components/ReminderCard';
-import AddButton from '@/components/AddButton';
 import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
@@ -279,9 +278,11 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           }}
         />
       ))}
-      <AddButton
-        label="add reminder"
-        theme={theme}
+      <PillButton
+        label="+ add reminder"
+        color={theme.text}
+        variant="outline"
+        size="small"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setEditingReminder(null);
@@ -438,10 +439,11 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           </Pressable>
         );
       })}
-      <AddButton
-        label="add block"
-        theme={theme}
-        disabled={appCount === 0}
+      <PillButton
+        label="+ add block"
+        color={theme.text}
+        variant="outline"
+        size="small"
         onPress={() => {
           if (appCount === 0) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
