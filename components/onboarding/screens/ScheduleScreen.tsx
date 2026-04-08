@@ -67,7 +67,7 @@ export default function ScheduleScreen({
       <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts.serif }]}>
         Set your reminders
       </Text>
-      <Text style={[styles.body, { color: theme.text }]}>
+      <Text style={[styles.body, { color: fullTheme.textSecondary }]}>
         We'll remind you to pause and do nothing.
       </Text>
 
@@ -97,7 +97,7 @@ export default function ScheduleScreen({
 
       {reminders.some((r) => r.enabled) && (
         <Animated.View entering={FadeIn.duration(400)} style={styles.hint}>
-          <Text style={[styles.hintText, { color: theme.text }]}>
+          <Text style={[styles.hintText, { color: fullTheme.textSecondary }]}>
             We'll ask permission to send a gentle reminder.
           </Text>
         </Animated.View>
@@ -124,7 +124,6 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 16,
     textAlign: 'left',
-    opacity: 0.6,
     marginBottom: 28,
   },
   tapHint: {
@@ -138,7 +137,6 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: 14,
-    opacity: 0.5,
     textAlign: 'left',
   },
 });

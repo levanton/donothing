@@ -108,29 +108,18 @@ export default function OnboardingRoute() {
         </Animated.View>
       )}
 
-      {/* Back button on second screen (no progress bar) */}
-      {currentIndex === 1 && (
-        <Pressable
-          onPress={flow.goBack}
-          style={[styles.backButton, { position: 'absolute', top: insets.top + 10, left: 16 }]}
-          hitSlop={16}
-        >
-          <Feather name="chevron-left" size={22} color={backColor} style={{ opacity: 0.6 }} />
-        </Pressable>
-      )}
-
       {/* Top bar: back button + progress */}
-      {currentIndex >= 2 && (
+      {currentPage.showBackButton && (
         <View style={[styles.topBar, { top: insets.top + 10 }]}>
           <Pressable
             onPress={flow.goBack}
             style={styles.backButton}
             hitSlop={16}
           >
-            <Feather name="chevron-left" size={22} color={backColor} style={{ opacity: 0.6 }} />
+            <Feather name="chevron-left" size={22} color={backColor} />
           </Pressable>
           {currentPage.showProgress && (
-            <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
+            <View style={[styles.progressTrack, { backgroundColor: palette.charcoal + '1F' }]}>
               <View
                 style={[
                   styles.progressFill,

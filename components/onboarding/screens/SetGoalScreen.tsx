@@ -109,7 +109,6 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 16,
     textAlign: 'center',
-    opacity: 0.6,
     marginBottom: 72,
   },
   valueRow: {

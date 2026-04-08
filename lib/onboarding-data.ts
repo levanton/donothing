@@ -108,13 +108,6 @@ export const GOAL_MINUTES: Record<string, number> = {
   '30m': 30,
 };
 
-// Schedule option → hour for reminder
-export const SCHEDULE_HOURS: Record<string, { hour: number; minute: number }> = {
-  'Morning — start your day calm': { hour: 8, minute: 0 },
-  'Afternoon — reset your brain': { hour: 13, minute: 0 },
-  'Evening — wind down before sleep': { hour: 21, minute: 0 },
-};
-
 // ── Flat page list — single source of truth for the onboarding flow ──────
 
 export type PageId =
@@ -129,23 +122,24 @@ export interface OnboardingPage {
   theme: ThemeMode;
   hasOwnButton: boolean;
   showProgress: boolean;
+  showBackButton: boolean;
 }
 
 export const PAGES: OnboardingPage[] = [
-  { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
-  { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
-  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
-  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
-  { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true  },
-  { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true  },
-  { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
-  { id: 'tryNothing',      bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
-  { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false },
-  { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false },
-  { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
-  { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
-  { id: 'schedule',        bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
-  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
+  { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'tryNothing',      bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'schedule',        bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
 ];
 
 // How-it-works steps with Feather icon names

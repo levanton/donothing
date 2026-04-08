@@ -64,7 +64,7 @@ function FactRow({ icon, text, isMci, delay, onAppear }: {
           <Feather name={icon as any} size={16} color={palette.terracotta} />
         )}
       </View>
-      <Text style={[styles.factText, { color: '#FFFFFF' }]}>
+      <Text style={[styles.factText, { color: palette.cream }]}>
         {text}
       </Text>
       <Feather name="check" size={16} color={'#FFFFFF'} style={{ marginLeft: 4 }} />

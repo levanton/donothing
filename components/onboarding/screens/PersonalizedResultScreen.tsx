@@ -53,7 +53,7 @@ export default function PersonalizedResultScreen({
             >
               <Feather name="check" size={20} color={palette.terracotta} />
               <View style={styles.lineContent}>
-                <Feather name={line.icon} size={16} color={theme.text} style={{ opacity: 0.5 }} />
+                <Feather name={line.icon} size={16} color={theme.text} />
                 <Text style={[styles.lineText, { color: theme.text }]}>{line.text}</Text>
               </View>
             </Animated.View>
@@ -106,7 +106,6 @@ const styles = StyleSheet.create({
   personalized: {
     fontSize: 16,
     textAlign: 'center',
-    opacity: 0.6,
     lineHeight: 24,
     fontFamily: Fonts?.serif,
   },

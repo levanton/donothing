@@ -236,7 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '400',
     textAlign: 'left',
-    opacity: 0.7,
     marginTop: 8,
     marginBottom: 40,
     paddingHorizontal: 24,

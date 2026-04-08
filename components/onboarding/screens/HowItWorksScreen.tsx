@@ -50,7 +50,6 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
     marginBottom: 48,
-    opacity: 0.7,
   },
   steps: {
     gap: 28,
@@ -67,7 +66,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
-    opacity: 0.6,
   },
   stepText: {
     fontSize: 22,
