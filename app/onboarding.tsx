@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,7 +13,9 @@ import { setSetting } from '@/lib/db/settings';
 import { insertReminder } from '@/lib/db/reminders';
 import { getAllReminders } from '@/lib/db/reminders';
 import { requestPermission, syncReminders } from '@/lib/notifications';
-import { SCREENS, GOAL_MINUTES, SCHEDULE_HOURS } from '@/lib/onboarding-data';
+import { SCREENS, GOAL_MINUTES } from '@/lib/onboarding-data';
+import { DEFAULT_REMINDERS } from '@/components/onboarding/screens/ScheduleScreen';
+import type { ReminderDraft, ScheduleSheetHandle } from '@/components/onboarding/screens/ScheduleScreen';
 
 import PillButton from '@/components/PillButton';
 
@@ -34,7 +36,27 @@ import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsSc
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
 import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
+const __DEV_JUMP__ = __DEV__;
+
 const TOTAL_PAGES = SCREENS.length + 3; // +3 for ScreenTimeStats, TryNothing, FirstMinuteDone, DailyBenefits
+
+const PAGE_NAMES = [
+  '0 Nostalgia',
+  '1 Rushing',
+  '2 Evidence',
+  '3 PhoneSymptom',
+  '4 PainQuiz',
+  '5 ScreenTimeQuiz',
+  '6 ScreenTimeStats',
+  '7 TryNothing',
+  '8 FirstMinuteDone',
+  '9 DailyBenefits',
+  '10 HowItWorks',
+  '11 SetGoal',
+  '12 Schedule',
+  '13 PersonalizedResult',
+  '14 LetsGo',
+];
 
 function getPageBg(page: number): string {
   switch (page) {
@@ -61,7 +83,9 @@ export default function OnboardingRoute() {
   const [painPoints, setPainPoints] = useState<string[]>([]);
   const [screenTime, setScreenTime] = useState<string[]>([]);
   const [goal, setGoal] = useState<string[]>([]);
-  const [scheduleSlot, setScheduleSlot] = useState<string[]>([]);
+  const [reminders, setReminders] = useState<ReminderDraft[]>(DEFAULT_REMINDERS);
+  const [showJumper, setShowJumper] = useState(false);
+  const scheduleRef = useRef<ScheduleSheetHandle>(null);
 
   // Pages 6, 7, 8, 9 are extra screens not in SCREENS array
   const screenIndex = (() => {
@@ -89,7 +113,7 @@ export default function OnboardingRoute() {
       case 'setGoal':
         return goal.length > 0;
       case 'schedule':
-        return scheduleSlot.length > 0;
+        return reminders.some((r) => r.enabled);
       default:
         return true;
     }
@@ -116,8 +140,9 @@ export default function OnboardingRoute() {
     if (screenTime.length > 0) {
       setSetting('onboarding_screenTime', screenTime[0]);
     }
-    if (scheduleSlot.length > 0) {
-      setSetting('onboarding_reminderSlot', scheduleSlot[0]);
+    const enabledReminders = reminders.filter((r) => r.enabled);
+    if (enabledReminders.length > 0) {
+      setSetting('onboarding_reminderSlot', JSON.stringify(enabledReminders));
     }
 
     // Set daily goal
@@ -126,17 +151,16 @@ export default function OnboardingRoute() {
       await useAppStore.getState().setDailyGoal(minutes);
     }
 
-    // Set up reminder — insert directly to avoid Alert on denied permissions
-    if (scheduleSlot.length > 0) {
-      const slot = SCHEDULE_HOURS[scheduleSlot[0]];
-      if (slot) {
-        const status = await requestPermission();
-        if (status === 'granted') {
-          insertReminder(slot.hour, slot.minute, [1, 2, 3, 4, 5, 6, 7]);
-          const reminders = getAllReminders();
-          await syncReminders(reminders);
-          useAppStore.setState({ reminders });
+    // Set up reminders for all enabled drafts
+    if (enabledReminders.length > 0) {
+      const status = await requestPermission();
+      if (status === 'granted') {
+        for (const draft of enabledReminders) {
+          insertReminder(draft.hour, draft.minute, draft.weekdays);
         }
+        const savedReminders = getAllReminders();
+        await syncReminders(savedReminders);
+        useAppStore.setState({ reminders: savedReminders });
       }
     }
 
@@ -148,7 +172,7 @@ export default function OnboardingRoute() {
     setTimeout(() => {
       useAppStore.getState().startSession();
     }, 500);
-  }, [painPoints, screenTime, goal, scheduleSlot, router]);
+  }, [painPoints, screenTime, goal, reminders, router]);
 
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentPage === TOTAL_PAGES - 1;
@@ -173,8 +197,8 @@ export default function OnboardingRoute() {
       case 9: return <DailyBenefitsScreen {...props} />;
       case 10: return <HowItWorksScreen {...props} />;
       case 11: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 12: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
-      case 13: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
+      case 12: return <ScheduleScreen ref={scheduleRef} {...props} reminders={reminders} onRemindersChange={setReminders} />;
+      case 13: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} reminders={reminders} />;
       case 14: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
     }
@@ -248,6 +272,41 @@ export default function OnboardingRoute() {
           )}
         </View>
       )}
+
+      {/* Schedule bottom sheet — rendered at top level so it's above Continue button */}
+      {currentPage === 12 && scheduleRef.current?.renderSheet()}
+
+      {/* DEV: Page jumper button */}
+      {__DEV_JUMP__ && (
+        <Pressable
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); setShowJumper(true); }}
+          style={[styles.jumperButton, { bottom: insets.bottom + 8 }]}
+        >
+          <Text style={styles.jumperButtonText}>{currentPage}</Text>
+        </Pressable>
+      )}
+      {__DEV_JUMP__ && (
+        <Modal visible={showJumper} animationType="fade" transparent onRequestClose={() => setShowJumper(false)}>
+          <Pressable style={styles.jumperOverlay} onPress={() => setShowJumper(false)}>
+            <Pressable style={[styles.jumperSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <Text style={styles.jumperTitle}>Jump to page</Text>
+              <ScrollView style={styles.jumperScroll} bounces={false}>
+                {PAGE_NAMES.map((name, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => { setCurrentPage(i); setShowJumper(false); Haptics.selectionAsync(); }}
+                    style={[styles.jumperRow, currentPage === i && styles.jumperRowActive]}
+                  >
+                    <Text style={[styles.jumperText, currentPage === i && styles.jumperTextActive]}>
+                      {name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -292,5 +351,59 @@ const styles = StyleSheet.create({
   progressFill: {
     height: 5,
     borderRadius: 5,
+  },
+  jumperButton: {
+    position: 'absolute',
+    left: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jumperButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.brown,
+  },
+  jumperOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  jumperSheet: {
+    backgroundColor: palette.cream,
+    borderRadius: 20,
+    paddingTop: 20,
+    width: '80%',
+    maxHeight: '70%',
+  },
+  jumperTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+    color: palette.brown,
+  },
+  jumperScroll: {
+    paddingHorizontal: 8,
+  },
+  jumperRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  jumperRowActive: {
+    backgroundColor: palette.terracotta + '20',
+  },
+  jumperText: {
+    fontSize: 14,
+    color: palette.brown,
+  },
+  jumperTextActive: {
+    color: palette.terracotta,
+    fontWeight: '600',
   },
 });
