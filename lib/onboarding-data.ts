@@ -86,11 +86,6 @@ export const SCREENS: OnboardingScreen[] = [
     type: 'info',
     heading: 'Your plan is ready.',
   },
-  {
-    id: 'letsGo',
-    type: 'cta',
-    heading: 'Ready to do nothing?',
-  },
 ];
 
 // Goal recommendation based on screen time answer

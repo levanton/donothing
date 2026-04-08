@@ -37,7 +37,6 @@ import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
 import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
 import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsScreen';
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
-import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
 const __DEV_JUMP__ = __DEV__;
 
@@ -58,7 +57,6 @@ const PAGE_NAMES = [
   '11 SetGoal',
   '12 Schedule',
   '13 PersonalizedResult',
-  '14 LetsGo',
 ];
 
 function getPageBg(page: number): string {
@@ -200,13 +198,11 @@ export default function OnboardingRoute() {
     }, 500);
   }, [painPoints, screenTime, goal, reminders, router]);
 
-  // Last screen (LetsGo) has its own button
   const isLastScreen = currentPage === TOTAL_PAGES - 1;
-  // Quiz/setup screens have their own Continue button
   // Screens with their own navigation buttons (no shared Continue)
   const extraOwnButton = [6, 7, 8, 9]; // ScreenTimeStats, TryNothing, FirstMinuteDone, DailyBenefits
   const hasOwnButton = ['nostalgia', 'rushing', 'evidence', 'phoneSymptom'].includes(currentScreen?.id ?? '') || extraOwnButton.includes(currentPage);
-  const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
+  const showBottomButton = !hasOwnButton && canAdvance;
 
   const renderScreen = () => {
     const props = { isActive: true, onNext: goNext, theme: screenTheme };
@@ -225,7 +221,6 @@ export default function OnboardingRoute() {
       case 11: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
       case 12: return <ScheduleScreen {...props} reminders={reminders} onRemindersChange={setReminders} onEditReminder={handleEditReminder} />;
       case 13: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} reminders={reminders} />;
-      case 14: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
     }
   };
@@ -250,10 +245,10 @@ export default function OnboardingRoute() {
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
           <PillButton
-            label="Continue"
-            onPress={goNext}
-            color={screenTheme.text}
-            outline
+            label={isLastScreen ? 'Start' : 'Continue'}
+            onPress={isLastScreen ? handleFinish : goNext}
+            color={isLastScreen ? palette.terracotta : screenTheme.text}
+            variant={isLastScreen ? 'filled' : 'outline'}
           />
         </Animated.View>
       )}
