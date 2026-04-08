@@ -159,7 +159,7 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
   });
 
   const labelStyle = useAnimatedStyle(() => ({
-    opacity: labelOpacity.value * 0.35,
+    opacity: labelOpacity.value * 0.8,
   }));
 
   const hintStyle = useAnimatedStyle(() => ({
@@ -256,6 +256,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts?.serif,
     fontSize: 18,
     fontWeight: '300',
+    marginBottom: -16,
   },
   hint: {
     fontFamily: Fonts?.serif,
