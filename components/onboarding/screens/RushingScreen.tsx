@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import PillButton from '@/components/PillButton';
+import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
@@ -125,7 +125,9 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
         <Animated.View
           style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}
         >
-          <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
+          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
+            <Feather name="arrow-right" size={22} color={theme.text} />
+          </Pressable>
         </Animated.View>
       </View>
     </View>
@@ -167,12 +169,20 @@ const styles = StyleSheet.create({
   textArea: {},
   body: {
     fontFamily: Fonts?.serif,
-    fontSize: 23,
+    fontSize: 21,
     fontWeight: '400',
     textAlign: 'left',
     lineHeight: 34,
   },
   buttonArea: {
+    alignItems: 'flex-end',
+  },
+  circleButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -8,17 +8,22 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import PillButton from '@/components/PillButton';
+import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 
-const BODY_TEXT = 'Lying in the grass. Staring at clouds. Dreaming about nothing.\nTime just... stopped.';
-const WORDS = BODY_TEXT.split(' ');
+const LINES = [
+  { text: 'Lying in the grass.', bold: false },
+  { text: 'Staring at clouds.', bold: false },
+  { text: 'Dreaming about nothing.', bold: false },
+  { text: '\nTime just was.', bold: false },
+  { text: '\nTime just... stopped.', bold: true },
+];
 const WORD_DELAY = 280;
 
 const grassImage = require('@/assets/images/grass.png');
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-function Word({ text, delay }: { text: string; delay: number }) {
+function Word({ text, delay, bold }: { text: string; delay: number; bold?: boolean }) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(8);
 
@@ -32,7 +37,7 @@ function Word({ text, delay }: { text: string; delay: number }) {
     transform: [{ translateY: translateY.value }],
   }));
 
-  return <Animated.Text style={animStyle}>{text} </Animated.Text>;
+  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text} </Animated.Text>;
 }
 
 interface Props {
@@ -52,7 +57,8 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
 
-  const totalWordsDuration = WORDS.length * WORD_DELAY + 600;
+  const allWords = LINES.flatMap(l => l.text.split(' ').map(w => ({ word: w, bold: l.bold })));
+  const totalWordsDuration = allWords.length * WORD_DELAY + 600;
 
   useEffect(() => {
     if (!isActive) return;
@@ -110,8 +116,8 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
         <View style={styles.textArea}>
           {showBody && (
             <Text style={[styles.body, { color: theme.text }]}>
-              {WORDS.map((word, i) => (
-                <Word key={i} text={word} delay={i * WORD_DELAY} />
+              {allWords.map((w, i) => (
+                <Word key={i} text={w.word} delay={i * WORD_DELAY} bold={w.bold} />
               ))}
             </Text>
           )}
@@ -124,7 +130,9 @@ export default function NostalgiaScreen({ isActive, onNext, theme }: Props) {
         <Animated.View
           style={[styles.buttonArea, { paddingBottom: insets.bottom + 24 }, buttonAnimStyle]}
         >
-          <PillButton label="Continue" onPress={onNext} color={theme.text} outline />
+          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
+            <Feather name="arrow-right" size={22} color={theme.text} />
+          </Pressable>
         </Animated.View>
       </View>
     </View>
@@ -168,12 +176,20 @@ const styles = StyleSheet.create({
   },
   body: {
     fontFamily: Fonts?.serif,
-    fontSize: 23,
+    fontSize: 21,
     fontWeight: '400',
     textAlign: 'left',
     lineHeight: 34,
   },
   buttonArea: {
+    alignItems: 'flex-end',
+  },
+  circleButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });

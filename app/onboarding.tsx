@@ -125,7 +125,7 @@ export default function OnboardingRoute() {
   // Last screen (LetsGo) has its own button
   const isLastScreen = currentScreen?.id === 'letsGo';
   // Quiz/setup screens have their own Continue button
-  const hasOwnButton = ['nostalgia', 'rushing'].includes(currentScreen?.id ?? '');
+  const hasOwnButton = ['nostalgia', 'rushing', 'evidence'].includes(currentScreen?.id ?? '');
   const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
 
   const renderScreen = () => {
@@ -175,8 +175,19 @@ export default function OnboardingRoute() {
         </Animated.View>
       )}
 
-      {/* Top bar: back button + progress */}
-      <View style={[styles.topBar, { top: insets.top + 10 }]}>
+      {/* Back button on second screen (no progress bar) */}
+      {currentPage === 1 && (
+        <Pressable
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPage(0); }}
+          style={[styles.backButton, { position: 'absolute', top: insets.top + 10, left: 16 }]}
+          hitSlop={16}
+        >
+          <Feather name="chevron-left" size={22} color={screenTheme.text} style={{ opacity: 0.6 }} />
+        </Pressable>
+      )}
+
+      {/* Top bar: back button + progress (hidden on first two screens) */}
+      {currentPage >= 2 && <View style={[styles.topBar, { top: insets.top + 10 }]}>
         {currentPage > 0 ? (
           <Pressable
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPage(currentPage - 1); }}
@@ -199,7 +210,7 @@ export default function OnboardingRoute() {
             ]}
           />
         </View>
-      </View>
+      </View>}
     </View>
   );
 }

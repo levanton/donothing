@@ -1,8 +1,12 @@
+import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
+
+const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 interface Fact {
   stat: string;
@@ -27,14 +31,24 @@ const FACTS: Fact[] = [
     accentColor: '#F9F2E0',
   },
   {
+    stat: 'Rest',
+    line: '= better ideas',
+    body: 'J.K. Rowling dreamed up Harry Potter during 4 boring hours on a train. Your brain does its best work when you stop.',
+    src: 'UCLan · 2014',
+    url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
+    bg: '#333431',
+    textColor: '#F9F2E0',
+    accentColor: '#F9F2E0',
+  },
+  {
     stat: '150×',
     line: 'a day you check it',
     body: 'Every 10 minutes. Silencing it makes it worse — anxiety of missing something makes you check even more.',
     src: 'slicktext.com · 2026',
     url: 'https://www.slicktext.com/blog/smartphone-addiction-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
+    bg: '#E8A99A',
+    textColor: '#333431',
+    accentColor: '#333431',
   },
   {
     stat: '70',
@@ -42,9 +56,9 @@ const FACTS: Fact[] = [
     body: '1 day per week, 6 per month, 70 per year. Over two months of your life, every year, scrolling.',
     src: 'addictionhelp.com · 2025',
     url: 'https://www.addictionhelp.com/phone-addiction/statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
+    bg: '#CF644D',
+    textColor: '#F9F2E0',
+    accentColor: '#F9F2E0',
   },
   {
     stat: '23 min',
@@ -52,7 +66,7 @@ const FACTS: Fact[] = [
     body: 'Even a 3-second notification resets your focus clock. Every buzz, every banner — deep work never begins.',
     src: 'UC Irvine · 2023',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#CF644D',
+    bg: '#333431',
     textColor: '#F9F2E0',
     accentColor: '#F9F2E0',
   },
@@ -62,9 +76,9 @@ const FACTS: Fact[] = [
     body: 'Even face down, silent — your brain wastes energy resisting the urge to check it.',
     src: 'UT Austin · 2017',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
+    bg: '#E8A99A',
+    textColor: '#333431',
+    accentColor: '#333431',
   },
   {
     stat: '55%',
@@ -72,9 +86,9 @@ const FACTS: Fact[] = [
     body: '70% say phones interfere with relationships daily. We\'re physically present but mentally scrolling.',
     src: 'harmonyhit.com · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
+    bg: '#CF644D',
+    textColor: '#F9F2E0',
+    accentColor: '#F9F2E0',
   },
   {
     stat: '76%',
@@ -82,7 +96,7 @@ const FACTS: Fact[] = [
     body: 'It\'s called nomophobia. 88% check within 10 min of waking. 4 in 5 addicts wish they weren\'t.',
     src: 'Reviews.org · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#CF644D',
+    bg: '#333431',
     textColor: '#F9F2E0',
     accentColor: '#F9F2E0',
   },
@@ -92,25 +106,15 @@ const FACTS: Fact[] = [
     body: '12 seconds shorter than two years ago. We switch tasks 566 times per workday. Never finishing a thought.',
     src: 'Gloria Mark · 2023',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
+    bg: '#E8A99A',
+    textColor: '#333431',
+    accentColor: '#333431',
   },
   {
     stat: '82%',
     line: 'at risk of burnout',
     body: 'Gen Z peaks at 25 — seventeen years earlier than before. Doing nothing isn\'t laziness. It\'s recovery.',
     src: 'Mercer · 2024',
-    url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
-  },
-  {
-    stat: 'Rest',
-    line: '= better ideas',
-    body: 'J.K. Rowling dreamed up Harry Potter during 4 boring hours on a train. Your brain does its best work when you stop.',
-    src: 'UCLan · 2014',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
     bg: '#CF644D',
     textColor: '#F9F2E0',
@@ -140,56 +144,76 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
   const cardWidth = width * 0.52;
   const cardHeight = cardWidth * 1.45;
 
+  const buttonOpacity = useSharedValue(0);
+  const buttonTranslateY = useSharedValue(12);
+
+  React.useEffect(() => {
+    if (!isActive) return;
+    buttonOpacity.value = withDelay(1600, withTiming(1, { duration: 700, easing: EASE_OUT }));
+    buttonTranslateY.value = withDelay(1600, withTiming(0, { duration: 700, easing: EASE_OUT }));
+  }, [isActive]);
+
+  const buttonAnimStyle = useAnimatedStyle(() => ({
+    opacity: buttonOpacity.value,
+    transform: [{ translateY: buttonTranslateY.value }],
+  }));
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={{ flex: 1 }} />
-      <Animated.Text
-        entering={FadeIn.duration(600)}
-        style={[styles.title, { color: theme.text }]}
-      >
-        The Facts
-      </Animated.Text>
-      <Animated.Text
-        entering={FadeIn.duration(600).delay(200)}
-        style={[styles.subtitle, { color: theme.text }]}
-      >
-        What we lose by never stopping — and what we could gain by doing nothing
-      </Animated.Text>
-      <Animated.View entering={FadeIn.duration(800).delay(300)} style={{ height: cardHeight }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-          contentContainerStyle={styles.sliderContent}
-          decelerationRate="fast"
-          snapToInterval={cardWidth + 12}
+    <View style={[styles.container, { backgroundColor: theme.bg, paddingBottom: insets.bottom }]}>
+      <View style={styles.centerArea}>
+        <Animated.Text
+          entering={FadeIn.duration(900)}
+          style={[styles.title, { color: theme.text }]}
         >
-          {FACTS.map((f, i) => (
-            <Pressable
-              key={i}
-              onPress={() => Linking.openURL(f.url)}
-              style={[
-                styles.card,
-                {
-                  width: cardWidth,
-                  height: cardHeight,
-                  backgroundColor: f.bg,
-                },
-              ]}
-            >
-              <Text style={[styles.stat, { color: f.textColor }]}>{f.stat}</Text>
-              <Text style={[styles.line, { color: f.textColor }]}>{f.line}</Text>
-              <View style={styles.cardBottom}>
-                <Text style={[styles.body, { color: f.accentColor }]}>{f.body}</Text>
-                <View style={[styles.srcChip, { borderColor: f.accentColor }]}>
-                  <Text style={[styles.src, { color: f.accentColor }]}>{f.src}</Text>
+          The Facts
+        </Animated.Text>
+        <Animated.Text
+          entering={FadeIn.duration(900).delay(500)}
+          style={[styles.subtitle, { color: theme.text }]}
+        >
+          What we lose by never stopping — and what we could gain by doing nothing
+        </Animated.Text>
+        <Animated.View entering={FadeIn.duration(1100).delay(1000)} style={{ height: cardHeight }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            bounces={false}
+            contentContainerStyle={styles.sliderContent}
+            decelerationRate="fast"
+            snapToInterval={cardWidth + 12}
+          >
+            {FACTS.map((f, i) => (
+              <Pressable
+                key={i}
+                onPress={() => Linking.openURL(f.url)}
+                style={[
+                  styles.card,
+                  {
+                    width: cardWidth,
+                    height: cardHeight,
+                    backgroundColor: f.bg,
+                  },
+                ]}
+              >
+                <Text style={[styles.stat, { color: f.textColor }]}>{f.stat}</Text>
+                <Text style={[styles.line, { color: f.textColor }]}>{f.line}</Text>
+                <View style={styles.cardBottom}>
+                  <Text style={[styles.body, { color: f.accentColor }]}>{f.body}</Text>
+                  <View style={[styles.srcChip, { borderColor: f.accentColor }]}>
+                    <Text style={[styles.src, { color: f.accentColor }]}>{f.src}</Text>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      </View>
+
+      <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
+        <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
+          <Feather name="arrow-right" size={22} color={theme.text} />
+        </Pressable>
       </Animated.View>
-      <View style={{ flex: 1 }} />
     </View>
   );
 }
@@ -198,21 +222,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centerArea: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   title: {
     fontFamily: Fonts?.serif,
     fontSize: 34,
     fontWeight: '400',
-    textAlign: 'center',
+    textAlign: 'left',
+    paddingHorizontal: 24,
   },
   subtitle: {
     fontFamily: Fonts?.serif,
     fontSize: 17,
     fontWeight: '400',
-    textAlign: 'center',
+    textAlign: 'left',
     opacity: 0.7,
     marginTop: 8,
     marginBottom: 40,
-    paddingHorizontal: 40,
+    paddingHorizontal: 24,
   },
   sliderContent: {
     paddingHorizontal: 24,
@@ -259,5 +288,17 @@ const styles = StyleSheet.create({
     fontFamily: Fonts?.serif,
     fontSize: 11,
     fontWeight: '500',
+  },
+  buttonArea: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 32,
+  },
+  circleButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
