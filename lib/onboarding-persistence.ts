@@ -53,7 +53,4 @@ export async function saveOnboardingData(params: {
   // Always mark complete and navigate — don't trap user in onboarding
   useAppStore.getState().setOnboardingComplete();
   params.router.replace('/');
-  setTimeout(() => {
-    useAppStore.getState().startSession();
-  }, 500);
 }
