@@ -209,12 +209,12 @@ export default function OnboardingRoute() {
               style={styles.backButton}
               hitSlop={16}
             >
-              <Feather name="chevron-left" size={22} color={screenTheme.text} style={{ opacity: 0.6 }} />
+              <Feather name="chevron-left" size={22} color={currentPage === 8 ? palette.cream : screenTheme.text} style={{ opacity: 0.6 }} />
             </Pressable>
           ) : (
             <View style={styles.backPlaceholder} />
           )}
-          {currentPage !== 7 && (
+          {currentPage !== 7 && currentPage !== 8 && (
             <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
               <View
                 style={[

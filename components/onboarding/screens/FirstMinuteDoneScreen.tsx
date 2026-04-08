@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
@@ -18,7 +18,7 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function getTodayIndex(): number {
   const d = new Date().getDay();
-  return d === 0 ? 6 : d - 1; // Mon=0, Sun=6
+  return d === 0 ? 6 : d - 1;
 }
 
 interface Props {
@@ -27,12 +27,14 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function FirstMinuteDoneScreen({ isActive, onNext, theme }: Props) {
+export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
   const insets = useSafeAreaInsets();
   const todayIdx = getTodayIndex();
 
+  const imageOpacity = useSharedValue(0);
+  const imageTranslateY = useSharedValue(16);
   const titleOpacity = useSharedValue(0);
-  const titleScale = useSharedValue(0.92);
+  const titleScale = useSharedValue(0.88);
   const bodyOpacity = useSharedValue(0);
   const bodyTranslateY = useSharedValue(10);
   const weekOpacity = useSharedValue(0);
@@ -41,14 +43,26 @@ export default function FirstMinuteDoneScreen({ isActive, onNext, theme }: Props
 
   useEffect(() => {
     if (!isActive) return;
-    titleOpacity.value = withDelay(300, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    titleScale.value = withDelay(300, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    bodyOpacity.value = withDelay(1000, withTiming(1, { duration: 700, easing: EASE_OUT }));
-    bodyTranslateY.value = withDelay(1000, withTiming(0, { duration: 700, easing: EASE_OUT }));
-    weekOpacity.value = withDelay(1800, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    buttonOpacity.value = withDelay(2600, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    buttonTranslateY.value = withDelay(2600, withTiming(0, { duration: 600, easing: EASE_OUT }));
+    // Image first
+    imageOpacity.value = withDelay(200, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    imageTranslateY.value = withDelay(200, withTiming(0, { duration: 800, easing: EASE_OUT }));
+    // Then title
+    titleOpacity.value = withDelay(700, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    titleScale.value = withDelay(700, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    // Then body
+    bodyOpacity.value = withDelay(1300, withTiming(1, { duration: 700, easing: EASE_OUT }));
+    bodyTranslateY.value = withDelay(1300, withTiming(0, { duration: 700, easing: EASE_OUT }));
+    // Then week
+    weekOpacity.value = withDelay(2000, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    // Then button
+    buttonOpacity.value = withDelay(2700, withTiming(1, { duration: 600, easing: EASE_OUT }));
+    buttonTranslateY.value = withDelay(2700, withTiming(0, { duration: 600, easing: EASE_OUT }));
   }, [isActive]);
+
+  const imageStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
+    transform: [{ translateY: imageTranslateY.value }],
+  }));
 
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
@@ -70,22 +84,45 @@ export default function FirstMinuteDoneScreen({ isActive, onNext, theme }: Props
   }));
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={[styles.container, { backgroundColor: palette.terracotta }]}>
       <View style={[styles.content, { paddingBottom: insets.bottom }]}>
         <View style={styles.centerArea}>
-          <Animated.View style={titleStyle}>
-            <Text style={[styles.title, { color: palette.terracotta }]}>
-              1 min
+          <Animated.View style={[imageStyle, { alignItems: 'center' }]}>
+            <Image
+              source={require('@/assets/images/sun.png')}
+              style={styles.sunImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+          <Animated.View style={[titleStyle, { alignItems: 'center' }]}>
+            <Text style={[styles.title, { color: palette.cream }]}>
+              You did it.
             </Text>
-            <Text style={[styles.subtitle, { color: theme.text }]}>
-              of nothing. Done.
+            <Text style={[styles.subtitle, { color: palette.cream }]}>
+              One minute of nothing.
             </Text>
           </Animated.View>
 
           <Animated.View style={[styles.bodyArea, bodyStyle]}>
-            <Text style={[styles.body, { color: theme.text }]}>
-              That's your first step.{'\n'}Let's keep it going.
-            </Text>
+            {[
+              { icon: 'heart', text: 'Cortisol dropped' },
+              { icon: 'zap', text: 'Focus sharpened' },
+              { icon: 'compass', text: 'Clearer decisions' },
+              { icon: 'brain', text: 'Brain recharging', isMci: true },
+            ].map((item, i) => (
+              <View key={i} style={styles.factRow}>
+                <View style={styles.factIcon}>
+                  {item.isMci ? (
+                    <MaterialCommunityIcons name={item.icon as any} size={16} color={palette.terracotta} />
+                  ) : (
+                    <Feather name={item.icon as any} size={14} color={palette.terracotta} />
+                  )}
+                </View>
+                <Text style={[styles.factText, { color: palette.cream }]}>
+                  {item.text}
+                </Text>
+              </View>
+            ))}
           </Animated.View>
 
           <Animated.View style={[styles.weekArea, weekStyle]}>
@@ -101,13 +138,13 @@ export default function FirstMinuteDoneScreen({ isActive, onNext, theme }: Props
                         width: size,
                         height: size,
                         borderRadius: size / 2,
-                        backgroundColor: done ? palette.terracotta : palette.charcoal + '20',
+                        backgroundColor: done ? palette.cream : palette.cream + 'BB',
                       }}
                     />
                     <Text
                       style={[
                         styles.weekDayLabel,
-                        { color: isToday ? theme.text : theme.text + '80' },
+                        { color: isToday ? palette.cream : palette.cream + 'CC' },
                       ]}
                     >
                       {day}
@@ -116,12 +153,15 @@ export default function FirstMinuteDoneScreen({ isActive, onNext, theme }: Props
                 );
               })}
             </View>
+            <Text style={[styles.streakHint, { color: palette.cream }]}>
+              Day 1. Let's fill the rest.
+            </Text>
           </Animated.View>
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
-            <Feather name="arrow-right" size={22} color={theme.text} />
+          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: palette.cream }]}>
+            <Feather name="arrow-right" size={22} color={palette.cream} />
           </Pressable>
         </Animated.View>
       </View>
@@ -142,40 +182,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sunImage: {
+    width: 180,
+    height: 180,
+    marginBottom: 20,
+  },
   title: {
     fontFamily: Fonts?.serif,
-    fontSize: 56,
+    fontSize: 48,
     fontWeight: '600',
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: Fonts?.serif,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '300',
     textAlign: 'center',
     marginTop: 8,
   },
   bodyArea: {
-    marginTop: 32,
+    marginTop: 28,
+    gap: 10,
   },
-  body: {
+  factRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  factIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: palette.cream,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  factText: {
     fontFamily: Fonts?.serif,
-    fontSize: 18,
-    fontWeight: '300',
-    textAlign: 'center',
-    lineHeight: 26,
-    opacity: 0.6,
+    fontSize: 17,
+    fontWeight: '400',
   },
   weekArea: {
     marginTop: 48,
     width: '100%',
     maxWidth: 280,
+    alignItems: 'center',
   },
   weekGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     height: 44,
+    width: '100%',
   },
   weekDayCol: {
     alignItems: 'center',
@@ -187,6 +245,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '400',
     letterSpacing: 0.5,
+  },
+  streakHint: {
+    fontFamily: Fonts?.serif,
+    fontSize: 14,
+    fontWeight: '300',
+    marginTop: 16,
   },
   buttonArea: {
     alignItems: 'flex-end',

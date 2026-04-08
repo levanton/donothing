@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
   Easing,
@@ -18,7 +18,7 @@ import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
-const SESSION_DURATION = 60;
+const SESSION_DURATION = 10; // TODO: revert to 60 for production
 const RING_R = 42;
 
 const HINTS = [
@@ -68,6 +68,10 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
 
   // Breathing pulse on timer
   const breathePulse = useSharedValue(1);
+
+  // Finish burst
+  const burstScale = useSharedValue(0);
+  const burstOpacity = useSharedValue(0);
 
   // Entry animation
   useEffect(() => {
@@ -121,8 +125,18 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
       setElapsed(prev => {
         if (prev >= SESSION_DURATION - 1) {
           clearInterval(intervalRef.current);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setTimeout(() => onNext(), 1500);
+          // Gentle celebration haptic — light taps building up
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), 150);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 300);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 450);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 650);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 850);
+          setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 1100);
+          // Burst animation
+          burstOpacity.value = withTiming(1, { duration: 300 });
+          burstScale.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.ease) });
+          setTimeout(() => onNext(), 1200);
           return SESSION_DURATION;
         }
         return prev + 1;
@@ -170,6 +184,14 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
     transform: [{ scale: breathePulse.value }],
   }));
 
+  const { width, height } = Dimensions.get('window');
+  const burstSize = Math.hypot(width, height);
+
+  const burstStyle = useAnimatedStyle(() => ({
+    opacity: burstOpacity.value,
+    transform: [{ scale: burstScale.value }],
+  }));
+
   const remaining = SESSION_DURATION - elapsed;
 
   return (
@@ -185,6 +207,7 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
           <TimerDisplay
             seconds={remaining}
             color={theme.text}
+            fontSize={64}
           />
         </Animated.View>
 
@@ -224,6 +247,16 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
           {done ? 'done.' : hint}
         </Animated.Text>
       </Animated.View>
+
+      {/* Finish burst */}
+      <View style={styles.burstWrap}>
+        <Animated.View
+          style={[
+            { width: burstSize, height: burstSize, borderRadius: burstSize / 2, backgroundColor: palette.terracotta },
+            burstStyle,
+          ]}
+        />
+      </View>
     </View>
   );
 }
@@ -262,5 +295,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts?.serif,
     fontSize: 18,
     fontWeight: '300',
+  },
+  burstWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
   },
 });
