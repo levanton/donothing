@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import PillButton from '@/components/PillButton';
 import { palette } from '@/lib/theme';
 
 interface Props {
@@ -38,23 +36,34 @@ export default function ChipSelect({
 
   return (
     <View style={styles.container}>
-      {options.map((opt, idx) => (
-        <Animated.View
-          key={opt}
-          entering={FadeInDown.delay(idx * 100).duration(400)}
-        >
-          <PillButton
-            label={opt}
-            onPress={() => handlePress(opt)}
-            color={color}
-            filled={selected.includes(opt)}
-            fillColor={palette.terracotta}
-            chipBg={chipBg}
-            small={small}
-            style={styles.chip}
-          />
-        </Animated.View>
-      ))}
+      {options.map((opt, idx) => {
+        const isSelected = selected.includes(opt);
+        return (
+          <Animated.View
+            key={opt}
+            entering={FadeInDown.delay(idx * 100).duration(400)}
+          >
+            <Pressable
+              onPress={() => handlePress(opt)}
+              style={[
+                styles.chip,
+                small && styles.chipSmall,
+                isSelected
+                  ? { backgroundColor: palette.terracotta, borderColor: palette.terracotta }
+                  : { backgroundColor: chipBg ?? palette.cream, borderColor: chipBg ?? palette.cream },
+              ]}
+            >
+              <Text style={[
+                styles.text,
+                small && styles.textSmall,
+                { color: isSelected ? palette.cream : palette.charcoal },
+              ]}>
+                {opt}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        );
+      })}
     </View>
   );
 }
@@ -67,6 +76,23 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   chip: {
+    borderWidth: 0,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    alignItems: 'center',
     marginBottom: 2,
+  },
+  chipSmall: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  text: {
+    fontSize: 16,
+    letterSpacing: 0.3,
+    fontWeight: '400',
+  },
+  textSmall: {
+    fontSize: 12,
   },
 });

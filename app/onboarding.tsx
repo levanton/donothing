@@ -30,10 +30,11 @@ import ScheduleScreen from '@/components/onboarding/screens/ScheduleScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
 import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
 import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
+import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsScreen';
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
 import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
-const TOTAL_PAGES = SCREENS.length + 2; // +2 for ScreenTimeStats, TryNothing (FirstMinuteDone replaces TheTurn)
+const TOTAL_PAGES = SCREENS.length + 3; // +3 for ScreenTimeStats, TryNothing, FirstMinuteDone, DailyBenefits
 
 export default function OnboardingRoute() {
   const router = useRouter();
@@ -46,19 +47,20 @@ export default function OnboardingRoute() {
   const [goal, setGoal] = useState<string[]>([]);
   const [scheduleSlot, setScheduleSlot] = useState<string[]>([]);
 
-  // Pages 6, 7, 8 are extra screens not in SCREENS array
+  // Pages 6, 7, 8, 9 are extra screens not in SCREENS array
   const screenIndex = (() => {
     if (currentPage <= 5) return currentPage;
     if (currentPage === 6) return -1; // ScreenTimeStats
     if (currentPage === 7) return -1; // TryNothing
     if (currentPage === 8) return -1; // FirstMinuteDone
-    return currentPage - 2;           // rest offset by 2 (TheTurn removed, 3 extra - 1 removed = 2)
+    if (currentPage === 9) return -1; // DailyBenefits
+    return currentPage - 3;           // rest offset by 3
   })();
   const currentScreen = screenIndex >= 0 ? SCREENS[screenIndex] : null;
 
   // Onboarding always uses custom themes, independent of phone setting
   const darkScreenIds = ['painQuiz', 'screenTimeQuiz'];
-  const isDarkOverride = darkScreenIds.includes(currentScreen?.id ?? '');
+  const isDarkOverride = darkScreenIds.includes(currentScreen?.id ?? '') || currentPage === 9;
   const screenTheme = isDarkOverride ? themes.dark : themes.light;
 
   // Can advance: quiz/setup screens require selection
@@ -136,7 +138,7 @@ export default function OnboardingRoute() {
   const isLastScreen = currentPage === TOTAL_PAGES - 1;
   // Quiz/setup screens have their own Continue button
   // Screens with their own navigation buttons (no shared Continue)
-  const extraOwnButton = [6, 7, 8]; // ScreenTimeStats, TryNothing, FirstMinuteDone
+  const extraOwnButton = [6, 7, 8, 9]; // ScreenTimeStats, TryNothing, FirstMinuteDone, DailyBenefits
   const hasOwnButton = ['nostalgia', 'rushing', 'evidence', 'phoneSymptom'].includes(currentScreen?.id ?? '') || extraOwnButton.includes(currentPage);
   const showBottomButton = !isLastScreen && !hasOwnButton && canAdvance;
 
@@ -152,11 +154,12 @@ export default function OnboardingRoute() {
       case 6: return <ScreenTimeStatsScreen {...props} screenTimeAnswer={screenTime[0] ?? ''} />;
       case 7: return <TryNothingScreen {...props} />;
       case 8: return <FirstMinuteDoneScreen {...props} />;
-      case 9: return <HowItWorksScreen {...props} />;
-      case 10: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 11: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
-      case 12: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
-      case 13: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
+      case 9: return <DailyBenefitsScreen {...props} />;
+      case 10: return <HowItWorksScreen {...props} />;
+      case 11: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
+      case 12: return <ScheduleScreen {...props} selected={scheduleSlot} onSelect={setScheduleSlot} />;
+      case 13: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} scheduleSlot={scheduleSlot[0] ?? ''} />;
+      case 14: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
     }
   };
@@ -209,12 +212,12 @@ export default function OnboardingRoute() {
               style={styles.backButton}
               hitSlop={16}
             >
-              <Feather name="chevron-left" size={22} color={currentPage === 8 ? palette.cream : screenTheme.text} style={{ opacity: 0.6 }} />
+              <Feather name="chevron-left" size={22} color={[8, 9].includes(currentPage) ? palette.cream : screenTheme.text} style={{ opacity: 0.6 }} />
             </Pressable>
           ) : (
             <View style={styles.backPlaceholder} />
           )}
-          {currentPage !== 7 && currentPage !== 8 && (
+          {![7, 8, 9].includes(currentPage) && (
             <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
               <View
                 style={[

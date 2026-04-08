@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import PillButton from '@/components/PillButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -37,14 +38,17 @@ function FactRow({ icon, text, isMci, delay, onAppear }: {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.85);
   const translateX = useSharedValue(-20);
+  const onAppearRef = useRef(onAppear);
+  onAppearRef.current = onAppear;
 
   useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: 500, easing: EASE_OUT }));
-    translateX.value = withDelay(delay, withTiming(0, { duration: 500, easing: EASE_OUT }));
-    scale.value = withDelay(delay, withTiming(1, { duration: 500, easing: EASE_OUT }));
-    const t = setTimeout(onAppear, delay);
+    const d = delay;
+    opacity.value = withDelay(d, withTiming(1, { duration: 500, easing: EASE_OUT }));
+    translateX.value = withDelay(d, withTiming(0, { duration: 500, easing: EASE_OUT }));
+    scale.value = withDelay(d, withTiming(1, { duration: 500, easing: EASE_OUT }));
+    const t = setTimeout(() => onAppearRef.current(), d);
     return () => clearTimeout(t);
-  }, []);
+  }, [delay]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -60,10 +64,10 @@ function FactRow({ icon, text, isMci, delay, onAppear }: {
           <Feather name={icon as any} size={16} color={palette.terracotta} />
         )}
       </View>
-      <Text style={[styles.factText, { color: palette.cream }]}>
+      <Text style={[styles.factText, { color: '#FFFFFF' }]}>
         {text}
       </Text>
-      <Feather name="check" size={16} color={palette.cream} style={{ marginLeft: 4 }} />
+      <Feather name="check" size={16} color={'#FFFFFF'} style={{ marginLeft: 4 }} />
     </Animated.View>
   );
 }
@@ -188,9 +192,7 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={styles.continueButton}>
-            <Text style={styles.continueText}>continue</Text>
-          </Pressable>
+          <PillButton label="continue" onPress={onNext} variant="filled" size="large" color={palette.terracotta} bg={palette.cream} />
         </Animated.View>
       </View>
     </View>
@@ -287,17 +289,5 @@ const styles = StyleSheet.create({
   },
   buttonArea: {
     alignItems: 'center',
-  },
-  continueButton: {
-    backgroundColor: palette.cream,
-    borderRadius: 100,
-    paddingVertical: 14,
-    paddingHorizontal: 48,
-  },
-  continueText: {
-    fontFamily: Fonts?.serif,
-    fontSize: 18,
-    fontWeight: '400',
-    color: palette.terracotta,
   },
 });
