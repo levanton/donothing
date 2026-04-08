@@ -113,9 +113,9 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
               <View key={i} style={styles.factRow}>
                 <View style={styles.factIcon}>
                   {item.isMci ? (
-                    <MaterialCommunityIcons name={item.icon as any} size={16} color={palette.terracotta} />
+                    <MaterialCommunityIcons name={item.icon as any} size={18} color={palette.terracotta} />
                   ) : (
-                    <Feather name={item.icon as any} size={14} color={palette.terracotta} />
+                    <Feather name={item.icon as any} size={16} color={palette.terracotta} />
                   )}
                 </View>
                 <Text style={[styles.factText, { color: palette.cream }]}>
@@ -210,17 +210,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   factIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: palette.cream,
+    opacity: 0.85,
     justifyContent: 'center',
     alignItems: 'center',
   },
   factText: {
     fontFamily: Fonts?.serif,
-    fontSize: 17,
-    fontWeight: '400',
+    fontSize: 20,
+    fontWeight: '500',
   },
   weekArea: {
     marginTop: 48,
