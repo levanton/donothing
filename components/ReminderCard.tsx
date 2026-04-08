@@ -32,7 +32,7 @@ export default function ReminderCard({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.card, { borderColor: enabled ? theme.accent : theme.textTertiary }]}
+      style={[styles.card, { borderColor: enabled ? theme.accent : theme.text }]}
     >
       <View style={styles.cardContent}>
         <Text style={[styles.cardTime, {
