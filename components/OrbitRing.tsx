@@ -23,9 +23,10 @@ interface OrbitRingProps {
   elapsed: number;
   onStop?: () => void;
   dotProgress: SharedValue<number>;
+  hideStop?: boolean;
 }
 
-export default function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress }: OrbitRingProps) {
+export default function OrbitRing({ color, faintColor, elapsed, onStop, dotProgress, hideStop }: OrbitRingProps) {
   const cx = RING_SIZE / 2;
   const cy = RING_SIZE / 2;
 
@@ -70,9 +71,11 @@ export default function OrbitRing({ color, faintColor, elapsed, onStop, dotProgr
           animatedProps={leadingProps}
         />
       </Svg>
-      <View style={styles.center}>
-        <Feather name="square" size={20} color={color} style={{ opacity: 0.6 }} />
-      </View>
+      {!hideStop && (
+        <View style={styles.center}>
+          <Feather name="square" size={20} color={color} style={{ opacity: 0.6 }} />
+        </View>
+      )}
     </Pressable>
   );
 }

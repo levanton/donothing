@@ -201,30 +201,34 @@ export default function OnboardingRoute() {
       )}
 
       {/* Top bar: back button + progress (hidden on first two screens) */}
-      {currentPage >= 2 && <View style={[styles.topBar, { top: insets.top + 10 }]}>
-        {currentPage > 0 ? (
-          <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPage(currentPage - 1); }}
-            style={styles.backButton}
-            hitSlop={16}
-          >
-            <Feather name="chevron-left" size={22} color={screenTheme.text} style={{ opacity: 0.6 }} />
-          </Pressable>
-        ) : (
-          <View style={styles.backPlaceholder} />
-        )}
-        <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: palette.terracotta,
-                width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%`,
-              },
-            ]}
-          />
+      {currentPage >= 2 && (
+        <View style={[styles.topBar, { top: insets.top + 10 }]}>
+          {currentPage > 0 ? (
+            <Pressable
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPage(currentPage - 1); }}
+              style={styles.backButton}
+              hitSlop={16}
+            >
+              <Feather name="chevron-left" size={22} color={screenTheme.text} style={{ opacity: 0.6 }} />
+            </Pressable>
+          ) : (
+            <View style={styles.backPlaceholder} />
+          )}
+          {currentPage !== 7 && (
+            <View style={[styles.progressTrack, { backgroundColor: 'rgba(68,68,68,0.12)' }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: palette.terracotta,
+                    width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%`,
+                  },
+                ]}
+              />
+            </View>
+          )}
         </View>
-      </View>}
+      )}
     </View>
   );
 }

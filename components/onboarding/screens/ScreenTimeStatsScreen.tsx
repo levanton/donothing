@@ -87,7 +87,7 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
       l.text.split(' ').map(w => ({ word: w, bold: l.bold, accent: l.accent }))
     ), [lines]);
 
-  const WORD_DELAY = 200;
+  const WORD_DELAY = 120;
   const totalWordsDuration = allWords.length * WORD_DELAY + 700;
 
   const buttonOpacity = useSharedValue(0);
@@ -98,7 +98,7 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
     const t1 = setTimeout(() => {
       buttonOpacity.value = withTiming(1, { duration: 600, easing: EASE_OUT });
       buttonTranslateY.value = withTiming(0, { duration: 600, easing: EASE_OUT });
-    }, totalWordsDuration + 400);
+    }, totalWordsDuration + 200);
     return () => clearTimeout(t1);
   }, [isActive]);
 

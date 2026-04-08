@@ -161,18 +161,16 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: theme.bg, paddingBottom: insets.bottom }]}>
       <View style={styles.centerArea}>
-        <Animated.Text
-          entering={FadeIn.duration(900)}
-          style={[styles.title, { color: theme.text }]}
-        >
-          The Facts
-        </Animated.Text>
-        <Animated.Text
-          entering={FadeIn.duration(900).delay(500)}
-          style={[styles.subtitle, { color: theme.text }]}
-        >
-          What we lose by never stopping — and what we could gain by doing nothing
-        </Animated.Text>
+        <Animated.View entering={FadeIn.duration(900)}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            The Facts
+          </Text>
+        </Animated.View>
+        <Animated.View entering={FadeIn.duration(900).delay(500)}>
+          <Text style={[styles.subtitle, { color: theme.text }]}>
+            What we lose by never stopping — and what we could gain by doing nothing
+          </Text>
+        </Animated.View>
         <Animated.View entering={FadeIn.duration(1100).delay(1000)} style={{ height: cardHeight }}>
           <ScrollView
             horizontal

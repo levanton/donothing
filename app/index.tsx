@@ -38,6 +38,7 @@ import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
+import TimerDisplay from '@/components/TimerDisplay';
 
 const FOCUS_OPTIONS = [
   { label: '15 min', seconds: 15 * 60 },
@@ -115,7 +116,7 @@ export default function DoNothingScreen() {
   const timerOpacity = useSharedValue(0.15);
   const dotProgress = useSharedValue(0);
   const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
-  const buttonSize = useSharedValue(88);     // 88 = button, 12 = dot
+  const buttonSize = useSharedValue(100);     // 100 = button, 12 = dot
   const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
@@ -490,7 +491,7 @@ export default function DoNothingScreen() {
     await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
-    buttonSize.value = withTiming(88, { duration: 600 });
+    buttonSize.value = withTiming(100, { duration: 600 });
     playIconOpacity.value = withTiming(1, { duration: 900 });
     timerOpacity.value = withTiming(0.15, { duration: 700 });
     // "ing" disappears
@@ -812,18 +813,21 @@ export default function DoNothingScreen() {
 
       {/* Timer */}
       <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-        <Animated.Text
-          style={[
-            styles.timer,
-            { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
-          ]}
-        >
-          {showGoalSlider && !started
-            ? `${String(sliderMinutes).padStart(2, '0')}:00`
-            : goalSeconds > 0
-              ? timerDisplay(Math.max(0, goalSeconds - elapsed))
-              : timerDisplay(elapsed)}
-        </Animated.Text>
+        {showGoalSlider && !started ? (
+          <Animated.Text
+            style={[
+              styles.timer,
+              { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
+            ]}
+          >
+            {`${String(sliderMinutes).padStart(2, '0')}:00`}
+          </Animated.Text>
+        ) : (
+          <TimerDisplay
+            seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
+            color={theme.text}
+          />
+        )}
       </Animated.View>
 
       {/* Orbit ring + unified button/dot */}
