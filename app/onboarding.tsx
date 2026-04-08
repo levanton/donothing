@@ -147,7 +147,7 @@ export default function OnboardingRoute() {
 
       {/* Schedule reminder picker */}
       {currentPage.id === 'schedule' && (
-        <PickerSheet ref={flow.reminderSheetRef} theme={themes.light} onDismiss={() => flow.handleEditReminder(null)}>
+        <PickerSheet ref={flow.reminderSheetRef} theme={themes.light} onDismiss={flow.dismissReminderSheet}>
           <TimePickerContent
             key={flow.editingReminderId ?? 'new'}
             theme={themes.light}

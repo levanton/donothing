@@ -35,6 +35,7 @@ export interface OnboardingFlow {
   editingReminderId: string | null;
   editingReminder: ReminderDraft | undefined;
   handleEditReminder: (id: string | null) => void;
+  dismissReminderSheet: () => void;
   handleConfirmReminder: (hour: number, minute: number, weekdays: number[]) => void;
   reminderSheetRef: React.RefObject<BottomSheet | null>;
 
@@ -109,6 +110,10 @@ export function useOnboardingFlow(): OnboardingFlow {
     reminderSheetRef.current?.expand();
   }, []);
 
+  const dismissReminderSheet = useCallback(() => {
+    setEditingReminderId(null);
+  }, []);
+
   const handleConfirmReminder = useCallback(
     (hour: number, minute: number, weekdays: number[]) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -150,6 +155,7 @@ export function useOnboardingFlow(): OnboardingFlow {
     editingReminderId,
     editingReminder,
     handleEditReminder,
+    dismissReminderSheet,
     handleConfirmReminder,
     reminderSheetRef,
     screenTheme,

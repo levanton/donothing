@@ -187,6 +187,10 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
   const { width, height } = Dimensions.get('window');
   const burstSize = Math.hypot(width, height);
 
+  const playIconStyle = useAnimatedStyle(() => ({
+    opacity: playIconOpacity.value,
+  }));
+
   const burstStyle = useAnimatedStyle(() => ({
     opacity: burstOpacity.value,
     transform: [{ scale: burstScale.value }],
@@ -234,7 +238,7 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
                   unifiedDotStyle,
                 ]}
               >
-                <Animated.View style={{ opacity: playIconOpacity }}>
+                <Animated.View style={playIconStyle}>
                   <Feather name="play" size={36} color={theme.bg} style={{ marginLeft: 4 }} />
                 </Animated.View>
               </Animated.View>
