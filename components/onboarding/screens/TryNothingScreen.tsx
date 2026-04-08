@@ -18,7 +18,7 @@ import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
-const SESSION_DURATION = 10; // TODO: revert to 60 for production
+const SESSION_DURATION = 60;
 const RING_R = 42;
 
 const HINTS = [

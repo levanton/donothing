@@ -1,5 +1,8 @@
 // Onboarding screen definitions (v1 — Main, Status = Ready only)
 
+import { palette } from '@/lib/theme';
+import type { ThemeMode } from '@/lib/theme';
+
 export type ScreenType = 'story' | 'quiz' | 'info' | 'setup' | 'cta';
 
 export interface OnboardingScreen {
@@ -111,6 +114,39 @@ export const SCHEDULE_HOURS: Record<string, { hour: number; minute: number }> = 
   'Afternoon — reset your brain': { hour: 13, minute: 0 },
   'Evening — wind down before sleep': { hour: 21, minute: 0 },
 };
+
+// ── Flat page list — single source of truth for the onboarding flow ──────
+
+export type PageId =
+  | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
+  | 'painQuiz' | 'screenTimeQuiz'
+  | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
+  | 'howItWorks' | 'setGoal' | 'schedule' | 'personalResult';
+
+export interface OnboardingPage {
+  id: PageId;
+  bg: string;
+  theme: ThemeMode;
+  hasOwnButton: boolean;
+  showProgress: boolean;
+}
+
+export const PAGES: OnboardingPage[] = [
+  { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
+  { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
+  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
+  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
+  { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true  },
+  { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true  },
+  { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true  },
+  { id: 'tryNothing',      bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false },
+  { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false },
+  { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false },
+  { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
+  { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
+  { id: 'schedule',        bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
+  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true  },
+];
 
 // How-it-works steps with Feather icon names
 export const HOW_IT_WORKS_STEPS = [
