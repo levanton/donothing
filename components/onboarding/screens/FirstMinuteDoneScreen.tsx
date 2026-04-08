@@ -7,7 +7,10 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
+  withSequence,
+  withSpring,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -16,9 +19,53 @@ const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const FACTS = [
+  { icon: 'heart', text: 'Cortisol dropped', isMci: false },
+  { icon: 'zap', text: 'Focus sharpened', isMci: false },
+  { icon: 'compass', text: 'Clearer decisions', isMci: false },
+  { icon: 'brain', text: 'Brain recharging', isMci: true },
+];
+
 function getTodayIndex(): number {
   const d = new Date().getDay();
   return d === 0 ? 6 : d - 1;
+}
+
+function FactRow({ icon, text, isMci, delay, onAppear }: {
+  icon: string; text: string; isMci: boolean; delay: number; onAppear: () => void;
+}) {
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.85);
+  const translateX = useSharedValue(-20);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 500, easing: EASE_OUT }));
+    translateX.value = withDelay(delay, withTiming(0, { duration: 500, easing: EASE_OUT }));
+    scale.value = withDelay(delay, withTiming(1, { duration: 500, easing: EASE_OUT }));
+    const t = setTimeout(onAppear, delay);
+    return () => clearTimeout(t);
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }, { translateX: translateX.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.factRow, style]}>
+      <View style={styles.factIcon}>
+        {isMci ? (
+          <MaterialCommunityIcons name={icon as any} size={18} color={palette.terracotta} />
+        ) : (
+          <Feather name={icon as any} size={16} color={palette.terracotta} />
+        )}
+      </View>
+      <Text style={[styles.factText, { color: palette.cream }]}>
+        {text}
+      </Text>
+      <Feather name="check" size={16} color={palette.cream} style={{ marginLeft: 4 }} />
+    </Animated.View>
+  );
 }
 
 interface Props {
@@ -35,28 +82,21 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
   const imageTranslateY = useSharedValue(16);
   const titleOpacity = useSharedValue(0);
   const titleScale = useSharedValue(0.88);
-  const bodyOpacity = useSharedValue(0);
-  const bodyTranslateY = useSharedValue(10);
   const weekOpacity = useSharedValue(0);
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
 
   useEffect(() => {
     if (!isActive) return;
-    // Image first
     imageOpacity.value = withDelay(200, withTiming(1, { duration: 800, easing: EASE_OUT }));
     imageTranslateY.value = withDelay(200, withTiming(0, { duration: 800, easing: EASE_OUT }));
-    // Then title
     titleOpacity.value = withDelay(700, withTiming(1, { duration: 800, easing: EASE_OUT }));
     titleScale.value = withDelay(700, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    // Then body
-    bodyOpacity.value = withDelay(1300, withTiming(1, { duration: 700, easing: EASE_OUT }));
-    bodyTranslateY.value = withDelay(1300, withTiming(0, { duration: 700, easing: EASE_OUT }));
-    // Then week
-    weekOpacity.value = withDelay(2000, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    // Then button
-    buttonOpacity.value = withDelay(2700, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    buttonTranslateY.value = withDelay(2700, withTiming(0, { duration: 600, easing: EASE_OUT }));
+    // Facts: 1300, 1600, 1900, 2200
+    // Week after facts
+    weekOpacity.value = withDelay(2700, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    buttonOpacity.value = withDelay(3300, withTiming(1, { duration: 600, easing: EASE_OUT }));
+    buttonTranslateY.value = withDelay(3300, withTiming(0, { duration: 600, easing: EASE_OUT }));
   }, [isActive]);
 
   const imageStyle = useAnimatedStyle(() => ({
@@ -67,11 +107,6 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
     transform: [{ scale: titleScale.value }],
-  }));
-
-  const bodyStyle = useAnimatedStyle(() => ({
-    opacity: bodyOpacity.value,
-    transform: [{ translateY: bodyTranslateY.value }],
   }));
 
   const weekStyle = useAnimatedStyle(() => ({
@@ -103,34 +138,30 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
             </Text>
           </Animated.View>
 
-          <Animated.View style={[styles.bodyArea, bodyStyle]}>
-            {[
-              { icon: 'heart', text: 'Cortisol dropped' },
-              { icon: 'zap', text: 'Focus sharpened' },
-              { icon: 'compass', text: 'Clearer decisions' },
-              { icon: 'brain', text: 'Brain recharging', isMci: true },
-            ].map((item, i) => (
-              <View key={i} style={styles.factRow}>
-                <View style={styles.factIcon}>
-                  {item.isMci ? (
-                    <MaterialCommunityIcons name={item.icon as any} size={18} color={palette.terracotta} />
-                  ) : (
-                    <Feather name={item.icon as any} size={16} color={palette.terracotta} />
-                  )}
-                </View>
-                <Text style={[styles.factText, { color: palette.cream }]}>
-                  {item.text}
-                </Text>
-              </View>
-            ))}
-          </Animated.View>
+          {isActive && (
+            <View style={styles.bodyArea}>
+              {FACTS.map((item, i) => (
+                <FactRow
+                  key={i}
+                  icon={item.icon}
+                  text={item.text}
+                  isMci={item.isMci}
+                  delay={1300 + i * 300}
+                  onAppear={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                />
+              ))}
+            </View>
+          )}
 
-          <Animated.View style={[styles.weekArea, weekStyle]}>
+          <Animated.View style={[styles.weekCard, weekStyle]}>
+            <Text style={[styles.streakHint, { color: palette.charcoal }]}>
+              Day 1. Let's fill the rest.
+            </Text>
             <View style={styles.weekGrid}>
               {DAYS.map((day, i) => {
                 const isToday = i === todayIdx;
                 const done = isToday;
-                const size = done ? 20 : 4;
+                const size = done ? 24 : 6;
                 return (
                   <View key={day} style={styles.weekDayCol}>
                     <View
@@ -138,13 +169,13 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
                         width: size,
                         height: size,
                         borderRadius: size / 2,
-                        backgroundColor: done ? palette.cream : palette.cream + 'BB',
+                        backgroundColor: done ? palette.charcoal : palette.charcoal + '30',
                       }}
                     />
                     <Text
                       style={[
                         styles.weekDayLabel,
-                        { color: isToday ? palette.cream : palette.cream + 'CC' },
+                        { color: isToday ? palette.charcoal : palette.charcoal + '80' },
                       ]}
                     >
                       {day}
@@ -153,15 +184,12 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
                 );
               })}
             </View>
-            <Text style={[styles.streakHint, { color: palette.cream }]}>
-              Day 1. Let's fill the rest.
-            </Text>
           </Animated.View>
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: palette.cream }]}>
-            <Feather name="arrow-right" size={22} color={palette.cream} />
+          <Pressable onPress={onNext} style={styles.continueButton}>
+            <Text style={styles.continueText}>continue</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -183,13 +211,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sunImage: {
-    width: 180,
-    height: 180,
-    marginBottom: 20,
+    width: 190,
+    height: 190,
+    marginBottom: -12,
   },
   title: {
     fontFamily: Fonts?.serif,
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -201,13 +229,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bodyArea: {
-    marginTop: 28,
-    gap: 10,
+    marginTop: 32,
+    gap: 12,
+    alignSelf: 'center',
   },
   factRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   factIcon: {
     width: 32,
@@ -223,45 +252,52 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '500',
   },
-  weekArea: {
-    marginTop: 48,
+  weekCard: {
+    marginTop: 36,
     width: '100%',
-    maxWidth: 280,
+    backgroundColor: palette.cream,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  streakHint: {
+    fontFamily: Fonts?.serif,
+    fontSize: 18,
+    fontWeight: '400',
+    marginBottom: 16,
   },
   weekGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 44,
+    height: 52,
     width: '100%',
   },
   weekDayCol: {
     alignItems: 'center',
     justifyContent: 'flex-end',
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   weekDayLabel: {
-    fontSize: 10,
-    fontWeight: '400',
+    fontSize: 13,
+    fontWeight: '500',
     letterSpacing: 0.5,
   },
-  streakHint: {
-    fontFamily: Fonts?.serif,
-    fontSize: 14,
-    fontWeight: '300',
-    marginTop: 16,
-  },
   buttonArea: {
-    alignItems: 'flex-end',
-  },
-  circleButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  continueButton: {
+    backgroundColor: palette.cream,
+    borderRadius: 100,
+    paddingVertical: 14,
+    paddingHorizontal: 48,
+  },
+  continueText: {
+    fontFamily: Fonts?.serif,
+    fontSize: 18,
+    fontWeight: '400',
+    color: palette.terracotta,
   },
 });
