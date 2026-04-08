@@ -1,20 +1,14 @@
-import { useCallback, useImperativeHandle, useRef, useState, forwardRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import type BottomSheet from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { palette, themes } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
-import PickerSheet from '@/components/PickerSheet';
-import TimePickerContent, {
-  formatTime12,
-  WEEKDAY_VALUES,
-  WEEKDAY_SHORT,
-  ALL_DAYS,
-} from '@/components/TimePicker';
+import ReminderCard from '@/components/ReminderCard';
+import { ALL_DAYS } from '@/components/TimePicker';
 
 export interface ReminderDraft {
   id: string;
@@ -30,31 +24,24 @@ const DEFAULT_REMINDERS: ReminderDraft[] = [
   { id: 'evening', hour: 21, minute: 0, weekdays: ALL_DAYS, enabled: false },
 ];
 
-export interface ScheduleSheetHandle {
-  renderSheet: () => React.ReactNode;
-}
-
 interface Props {
   isActive: boolean;
   onNext: () => void;
   reminders: ReminderDraft[];
   onRemindersChange: (reminders: ReminderDraft[]) => void;
+  onEditReminder: (id: string | null) => void;
   theme: { text: string; bg: string };
 }
 
-let nextId = 1;
-
-const ScheduleScreen = forwardRef<ScheduleSheetHandle, Props>(function ScheduleScreen({
+export default function ScheduleScreen({
   isActive,
   onNext,
   reminders,
   onRemindersChange,
+  onEditReminder,
   theme,
-}, ref) {
+}: Props) {
   const insets = useSafeAreaInsets();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const sheetRef = useRef<BottomSheet>(null);
-
   const fullTheme = themes.light;
 
   const toggleReminder = useCallback((id: string) => {
@@ -68,51 +55,6 @@ const ScheduleScreen = forwardRef<ScheduleSheetHandle, Props>(function ScheduleS
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onRemindersChange(reminders.filter((r) => r.id !== id));
   }, [reminders, onRemindersChange]);
-
-  const openEditor = useCallback((id: string | null) => {
-    setEditingId(id);
-    sheetRef.current?.expand();
-  }, []);
-
-  const closeSheet = useCallback(() => {
-    sheetRef.current?.close();
-  }, []);
-
-  const handleConfirm = useCallback((hour: number, minute: number, weekdays: number[]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (editingId) {
-      onRemindersChange(
-        reminders.map((r) =>
-          r.id === editingId ? { ...r, hour, minute, weekdays } : r,
-        ),
-      );
-    } else {
-      onRemindersChange([
-        ...reminders,
-        { id: `custom-${nextId++}`, hour, minute, weekdays, enabled: true },
-      ]);
-    }
-    sheetRef.current?.close();
-  }, [editingId, reminders, onRemindersChange]);
-
-  const editingReminder = editingId ? reminders.find((r) => r.id === editingId) : null;
-
-  useImperativeHandle(ref, () => ({
-    renderSheet: () => (
-      <PickerSheet ref={sheetRef} theme={fullTheme} onDismiss={() => setEditingId(null)}>
-        <TimePickerContent
-          key={editingId ?? 'new'}
-          theme={fullTheme}
-          title={editingId ? 'Edit reminder' : 'Add reminder'}
-          initialHour={editingReminder?.hour}
-          initialMinute={editingReminder?.minute}
-          initialDays={editingReminder?.weekdays}
-          onConfirm={handleConfirm}
-          onCancel={closeSheet}
-        />
-      </PickerSheet>
-    ),
-  }), [editingId, editingReminder, fullTheme, handleConfirm, closeSheet]);
 
   return (
     <ScrollView
@@ -136,59 +78,21 @@ const ScheduleScreen = forwardRef<ScheduleSheetHandle, Props>(function ScheduleS
           </Text>
 
           {reminders.map((r) => (
-            <Pressable
+            <ReminderCard
               key={r.id}
-              onPress={() => openEditor(r.id)}
-              style={[styles.card, {
-                borderColor: r.enabled ? fullTheme.accent : fullTheme.textTertiary,
-              }]}
-            >
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardTime, {
-                  color: r.enabled ? fullTheme.accent : theme.text,
-                  fontFamily: Fonts.mono,
-                }]}>
-                  {formatTime12(r.hour, r.minute)}
-                </Text>
-                <View style={styles.cardDays}>
-                  {WEEKDAY_VALUES.map((day, i) => {
-                    const active = !r.weekdays?.length || r.weekdays.includes(day);
-                    return (
-                      <View key={day} style={styles.cardDayCol}>
-                        <View style={[styles.cardDot, {
-                          backgroundColor: active ? theme.text : 'transparent',
-                          borderColor: active ? theme.text : fullTheme.textTertiary,
-                        }]} />
-                        <Text style={[styles.cardDayText, {
-                          color: active ? theme.text : fullTheme.textTertiary,
-                        }]}>
-                          {WEEKDAY_SHORT[i]}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-              <View style={styles.cardActions}>
-                <Switch
-                  value={r.enabled}
-                  onValueChange={() => toggleReminder(r.id)}
-                  trackColor={{ false: fullTheme.textTertiary, true: fullTheme.accent }}
-                  thumbColor={palette.white}
-                  ios_backgroundColor={r.enabled ? fullTheme.accent : fullTheme.textTertiary}
-                  style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                />
-                {reminders.length > 1 && (
-                  <Pressable onPress={() => removeReminder(r.id)} hitSlop={12}>
-                    <Feather name="x" size={16} color={fullTheme.textTertiary} />
-                  </Pressable>
-                )}
-              </View>
-            </Pressable>
+              hour={r.hour}
+              minute={r.minute}
+              weekdays={r.weekdays}
+              enabled={r.enabled}
+              theme={fullTheme}
+              onPress={() => onEditReminder(r.id)}
+              onToggle={() => toggleReminder(r.id)}
+              onRemove={reminders.length > 1 ? () => removeReminder(r.id) : undefined}
+            />
           ))}
 
           <Pressable
-            onPress={() => openEditor(null)}
+            onPress={() => onEditReminder(null)}
             style={[styles.addButton, { borderColor: fullTheme.textTertiary }]}
           >
             <Feather name="plus" size={14} color={theme.text} />
@@ -206,9 +110,7 @@ const ScheduleScreen = forwardRef<ScheduleSheetHandle, Props>(function ScheduleS
       )}
     </ScrollView>
   );
-});
-
-export default ScheduleScreen;
+}
 
 export { DEFAULT_REMINDERS };
 
@@ -236,38 +138,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'left',
     marginBottom: 12,
-  },
-  card: {
-    borderWidth: 1.2,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardContent: { gap: 4 },
-  cardTime: { fontSize: 20, fontWeight: '300' },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardDays: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-  },
-  cardDayCol: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  cardDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    borderWidth: 1,
-  },
-  cardDayText: {
-    fontSize: 8,
-    fontWeight: '400',
   },
   addButton: {
     flexDirection: 'row',

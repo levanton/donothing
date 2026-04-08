@@ -15,6 +15,7 @@ import { useAppStore } from '@/lib/store';
 import type { Reminder, ScheduledBlock } from '@/lib/db/types';
 import { requestAuth } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
+import ReminderCard from '@/components/ReminderCard';
 import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
@@ -255,59 +256,27 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         </View>
       )}
       {reminders.map((r) => (
-        <Pressable
+        <ReminderCard
           key={r.id}
+          hour={r.hour}
+          minute={r.minute}
+          weekdays={r.weekdays}
+          enabled={r.enabled}
+          theme={theme}
           onPress={() => {
             Haptics.selectionAsync();
             setEditingReminder(r);
             reminderSheetRef.current?.expand();
           }}
-          style={[styles.card, { borderColor: r.enabled ? theme.accent : theme.textTertiary }]}
-        >
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardTime, { color: r.enabled ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
-              {formatTime12(r.hour, r.minute)}
-            </Text>
-            <View style={styles.cardDays}>
-              {WEEKDAY_VALUES.map((day, i) => {
-                const active = !r.weekdays?.length || r.weekdays.includes(day);
-                return (
-                  <View key={day} style={styles.cardDayCol}>
-                    <View style={[styles.cardDot, {
-                      backgroundColor: active ? theme.text : 'transparent',
-                      borderColor: active ? theme.text : theme.textTertiary,
-                    }]} />
-                    <Text style={[styles.cardDayText, { color: active ? theme.text : theme.textTertiary }]}>
-                      {WEEKDAY_SHORT[i]}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-          <View style={styles.cardActions}>
-            <Switch
-              value={r.enabled}
-              onValueChange={() => {
-                Haptics.selectionAsync();
-                store().toggleReminder(r.id);
-              }}
-              trackColor={{ false: theme.textTertiary, true: theme.accent }}
-              thumbColor={palette.white}
-              ios_backgroundColor={r.enabled ? theme.accent : theme.textTertiary}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                store().removeReminder(r.id);
-              }}
-              hitSlop={12}
-            >
-              <Feather name="x" size={16} color={theme.textTertiary} />
-            </Pressable>
-          </View>
-        </Pressable>
+          onToggle={() => {
+            Haptics.selectionAsync();
+            store().toggleReminder(r.id);
+          }}
+          onRemove={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            store().removeReminder(r.id);
+          }}
+        />
       ))}
       <Pressable
         onPress={() => {
@@ -557,7 +526,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
-  cardTime: { fontSize: 20, fontWeight: '300' },
+  cardTime: { fontSize: 28, fontWeight: '300' },
   cardLabel: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
@@ -689,9 +658,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   cardDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 5.5,
+    height: 5.5,
+    borderRadius: 2.75,
     borderWidth: 1,
   },
   cardDayText: {

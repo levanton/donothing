@@ -15,7 +15,10 @@ import { getAllReminders } from '@/lib/db/reminders';
 import { requestPermission, syncReminders } from '@/lib/notifications';
 import { SCREENS, GOAL_MINUTES } from '@/lib/onboarding-data';
 import { DEFAULT_REMINDERS } from '@/components/onboarding/screens/ScheduleScreen';
-import type { ReminderDraft, ScheduleSheetHandle } from '@/components/onboarding/screens/ScheduleScreen';
+import type { ReminderDraft } from '@/components/onboarding/screens/ScheduleScreen';
+import PickerSheet from '@/components/PickerSheet';
+import TimePickerContent from '@/components/TimePicker';
+import type BottomSheet from '@gorhom/bottom-sheet';
 
 import PillButton from '@/components/PillButton';
 
@@ -85,7 +88,30 @@ export default function OnboardingRoute() {
   const [goal, setGoal] = useState<string[]>([]);
   const [reminders, setReminders] = useState<ReminderDraft[]>(DEFAULT_REMINDERS);
   const [showJumper, setShowJumper] = useState(false);
-  const scheduleRef = useRef<ScheduleSheetHandle>(null);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const reminderSheetRef = useRef<BottomSheet>(null);
+
+  const editingReminder = editingReminderId ? reminders.find((r) => r.id === editingReminderId) : null;
+
+  const handleEditReminder = useCallback((id: string | null) => {
+    setEditingReminderId(id);
+    reminderSheetRef.current?.expand();
+  }, []);
+
+  const handleConfirmReminder = useCallback((hour: number, minute: number, weekdays: number[]) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (editingReminderId) {
+      setReminders((prev) =>
+        prev.map((r) => r.id === editingReminderId ? { ...r, hour, minute, weekdays } : r),
+      );
+    } else {
+      setReminders((prev) => [
+        ...prev,
+        { id: `custom-${Date.now()}`, hour, minute, weekdays, enabled: true },
+      ]);
+    }
+    reminderSheetRef.current?.close();
+  }, [editingReminderId]);
 
   // Pages 6, 7, 8, 9 are extra screens not in SCREENS array
   const screenIndex = (() => {
@@ -197,7 +223,7 @@ export default function OnboardingRoute() {
       case 9: return <DailyBenefitsScreen {...props} />;
       case 10: return <HowItWorksScreen {...props} />;
       case 11: return <SetGoalScreen {...props} selected={goal} onSelect={setGoal} screenTimeAnswer={screenTime[0] ?? ''} />;
-      case 12: return <ScheduleScreen ref={scheduleRef} {...props} reminders={reminders} onRemindersChange={setReminders} />;
+      case 12: return <ScheduleScreen {...props} reminders={reminders} onRemindersChange={setReminders} onEditReminder={handleEditReminder} />;
       case 13: return <PersonalizedResultScreen {...props} painPoints={painPoints} screenTime={screenTime[0] ?? ''} goal={goal[0] ?? '5m'} reminders={reminders} />;
       case 14: return <LetsGoScreen isActive onFinish={handleFinish} theme={screenTheme} />;
       default: return null;
@@ -273,8 +299,21 @@ export default function OnboardingRoute() {
         </View>
       )}
 
-      {/* Schedule bottom sheet — rendered at top level so it's above Continue button */}
-      {currentPage === 12 && scheduleRef.current?.renderSheet()}
+      {/* Schedule reminder picker — at top level so it's above Continue button */}
+      {currentPage === 12 && (
+        <PickerSheet ref={reminderSheetRef} theme={themes.light} onDismiss={() => setEditingReminderId(null)}>
+          <TimePickerContent
+            key={editingReminderId ?? 'new'}
+            theme={themes.light}
+            title={editingReminderId ? 'Edit reminder' : 'Add reminder'}
+            initialHour={editingReminder?.hour}
+            initialMinute={editingReminder?.minute}
+            initialDays={editingReminder?.weekdays}
+            onConfirm={handleConfirmReminder}
+            onCancel={() => reminderSheetRef.current?.close()}
+          />
+        </PickerSheet>
+      )}
 
       {/* DEV: Page jumper button */}
       {__DEV_JUMP__ && (
