@@ -36,6 +36,22 @@ import LetsGoScreen from '@/components/onboarding/screens/LetsGoScreen';
 
 const TOTAL_PAGES = SCREENS.length + 3; // +3 for ScreenTimeStats, TryNothing, FirstMinuteDone, DailyBenefits
 
+function getPageBg(page: number): string {
+  switch (page) {
+    case 4:  // PainQuiz
+    case 5:  // ScreenTimeQuiz
+      return palette.charcoal;
+    case 7:  // TryNothing
+      return palette.cream;
+    case 8:  // FirstMinuteDone
+      return palette.terracotta;
+    case 9:  // DailyBenefits
+      return palette.charcoal;
+    default:
+      return palette.cream;
+  }
+}
+
 export default function OnboardingRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -165,7 +181,7 @@ export default function OnboardingRoute() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: screenTheme.bg }]}>
+    <View style={[styles.container, { backgroundColor: getPageBg(currentPage) }]}>
       <StatusBar style={isDarkOverride ? 'light' : 'dark'} />
 
       <Animated.View
