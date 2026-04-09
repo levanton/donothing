@@ -1,8 +1,15 @@
 import { useCallback, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+} from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
@@ -37,12 +44,16 @@ const CTA_LABELS: Record<PlanId, string> = {
   lifetime: 'Get Lifetime — $69.99',
 };
 
-function HeroImage() {
+function HeroImage({ scrollY }: { scrollY: Animated.SharedValue<number> }) {
+  const parallaxStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(scrollY.value, [0, 300], [0, 80]) }],
+  }));
+
   return (
     <Animated.View entering={FadeIn.delay(100).duration(800)} style={styles.heroContainer}>
-      <Image
+      <Animated.Image
         source={require('@/assets/images/grass-old.png')}
-        style={styles.heroImage}
+        style={[styles.heroImage, parallaxStyle]}
         resizeMode="contain"
       />
     </Animated.View>
@@ -73,6 +84,12 @@ interface Props {
 export default function PaywallScreen({ isActive, onFinish }: Props) {
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
 
   const handleSkip = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -87,7 +104,9 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -99,7 +118,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           </Pressable>
         </View>
 
-        <HeroImage />
+        <HeroImage scrollY={scrollY} />
 
         <FeatureCarousel />
 
@@ -153,7 +172,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
             <Text style={styles.footerLink}>Restore Purchases</Text>
           </Pressable>
         </Animated.View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
