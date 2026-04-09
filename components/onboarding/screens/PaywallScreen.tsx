@@ -46,7 +46,7 @@ const CTA_LABELS: Record<PlanId, string> = {
 
 function HeroImage({ scrollY }: { scrollY: Animated.SharedValue<number> }) {
   const parallaxStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(scrollY.value, [0, 300], [0, 80]) }],
+    transform: [{ translateY: scrollY.value * 0.5 }],
   }));
 
   return (
@@ -197,8 +197,8 @@ const styles = StyleSheet.create({
   scroll: {},
   heroContainer: {
     alignItems: 'center',
-    marginTop: 0,
-    marginBottom: 0,
+    marginTop: 14,
+    marginBottom: 16,
   },
   heroImage: {
     width: 280,
