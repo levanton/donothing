@@ -188,9 +188,9 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
 }
 
 const CTA_LABELS: Record<PlanId, string> = {
-  monthly: 'Subscribe',
+  monthly: 'Subscribe — $4.99/mo',
   yearly: 'Try Free for 3 Days',
-  lifetime: 'Pay once $69.99, own forever',
+  lifetime: 'Get Lifetime — $69.99',
 };
 
 // Decorative hero orbit illustration
@@ -298,11 +298,20 @@ export default function PaywallRoute() {
           <PillButton
             label={CTA_LABELS[selectedPlan]}
             onPress={handlePurchase}
-            color={palette.terracotta}
+            color={selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta}
             variant="filled"
             size="large"
-            style={styles.ctaButton}
+            style={[styles.ctaButton, {
+              paddingVertical: 20,
+              shadowColor: selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta,
+              shadowOpacity: 0.25,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 },
+            }]}
           />
+          {selectedPlan === 'yearly' && (
+            <Text style={styles.ctaHelper}>Then $34.99/year. Cancel anytime.</Text>
+          )}
         </Animated.View>
 
         {/* Footer */}
@@ -393,6 +402,13 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     alignSelf: 'stretch',
+  },
+  ctaHelper: {
+    fontSize: 13,
+    fontFamily: Fonts.mono,
+    color: `${palette.brown}80`,
+    textAlign: 'center',
+    marginTop: 8,
   },
   // Footer
   footer: {
