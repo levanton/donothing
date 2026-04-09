@@ -49,40 +49,38 @@ export default function PlanCard({
       {/* Radio dot — only when selected, absolute so it doesn't shift content */}
       {isSelected && <View style={[styles.radioDot, isDark && styles.radioDotDark]} />}
 
-      {hasDetail ? (
-        <View style={[styles.detailContent, isDark && styles.detailContentDark]}>
-          {isDark && badge ? (
+      {isDark ? (
+        <>
+          <Text style={[styles.simpleLine, styles.simpleLineDark, { textAlign: 'left' }]}>
+            Pay once <Text style={styles.priceDetailDark}>{price}</Text>, own forever
+          </Text>
+          {badge ? (
             <View style={styles.limitedTag}>
               <Text style={styles.limitedTagText}>{badge} offer</Text>
             </View>
           ) : null}
-          {isDark ? (
-            <Text style={[styles.subtitleLight, styles.subtitleLightDark]}>
-              Pay once <Text style={styles.priceDetailDark}>{price}</Text>, own forever
+        </>
+      ) : hasDetail ? (
+        <View style={styles.detailContent}>
+          {subtitle ? (
+            <Text style={styles.subtitleLine}>
+              <Text style={styles.subtitleLight}>First 3 days </Text>
+              <Text style={styles.subtitleBold}>FREE!</Text>
             </Text>
-          ) : (
-            <>
-              {subtitle ? (
-                <Text style={styles.subtitleLine}>
-                  <Text style={styles.subtitleLight}>First 3 days </Text>
-                  <Text style={styles.subtitleBold}>FREE!</Text>
-                </Text>
-              ) : null}
-              <View style={styles.priceLine}>
-                <Text style={styles.afterLabel}>After Trial: </Text>
-                {oldPrice ? (
-                  <View style={styles.oldPriceWrap}>
-                    <Text style={styles.oldPrice}>{oldPrice}</Text>
-                    <View style={styles.strikethrough} />
-                  </View>
-                ) : null}
-                <Text style={styles.priceDetail}>{'  '}{price}</Text>
+          ) : null}
+          <View style={styles.priceLine}>
+            <Text style={styles.afterLabel}>After Trial: </Text>
+            {oldPrice ? (
+              <View style={styles.oldPriceWrap}>
+                <Text style={styles.oldPrice}>{oldPrice}</Text>
+                <View style={styles.strikethrough} />
               </View>
-            </>
-          )}
+            ) : null}
+            <Text style={styles.priceDetail}>{'  '}{price}</Text>
+          </View>
         </View>
       ) : (
-        <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected, isDark && styles.simpleLineDark]}>
+        <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected]}>
           {name}: {price}
         </Text>
       )}
@@ -118,8 +116,8 @@ const styles = StyleSheet.create({
   },
   cardDark: {
     borderWidth: 1.5,
-    borderColor: palette.brown,
-    backgroundColor: palette.brown,
+    borderColor: '#2C4A3E',
+    backgroundColor: '#2C4A3E',
   },
   // Simple plan (one-liner)
   simpleLine: {
@@ -135,12 +133,11 @@ const styles = StyleSheet.create({
     color: palette.cream,
   },
   limitedTag: {
-    alignSelf: 'flex-start',
     backgroundColor: palette.terracotta,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    marginBottom: 4,
+    marginLeft: 10,
   },
   limitedTagText: {
     color: palette.cream,
