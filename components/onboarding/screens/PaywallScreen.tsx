@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -26,7 +26,13 @@ const PLANS: { id: PlanId; name: string; price: string; oldPrice?: string; subti
     subtitle: 'First 3 days FREE!',
     badge: 'Popular',
   },
-  { id: 'lifetime', name: 'Lifetime', price: '$69.99', badge: 'Limited' },
+  {
+    id: 'lifetime',
+    name: 'Lifetime',
+    price: '$69.99',
+    subtitle: 'Pay once, own forever',
+    badge: 'Limited',
+  },
 ];
 
 const FEATURES = [
@@ -150,25 +156,17 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
 const CTA_LABELS: Record<PlanId, string> = {
   monthly: 'Subscribe',
   yearly: 'Try Free for 3 Days',
-  lifetime: 'Buy Once',
+  lifetime: 'Pay once $69.99, own forever',
 };
 
-function HeroIllustration() {
-  const size = 200;
-  const center = size / 2;
-  const ringRadius = 70;
-
+function HeroImage() {
   return (
     <Animated.View entering={FadeIn.delay(100).duration(800)} style={styles.heroContainer}>
-      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <Circle cx={center} cy={center} r={90} fill={`${palette.salmon}25`} />
-        <Circle cx={center} cy={center} r={ringRadius} fill="none" stroke={palette.salmon} strokeWidth={2} />
-        <Circle cx={center} cy={center} r={50} fill="none" stroke={palette.terracotta} strokeWidth={2.5} strokeDasharray="8 6" />
-        <Circle cx={center} cy={center} r={6} fill={palette.terracotta} />
-        <Circle cx={center + ringRadius} cy={center} r={5} fill={palette.salmon} />
-        <Circle cx={center} cy={center - ringRadius} r={4} fill={palette.terracotta} />
-        <Circle cx={center - ringRadius * 0.7} cy={center + ringRadius * 0.7} r={3.5} fill={`${palette.brown}60`} />
-      </Svg>
+      <Image
+        source={require('@/assets/images/grass-old.png')}
+        style={styles.heroImage}
+        resizeMode="contain"
+      />
     </Animated.View>
   );
 }
@@ -223,7 +221,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           </Pressable>
         </View>
 
-        <HeroIllustration />
+        <HeroImage />
 
         {/* Feature cards carousel */}
         <Animated.View entering={FadeIn.delay(400).duration(500)}>
@@ -310,6 +308,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 4,
+  },
+  heroImage: {
+    width: 280,
+    height: 160,
   },
   carousel: {
     paddingHorizontal: 24,

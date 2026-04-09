@@ -15,6 +15,7 @@ interface PlanCardProps {
   onSelect: () => void;
 }
 
+
 export default function PlanCard({
   name,
   price,
@@ -49,35 +50,41 @@ export default function PlanCard({
       {isSelected && <View style={[styles.radioDot, isDark && styles.radioDotDark]} />}
 
       {hasDetail ? (
-        <View style={styles.detailContent}>
-          {subtitle ? (
-            <Text style={styles.subtitleLine}>
-              <Text style={styles.subtitleLight}>First 3 days </Text>
-              <Text style={styles.subtitleBold}>FREE!</Text>
-            </Text>
-          ) : null}
-          <View style={styles.priceLine}>
-            <Text style={styles.afterLabel}>After Trial: </Text>
-            {oldPrice ? (
-              <View style={styles.oldPriceWrap}>
-                <Text style={styles.oldPrice}>{oldPrice}</Text>
-                <View style={styles.strikethrough} />
-              </View>
-            ) : null}
-            <Text style={styles.priceDetail}>{'  '}{price}</Text>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.simpleContent}>
-          <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected, isDark && styles.simpleLineDark]}>
-            {name}: {price}
-          </Text>
-          {badge && isDark ? (
-            <View style={[styles.badgeInline, isSelected && styles.badgeInlineSelected]}>
-              <Text style={styles.badgeText}>{badge}</Text>
+        <View style={[styles.detailContent, isDark && styles.detailContentDark]}>
+          {isDark && badge ? (
+            <View style={styles.limitedTag}>
+              <Text style={styles.limitedTagText}>{badge} offer</Text>
             </View>
           ) : null}
+          {isDark ? (
+            <Text style={[styles.subtitleLight, styles.subtitleLightDark]}>
+              Pay once <Text style={styles.priceDetailDark}>{price}</Text>, own forever
+            </Text>
+          ) : (
+            <>
+              {subtitle ? (
+                <Text style={styles.subtitleLine}>
+                  <Text style={styles.subtitleLight}>First 3 days </Text>
+                  <Text style={styles.subtitleBold}>FREE!</Text>
+                </Text>
+              ) : null}
+              <View style={styles.priceLine}>
+                <Text style={styles.afterLabel}>After Trial: </Text>
+                {oldPrice ? (
+                  <View style={styles.oldPriceWrap}>
+                    <Text style={styles.oldPrice}>{oldPrice}</Text>
+                    <View style={styles.strikethrough} />
+                  </View>
+                ) : null}
+                <Text style={styles.priceDetail}>{'  '}{price}</Text>
+              </View>
+            </>
+          )}
         </View>
+      ) : (
+        <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected, isDark && styles.simpleLineDark]}>
+          {name}: {price}
+        </Text>
       )}
 
       {/* Badge (floating, for non-dark cards) */}
@@ -111,37 +118,36 @@ const styles = StyleSheet.create({
   },
   cardDark: {
     borderWidth: 1.5,
-    borderColor: palette.charcoal,
-    backgroundColor: palette.charcoal,
+    borderColor: palette.brown,
+    backgroundColor: palette.brown,
   },
   // Simple plan (one-liner)
   simpleLine: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '400',
     fontFamily: Fonts.serif,
     color: palette.brown,
     textAlign: 'center',
   },
-  simpleLineSelected: {
-    fontWeight: '600',
-  },
+  simpleLineSelected: {},
   simpleLineDark: {
     color: palette.cream,
   },
-  simpleContent: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  badgeInline: {
-    backgroundColor: palette.salmon,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  badgeInlineSelected: {
+  limitedTag: {
+    alignSelf: 'flex-start',
     backgroundColor: palette.terracotta,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  limitedTagText: {
+    color: palette.cream,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   // Radio dot (shown only when selected, absolute positioned)
   radioDot: {
@@ -162,6 +168,10 @@ const styles = StyleSheet.create({
     paddingLeft: 30,
     paddingRight: 30,
   },
+  detailContentDark: {
+    paddingLeft: 30,
+    paddingRight: 30,
+  },
   subtitleLine: {
     fontSize: 16,
   },
@@ -173,6 +183,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: palette.brown,
     textDecorationLine: 'underline',
+  },
+  subtitleLineDark: {},
+  subtitleLightDark: {
+    color: `${palette.cream}BB`,
   },
   priceLine: {
     flexDirection: 'row',
@@ -202,9 +216,14 @@ const styles = StyleSheet.create({
   },
   priceDetail: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '400',
     fontFamily: Fonts.mono,
     color: palette.brown,
+  },
+  priceDetailDark: {
+    color: palette.cream,
+    fontSize: 18,
+    fontWeight: '600',
   },
   // Badge
   badge: {
