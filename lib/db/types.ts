@@ -2,6 +2,7 @@ export interface Session {
   id: string;
   timestamp: number;
   duration: number;
+  mood?: string;
 }
 
 export interface Reminder {
@@ -19,4 +20,19 @@ export interface ScheduledBlock {
   durationMinutes: number;
   weekdays: number[];
   enabled: boolean;
+}
+
+export interface CheckinRow {
+  id: string;
+  timestamp: number;
+  week_key: string;
+  sleep: number;
+  anxiety: number;
+  focus: number;
+  energy: number;
+}
+
+export interface MilestoneRow {
+  id: string;
+  achieved_at: number;
 }

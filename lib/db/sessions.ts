@@ -37,6 +37,11 @@ export function getSessionsByDateRange(startMs: number, endMs: number): Session[
   );
 }
 
+export function deleteSessionById(id: string): void {
+  const db = getDb();
+  db.runSync('DELETE FROM sessions WHERE id = ?', id);
+}
+
 export function deleteSessionsByDateKey(dateKey: string): void {
   const db = getDb();
   // dateKey is "YYYY-MM-DD", parse to get start/end timestamps in local time
@@ -147,6 +152,19 @@ export function getActiveDaysCount(): number {
     `SELECT COUNT(DISTINCT strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', 'localtime')) as count FROM sessions`,
   );
   return row?.count ?? 0;
+}
+
+export function updateSessionMood(sessionId: string, mood: string): void {
+  const db = getDb();
+  db.runSync('UPDATE sessions SET mood = ? WHERE id = ?', mood, sessionId);
+}
+
+export function getTotalDuration(): number {
+  const db = getDb();
+  const row = db.getFirstSync<{ total: number }>(
+    'SELECT COALESCE(SUM(duration), 0) as total FROM sessions',
+  );
+  return row?.total ?? 0;
 }
 
 export function getBestDayDuration(): number {

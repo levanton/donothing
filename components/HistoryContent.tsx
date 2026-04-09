@@ -1,84 +1,100 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Fragment, memo, useMemo } from 'react';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const SCREEN_W = Dimensions.get('window').width;
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
-import { formatTimeShort, formatTimeStat } from '@/lib/format';
-import { getDailyStats, getStats, getStreak, type DayStats } from '@/lib/stats';
-import { getDurationSince, getSessionCount, getLongestSessionDuration, getActiveDaysCount, getBestDayDuration } from '@/lib/db/sessions';
+import type { AppTheme } from '@/lib/theme';
+import { formatTimeStat } from '@/lib/format';
+import { getStats, getStreak, getWeekStats, type WeekDay } from '@/lib/stats';
+import { getDurationSince, getSessionCount, getLongestSessionDuration, getWeekDurations } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
+import MilestonesList from './MilestonesList';
 import { useAppStore } from '@/lib/store';
 
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<DayStats>);
-
-const DELETE_BTN_W = 80;
-
-const SwipeableDayRow = memo(function SwipeableDayRow({ day, theme, onDelete }: {
-  day: DayStats;
-  theme: any;
-  onDelete: (date: string) => void;
+// ── Hero number ───────────────────────────────────────────────────────
+const HeroNumber = memo(function HeroNumber({ value, unit, label, theme }: {
+  value: string; unit: string; label: string; theme: AppTheme;
 }) {
-  const translateX = useSharedValue(0);
-  const startX = useSharedValue(0);
-
-  const swipe = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-5, 5])
-    .onStart(() => {
-      startX.value = translateX.value;
-    })
-    .onUpdate((e) => {
-      'worklet';
-      const next = startX.value + e.translationX;
-      translateX.value = Math.max(-DELETE_BTN_W, Math.min(0, next));
-    })
-    .onEnd((e) => {
-      'worklet';
-      if (e.translationX < -40 || e.velocityX < -500) {
-        translateX.value = withTiming(-DELETE_BTN_W, { duration: 200 });
-      } else {
-        translateX.value = withTiming(0, { duration: 200 });
-      }
-    });
-
-  const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
   return (
-    <View style={styles.swipeContainer}>
-      <Pressable
-        style={[styles.deleteBtn, { backgroundColor: palette.danger }]}
-        onPress={() => {
-          translateX.value = withTiming(0, { duration: 200 });
-          onDelete(day.date);
-        }}
-      >
-        <Text style={styles.deleteBtnText}>Delete</Text>
-      </Pressable>
-      <GestureDetector gesture={day.duration > 0 ? swipe : Gesture.Manual()}>
-        <Animated.View style={[styles.swipeRow, { borderBottomColor: theme.border, backgroundColor: theme.bg }, rowStyle]}>
-          <Text style={[styles.dayLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>{day.label}</Text>
-          <Text style={[styles.dayDuration, {
-            color: day.duration > 0 ? theme.text : theme.textTertiary,
-            fontFamily: Fonts!.serif,
-          }]}>
-            {day.duration > 0 ? formatTimeShort(day.duration) : '\u2014'}
-          </Text>
-        </Animated.View>
-      </GestureDetector>
-    </View>
+    <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.heroContainer}>
+      <View style={styles.heroValueRow}>
+        <Text style={[styles.heroValue, { color: theme.text, fontFamily: Fonts.serif }]}>{value}</Text>
+        {unit ? <Text style={[styles.heroUnit, { color: theme.textTertiary }]}>{unit}</Text> : null}
+      </View>
+      <Text style={[styles.heroLabel, { color: theme.textTertiary, fontFamily: Fonts.serif }]}>{label}</Text>
+    </Animated.View>
   );
 });
 
+// ── Week strip (vertical bars) ────────────────────────────────────────
+const MAX_BAR_H = 40;
+const BAR_W = 6;
 
+const WeekStrip = memo(function WeekStrip({ weekStats, theme }: { weekStats: WeekDay[]; theme: AppTheme }) {
+  const maxDur = Math.max(...weekStats.map((d) => d.duration), 1);
+
+  return (
+    <Animated.View entering={FadeIn.delay(200).duration(400)} style={styles.weekStripContainer}>
+      {weekStats.map((day) => {
+        const barH = day.duration > 0
+          ? 2 + (day.duration / maxDur) * (MAX_BAR_H - 2)
+          : 2;
+        return (
+          <View key={day.date} style={styles.weekStripCol}>
+            <Text style={[styles.weekStripDay, { color: day.isToday ? theme.text : theme.textTertiary, fontFamily: Fonts.serif }]}>
+              {day.dayName.charAt(0)}
+            </Text>
+            <View style={styles.weekStripBarArea}>
+              <View style={{
+                width: BAR_W,
+                height: barH,
+                borderRadius: BAR_W / 2,
+                backgroundColor: day.duration > 0 ? theme.accent : theme.border,
+                opacity: day.duration > 0 ? 1 : 0.3,
+              }} />
+            </View>
+          </View>
+        );
+      })}
+    </Animated.View>
+  );
+});
+
+// ── Secondary stats row ───────────────────────────────────────────────
+const SecondaryStats = memo(function SecondaryStats({ items, theme }: {
+  items: { value: string; label: string }[]; theme: AppTheme;
+}) {
+  return (
+    <Animated.View entering={FadeIn.delay(350).duration(400)} style={styles.secondaryRow}>
+      {items.map((item, i) => (
+        <Fragment key={item.label}>
+          {i > 0 && <View style={[styles.secondaryDivider, { backgroundColor: theme.border }]} />}
+          <View style={styles.secondaryCell}>
+            <Text style={[styles.secondaryValue, { color: theme.text, fontFamily: Fonts.serif }]}>{item.value}</Text>
+            <Text style={[styles.secondaryLabel, { color: theme.textTertiary }]}>{item.label}</Text>
+          </View>
+        </Fragment>
+      ))}
+    </Animated.View>
+  );
+});
+
+// ── Section divider ───────────────────────────────────────────────────
+function SectionDivider({ color }: { color: string }) {
+  return (
+    <View style={styles.dividerOuter}>
+      <View style={[styles.dividerLine, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// ── Zen quotes ────────────────────────────────────────────────────────
 const ZEN_QUOTES = [
   'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
   'the quieter you become, the more you can hear.',
@@ -87,6 +103,7 @@ const ZEN_QUOTES = [
   'do nothing, and everything is done.',
 ];
 
+// ── Main component ────────────────────────────────────────────────────
 interface HistoryContentProps {
   onClose: () => void;
   insets: { top: number; bottom: number };
@@ -95,187 +112,62 @@ interface HistoryContentProps {
 }
 
 export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
-  const deleteSessionsByDate = useAppStore((s) => s.deleteSessionsByDate);
-  // Subscribe to weekStats to trigger re-render when session data changes
   useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
+  const achievedMilestones = useAppStore((s) => s.achievedMilestones);
   const theme = themes[themeMode];
 
-  const dailyStats = getDailyStats();
   const totalStats = getStats();
   const streak = getStreak();
-  const totalAll = formatTimeStat(totalStats.year);
+  const weekStats = getWeekStats();
   const totalSessions = getSessionCount();
   const avgSession = totalSessions > 0
     ? formatTimeStat(Math.round(totalStats.year / totalSessions))
     : { value: '0', unit: 'min' };
-
-  const bestDayStat = formatTimeStat(getBestDayDuration());
-  const daysActive = getActiveDaysCount();
   const longestSession = formatTimeStat(getLongestSessionDuration());
 
-  // This month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const thisMonth = getDurationSince(startOfMonth);
   const thisMonthStat = formatTimeStat(thisMonth);
 
-  const [statsPage, setStatsPage] = useState(0);
-  const statsTranslateX = useSharedValue(0);
+  // Hero: most impressive stat
+  const heroStat = useMemo(() => {
+    if (streak >= 7) return { value: String(streak), unit: 'days', label: 'current streak' };
+    if (thisMonth >= 3600) return { value: thisMonthStat.value, unit: thisMonthStat.unit, label: 'this month' };
+    if (streak >= 3) return { value: String(streak), unit: 'days', label: 'streak' };
+    return { value: thisMonthStat.value, unit: thisMonthStat.unit, label: 'this month' };
+  }, [streak, thisMonth, thisMonthStat]);
 
-  const setPage = useCallback((p: number) => {
-    setStatsPage(p);
-    Haptics.selectionAsync();
-  }, []);
+  // Weekly insight
+  const weekInsight = useMemo(() => {
+    const thisWeekTotal = totalStats.week;
+    const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - dayOfWeek * 86400000;
+    const lastWeekStart = thisWeekStart - 7 * 86400000;
+    const lastWeekDurations = getWeekDurations(lastWeekStart, thisWeekStart);
+    let lastWeekTotal = 0;
+    lastWeekDurations.forEach((v) => { lastWeekTotal += v; });
+    if (thisWeekTotal === 0 && lastWeekTotal === 0) return null;
+    if (lastWeekTotal === 0 && thisWeekTotal > 0) return 'a fresh start this week.';
+    if (thisWeekTotal === 0) return 'no stillness yet this week.';
+    const pct = Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100);
+    if (pct > 10) return `${pct}% more stillness than last week.`;
+    if (pct < -10) return `${Math.abs(pct)}% less than last week. that's okay.`;
+    return 'about the same as last week. steady.';
+  }, [totalStats.week]);
 
-  const statsSwipe = Gesture.Pan()
-    .activeOffsetX([-30, 30])
-    .failOffsetY([-15, 15])
-    .onUpdate((e) => {
-      'worklet';
-      const base = statsPage === 0 ? 0 : -SCREEN_W;
-      statsTranslateX.value = base + e.translationX;
-    })
-    .onEnd((e) => {
-      'worklet';
-      if (e.translationX < -50 && statsPage === 0) {
-        statsTranslateX.value = withTiming(-SCREEN_W, { duration: 250 });
-        runOnJS(setPage)(1);
-      } else if (e.translationX > 50 && statsPage === 1) {
-        statsTranslateX.value = withTiming(0, { duration: 250 });
-        runOnJS(setPage)(0);
-      } else {
-        statsTranslateX.value = withTiming(statsPage === 0 ? 0 : -SCREEN_W, { duration: 250 });
-      }
-    });
+  const secondaryItems = useMemo(() => [
+    { value: `${avgSession.value} ${avgSession.unit}`, label: 'AVG SESSION' },
+    { value: `${longestSession.value} ${longestSession.unit}`, label: 'LONGEST' },
+    { value: String(totalSessions), label: 'SESSIONS' },
+  ], [avgSession, longestSession, totalSessions]);
 
-  const statsSlideStyle = useAnimatedStyle(() => ({
-    flexDirection: 'row',
-    width: SCREEN_W * 2,
-    transform: [{ translateX: statsTranslateX.value }],
-  }));
-
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
-  );
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
 
-  const renderItem = useCallback(({ item }: { item: DayStats }) => (
-    <SwipeableDayRow day={item} theme={theme} onDelete={deleteSessionsByDate} />
-  ), [theme, deleteSessionsByDate]);
-
-  const keyExtractor = useCallback((item: DayStats) => item.date, []);
-
-  const listHeader = useMemo(() => (
-    <>
-      <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          History
-        </Text>
-        <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
-          <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.statsOuter, { borderColor: theme.border }]}>
-        <GestureDetector gesture={statsSwipe}>
-          <Animated.View style={[styles.statsScroll, statsSlideStyle]}>
-          {/* Page 1 */}
-          <View style={[styles.statsPage, { width: SCREEN_W }]}>
-            <View style={styles.statsRow}>
-              <View style={styles.totalSection}>
-                <View style={styles.totalValueRow}>
-                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{thisMonthStat.value}</Text>
-                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{thisMonthStat.unit}</Text>
-                </View>
-                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>this month</Text>
-              </View>
-              <View style={styles.statsGrid}>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                    {formatTimeStat(totalStats.week).value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {formatTimeStat(totalStats.week).unit}</Text>
-                  </Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>this week</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: streak > 0 ? theme.accent : theme.text, fontFamily: Fonts!.serif }]}>{streak}</Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>day streak</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                    {avgSession.value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {avgSession.unit}</Text>
-                  </Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>avg session</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                    {longestSession.value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {longestSession.unit}</Text>
-                  </Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>longest</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Page 2 */}
-          <View style={[styles.statsPage, { width: SCREEN_W }]}>
-            <View style={styles.statsRow}>
-              <View style={styles.totalSection}>
-                <View style={styles.totalValueRow}>
-                  <Text style={[styles.totalValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{totalAll.value}</Text>
-                  <Text style={[styles.totalUnit, { color: theme.textTertiary }]}>{totalAll.unit}</Text>
-                </View>
-                <Text style={[styles.totalLabel, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>total stillness</Text>
-              </View>
-              <View style={styles.statsGrid}>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{totalSessions}</Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>sessions</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>{daysActive}</Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>days active</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                    {bestDayStat.value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {bestDayStat.unit}</Text>
-                  </Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>best day</Text>
-                </View>
-                <View style={styles.statCell}>
-                  <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                    {formatTimeStat(totalStats.today).value}<Text style={[styles.statUnit, { color: theme.textTertiary }]}> {formatTimeStat(totalStats.today).unit}</Text>
-                  </Text>
-                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>today</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-          </Animated.View>
-        </GestureDetector>
-
-        <View style={styles.pageDots}>
-          <View style={[styles.dot, { backgroundColor: statsPage === 0 ? theme.text : theme.border }]} />
-          <View style={[styles.dot, { backgroundColor: statsPage === 1 ? theme.text : theme.border }]} />
-        </View>
-      </View>
-
-      <ActivityCalendar theme={theme} />
-
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
-    </>
-  ), [theme, statsPage, statsSwipe, statsSlideStyle, onClose, thisMonthStat, totalStats, streak, avgSession, longestSession, totalAll, totalSessions, daysActive, bestDayStat]);
-
-  const listFooter = useMemo(() => (
-    <View style={styles.quoteContainer}>
-      <Text style={[styles.quoteText, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-        {quote}
-      </Text>
-    </View>
-  ), [theme.textTertiary, quote]);
-
-  const flatList = (
-    <AnimatedFlatList
+  const content = (
+    <Animated.ScrollView
       style={{ flex: 1 }}
       bounces={false}
       overScrollMode="never"
@@ -286,108 +178,90 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         paddingTop: insets.top + 8,
         paddingBottom: insets.bottom + 40,
       }}
-      data={dailyStats}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      ListHeaderComponent={listHeader}
-      ListFooterComponent={listFooter}
-    />
+    >
+      {/* Header */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: theme.text, fontFamily: Fonts.serif }]}>Journey</Text>
+        <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
+          <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
+        </Pressable>
+      </View>
+
+      {/* Surface: emotional impact */}
+      <HeroNumber value={heroStat.value} unit={heroStat.unit} label={heroStat.label} theme={theme} />
+
+      {weekInsight && (
+        <Animated.Text
+          entering={FadeIn.delay(300).duration(400)}
+          style={[styles.insightText, { color: theme.textTertiary, fontFamily: Fonts.serif }]}
+        >
+          {weekInsight}
+        </Animated.Text>
+      )}
+
+      <SecondaryStats items={secondaryItems} theme={theme} />
+
+      {/* Depth: structure */}
+      <SectionDivider color={theme.border} />
+
+      <ActivityCalendar theme={theme} />
+
+      <SectionDivider color={theme.border} />
+
+      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>MILESTONES</Text>
+      <MilestonesList theme={theme} achievedMilestones={achievedMilestones} />
+
+      {/* Footer */}
+      <View style={styles.quoteContainer}>
+        <Text style={[styles.quoteText, { color: theme.textTertiary, fontFamily: Fonts.serif }]}>{quote}</Text>
+      </View>
+    </Animated.ScrollView>
   );
 
   if (nativeScrollGesture) {
-    return <GestureDetector gesture={nativeScrollGesture}>{flatList}</GestureDetector>;
+    return <GestureDetector gesture={nativeScrollGesture}>{content}</GestureDetector>;
   }
-  return flatList;
+  return content;
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  // Header
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 },
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  statsOuter: {
-    marginBottom: 32,
-    marginHorizontal: -24,
-    paddingBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  statsScroll: {
-    overflow: 'hidden',
-  },
-  statsPage: {
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statsArrow: {
-    position: 'absolute',
-    top: 0,
-    bottom: 16,
-    justifyContent: 'center',
-  },
-  pageDots: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 24,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  totalSection: { flex: 1 },
-  totalValueRow: { flexDirection: 'row', alignItems: 'baseline' },
-  totalValue: { fontSize: 56, fontWeight: '300' },
-  totalUnit: { fontSize: 20, fontWeight: '300', marginLeft: 4 },
-  totalLabel: { fontSize: 15, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
-  statsGrid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  statCell: {
-    width: '50%',
-    paddingVertical: 10,
-    paddingLeft: 12,
-  },
-  statValue: { fontSize: 24, fontWeight: '300' },
-  statUnit: { fontSize: 15, fontWeight: '300' },
-  statLabel: { fontSize: 13, fontWeight: '300', marginTop: 3 },
-  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
-  dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  swipeContainer: {
-    marginHorizontal: -24,
-    overflow: 'hidden',
-  },
-  swipeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  dayLabel: { fontSize: 16, fontWeight: '400' },
-  dayDuration: { fontSize: 16, fontWeight: '300' },
-  deleteBtn: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: DELETE_BTN_W,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteBtnText: {
-    color: palette.white,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center' },
+
+  // Hero number
+  heroContainer: { alignItems: 'center', marginBottom: 32 },
+  heroValueRow: { flexDirection: 'row', alignItems: 'baseline' },
+  heroValue: { fontSize: 72, fontWeight: '200' },
+  heroUnit: { fontSize: 18, fontWeight: '300', marginLeft: 6 },
+  heroLabel: { fontSize: 15, fontWeight: '300', fontStyle: 'italic', marginTop: 4 },
+
+  // Week strip
+  weekStripContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 24 },
+  weekStripCol: { alignItems: 'center', flex: 1, gap: 8 },
+  weekStripDay: { fontSize: 11, fontWeight: '400', letterSpacing: 0.5 },
+  weekStripBarArea: { height: MAX_BAR_H, justifyContent: 'flex-end', alignItems: 'center' },
+
+  // Insight
+  insightText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginBottom: 48 },
+
+  // Secondary stats
+  secondaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 40 },
+  secondaryCell: { flex: 1, alignItems: 'center' },
+  secondaryValue: { fontSize: 20, fontWeight: '300' },
+  secondaryLabel: { fontSize: 10, fontWeight: '400', letterSpacing: 2, marginTop: 4 },
+  secondaryDivider: { width: StyleSheet.hairlineWidth, height: 32, alignSelf: 'center' },
+
+  // Section divider
+  dividerOuter: { alignItems: 'center', marginVertical: 40 },
+  dividerLine: { width: 40, height: 1 },
+
+  // Section labels
+  sectionLabel: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
+
+  // Footer
+  quoteContainer: { marginTop: 48, paddingHorizontal: 16, alignItems: 'center', marginBottom: 20 },
   quoteText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22 },
 });

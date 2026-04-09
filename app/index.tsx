@@ -38,6 +38,11 @@ import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
+import PostSessionReflection from '@/components/PostSessionReflection';
+import MilestoneOverlay from '@/components/MilestoneOverlay';
+import WeeklyCheckin from '@/components/WeeklyCheckin';
+import { MILESTONES } from '@/lib/milestones';
+import JourneyTags from '@/components/JourneyTags';
 import TimerDisplay from '@/components/TimerDisplay';
 
 const FOCUS_OPTIONS = [
@@ -88,6 +93,11 @@ export default function DoNothingScreen() {
   const focusTotal = useAppStore((s) => s.focusTotal);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
+  const reflectionVisible = useAppStore((s) => s.reflectionVisible);
+  const lastSessionId = useAppStore((s) => s.lastSessionId);
+  const milestoneQueue = useAppStore((s) => s.milestoneQueue);
+  const weeklyCheckinVisible = useAppStore((s) => s.weeklyCheckinVisible);
+  const previousCheckin = useAppStore((s) => s.previousCheckin);
 
   const isActiveRef = useRef(true);
 
@@ -502,6 +512,31 @@ export default function DoNothingScreen() {
     hideOpacity.value = withTiming(1, { duration: 1125 });
     // Reset elapsed after animations finish
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
+    // Show reflection after exit animations settle
+    setTimeout(() => useAppStore.getState().showReflection(), 800);
+  }, []);
+
+  const handleReflectionDone = useCallback(() => {
+    useAppStore.getState().dismissReflection();
+  }, []);
+
+  const handleMilestoneDismiss = useCallback(() => {
+    useAppStore.getState().dismissMilestone();
+  }, []);
+
+  const currentMilestone = milestoneQueue.length > 0
+    ? MILESTONES.find((m) => m.id === milestoneQueue[0]) ?? null
+    : null;
+
+  const handleCheckinDone = useCallback(
+    (data: { sleep: number; anxiety: number; focus: number; energy: number }) => {
+      useAppStore.getState().submitCheckin(data);
+    },
+    [],
+  );
+
+  const handleCheckinDismiss = useCallback(() => {
+    useAppStore.getState().dismissCheckin();
   }, []);
 
   const handleHistory = useCallback(() => {
@@ -955,6 +990,15 @@ export default function DoNothingScreen() {
         </View>
       </Pressable>
 
+      {/* Journey tags */}
+      {!started && (
+        <JourneyTags
+          theme={theme}
+          dailyGoalMinutes={dailyGoalMinutes}
+          todayDuration={stats.today}
+        />
+      )}
+
       {/* Week dots */}
       {weekStats.length > 0 && (
         <View style={styles.weekSection}>
@@ -1006,7 +1050,7 @@ export default function DoNothingScreen() {
         ]}
       >
         <PillButton
-          label="History"
+          label="Journey"
           onPress={handleHistory}
           color={themeMode === 'dark' ? palette.cream : palette.brown}
           outline
@@ -1037,6 +1081,31 @@ export default function DoNothingScreen() {
       />
     </Animated.View>
     </GestureDetector>
+
+    {/* Post-session reflection overlay */}
+    <PostSessionReflection
+      visible={reflectionVisible}
+      sessionId={lastSessionId}
+      theme={theme}
+      onDone={handleReflectionDone}
+    />
+
+    {/* Milestone celebration overlay */}
+    <MilestoneOverlay
+      milestone={currentMilestone}
+      theme={theme}
+      onDismiss={handleMilestoneDismiss}
+    />
+
+    {/* Weekly check-in overlay */}
+    <WeeklyCheckin
+      visible={weeklyCheckinVisible}
+      theme={theme}
+      previousCheckin={previousCheckin}
+      onDone={handleCheckinDone}
+      onDismiss={handleCheckinDismiss}
+    />
+
     </View>
   );
 }

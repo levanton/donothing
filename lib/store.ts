@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { initDatabase } from './db';
 import {
   addSession as dbAddSession,
+  deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
 } from './db/sessions';
 import {
@@ -25,9 +26,12 @@ import {
   getNotificationIds,
   clearNotificationIds,
 } from './db/notification-state';
-import type { Reminder, ScheduledBlock } from './db/types';
-import { getWeekStats, WeekDay } from './stats';
+import type { Reminder, ScheduledBlock, CheckinRow } from './db/types';
+import { getWeekStats, WeekDay, getISOWeekKey } from './stats';
 import { ThemeMode } from './theme';
+import { getAchievedMilestones } from './db/milestones-db';
+import { evaluateAndSaveNewMilestones } from './milestones';
+import { getCheckinByWeek, getPreviousCheckin, getLatestCheckin, insertCheckin } from './db/checkins';
 import {
   configureNotifications, requestPermission,
   syncReminders, cancelNotification,
@@ -65,9 +69,35 @@ export interface AppState {
   reminders: Reminder[];
   scheduledBlocks: ScheduledBlock[];
 
+  // Post-session reflection
+  reflectionVisible: boolean;
+  lastSessionId: string;
+  lastSessionDuration: number;
+
+  // Milestones
+  milestoneQueue: string[];
+  achievedMilestones: Map<string, number>;
+
+  // Weekly check-in
+  weeklyCheckinVisible: boolean;
+  previousCheckin: import('./db/types').CheckinRow | null;
+
   // Onboarding
   onboardingComplete: boolean;
   setOnboardingComplete: () => void;
+
+  // Reflection actions
+  showReflection: () => void;
+  dismissReflection: () => void;
+
+  // Milestone actions
+  checkMilestones: () => void;
+  dismissMilestone: () => void;
+
+  // Weekly check-in actions
+  checkAndShowWeeklyCheckin: () => void;
+  submitCheckin: (data: { sleep: number; anxiety: number; focus: number; energy: number }) => void;
+  dismissCheckin: () => void;
 
   // Actions
   init: () => Promise<void>;
@@ -103,6 +133,7 @@ export interface AppState {
   toggleScheduledBlock: (id: string) => Promise<void>;
 
   // Session actions
+  deleteSession: (id: string) => Promise<void>;
   deleteSessionsByDate: (dateKey: string) => Promise<void>;
 
   // AppState
@@ -123,6 +154,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusStep: 'hidden',
   focusRemaining: 0,
   focusTotal: 0,
+
+  // Post-session reflection
+  reflectionVisible: false,
+  lastSessionId: '',
+  lastSessionDuration: 0,
+
+  // Milestones
+  milestoneQueue: [],
+  achievedMilestones: new Map(),
+
+  // Weekly check-in
+  weeklyCheckinVisible: false,
+  previousCheckin: null,
 
   // Settings
   settingsOpen: false,
@@ -164,15 +208,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     } catch {}
 
+    // Load milestones
+    const achievedMilestones = getAchievedMilestones();
+
     set({
       themeMode,
       dailyGoalMinutes,
       onboardingComplete,
       reminders,
       scheduledBlocks,
+      achievedMilestones,
       weekStats: getWeekStats(),
       ready: true,
     });
+
+    // Check if weekly check-in is due
+    get().checkAndShowWeeklyCheckin();
   },
 
   // --- Timer ---
@@ -191,12 +242,77 @@ export const useAppStore = create<AppState>((set, get) => ({
       timerInterval = null;
     }
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-    set({ started: false });
-    dbAddSession(duration);
-    set({ weekStats: getWeekStats() });
+    const session = dbAddSession(duration);
+    set({
+      started: false,
+      weekStats: getWeekStats(),
+      lastSessionId: session?.id ?? '',
+      lastSessionDuration: duration,
+    });
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
+
+  // --- Reflection ---
+  showReflection: () => {
+    if (get().lastSessionDuration >= 10) {
+      set({ reflectionVisible: true });
+    }
+  },
+
+  dismissReflection: () => {
+    set({ reflectionVisible: false });
+    // Check milestones after reflection
+    get().checkMilestones();
+  },
+
+  // --- Milestones ---
+  checkMilestones: () => {
+    const newIds = evaluateAndSaveNewMilestones();
+    if (newIds.length > 0) {
+      set({
+        milestoneQueue: newIds,
+        achievedMilestones: getAchievedMilestones(),
+      });
+    }
+  },
+
+  dismissMilestone: () => {
+    const queue = get().milestoneQueue.slice(1);
+    set({ milestoneQueue: queue });
+  },
+
+  // --- Weekly Check-in ---
+  checkAndShowWeeklyCheckin: () => {
+    const weekKey = getISOWeekKey();
+    const existing = getCheckinByWeek(weekKey);
+    if (existing) return; // Already done this week
+
+    const latest = getLatestCheckin();
+    if (latest) {
+      // Show only if >= 6 days since last check-in
+      const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+      if (Date.now() - latest.timestamp < sixDaysMs) return;
+    }
+
+    const previous = getPreviousCheckin(weekKey);
+    set({ weeklyCheckinVisible: true, previousCheckin: previous });
+  },
+
+  submitCheckin: (data: { sleep: number; anxiety: number; focus: number; energy: number }) => {
+    const weekKey = getISOWeekKey();
+    insertCheckin(weekKey, data.sleep, data.anxiety, data.focus, data.energy);
+    set({ weeklyCheckinVisible: false });
+  },
+
+  dismissCheckin: () => {
+    set({ weeklyCheckinVisible: false });
+  },
+
+  deleteSession: async (id: string) => {
+    dbDeleteSession(id);
+    set({ weekStats: getWeekStats() });
+  },
 
   deleteSessionsByDate: async (dateKey: string) => {
     deleteSessionsByDateKey(dateKey);
@@ -378,5 +494,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleForeground: () => {
     set({ weekStats: getWeekStats() });
+    get().checkAndShowWeeklyCheckin();
   },
 }));
