@@ -154,9 +154,9 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
 }
 
 const CTA_LABELS: Record<PlanId, string> = {
-  monthly: 'Subscribe',
+  monthly: 'Subscribe — $4.99/mo',
   yearly: 'Try Free for 3 Days',
-  lifetime: 'Pay once $69.99, own forever',
+  lifetime: 'Get Lifetime — $69.99',
 };
 
 function HeroImage() {
@@ -255,16 +255,23 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           ))}
         </Animated.View>
 
+        <Text style={styles.cancelText}>
+          {selectedPlan === 'yearly'
+            ? '3 days free, then $34.99/year. Cancel anytime.'
+            : 'Cancel anytime.'}
+        </Text>
+
         {/* CTA */}
         <Animated.View entering={FadeInUp.delay(1000).duration(500)} style={styles.cta}>
-          <PillButton
-            label={CTA_LABELS[selectedPlan]}
+          <Pressable
             onPress={handlePurchase}
-            color={palette.terracotta}
-            variant="filled"
-            size="large"
-            style={styles.ctaButton}
-          />
+            style={[styles.ctaButton, {
+              backgroundColor: selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta,
+              shadowColor: selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta,
+            }]}
+          >
+            <Text style={styles.ctaText}>{CTA_LABELS[selectedPlan]}</Text>
+          </Pressable>
         </Animated.View>
 
         {/* Footer */}
@@ -295,7 +302,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 2,
   },
   closeButton: {
     width: 36,
@@ -306,8 +313,8 @@ const styles = StyleSheet.create({
   scroll: {},
   heroContainer: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 0,
+    marginBottom: 0,
   },
   heroImage: {
     width: 280,
@@ -348,12 +355,32 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 20,
+    borderRadius: 100,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  ctaText: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: Fonts.mono,
+    color: palette.cream,
+    letterSpacing: 0.3,
+  },
+  cancelText: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: `${palette.brown}80`,
+    textAlign: 'center',
+    marginTop: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 48,
     gap: 6,
   },
   footerLink: {

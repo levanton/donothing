@@ -40,14 +40,14 @@ export default function PlanCard({
       style={[
         styles.card,
         isDark
-          ? styles.cardDark
+          ? [styles.cardDark, isSelected && styles.cardDarkSelected]
           : isSelected
             ? styles.cardSelected
             : styles.cardUnselected,
       ]}
     >
       {/* Radio dot — only when selected, absolute so it doesn't shift content */}
-      {isSelected && <View style={[styles.radioDot, isDark && styles.radioDotDark]} />}
+      {isSelected && <View style={styles.radioDot} />}
 
       {isDark ? (
         <>
@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
     borderColor: '#2C4A3E',
     backgroundColor: '#2C4A3E',
   },
+  cardDarkSelected: {},
   // Simple plan (one-liner)
   simpleLine: {
     flex: 1,
@@ -140,14 +141,14 @@ const styles = StyleSheet.create({
   },
   limitedTag: {
     borderWidth: 1.5,
-    borderColor: `${palette.cream}40`,
+    borderColor: palette.cream,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     marginLeft: 10,
   },
   limitedTagText: {
-    color: palette.salmon,
+    color: palette.cream,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
