@@ -11,7 +11,7 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import PillButton from '@/components/PillButton';
-import PlanCard from '@/components/paywall/PlanCard';
+import PlanCard from '@/components/paywall/PlanCardGeneral';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 170;
@@ -19,22 +19,26 @@ const CARD_HEIGHT = 210;
 
 type PlanId = 'monthly' | 'yearly' | 'lifetime';
 
-const PLANS: { id: PlanId; name: string; price: string; oldPrice?: string; subtitle?: string; badge?: string }[] = [
-  { id: 'monthly', name: 'Monthly', price: '$4.99 / month' },
+const PLANS = [
+  { id: 'monthly' as PlanId, planName: 'Monthly', price: '$4.99', period: '/month' },
   {
-    id: 'yearly',
-    name: 'Yearly',
-    price: '$34.99 / year',
+    id: 'yearly' as PlanId,
+    planName: 'Yearly',
+    price: '$34.99',
+    period: '/year',
     oldPrice: '$49.99',
-    subtitle: 'First 3 days FREE!',
+    trialText: 'First 3 days FREE',
     badge: 'Popular',
+    isRecommended: true,
   },
   {
-    id: 'lifetime',
-    name: 'Lifetime',
+    id: 'lifetime' as PlanId,
+    planName: 'Lifetime',
     price: '$69.99',
-    subtitle: 'Pay once, own forever',
+    trialText: 'Pay once, own forever',
     badge: 'Limited',
+    badgeColor: palette.umber,
+    accentColor: palette.umber,
   },
 ];
 
@@ -188,9 +192,9 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
 }
 
 const CTA_LABELS: Record<PlanId, string> = {
-  monthly: 'Subscribe',
+  monthly: 'Subscribe — $4.99/mo',
   yearly: 'Try Free for 3 Days',
-  lifetime: 'Pay once $69.99, own forever',
+  lifetime: 'Get Lifetime — $69.99',
 };
 
 // Decorative hero orbit illustration
@@ -278,12 +282,15 @@ export default function PaywallRoute() {
           {PLANS.map((plan) => (
             <PlanCard
               key={plan.id}
-              name={plan.name}
+              planName={plan.planName}
               price={plan.price}
+              period={plan.period}
               oldPrice={plan.oldPrice}
-              subtitle={plan.subtitle}
+              trialText={plan.trialText}
               badge={plan.badge}
-              variant={plan.id === 'lifetime' ? 'dark' : 'default'}
+              badgeColor={plan.badgeColor}
+              accentColor={plan.accentColor}
+              isRecommended={plan.isRecommended}
               isSelected={selectedPlan === plan.id}
               onSelect={() => setSelectedPlan(plan.id)}
             />
@@ -298,11 +305,19 @@ export default function PaywallRoute() {
           <PillButton
             label={CTA_LABELS[selectedPlan]}
             onPress={handlePurchase}
-            color={palette.terracotta}
+            color={selectedPlan === 'lifetime' ? palette.umber : palette.terracotta}
             variant="filled"
             size="large"
-            style={styles.ctaButton}
+            style={[styles.ctaButton, {
+              shadowColor: selectedPlan === 'lifetime' ? palette.umber : palette.terracotta,
+              shadowOpacity: 0.25,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 },
+            }]}
           />
+          {selectedPlan === 'yearly' && (
+            <Text style={styles.ctaHelper}>Then $34.99/year. Cancel anytime.</Text>
+          )}
         </Animated.View>
 
         {/* Footer */}
@@ -393,6 +408,14 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     alignSelf: 'stretch',
+    paddingVertical: 20,
+  },
+  ctaHelper: {
+    fontSize: 13,
+    fontFamily: Fonts.mono,
+    color: `${palette.brown}80`,
+    textAlign: 'center',
+    marginTop: 8,
   },
   // Footer
   footer: {
