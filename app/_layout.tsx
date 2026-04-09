@@ -10,6 +10,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.charcoal } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="paywall" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </GestureHandlerRootView>
   );
