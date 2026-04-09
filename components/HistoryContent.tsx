@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
@@ -11,19 +11,19 @@ const SCREEN_W = Dimensions.get('window').width;
 import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
 import { formatTimeShort, formatTimeStat } from '@/lib/format';
-import { getDailyStats, getStats, getStreak } from '@/lib/stats';
+import { getDailyStats, getStats, getStreak, type DayStats } from '@/lib/stats';
 import { getDurationSince, getSessionCount, getLongestSessionDuration, getActiveDaysCount, getBestDayDuration } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<DayStats>);
 
 const DELETE_BTN_W = 80;
 
-function SwipeableDayRow({ day, theme, onDelete }: {
-  day: { date: string; label: string; duration: number };
+const SwipeableDayRow = memo(function SwipeableDayRow({ day, theme, onDelete }: {
+  day: DayStats;
   theme: any;
-  onDelete: () => void;
+  onDelete: (date: string) => void;
 }) {
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -58,7 +58,7 @@ function SwipeableDayRow({ day, theme, onDelete }: {
         style={[styles.deleteBtn, { backgroundColor: palette.danger }]}
         onPress={() => {
           translateX.value = withTiming(0, { duration: 200 });
-          onDelete();
+          onDelete(day.date);
         }}
       >
         <Text style={styles.deleteBtnText}>Delete</Text>
@@ -76,7 +76,7 @@ function SwipeableDayRow({ day, theme, onDelete }: {
       </GestureDetector>
     </View>
   );
-}
+});
 
 
 const ZEN_QUOTES = [
@@ -160,19 +160,14 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   );
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
 
-  const scrollView = (
-    <AnimatedScrollView
-      style={{ flex: 1 }}
-      bounces={false}
-      overScrollMode="never"
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      contentContainerStyle={{
-        paddingHorizontal: 24,
-        paddingTop: insets.top + 8,
-        paddingBottom: insets.bottom + 40,
-      }}
-    >
+  const renderItem = useCallback(({ item }: { item: DayStats }) => (
+    <SwipeableDayRow day={item} theme={theme} onDelete={deleteSessionsByDate} />
+  ), [theme, deleteSessionsByDate]);
+
+  const keyExtractor = useCallback((item: DayStats) => item.date, []);
+
+  const listHeader = useMemo(() => (
+    <>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
           History
@@ -259,8 +254,6 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
           </Animated.View>
         </GestureDetector>
 
-
-{/* Dots — bottom left */}
         <View style={styles.pageDots}>
           <View style={[styles.dot, { backgroundColor: statsPage === 0 ? theme.text : theme.border }]} />
           <View style={[styles.dot, { backgroundColor: statsPage === 1 ? theme.text : theme.border }]} />
@@ -270,27 +263,41 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
       <ActivityCalendar theme={theme} />
 
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ALL SESSIONS</Text>
-      {dailyStats.map((day) => (
-        <SwipeableDayRow
-          key={day.date}
-          day={day}
-          theme={theme}
-          onDelete={() => deleteSessionsByDate(day.date)}
-        />
-      ))}
+    </>
+  ), [theme, statsPage, statsSwipe, statsSlideStyle, onClose, thisMonthStat, totalStats, streak, avgSession, longestSession, totalAll, totalSessions, daysActive, bestDayStat]);
 
-      <View style={styles.quoteContainer}>
-        <Text style={[styles.quoteText, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-          {quote}
-        </Text>
-      </View>
-    </AnimatedScrollView>
+  const listFooter = useMemo(() => (
+    <View style={styles.quoteContainer}>
+      <Text style={[styles.quoteText, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
+        {quote}
+      </Text>
+    </View>
+  ), [theme.textTertiary, quote]);
+
+  const flatList = (
+    <AnimatedFlatList
+      style={{ flex: 1 }}
+      bounces={false}
+      overScrollMode="never"
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      contentContainerStyle={{
+        paddingHorizontal: 24,
+        paddingTop: insets.top + 8,
+        paddingBottom: insets.bottom + 40,
+      }}
+      data={dailyStats}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      ListHeaderComponent={listHeader}
+      ListFooterComponent={listFooter}
+    />
   );
 
   if (nativeScrollGesture) {
-    return <GestureDetector gesture={nativeScrollGesture}>{scrollView}</GestureDetector>;
+    return <GestureDetector gesture={nativeScrollGesture}>{flatList}</GestureDetector>;
   }
-  return scrollView;
+  return flatList;
 }
 
 const styles = StyleSheet.create({
