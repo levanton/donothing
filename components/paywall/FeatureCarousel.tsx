@@ -1,18 +1,21 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { memo, useCallback, useEffect, useRef } from 'react';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { palette } from '@/lib/theme';
 
-const CARD_WIDTH = 170;
-const CARD_HEIGHT = 210;
+const CARD_WIDTH = 150;
+const CARD_HEIGHT = 200;
+const GAP = 12;
+const ITEM_SIZE = CARD_WIDTH + GAP;
 
 const FEATURES = [
   { id: 'lock', label: 'Focus\nLock', bg: palette.terracotta, fg: palette.cream },
   { id: 'stats', label: 'Track\nProgress', bg: palette.charcoal, fg: palette.cream },
   { id: 'goals', label: 'Custom\nGoals', bg: palette.salmon, fg: palette.charcoal },
-  { id: 'reminders', label: 'Unlimited\nReminders', bg: palette.charcoal, fg: palette.cream },
-  { id: 'calendar', label: 'Activity\nCalendar', bg: palette.terracotta, fg: palette.cream },
+  { id: 'reminders', label: 'Unlimited\nReminders', bg: '#8B6B5B', fg: palette.cream },
+  { id: 'calendar', label: 'Activity\nCalendar', bg: palette.brown, fg: palette.cream },
 ] as const;
 
 function FeatureIllustration({ id, color }: { id: string; color: string }) {
@@ -125,34 +128,60 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
   }
 }
 
-function FeatureCard({ id, label, bg, fg, index }: typeof FEATURES[number] & { index: number }) {
+const FeatureCard = memo(function FeatureCard({ id, label, bg, fg }: typeof FEATURES[number]) {
   return (
-    <Animated.View
-      entering={FadeInDown.delay(400 + index * 100).duration(500)}
-      style={[styles.featureCard, { backgroundColor: bg }]}
-    >
+    <View style={[styles.featureCard, { backgroundColor: bg }]}>
       <View style={styles.featureIllustration}>
         <FeatureIllustration id={id} color={fg} />
       </View>
       <Text style={[styles.featureLabel, { color: fg }]}>{label}</Text>
-    </Animated.View>
+    </View>
   );
-}
+});
+
+// 20 copies — user will never reach the end
+const REPEAT = 20;
+const LOOP_DATA = Array.from({ length: FEATURES.length * REPEAT }, (_, i) => ({
+  ...FEATURES[i % FEATURES.length],
+  key: `f${i}`,
+}));
+const MIDDLE_OFFSET = Math.floor(REPEAT / 2) * FEATURES.length * ITEM_SIZE;
+
+const getItemLayout = (_: any, index: number) => ({
+  length: ITEM_SIZE,
+  offset: ITEM_SIZE * index,
+  index,
+});
 
 export default function FeatureCarousel() {
+  const listRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: MIDDLE_OFFSET, animated: false });
+  }, []);
+
+  const renderItem = useCallback(({ item }: { item: typeof LOOP_DATA[number] }) => (
+    <FeatureCard {...item} />
+  ), []);
+
   return (
     <Animated.View entering={FadeIn.delay(400).duration(500)}>
-      <ScrollView
+      <FlatList
+        ref={listRef}
+        data={LOOP_DATA}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.key}
+        getItemLayout={getItemLayout}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.carousel}
         decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + 12}
-      >
-        {FEATURES.map((feature, idx) => (
-          <FeatureCard key={feature.label} {...feature} index={idx} />
-        ))}
-      </ScrollView>
+        snapToInterval={ITEM_SIZE}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        removeClippedSubviews
+      />
     </Animated.View>
   );
 }
@@ -162,7 +191,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 8,
-    gap: 12,
+    gap: GAP,
   },
   featureCard: {
     width: CARD_WIDTH,
@@ -178,8 +207,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 23,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
+    textTransform: 'uppercase',
   },
 });
