@@ -1,11 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface PlanCardProps {
   name: string;
@@ -29,22 +27,14 @@ export default function PlanCard({
     onSelect();
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(isSelected ? 1.02 : 1, { damping: 15, stiffness: 200 }) }],
-  }));
-
   return (
-    <AnimatedPressable
+    <Pressable
       onPress={handlePress}
       style={[
         styles.card,
         isSelected ? styles.cardSelected : styles.cardUnselected,
-        animatedStyle,
       ]}
     >
-      {/* Left accent bar */}
-      {isSelected && <View style={styles.accentBar} />}
-
       {/* Plan info */}
       <View style={styles.content}>
         <Text style={[styles.name, isSelected && styles.nameSelected]}>{name}</Text>
@@ -53,17 +43,10 @@ export default function PlanCard({
         ) : null}
       </View>
 
-      {/* Price + check */}
-      <View style={styles.priceWrap}>
-        <Text style={[styles.price, isSelected && styles.priceSelected]}>
-          {price}
-        </Text>
-        {isSelected && (
-          <View style={styles.check}>
-            <Feather name="check" size={14} color={palette.cream} />
-          </View>
-        )}
-      </View>
+      {/* Price */}
+      <Text style={[styles.price, isSelected && styles.priceSelected]}>
+        {price}
+      </Text>
 
       {/* Badge */}
       {badge ? (
@@ -71,7 +54,7 @@ export default function PlanCard({
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
       ) : null}
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 
@@ -95,22 +78,13 @@ const styles = StyleSheet.create({
     borderColor: `${palette.brown}15`,
     backgroundColor: `${palette.brown}06`,
   },
-  accentBar: {
-    position: 'absolute',
-    left: 8,
-    top: 12,
-    bottom: 12,
-    width: 3.5,
-    borderRadius: 2,
-    backgroundColor: palette.terracotta,
-  },
   content: {
     flex: 1,
     gap: 3,
     paddingLeft: 4,
   },
   name: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '500',
     fontFamily: Fonts.serif,
     color: palette.brown,
@@ -120,19 +94,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '400',
     color: `${palette.brown}80`,
   },
   subtitleSelected: {
     color: palette.terracotta,
   },
-  priceWrap: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
   price: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '500',
     fontFamily: Fonts.mono,
     color: `${palette.brown}80`,
@@ -140,14 +110,6 @@ const styles = StyleSheet.create({
   priceSelected: {
     color: palette.terracotta,
     fontWeight: '600',
-  },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: palette.terracotta,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   badge: {
     position: 'absolute',

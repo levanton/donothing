@@ -11,8 +11,8 @@ import { Fonts } from '@/constants/theme';
 import PillButton from '@/components/PillButton';
 import PlanCard from '@/components/paywall/PlanCard';
 
-const CARD_WIDTH = 140;
-const CARD_HEIGHT = 160;
+const CARD_WIDTH = 170;
+const CARD_HEIGHT = 190;
 
 type PlanId = 'monthly' | 'yearly' | 'lifetime';
 
@@ -37,7 +37,7 @@ const PLANS: { id: PlanId; name: string; price: string; subtitle?: string; badge
 const FEATURES = [
   { icon: 'lock' as const, label: 'Focus\nLock', bg: palette.terracotta, fg: palette.cream },
   { icon: 'bar-chart-2' as const, label: 'Full\nStatistics', bg: palette.charcoal, fg: palette.cream },
-  { icon: 'target' as const, label: 'Custom\nGoals', bg: palette.salmon, fg: palette.cream },
+  { icon: 'target' as const, label: 'Custom\nGoals', bg: palette.salmon, fg: palette.charcoal },
   { icon: 'bell' as const, label: 'Unlimited\nReminders', bg: palette.charcoal, fg: palette.cream },
   { icon: 'calendar' as const, label: 'Activity\nCalendar', bg: palette.terracotta, fg: palette.cream },
 ] as const;
@@ -105,31 +105,20 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
   }, [onFinish]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Top bar: skip */}
-      <View style={styles.topBar}>
-        <Pressable onPress={handleSkip} hitSlop={16} style={styles.closeButton}>
-          <Feather name="x" size={22} color={palette.brown} />
-        </Pressable>
-      </View>
-
+    <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
+        {/* Top bar: skip */}
+        <View style={styles.topBar}>
+          <Pressable onPress={handleSkip} hitSlop={16} style={styles.closeButton}>
+            <Feather name="x" size={22} color={palette.brown} />
+          </Pressable>
+        </View>
+
         <HeroIllustration />
-
-        <Animated.Text entering={FadeInUp.delay(200).duration(600)} style={styles.heading}>
-          Do Nothing
-        </Animated.Text>
-        <Animated.Text entering={FadeInUp.delay(200).duration(600)} style={styles.headingAccent}>
-          Pro
-        </Animated.Text>
-
-        <Animated.Text entering={FadeInUp.delay(350).duration(500)} style={styles.subheading}>
-          Unlock the full experience
-        </Animated.Text>
 
         {/* Feature cards carousel */}
         <Animated.View entering={FadeIn.delay(400).duration(500)}>
@@ -215,32 +204,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
-  heading: {
-    fontSize: 40,
-    fontWeight: '400',
-    fontFamily: Fonts.serif,
-    color: palette.brown,
-    textAlign: 'center',
-    lineHeight: 46,
-  },
-  headingAccent: {
-    fontSize: 42,
-    fontWeight: '300',
-    fontFamily: Fonts.serif,
-    fontStyle: 'italic',
-    color: palette.terracotta,
-    textAlign: 'center',
-    marginTop: 0,
-    lineHeight: 48,
-  },
-  subheading: {
-    fontSize: 17,
-    fontWeight: '300',
-    fontFamily: Fonts.serif,
-    color: palette.brown + 'A6',
-    textAlign: 'center',
-    marginTop: 10,
-  },
   carousel: {
     paddingHorizontal: 24,
     paddingTop: 28,
@@ -263,9 +226,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureLabel: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '600',
-    lineHeight: 19,
+    lineHeight: 23,
   },
   plans: {
     marginTop: 28,
