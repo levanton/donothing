@@ -265,10 +265,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '300',
     fontFamily: Fonts.serif,
-    color: palette.brown,
+    color: palette.brown + 'A6',
     textAlign: 'center',
     marginTop: 10,
-    opacity: 0.65,
   },
   // Feature carousel
   carousel: {
@@ -322,12 +321,10 @@ const styles = StyleSheet.create({
   footerLink: {
     fontSize: 13,
     fontWeight: '400',
-    color: palette.brown,
-    opacity: 0.5,
+    color: palette.brown + '80',
   },
   footerDot: {
     fontSize: 13,
-    color: palette.brown,
-    opacity: 0.3,
+    color: palette.brown + '4D',
   },
 });
