@@ -51,8 +51,8 @@ export default function PlanCard({
 
       {isDark ? (
         <>
-          <Text style={[styles.simpleLine, styles.simpleLineDark, { textAlign: 'left' }]}>
-            Pay once <Text style={styles.priceDetailDark}>{price}</Text>, own forever
+          <Text style={[styles.simpleLine, styles.simpleLineDark, { textAlign: 'left', paddingLeft: 30 }]}>
+            Pay once <Text style={styles.priceDetailDark}>{price}</Text>,{'\n'}own forever
           </Text>
           {badge ? (
             <View style={styles.limitedTag}>
@@ -81,7 +81,7 @@ export default function PlanCard({
         </View>
       ) : (
         <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected]}>
-          {name}: {price}
+          <Text style={styles.simpleName}>{name}:</Text> <Text style={styles.simplePrice}>{price}</Text>
         </Text>
       )}
 
@@ -129,20 +129,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   simpleLineSelected: {},
+  simpleName: {
+    fontWeight: '600',
+  },
+  simplePrice: {
+    fontFamily: Fonts.mono,
+  },
   simpleLineDark: {
     color: palette.cream,
   },
   limitedTag: {
-    backgroundColor: palette.terracotta,
+    borderWidth: 1.5,
+    borderColor: `${palette.cream}40`,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     marginLeft: 10,
   },
   limitedTagText: {
-    color: palette.cream,
+    color: palette.salmon,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -221,6 +228,7 @@ const styles = StyleSheet.create({
     color: palette.cream,
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: Fonts.mono,
   },
   // Badge
   badge: {
