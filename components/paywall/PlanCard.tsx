@@ -68,13 +68,20 @@ export default function PlanCard({
           </View>
         </View>
       ) : (
-        <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected, isDark && styles.simpleLineDark]}>
-          {name}: {price}
-        </Text>
+        <View style={styles.simpleContent}>
+          <Text style={[styles.simpleLine, isSelected && styles.simpleLineSelected, isDark && styles.simpleLineDark]}>
+            {name}: {price}
+          </Text>
+          {badge && isDark ? (
+            <View style={[styles.badgeInline, isSelected && styles.badgeInlineSelected]}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
       )}
 
-      {/* Badge */}
-      {badge ? (
+      {/* Badge (floating, for non-dark cards) */}
+      {badge && !isDark ? (
         <View style={[styles.badge, isSelected && styles.badgeSelected]}>
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
@@ -121,6 +128,20 @@ const styles = StyleSheet.create({
   },
   simpleLineDark: {
     color: palette.cream,
+  },
+  simpleContent: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  badgeInline: {
+    backgroundColor: palette.salmon,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  badgeInlineSelected: {
+    backgroundColor: palette.terracotta,
   },
   // Radio dot (shown only when selected, absolute positioned)
   radioDot: {
@@ -190,14 +211,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -11,
     right: 16,
-    backgroundColor: palette.salmon,
+    backgroundColor: palette.terracotta,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  badgeSelected: {
-    backgroundColor: palette.terracotta,
-  },
+  badgeSelected: {},
   badgeText: {
     color: palette.cream,
     fontSize: 11,
