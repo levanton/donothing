@@ -114,7 +114,8 @@ export type PageId =
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
-  | 'howItWorks' | 'setGoal' | 'schedule' | 'personalResult';
+  | 'testimonials' | 'howItWorks' | 'setGoal' | 'schedule' | 'personalResult'
+  | 'paywall';
 
 export interface OnboardingPage {
   id: PageId;
@@ -136,10 +137,12 @@ export const PAGES: OnboardingPage[] = [
   { id: 'tryNothing',      bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'testimonials',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'schedule',        bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'paywall',          bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];
 
 // How-it-works steps with Feather icon names

@@ -30,6 +30,8 @@ import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
 import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
 import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsScreen';
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
+import TestimonialsScreen from '@/components/onboarding/screens/TestimonialsScreen';
+import PaywallScreen from '@/components/onboarding/screens/PaywallScreen';
 
 const __DEV_JUMP__ = __DEV__;
 
@@ -72,10 +74,12 @@ export default function OnboardingRoute() {
       case 'tryNothing':      return <TryNothingScreen {...props} />;
       case 'firstMinuteDone': return <FirstMinuteDoneScreen {...props} />;
       case 'dailyBenefits':   return <DailyBenefitsScreen {...props} />;
+      case 'testimonials':    return <TestimonialsScreen {...props} />;
       case 'howItWorks':      return <HowItWorksScreen {...props} />;
       case 'setGoal':         return <SetGoalScreen {...props} selected={flow.goal} onSelect={flow.setGoal} screenTimeAnswer={flow.screenTime[0] ?? ''} />;
       case 'schedule':        return <ScheduleScreen {...props} reminders={flow.reminders} onRemindersChange={flow.setReminders} onEditReminder={flow.handleEditReminder} />;
       case 'personalResult':  return <PersonalizedResultScreen {...props} painPoints={flow.painPoints} screenTime={flow.screenTime[0] ?? ''} goal={flow.goal[0] ?? '5m'} reminders={flow.reminders} />;
+      case 'paywall':         return <PaywallScreen {...props} onFinish={handleFinish} />;
       default:                return null;
     }
   };
