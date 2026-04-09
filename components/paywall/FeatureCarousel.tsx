@@ -9,7 +9,7 @@ const CARD_HEIGHT = 210;
 
 const FEATURES = [
   { id: 'lock', label: 'Focus\nLock', bg: palette.terracotta, fg: palette.cream },
-  { id: 'stats', label: 'Full\nStatistics', bg: palette.charcoal, fg: palette.cream },
+  { id: 'stats', label: 'Track\nProgress', bg: palette.charcoal, fg: palette.cream },
   { id: 'goals', label: 'Custom\nGoals', bg: palette.salmon, fg: palette.charcoal },
   { id: 'reminders', label: 'Unlimited\nReminders', bg: palette.charcoal, fg: palette.cream },
   { id: 'calendar', label: 'Activity\nCalendar', bg: palette.terracotta, fg: palette.cream },
