@@ -139,12 +139,6 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           ))}
         </Animated.View>
 
-        <Text style={styles.cancelText}>
-          {selectedPlan === 'yearly'
-            ? '3 days free, then $34.99/year. Cancel anytime.'
-            : 'Cancel anytime.'}
-        </Text>
-
         {/* CTA */}
         <Animated.View entering={FadeInUp.delay(1000).duration(500)} style={styles.cta}>
           <Pressable
@@ -156,6 +150,11 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           >
             <Text style={styles.ctaText}>{CTA_LABELS[selectedPlan]}</Text>
           </Pressable>
+          <Text style={styles.cancelText}>
+            {selectedPlan === 'yearly'
+              ? '3 days free, then $34.99/year. Cancel anytime.'
+              : 'Cancel anytime.'}
+          </Text>
         </Animated.View>
 
         {/* Footer */}
@@ -232,9 +231,9 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 13,
     fontWeight: '400',
-    color: `${palette.brown}80`,
+    color: `${palette.brown}B0`,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 10,
   },
   footer: {
     flexDirection: 'row',
