@@ -55,7 +55,7 @@ export default function PlanCard({
             Pay once <Text style={styles.priceDetailDark}>{price}</Text>,{'\n'}own forever
           </Text>
           {badge ? (
-            <View style={styles.limitedTag}>
+            <View style={[styles.limitedTag, isSelected && styles.limitedTagSelected]}>
               <Text style={styles.limitedTagText}>{badge} offer</Text>
             </View>
           ) : null}
@@ -115,11 +115,13 @@ const styles = StyleSheet.create({
     backgroundColor: `${palette.brown}06`,
   },
   cardDark: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#2C4A3E',
     backgroundColor: '#2C4A3E',
   },
-  cardDarkSelected: {},
+  cardDarkSelected: {
+    borderColor: palette.terracotta,
+  },
   // Simple plan (one-liner)
   simpleLine: {
     flex: 1,
@@ -146,6 +148,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
     marginLeft: 10,
+  },
+  limitedTagSelected: {
+    borderColor: palette.terracotta,
   },
   limitedTagText: {
     color: palette.cream,
