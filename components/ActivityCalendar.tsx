@@ -186,10 +186,10 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
   return (
     <View style={styles.container}>
-      {/* Header — month name or "This week" */}
-      {expanded ? (
-        <>
-          <View style={styles.monthRow}>
+      {/* Header — month name or "This week" + toggle button on the right */}
+      <View style={styles.headerRow}>
+        {expanded ? (
+          <View style={styles.monthNav}>
             <Pressable onPress={goToPrevMonth} hitSlop={16}>
               <Feather name="chevron-left" size={20} color={theme.textSecondary} />
             </Pressable>
@@ -200,15 +200,20 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
               <Feather name="chevron-right" size={20} color={isCurrentMonth ? theme.border : theme.textSecondary} />
             </Pressable>
           </View>
-        </>
-      ) : (
-        <Pressable onPress={handleExpand} style={styles.weekHeaderRow}>
+        ) : (
           <Text style={[styles.monthLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
             This week
           </Text>
-          <Feather name="chevron-down" size={18} color={theme.text} />
+        )}
+
+        <Pressable onPress={handleExpand} hitSlop={12} style={styles.toggleBtn}>
+          <Feather
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={theme.text}
+          />
         </Pressable>
-      )}
+      </View>
 
       {/* Day-of-week headers */}
       <View style={styles.dayHeaders}>
@@ -228,22 +233,6 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
         </View>
       )}
 
-      {/* Toggle hint */}
-      {!expanded ? (
-        <Pressable onPress={handleExpand} style={styles.toggleHint}>
-          <Text style={[styles.toggleHintText, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            full calendar
-          </Text>
-          <Feather name="chevron-down" size={14} color={theme.text} />
-        </Pressable>
-      ) : (
-        <Pressable onPress={handleExpand} style={styles.toggleHint}>
-          <Text style={[styles.toggleHintText, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            show week
-          </Text>
-          <Feather name="chevron-up" size={14} color={theme.text} />
-        </Pressable>
-      )}
 
       {/* Selected day detail */}
       {selectedDate && (
@@ -318,9 +307,10 @@ const styles = StyleSheet.create({
   container: { marginBottom: 28 },
 
   // Headers
-  monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  weekHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  monthNav: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   monthLabel: { fontSize: 18, fontWeight: '400' },
+  toggleBtn: { padding: 4 },
 
   dayHeaders: { flexDirection: 'row', marginBottom: 8 },
   dayHeaderLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '400', letterSpacing: 0.5 },
@@ -333,9 +323,6 @@ const styles = StyleSheet.create({
   dayNumber: { fontSize: 15, fontWeight: '300', zIndex: 1, position: 'absolute' },
   activityBubble: { position: 'absolute' },
 
-  // Toggle hint
-  toggleHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingVertical: 8 },
-  toggleHintText: { fontSize: 13, fontWeight: '400' },
 
   // Selected day detail
   selectedDetail: { marginTop: 16, padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
