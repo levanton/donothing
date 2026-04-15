@@ -20,6 +20,13 @@ export interface ScheduledBlock {
   durationMinutes: number;
   weekdays: number[];
   enabled: boolean;
+  /** NULL = "All apps" sentinel. Otherwise points to block_groups.id */
+  groupId: string | null;
+}
+
+export interface BlockGroup {
+  id: string;
+  name: string;
 }
 
 export interface CheckinRow {

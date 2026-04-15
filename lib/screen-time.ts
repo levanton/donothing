@@ -115,9 +115,15 @@ const SHIELD_ACTIONS = {
   secondary: { behavior: 'close' as const },
 };
 
+export const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
+
+export function groupSelectionId(groupId: string): string {
+  return `donothing-group-${groupId}`;
+}
+
 export async function scheduleBlock(
   blockId: string,
-  selectionId: string,
+  groupId: string | null,
   hour: number,
   minute: number,
   durationMinutes: number,
@@ -134,23 +140,37 @@ export async function scheduleBlock(
   // Ensure authorization
   await requestAuth();
 
-  // Configure what happens when interval starts: block apps
+  const startActions: any[] = [
+    { type: 'clearWhitelist' },
+  ];
+
+  if (groupId === null) {
+    // "All apps" sentinel
+    startActions.push({ type: 'enableBlockAllMode' });
+  } else {
+    startActions.push({
+      type: 'blockSelection',
+      familyActivitySelectionId: groupSelectionId(groupId),
+    });
+  }
+
+  startActions.push({
+    type: 'addSelectionToWhitelist',
+    familyActivitySelection: { activitySelectionId: NEVER_BLOCK_SELECTION_ID },
+  });
+
+  startActions.push({
+    type: 'sendNotification',
+    payload: {
+      title: 'Do Nothing',
+      body: `Time to do nothing for ${durationMinutes} minutes.`,
+    },
+  });
+
   configureActions({
     activityName,
     callbackName: 'intervalDidStart',
-    actions: [
-      {
-        type: 'blockSelection',
-        familyActivitySelectionId: selectionId,
-      },
-      {
-        type: 'sendNotification',
-        payload: {
-          title: 'Do Nothing',
-          body: `Time to do nothing for ${durationMinutes} minutes.`,
-        },
-      },
-    ],
+    actions: startActions,
   });
 
   // No action on intervalDidEnd — user must unlock manually via the app

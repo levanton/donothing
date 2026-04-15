@@ -1,0 +1,8 @@
+{
+  "name": "app-labels",
+  "version": "0.1.0",
+  "description": "Local Expo module that renders FamilyActivitySelection tokens as SwiftUI Labels (icon + name).",
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "private": true
+}

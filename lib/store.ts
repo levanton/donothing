@@ -21,12 +21,18 @@ import {
   deleteScheduledBlock as dbDeleteScheduledBlock,
   toggleScheduledBlock as dbToggleScheduledBlock,
 } from './db/scheduled-blocks';
+import {
+  getAllBlockGroups,
+  insertBlockGroup,
+  renameBlockGroup as dbRenameBlockGroup,
+  deleteBlockGroup as dbDeleteBlockGroup,
+} from './db/block-groups';
 import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/settings';
 import {
   getNotificationIds,
   clearNotificationIds,
 } from './db/notification-state';
-import type { Reminder, ScheduledBlock, CheckinRow } from './db/types';
+import type { Reminder, ScheduledBlock, CheckinRow, BlockGroup } from './db/types';
 import { getWeekStats, WeekDay, getISOWeekKey } from './stats';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
@@ -68,6 +74,7 @@ export interface AppState {
   dailyGoalMinutes: number;
   reminders: Reminder[];
   scheduledBlocks: ScheduledBlock[];
+  blockGroups: BlockGroup[];
 
   // Post-session reflection
   reflectionVisible: boolean;
@@ -127,10 +134,15 @@ export interface AppState {
   editReminder: (id: string, hour: number, minute: number, weekdays: number[]) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   toggleReminder: (id: string) => Promise<void>;
-  addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
-  editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
+  addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null) => Promise<void>;
+  editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null) => Promise<void>;
   removeScheduledBlock: (id: string) => Promise<void>;
   toggleScheduledBlock: (id: string) => Promise<void>;
+
+  // Block groups
+  addBlockGroup: (name: string) => BlockGroup;
+  renameBlockGroup: (id: string, name: string) => void;
+  removeBlockGroup: (id: string) => Promise<void>;
 
   // Session actions
   deleteSession: (id: string) => Promise<void>;
@@ -173,6 +185,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dailyGoalMinutes: 0,
   reminders: [],
   scheduledBlocks: [],
+  blockGroups: [],
 
   // Onboarding
   onboardingComplete: false,
@@ -194,6 +207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
     const reminders = getAllReminders();
     const scheduledBlocks = getAllScheduledBlocks();
+    const blockGroups = getAllBlockGroups();
 
     // Sync notifications (async)
     await syncReminders(reminders);
@@ -203,7 +217,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { scheduleBlock } = await import('./screen-time');
       for (const b of scheduledBlocks) {
         if (b.enabled) {
-          await scheduleBlock(b.id, 'donothing-scheduled-block', b.hour, b.minute, b.durationMinutes);
+          await scheduleBlock(b.id, b.groupId, b.hour, b.minute, b.durationMinutes);
         }
       }
     } catch {}
@@ -217,6 +231,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       onboardingComplete,
       reminders,
       scheduledBlocks,
+      blockGroups,
       achievedMilestones,
       weekStats: getWeekStats(),
       ready: true,
@@ -429,24 +444,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ reminders: getAllReminders() });
   },
 
-  addScheduledBlock: async (hour, minute, durationMinutes, weekdays) => {
-    const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays);
+  addScheduledBlock: async (hour, minute, durationMinutes, weekdays, groupId) => {
+    const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays, groupId);
     try {
       const { scheduleBlock } = await import('./screen-time');
-      await scheduleBlock(block.id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+      await scheduleBlock(block.id, groupId, hour, minute, durationMinutes);
     } catch (e) {
       console.warn('Failed to schedule native block:', e);
     }
     set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
-  editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays) => {
+  editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays, groupId) => {
     try {
       const { unscheduleBlock, scheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
-      await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+      await scheduleBlock(id, groupId, hour, minute, durationMinutes);
     } catch {}
-    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays);
+    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays, groupId);
     set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
@@ -469,13 +484,42 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         if (nowEnabled) {
           const { scheduleBlock } = await import('./screen-time');
-          await scheduleBlock(id, 'donothing-scheduled-block', block.hour, block.minute, block.durationMinutes);
+          await scheduleBlock(id, block.groupId, block.hour, block.minute, block.durationMinutes);
         } else {
           const { unscheduleBlock } = await import('./screen-time');
           unscheduleBlock(id);
         }
       } catch {}
     }
+  },
+
+  addBlockGroup: (name) => {
+    const group = insertBlockGroup(name);
+    set({ blockGroups: getAllBlockGroups() });
+    return group;
+  },
+
+  renameBlockGroup: (id, name) => {
+    dbRenameBlockGroup(id, name);
+    set({ blockGroups: getAllBlockGroups() });
+  },
+
+  removeBlockGroup: async (id) => {
+    dbDeleteBlockGroup(id);
+    set({
+      blockGroups: getAllBlockGroups(),
+      scheduledBlocks: getAllScheduledBlocks(),
+    });
+    // Re-register detached blocks (now pointing at "All apps")
+    try {
+      const { scheduleBlock, unscheduleBlock } = await import('./screen-time');
+      for (const b of get().scheduledBlocks) {
+        if (b.enabled && b.groupId === null) {
+          unscheduleBlock(b.id);
+          await scheduleBlock(b.id, null, b.hour, b.minute, b.durationMinutes);
+        }
+      }
+    } catch {}
   },
 
   // --- AppState ---
