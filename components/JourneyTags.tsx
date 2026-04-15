@@ -1,6 +1,5 @@
 import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -23,37 +22,32 @@ function JourneyTags({ theme, dailyGoalMinutes, todayDuration }: Props) {
 
   return (
     <View style={styles.container}>
-      {tags.map((tag, idx) => {
+      {tags.map((tag) => {
         const isStage = tag.type === 'stage';
         const isGoalReached = tag.id === 'goal' && tag.label === 'goal reached';
 
         return (
-          <Animated.View
+          <View
             key={tag.id}
-            entering={FadeInDown.delay(idx * 80).duration(300)}
-            layout={Layout.duration(200)}
+            style={[
+              styles.tag,
+              isStage || isGoalReached
+                ? { backgroundColor: palette.terracotta }
+                : { backgroundColor: theme.subtle },
+            ]}
           >
-            <View
+            <Text
               style={[
-                styles.tag,
-                isStage || isGoalReached
-                  ? { backgroundColor: palette.terracotta }
-                  : { backgroundColor: theme.subtle },
+                styles.tagText,
+                {
+                  fontFamily: Fonts.serif,
+                  color: isStage || isGoalReached ? palette.cream : theme.text,
+                },
               ]}
             >
-              <Text
-                style={[
-                  styles.tagText,
-                  {
-                    fontFamily: Fonts.serif,
-                    color: isStage || isGoalReached ? palette.cream : theme.text,
-                  },
-                ]}
-              >
-                {tag.label}
-              </Text>
-            </View>
-          </Animated.View>
+              {tag.label}
+            </Text>
+          </View>
         );
       })}
     </View>

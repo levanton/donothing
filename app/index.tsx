@@ -476,6 +476,13 @@ export default function DoNothingScreen() {
     useAppStore.getState().unlockFocus();
   }, []);
 
+  // --- Distraction-free mode: hide timer & button while running ---
+  const [distractionFree, setDistractionFree] = useState(false);
+  const toggleDistractionFree = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDistractionFree((v) => !v);
+  }, []);
+
   // --- Debug: manual block toggle ---
   const [debugBlocked, setDebugBlocked] = useState(false);
   const handleDebugBlock = useCallback(async () => {
@@ -498,6 +505,7 @@ export default function DoNothingScreen() {
   const handleStop = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     deactivateKeepAwake('session');
+    setDistractionFree(false);
     await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
@@ -512,8 +520,6 @@ export default function DoNothingScreen() {
     hideOpacity.value = withTiming(1, { duration: 1125 });
     // Reset elapsed after animations finish
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
-    // Show reflection after exit animations settle
-    setTimeout(() => useAppStore.getState().showReflection(), 800);
   }, []);
 
   const handleReflectionDone = useCallback(() => {
@@ -776,7 +782,8 @@ export default function DoNothingScreen() {
       {/* Settings button — top left */}
       <Pressable
         onPress={handleSettingsPress}
-        style={[styles.lockButton, { top: insets.top + 12 }]}
+        disabled={started}
+        style={[styles.lockButton, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
         hitSlop={16}
       >
         <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
@@ -785,7 +792,8 @@ export default function DoNothingScreen() {
       {/* Onboarding test button — top right */}
       <Pressable
         onPress={() => router.push('/onboarding')}
-        style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 96 }]}
+        disabled={started}
+        style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 96, opacity: started ? 0 : 1 }]}
         hitSlop={16}
       >
         <Feather name="play" size={20} color={theme.text} style={{ opacity: 0.9 }} />
@@ -795,7 +803,8 @@ export default function DoNothingScreen() {
       {Platform.OS === 'ios' && (
         <Pressable
           onPress={handleDebugBlock}
-          style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 60 }]}
+          disabled={started}
+          style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 60, opacity: started ? 0 : 1 }]}
           hitSlop={16}
         >
           <Feather
@@ -808,7 +817,7 @@ export default function DoNothingScreen() {
       )}
 
       {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
         <Animated.View style={hideStyle}>
           <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
             Ready to{' '}
@@ -835,7 +844,8 @@ export default function DoNothingScreen() {
       {/* Theme toggle — top right */}
       <Pressable
         onPress={toggleTheme}
-        style={[styles.themeToggle, { top: insets.top + 12 }]}
+        disabled={started}
+        style={[styles.themeToggle, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
         hitSlop={16}
       >
         <View
@@ -847,28 +857,30 @@ export default function DoNothingScreen() {
       </Pressable>
 
       {/* Timer */}
-      <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-        {showGoalSlider && !started ? (
-          <Animated.Text
-            style={[
-              styles.timer,
-              { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
-            ]}
-          >
-            {`${String(sliderMinutes).padStart(2, '0')}:00`}
-          </Animated.Text>
-        ) : (
-          <TimerDisplay
-            seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
-            color={theme.text}
-            fontSize={64}
-            style={{ letterSpacing: 4 }}
-          />
-        )}
-      </Animated.View>
+      <View style={{ opacity: distractionFree ? 0 : 1 }} pointerEvents={distractionFree ? 'none' : 'auto'}>
+        <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+          {showGoalSlider && !started ? (
+            <Animated.Text
+              style={[
+                styles.timer,
+                { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
+              ]}
+            >
+              {`${String(sliderMinutes).padStart(2, '0')}:00`}
+            </Animated.Text>
+          ) : (
+            <TimerDisplay
+              seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
+              color={theme.text}
+              fontSize={64}
+              style={{ letterSpacing: 4 }}
+            />
+          )}
+        </Animated.View>
+      </View>
 
       {/* Orbit ring + unified button/dot */}
-      <View style={styles.orbitWrap}>
+      <View style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]} pointerEvents={distractionFree ? 'none' : 'auto'}>
       <View style={styles.orbitArea}>
         <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
           <OrbitRing
@@ -899,30 +911,30 @@ export default function DoNothingScreen() {
       </View>
 
         {/* Goal button — to the right of play */}
-        {!started && (
-          <Pressable
-            onPress={handleGoalToggle}
-            style={[
-              styles.goalButton,
-              {
-                borderColor: theme.border,
-                backgroundColor: (showGoalSlider || goalSeconds > 0) ? theme.border : 'transparent',
-              },
-            ]}
-            hitSlop={20}
-          >
-            <Text style={[styles.goalButtonText, {
-              color: theme.text,
-              fontFamily: Fonts!.serif,
-            }]}>
-              {(showGoalSlider || goalSeconds > 0) ? 'cancel' : 'goal'}
-            </Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={handleGoalToggle}
+          disabled={started}
+          style={[
+            styles.goalButton,
+            {
+              borderColor: theme.border,
+              backgroundColor: (showGoalSlider || goalSeconds > 0) ? theme.border : 'transparent',
+              opacity: started ? 0 : 1,
+            },
+          ]}
+          hitSlop={20}
+        >
+          <Text style={[styles.goalButtonText, {
+            color: theme.text,
+            fontFamily: Fonts!.serif,
+          }]}>
+            {(showGoalSlider || goalSeconds > 0) ? 'cancel' : 'goal'}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Message + goal slider overlay */}
-      <View style={styles.messageSliderArea}>
+      <View style={[styles.messageSliderArea, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
         <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
           <Text
             style={[
@@ -947,7 +959,7 @@ export default function DoNothingScreen() {
       </View>
 
       {/* Stats — with goal slider overlaid */}
-      <Pressable onPress={handleHistory}>
+      <Pressable onPress={handleHistory} disabled={started} style={{ opacity: started ? 0 : 1 }}>
         <View style={styles.statsColumn}>
           <View style={styles.statRow}>
             <Text
@@ -994,7 +1006,7 @@ export default function DoNothingScreen() {
 
       {/* Week dots */}
       {weekStats.length > 0 && (
-        <View style={styles.weekSection}>
+        <View style={[styles.weekSection, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
           <View style={styles.weekGrid}>
             {weekStats.map((day) => {
               const maxDur = Math.max(
@@ -1036,20 +1048,21 @@ export default function DoNothingScreen() {
       )}
 
       {/* Journey tags */}
-      {!started && (
+      <View style={{ opacity: started ? 0 : 1 }} pointerEvents={started ? 'none' : 'auto'}>
         <JourneyTags
           theme={theme}
           dailyGoalMinutes={dailyGoalMinutes}
           todayDuration={stats.today}
         />
-      )}
+      </View>
 
       {/* Bottom buttons */}
       <View
         style={[
           styles.bottomButtons,
-          { bottom: insets.bottom + 16 },
+          { bottom: insets.bottom + 16, opacity: started ? 0 : 1 },
         ]}
+        pointerEvents={started ? 'none' : 'auto'}
       >
         <PillButton
           label="Journey"
@@ -1058,6 +1071,21 @@ export default function DoNothingScreen() {
           outline
         />
       </View>
+
+      {/* Distraction-free toggle — visible only while timer is running */}
+      {started && (
+        <Pressable
+          onPress={toggleDistractionFree}
+          style={[styles.distractionFreeButton, { bottom: insets.bottom + 24, borderColor: theme.border }]}
+          hitSlop={16}
+        >
+          <Feather
+            name={distractionFree ? 'eye' : 'eye-off'}
+            size={20}
+            color={theme.textSecondary}
+          />
+        </Pressable>
+      )}
 
     </Animated.View>
     </GestureDetector>
@@ -1364,6 +1392,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'absolute',
     left: 4,
+  },
+  distractionFreeButton: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   goalButton: {
     position: 'absolute',
