@@ -22,6 +22,8 @@ export interface ScheduledBlock {
   enabled: boolean;
   /** NULL = "All apps" sentinel. Otherwise points to block_groups.id */
   groupId: string | null;
+  /** Minutes of "doing nothing" required to unlock apps inside the block window. */
+  unlockGoalMinutes: number;
 }
 
 export interface BlockGroup {

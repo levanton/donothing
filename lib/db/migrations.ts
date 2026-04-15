@@ -3,6 +3,7 @@ import { migration001 } from './migrations/001_initial';
 import { migration002 } from './migrations/002_seed_from_async_storage';
 import { migration003 } from './migrations/003_reflection_checkin_milestones';
 import { migration004 } from './migrations/004_block_groups';
+import { migration005 } from './migrations/005_unlock_goal';
 
 export interface Migration {
   version: number;
@@ -14,6 +15,7 @@ const syncMigrations: Migration[] = [
   migration001,
   migration003,
   migration004,
+  migration005,
 ];
 
 const asyncMigrations: Migration[] = [

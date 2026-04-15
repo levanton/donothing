@@ -12,6 +12,8 @@ import {
   isShieldActive,
   getAppGroupFileDirectory,
   copyFile,
+  disableBlockAllMode,
+  resetBlocks,
 } from 'react-native-device-activity';
 import { Asset } from 'expo-asset';
 
@@ -209,4 +211,66 @@ export function isBlockActive(): boolean {
 
 export function unscheduleBlock(blockId: string): void {
   stopMonitoring([`block-${blockId}`]);
+}
+
+/**
+ * Full nuclear reset — stops every monitor, drops block-all mode, resets the
+ * native block list, and unblocks every known group selection. Use when the
+ * DB has no blocks but the native shield is still active.
+ */
+export async function forceUnblockAll(knownGroupIds: string[]): Promise<void> {
+  try { stopMonitoring(); } catch {}
+  try { disableBlockAllMode(); } catch {}
+  try { resetBlocks(); } catch {}
+  try {
+    await unblockSelection({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
+  } catch {}
+  for (const gid of knownGroupIds) {
+    try {
+      await unblockSelection({ activitySelectionId: groupSelectionId(gid) });
+    } catch {}
+  }
+}
+
+/**
+ * Stop any `block-*` native monitors whose id is not in `validBlockIds`,
+ * and release shield state if we cleaned anything up. Fixes the case where
+ * the DB has been wiped but the native schedule/shield is still active.
+ */
+export async function reconcileBlocks(
+  validBlockIds: Set<string>,
+  knownGroupIds: string[],
+): Promise<void> {
+  try {
+    const active = getActivities();
+    const prefix = 'block-';
+    const ours = active.filter((n) => n.startsWith(prefix));
+    const orphans = ours.filter(
+      (n) => !validBlockIds.has(n.slice(prefix.length)),
+    );
+
+    // If user has no enabled blocks, or the shield is stuck active with no
+    // valid monitor behind it, do a full reset.
+    const dbEmpty = validBlockIds.size === 0;
+    const shieldStuck = isBlockActive() && validBlockIds.size === 0;
+
+    if (dbEmpty || shieldStuck) {
+      console.log('[ScreenTime] Full reset (dbEmpty=%s, stuck=%s)', dbEmpty, shieldStuck);
+      await forceUnblockAll(knownGroupIds);
+      return;
+    }
+
+    if (orphans.length > 0) {
+      console.log('[ScreenTime] Stopping orphan monitors:', orphans);
+      stopMonitoring(orphans);
+      try { disableBlockAllMode(); } catch {}
+      for (const gid of knownGroupIds) {
+        try {
+          await unblockSelection({ activitySelectionId: groupSelectionId(gid) });
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.warn('[ScreenTime] reconcile failed:', e);
+  }
 }

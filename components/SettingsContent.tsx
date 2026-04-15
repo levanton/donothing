@@ -205,12 +205,12 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     reminderSheetRef.current?.close();
   };
 
-  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null) => {
+  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (editingBlock) {
-      store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays, groupId);
+      store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays, groupId, unlockGoalMinutes);
     } else {
-      store().addScheduledBlock(hour, minute, duration, weekdays, groupId);
+      store().addScheduledBlock(hour, minute, duration, weekdays, groupId, unlockGoalMinutes);
     }
     blockSheetRef.current?.close();
   };
@@ -659,6 +659,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         initialDuration={editingBlock?.durationMinutes}
         initialDays={editingBlock?.weekdays}
         initialGroupId={editingBlock?.groupId ?? null}
+        initialUnlockGoal={editingBlock?.unlockGoalMinutes}
         groups={blockGroups}
         onConfirm={handleConfirmBlock}
         onCancel={() => blockSheetRef.current?.close()}
