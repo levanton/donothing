@@ -16,6 +16,7 @@ import AppPickerSheet from '@/components/AppPickerSheet';
 import { Fonts } from '@/constants/theme';
 import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
+import GoalWheel from './GoalWheel';
 import { useAppStore } from '@/lib/store';
 import type { Reminder, ScheduledBlock, BlockGroup } from '@/lib/db/types';
 import { getAuth, requestAuth, type AuthStatus } from '@/lib/screen-time';
@@ -329,15 +330,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           ? `Do nothing for ${dailyGoalMinutes} min every day`
           : 'Set a daily goal to track your progress'}
       </Text>
-      <GoalSliderBar
-        value={dailyGoalMinutes}
-        onChange={handleGoalChange}
-        theme={theme}
-        maxMinutes={90}
-        ticks={[5, 10, 15, 30, 45, 60]}
-        scaleLabels={['0', '5', '10', '15', '30', '45', '60', '90']}
-        accentColor={theme.accent}
-      />
+      <View style={{ marginHorizontal: -24 }}>
+        <GoalWheel
+          value={dailyGoalMinutes}
+          onChange={handleGoalChange}
+          theme={theme}
+        />
+      </View>
 
       {/* Reminders */}
       <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>

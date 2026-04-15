@@ -239,9 +239,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       weekStats: getWeekStats(),
       ready: true,
     });
-
-    // Check if weekly check-in is due
-    get().checkAndShowWeeklyCheckin();
   },
 
   // --- Timer ---
@@ -541,6 +538,5 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleForeground: () => {
     set({ weekStats: getWeekStats() });
-    get().checkAndShowWeeklyCheckin();
   },
 }));

@@ -40,7 +40,6 @@ import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
 import PostSessionReflection from '@/components/PostSessionReflection';
 import MilestoneOverlay from '@/components/MilestoneOverlay';
-import WeeklyCheckin from '@/components/WeeklyCheckin';
 import { MILESTONES } from '@/lib/milestones';
 import JourneyTags from '@/components/JourneyTags';
 import TimerDisplay from '@/components/TimerDisplay';
@@ -96,8 +95,6 @@ export default function DoNothingScreen() {
   const reflectionVisible = useAppStore((s) => s.reflectionVisible);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const milestoneQueue = useAppStore((s) => s.milestoneQueue);
-  const weeklyCheckinVisible = useAppStore((s) => s.weeklyCheckinVisible);
-  const previousCheckin = useAppStore((s) => s.previousCheckin);
 
   const isActiveRef = useRef(true);
 
@@ -533,17 +530,6 @@ export default function DoNothingScreen() {
   const currentMilestone = milestoneQueue.length > 0
     ? MILESTONES.find((m) => m.id === milestoneQueue[0]) ?? null
     : null;
-
-  const handleCheckinDone = useCallback(
-    (data: { sleep: number; anxiety: number; focus: number; energy: number }) => {
-      useAppStore.getState().submitCheckin(data);
-    },
-    [],
-  );
-
-  const handleCheckinDismiss = useCallback(() => {
-    useAppStore.getState().dismissCheckin();
-  }, []);
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1125,15 +1111,6 @@ export default function DoNothingScreen() {
       milestone={currentMilestone}
       theme={theme}
       onDismiss={handleMilestoneDismiss}
-    />
-
-    {/* Weekly check-in overlay */}
-    <WeeklyCheckin
-      visible={weeklyCheckinVisible}
-      theme={theme}
-      previousCheckin={previousCheckin}
-      onDone={handleCheckinDone}
-      onDismiss={handleCheckinDismiss}
     />
 
     </View>
