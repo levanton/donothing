@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
 import { activitySelectionMetadata } from 'react-native-device-activity';
@@ -195,11 +196,11 @@ function GroupEditorContent({
   return (
     <View style={styles.editorContent}>
       <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        {hasApps ? 'Edit list' : 'New list'}
+        {initialName ? 'Edit list' : 'New list'}
       </Text>
 
       <Text style={[styles.sheetFieldLabel, { color: theme.textTertiary, marginTop: 8 }]}>NAME</Text>
-      <TextInput
+      <BottomSheetTextInput
         value={name}
         onChangeText={setName}
         placeholder="e.g. Social, Games"
@@ -343,8 +344,9 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const status = await requestAuth();
     if (status !== 'approved') return;
-    const index = blockGroups.length + 1;
-    const group = store().addBlockGroup(`List ${index}`);
+    // Create with empty name; user enters it in the sheet.
+    // Empty-name groups are discarded on sheet dismiss.
+    const group = store().addBlockGroup('');
     setEditingGroup(group);
     setCreatedFresh(true);
     groupSheetRef.current?.expand();
@@ -375,8 +377,19 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   };
 
   const handleSaveGroup = (name: string) => {
-    if (editingGroup && name && name !== editingGroup.name) {
-      store().renameBlockGroup(editingGroup.id, name);
+    if (!editingGroup) {
+      groupSheetRef.current?.close();
+      return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      // Empty name on save behaves like cancel → discard the group.
+      store().removeBlockGroup(editingGroup.id);
+      groupSheetRef.current?.close();
+      return;
+    }
+    if (trimmed !== editingGroup.name) {
+      store().renameBlockGroup(editingGroup.id, trimmed);
     }
     groupSheetRef.current?.close();
   };
@@ -535,7 +548,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               >
                 <View style={styles.groupCardHeader}>
                   <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
-                    {g.name}
+                    {g.name || 'Untitled list'}
                   </Text>
                   <Feather name="chevron-right" size={18} color={theme.textTertiary} />
                 </View>
@@ -775,10 +788,11 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       ref={groupSheetRef}
       theme={theme}
       onDismiss={() => {
-        // Discard a fresh group if still empty when sheet closes.
+        // Discard a fresh group if the user didn't commit (no name or no apps).
         if (createdFresh && editingGroup) {
+          const g = blockGroups.find((x) => x.id === editingGroup.id) ?? editingGroup;
           const count = groupCounts[editingGroup.id] ?? 0;
-          if (count === 0) {
+          if (!g.name?.trim() || count === 0) {
             store().removeBlockGroup(editingGroup.id);
           }
         }

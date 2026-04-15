@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, type ReactNode } from 'react';
+import { Keyboard } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppTheme } from '@/lib/theme';
@@ -24,6 +25,10 @@ const PickerSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, children
       enableDynamicSizing
       enablePanDownToClose
       enableOverDrag={false}
+      keyboardBehavior="interactive"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
+      onAnimate={(_from, to) => { if (to === -1) Keyboard.dismiss(); }}
       onChange={(i) => { if (i === -1) onDismiss?.(); }}
       backdropComponent={renderBackdrop}
       handleIndicatorStyle={{ backgroundColor: theme.border }}
