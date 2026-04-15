@@ -160,9 +160,10 @@ export default function FeatureCarousel() {
     listRef.current?.scrollToOffset({ offset: MIDDLE_OFFSET, animated: false });
   }, []);
 
-  const renderItem = useCallback(({ item }: { item: typeof LOOP_DATA[number] }) => (
-    <FeatureCard {...item} />
-  ), []);
+  const renderItem = useCallback(({ item }: { item: typeof LOOP_DATA[number] }) => {
+    const { key: _key, ...props } = item;
+    return <FeatureCard {...props} />;
+  }, []);
 
   return (
     <Animated.View entering={FadeIn.delay(400).duration(500)}>
