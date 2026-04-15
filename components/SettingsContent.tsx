@@ -563,18 +563,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             </Pressable>
           </View>
 
-          {/* Built-in "All apps" row */}
-          <View style={[styles.groupCard, { borderColor: theme.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                All apps
-              </Text>
-              <Text style={[styles.groupSub, { color: theme.textTertiary }]}>
-                Everything, except never-block
-              </Text>
-            </View>
-          </View>
-
           {/* User groups */}
           {blockGroups.map((g) => {
             const count = groupCounts[g.id] ?? 0;
