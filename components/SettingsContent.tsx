@@ -604,25 +604,37 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           {/* Never-block allowlist */}
           <View style={{ height: 28 }} />
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            NEVER BLOCK
+            ALWAYS ALLOWED
           </Text>
           <Text style={[styles.sectionHint, { color: theme.textTertiary, marginBottom: 12 }]}>
-            Apps here stay unlocked in any block
+            These stay unlocked during any block
           </Text>
-          <Pressable
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              const status = await requestAuth();
-              if (status === 'approved') setShowNeverBlockPicker(true);
-            }}
-            style={[styles.groupCardCol, { borderColor: neverBlockCount > 0 ? theme.accent : theme.border }]}
-          >
-            <View style={styles.groupCardHeader}>
-              <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
-                {neverBlockCount > 0 ? 'Exceptions' : 'No exceptions'}
-              </Text>
-            </View>
-            {neverBlockCount > 0 && (
+          {neverBlockCount > 0 ? (
+            <Pressable
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const status = await requestAuth();
+                if (status === 'approved') setShowNeverBlockPicker(true);
+              }}
+              style={[styles.groupCardCol, { borderColor: theme.accent }]}
+            >
+              <View style={styles.groupCardHeader}>
+                <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
+                  {neverBlockCount === 1 ? '1 exception' : `${neverBlockCount} exceptions`}
+                </Text>
+                <Pressable
+                  onPress={async () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const status = await requestAuth();
+                    if (status === 'approved') setShowNeverBlockPicker(true);
+                  }}
+                  hitSlop={10}
+                  style={[styles.changeChip, { borderColor: theme.accent }]}
+                >
+                  <Feather name="edit-2" size={11} color={theme.accent} />
+                  <Text style={[styles.changeChipLabel, { color: theme.accent }]}>edit</Text>
+                </Pressable>
+              </View>
               <AppLabelsView
                 activitySelectionId={NEVER_BLOCK_SELECTION_ID}
                 iconSize={38}
@@ -633,8 +645,29 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 ringColor={theme.bg}
                 style={[styles.labelStrip, { height: 42 }]}
               />
-            )}
-          </Pressable>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const status = await requestAuth();
+                if (status === 'approved') setShowNeverBlockPicker(true);
+              }}
+              style={[styles.allowEmpty, { borderColor: theme.textTertiary }]}
+            >
+              <View style={[styles.allowEmptyIcon, { backgroundColor: theme.border }]}>
+                <Feather name="plus" size={20} color={theme.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.allowEmptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                  Allow some apps
+                </Text>
+                <Text style={[styles.allowEmptySub, { color: theme.textTertiary }]}>
+                  Pick apps that stay usable while blocking
+                </Text>
+              </View>
+            </Pressable>
+          )}
 
         </>
       )}
@@ -922,6 +955,47 @@ const styles = StyleSheet.create({
   labelStrip: {
     height: 36,
     width: '100%',
+  },
+  allowEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1.2,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  allowEmptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allowEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  allowEmptySub: {
+    fontSize: 12,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  changeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.2,
+    borderRadius: 100,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  changeChipLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
