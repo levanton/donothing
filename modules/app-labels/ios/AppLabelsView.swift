@@ -35,9 +35,10 @@ struct TokenIcon: View {
   let token: AnyActivityToken
   let size: CGFloat
   let tint: Color
-  let ringColor: Color
 
   var body: some View {
+    // Render at natural font size — no .frame() so there's no transparent
+    // padding around the icon when laid out in HStack.
     Group {
       switch token {
       case .app(let t):
@@ -50,16 +51,33 @@ struct TokenIcon: View {
     }
     .font(.system(size: size))
     .foregroundColor(tint)
-    .frame(width: size, height: size)
-    .background(
-      RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
-        .fill(ringColor)
-    )
-    .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
-    .overlay(
-      RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
-        .stroke(ringColor, lineWidth: 2)
-    )
+  }
+}
+
+@available(iOS 15.2, *)
+struct TokenRow: View {
+  let token: AnyActivityToken
+  let iconSize: CGFloat
+  let tint: Color
+
+  var body: some View {
+    HStack(spacing: 14) {
+      Group {
+        switch token {
+        case .app(let t): Label(t)
+        case .category(let t): Label(t)
+        case .web(let t): Label(t)
+        }
+      }
+      .labelStyle(.titleAndIcon)
+      .font(.system(size: 16))
+      .foregroundColor(tint)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, 10)
+    .padding(.horizontal, 4)
   }
 }
 
@@ -108,10 +126,39 @@ struct AppLabelsContent: View {
     let displayed = Array(tokens.prefix(limit))
     let remaining = tokens.count - displayed.count
 
-    if model.layout == "grid" {
+    switch model.layout {
+    case "list":
+      listBody(displayed: displayed, remaining: remaining)
+    case "grid":
       gridBody(displayed: displayed, remaining: remaining)
-    } else {
+    default:
       rowBody(displayed: displayed, remaining: remaining)
+    }
+  }
+
+  @ViewBuilder
+  private func listBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
+    ScrollView(showsIndicators: false) {
+      LazyVStack(spacing: 0) {
+        ForEach(Array(displayed.enumerated()), id: \.offset) { idx, token in
+          TokenRow(token: token, iconSize: model.iconSize, tint: tint)
+          if idx < displayed.count - 1 {
+            Rectangle()
+              .fill(Color.secondary.opacity(0.18))
+              .frame(height: 0.5)
+          }
+        }
+        if remaining > 0 {
+          HStack {
+            Text("+\(remaining) more")
+              .font(.system(size: 14, weight: .medium))
+              .foregroundColor(tint.opacity(0.7))
+            Spacer()
+          }
+          .padding(.vertical, 10)
+          .padding(.horizontal, 4)
+        }
+      }
     }
   }
 
@@ -119,21 +166,13 @@ struct AppLabelsContent: View {
   private func rowBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
     HStack(spacing: -model.overlap) {
       ForEach(Array(displayed.enumerated()), id: \.offset) { _, token in
-        TokenIcon(token: token, size: model.iconSize, tint: tint, ringColor: ringColor)
+        TokenIcon(token: token, size: model.iconSize, tint: tint)
       }
       if remaining > 0 {
         Text("+\(remaining)")
-          .font(.system(size: model.iconSize * 0.42, weight: .semibold))
+          .font(.system(size: model.iconSize * 0.38, weight: .semibold))
           .foregroundColor(tint)
           .frame(width: model.iconSize, height: model.iconSize)
-          .background(
-            RoundedRectangle(cornerRadius: model.iconSize * 0.225, style: .continuous)
-              .fill(ringColor.opacity(0.55))
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: model.iconSize * 0.225, style: .continuous)
-              .stroke(ringColor, lineWidth: 2)
-          )
       }
     }
     .frame(height: model.iconSize, alignment: .leading)
@@ -142,22 +181,23 @@ struct AppLabelsContent: View {
 
   @ViewBuilder
   private func gridBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
-    let cell = GridItem(.adaptive(minimum: model.iconSize + 8), spacing: 10)
-    LazyVGrid(columns: [cell], alignment: .leading, spacing: 10) {
+    // Fixed 5-column grid with tight spacing — looks like Apple's Home Screen.
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
+    LazyVGrid(columns: columns, alignment: .center, spacing: 16) {
       ForEach(Array(displayed.enumerated()), id: \.offset) { _, token in
-        TokenIcon(token: token, size: model.iconSize, tint: tint, ringColor: ringColor)
+        TokenIcon(token: token, size: model.iconSize, tint: tint)
       }
       if remaining > 0 {
         Text("+\(remaining)")
-          .font(.system(size: model.iconSize * 0.42, weight: .semibold))
+          .font(.system(size: model.iconSize * 0.38, weight: .semibold))
           .foregroundColor(tint)
           .frame(width: model.iconSize, height: model.iconSize)
       }
     }
+    .padding(.vertical, 4)
   }
 }
 
-@available(iOS 15.2, *)
 struct AppLabelsUnsupported: View {
   var body: some View {
     Text("iOS 15.2+ required")

@@ -11,8 +11,8 @@ export interface AppLabelsViewProps {
   maxItems?: number;
   /** Positive pixel overlap between icons (avatar-stack effect). Default 0. */
   overlap?: number;
-  /** Layout: "row" (HStack) or "grid" (adaptive VGrid). */
-  layout?: 'row' | 'grid';
+  /** Layout: "row" (overlapping HStack), "grid" (5-col VGrid) or "list" (vertical icon+name rows). */
+  layout?: 'row' | 'grid' | 'list';
   /** Hex color (#RRGGBB or #RRGGBBAA) for category/generic glyph tint. */
   tintColor?: string;
   /** Hex color of the ring/backdrop behind each icon. Match card bg. */

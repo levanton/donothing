@@ -3,11 +3,15 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
-import { activitySelectionMetadata } from 'react-native-device-activity';
+import {
+  activitySelectionMetadata,
+  getFamilyActivitySelectionId,
+  setFamilyActivitySelectionId,
+} from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
 import AppLabelsView from 'app-labels';
+import AppPickerSheet from '@/components/AppPickerSheet';
 
 import { Fonts } from '@/constants/theme';
 import { AppTheme, themes, palette } from '@/lib/theme';
@@ -21,6 +25,7 @@ import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDA
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
 const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
+const DRAFT_GROUP_ID = '__draft';
 
 interface SettingsContentProps {
   onClose: () => void;
@@ -182,6 +187,7 @@ function GroupEditorContent({
   hasApps,
   onSave,
   onDelete,
+  onCancel,
   onOpenPicker,
 }: {
   theme: AppTheme;
@@ -190,14 +196,26 @@ function GroupEditorContent({
   hasApps: boolean;
   onSave: (name: string) => void;
   onDelete: () => void;
+  onCancel: () => void;
   onOpenPicker: () => void;
 }) {
   const [name, setName] = useState(initialName);
   return (
     <View style={styles.editorContent}>
-      <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        {initialName ? 'Edit list' : 'New list'}
-      </Text>
+      <View style={styles.editorHeader}>
+        <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif, flex: 1, textAlign: 'left', marginBottom: 0 }]}>
+          {initialName ? 'Edit list' : 'New list'}
+        </Text>
+        {initialName ? (
+          <Pressable
+            onPress={onDelete}
+            hitSlop={10}
+            style={[styles.deleteIconBtn, { backgroundColor: palette.terracotta }]}
+          >
+            <Feather name="trash-2" size={16} color={palette.cream} />
+          </Pressable>
+        ) : null}
+      </View>
 
       <Text style={[styles.sheetFieldLabel, { color: theme.textTertiary, marginTop: 8 }]}>NAME</Text>
       <BottomSheetTextInput
@@ -232,8 +250,8 @@ function GroupEditorContent({
         <View style={[styles.editorGridWrap, { borderColor: theme.border }]}>
           <AppLabelsView
             activitySelectionId={`donothing-group-${group.id}`}
-            iconSize={44}
-            layout="grid"
+            iconSize={28}
+            layout="list"
             tintColor={theme.text}
             ringColor={theme.bg}
             style={styles.editorGrid}
@@ -253,7 +271,7 @@ function GroupEditorContent({
 
       <View style={{ height: 20 }} />
       <View style={styles.sheetButtons}>
-        <PillButton label="delete" onPress={onDelete} color={theme.textSecondary} outline flex />
+        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} outline flex />
         <PillButton label="save" onPress={() => onSave(name.trim() || initialName)} color={theme.accent} filled flex />
       </View>
     </View>
@@ -344,10 +362,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const status = await requestAuth();
     if (status !== 'approved') return;
-    // Create with empty name; user enters it in the sheet.
-    // Empty-name groups are discarded on sheet dismiss.
-    const group = store().addBlockGroup('');
-    setEditingGroup(group);
+    // Don't touch the DB yet — user may cancel. Use an in-memory draft that
+    // will be materialized on Save.
+    // Clear any lingering selection under the draft id from a previous draft.
+    try {
+      setFamilyActivitySelectionId({
+        id: `donothing-group-${DRAFT_GROUP_ID}`,
+        familyActivitySelection: '',
+      });
+    } catch {}
+    setGroupCounts((prev) => ({ ...prev, [DRAFT_GROUP_ID]: 0 }));
+    setEditingGroup({ id: DRAFT_GROUP_ID, name: '' });
     setCreatedFresh(true);
     groupSheetRef.current?.expand();
   };
@@ -359,21 +384,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     groupSheetRef.current?.expand();
   };
 
-  const handlePickerDismiss = (groupId: string) => {
+  const handlePickerDismiss = (_groupId: string) => {
+    // Picker closes; editor stays underneath. Discard-on-empty is handled
+    // by the editor sheet's own onDismiss when the user actually closes it.
     setPickerGroupId(null);
-    const count = groupCounts[groupId] ?? 0;
-    if (createdFresh && editingGroup?.id === groupId && count === 0) {
-      // Fresh-create flow with nothing picked: discard the group.
-      store().removeBlockGroup(groupId);
-      setEditingGroup(null);
-      setCreatedFresh(false);
-      return;
-    }
-    if (editingGroup?.id === groupId) {
-      // Either fresh-create with picks, or existing group "change apps" flow.
-      // Return to the editor sheet.
-      groupSheetRef.current?.expand();
-    }
   };
 
   const handleSaveGroup = (name: string) => {
@@ -383,19 +397,43 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      // Empty name on save behaves like cancel → discard the group.
-      store().removeBlockGroup(editingGroup.id);
+      // Empty name = cancel. If it was an existing group, don't touch it.
+      // If it was a draft, nothing to clean up (never persisted to DB).
       groupSheetRef.current?.close();
       return;
     }
-    if (trimmed !== editingGroup.name) {
+
+    if (editingGroup.id === DRAFT_GROUP_ID) {
+      // Materialize the draft: create real DB row, migrate selection.
+      const real = store().addBlockGroup(trimmed);
+      try {
+        const draftSelection = getFamilyActivitySelectionId(
+          `donothing-group-${DRAFT_GROUP_ID}`,
+        );
+        if (draftSelection) {
+          setFamilyActivitySelectionId({
+            id: `donothing-group-${real.id}`,
+            familyActivitySelection: draftSelection,
+          });
+          // Copy count too so the card preview shows immediately.
+          setGroupCounts((prev) => ({
+            ...prev,
+            [real.id]: prev[DRAFT_GROUP_ID] ?? 0,
+          }));
+        }
+        setFamilyActivitySelectionId({
+          id: `donothing-group-${DRAFT_GROUP_ID}`,
+          familyActivitySelection: '',
+        });
+      } catch {}
+    } else if (trimmed !== editingGroup.name) {
       store().renameBlockGroup(editingGroup.id, trimmed);
     }
     groupSheetRef.current?.close();
   };
 
   const handleDeleteGroup = () => {
-    if (editingGroup) {
+    if (editingGroup && editingGroup.id !== DRAFT_GROUP_ID) {
       store().removeBlockGroup(editingGroup.id);
     }
     groupSheetRef.current?.close();
@@ -550,18 +588,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                   <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
                     {g.name || 'Untitled list'}
                   </Text>
-                  <Feather name="chevron-right" size={18} color={theme.textTertiary} />
                 </View>
                 {count > 0 && (
                   <AppLabelsView
                     activitySelectionId={`donothing-group-${g.id}`}
-                    iconSize={32}
-                    maxItems={9}
-                    overlap={12}
+                    iconSize={38}
+                    maxItems={8}
+                    overlap={14}
                     layout="row"
                     tintColor={theme.text}
                     ringColor={theme.bg}
-                    style={styles.labelStrip}
+                    style={[styles.labelStrip, { height: 42 }]}
                   />
                 )}
               </Pressable>
@@ -569,7 +606,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           })}
 
           <PillButton
-            label="+ new list"
+            label="+ add category"
             color={theme.text}
             variant="outline"
             size="small"
@@ -596,54 +633,21 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
                 {neverBlockCount > 0 ? 'Exceptions' : 'No exceptions'}
               </Text>
-              <Feather name="chevron-right" size={18} color={theme.textTertiary} />
             </View>
             {neverBlockCount > 0 && (
               <AppLabelsView
                 activitySelectionId={NEVER_BLOCK_SELECTION_ID}
-                iconSize={32}
-                maxItems={9}
-                overlap={12}
+                iconSize={38}
+                maxItems={8}
+                overlap={14}
                 layout="row"
                 tintColor={theme.text}
                 ringColor={theme.bg}
-                style={styles.labelStrip}
+                style={[styles.labelStrip, { height: 42 }]}
               />
             )}
           </Pressable>
 
-          {/* Hidden native pickers */}
-          {pickerGroupId !== null && (
-            <DeviceActivitySelectionSheetViewPersisted
-              familyActivitySelectionId={`donothing-group-${pickerGroupId}`}
-              headerText={blockGroups.find((g) => g.id === pickerGroupId)?.name ?? 'Choose apps'}
-              footerText=""
-              onSelectionChange={(e) => {
-                const meta = e.nativeEvent;
-                const id = pickerGroupId;
-                if (!id) return;
-                setGroupCounts((prev) => ({
-                  ...prev,
-                  [id]: (meta.applicationCount ?? 0) + (meta.categoryCount ?? 0),
-                }));
-              }}
-              onDismissRequest={() => pickerGroupId && handlePickerDismiss(pickerGroupId)}
-              style={{ height: 1, width: 1, position: 'absolute', top: -9999 }}
-            />
-          )}
-          {showNeverBlockPicker && (
-            <DeviceActivitySelectionSheetViewPersisted
-              familyActivitySelectionId={NEVER_BLOCK_SELECTION_ID}
-              headerText="Apps never to block"
-              footerText=""
-              onSelectionChange={(e) => {
-                const meta = e.nativeEvent;
-                setNeverBlockCount((meta.applicationCount ?? 0) + (meta.categoryCount ?? 0));
-              }}
-              onDismissRequest={() => setShowNeverBlockPicker(false)}
-              style={{ height: 1, width: 1, position: 'absolute', top: -9999 }}
-            />
-          )}
         </>
       )}
 
@@ -788,13 +792,15 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       ref={groupSheetRef}
       theme={theme}
       onDismiss={() => {
-        // Discard a fresh group if the user didn't commit (no name or no apps).
-        if (createdFresh && editingGroup) {
-          const g = blockGroups.find((x) => x.id === editingGroup.id) ?? editingGroup;
-          const count = groupCounts[editingGroup.id] ?? 0;
-          if (!g.name?.trim() || count === 0) {
-            store().removeBlockGroup(editingGroup.id);
-          }
+        // Draft is purely in-memory — nothing to delete from DB, but clean the
+        // lingering selection from UserDefaults.
+        if (editingGroup?.id === DRAFT_GROUP_ID) {
+          try {
+            setFamilyActivitySelectionId({
+              id: `donothing-group-${DRAFT_GROUP_ID}`,
+              familyActivitySelection: '',
+            });
+          } catch {}
         }
         setEditingGroup(null);
         setCreatedFresh(false);
@@ -809,9 +815,11 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           hasApps={(groupCounts[editingGroup.id] ?? 0) > 0}
           onSave={handleSaveGroup}
           onDelete={handleDeleteGroup}
+          onCancel={() => groupSheetRef.current?.close()}
           onOpenPicker={() => {
             if (!editingGroup) return;
-            groupSheetRef.current?.close();
+            // Don't close the editor sheet — let the picker overlay on top
+            // so the editor state (name being typed, etc.) survives.
             requestAuth().then((status) => {
               if (status === 'approved') setPickerGroupId(editingGroup.id);
             });
@@ -819,6 +827,40 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         />
       )}
     </PickerSheet>
+
+    {/* App picker: group */}
+    <AppPickerSheet
+      theme={theme}
+      selectionId={pickerGroupId ? `donothing-group-${pickerGroupId}` : null}
+      title={blockGroups.find((g) => g.id === pickerGroupId)?.name || 'Choose apps'}
+      onClose={() => {
+        const id = pickerGroupId;
+        if (id) {
+          try {
+            const meta = activitySelectionMetadata({ activitySelectionId: `donothing-group-${id}` });
+            setGroupCounts((prev) => ({
+              ...prev,
+              [id]: (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0) + (meta?.webDomainCount ?? 0),
+            }));
+          } catch {}
+          handlePickerDismiss(id);
+        }
+      }}
+    />
+
+    {/* App picker: never-block */}
+    <AppPickerSheet
+      theme={theme}
+      selectionId={showNeverBlockPicker ? NEVER_BLOCK_SELECTION_ID : null}
+      title="Never block"
+      onClose={() => {
+        try {
+          const meta = activitySelectionMetadata({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
+          setNeverBlockCount((meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0) + (meta?.webDomainCount ?? 0));
+        } catch {}
+        setShowNeverBlockPicker(false);
+      }}
+    />
     </>
   );
 }
@@ -911,6 +953,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 8,
   },
+  editorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  deleteIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   nameInput: {
     borderWidth: 1.2,
     borderRadius: 14,
@@ -943,12 +997,13 @@ const styles = StyleSheet.create({
   editorGridWrap: {
     borderWidth: 1.2,
     borderRadius: 14,
-    padding: 14,
-    minHeight: 120,
-    maxHeight: 280,
+    paddingHorizontal: 14,
+    maxHeight: 320,
+    overflow: 'hidden',
   },
   editorGrid: {
-    flex: 1,
+    width: '100%',
+    height: 320,
   },
   editorEmpty: {
     borderWidth: 1.2,
