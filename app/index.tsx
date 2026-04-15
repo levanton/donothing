@@ -817,7 +817,7 @@ export default function DoNothingScreen() {
       )}
 
       {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
-      <View style={[styles.headerRow, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
+      <View style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]} pointerEvents={distractionFree ? 'none' : 'auto'}>
         <Animated.View style={hideStyle}>
           <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
             Ready to{' '}
