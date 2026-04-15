@@ -861,6 +861,8 @@ export default function DoNothingScreen() {
           <TimerDisplay
             seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
             color={theme.text}
+            fontSize={64}
+            style={{ letterSpacing: 4 }}
           />
         )}
       </Animated.View>
@@ -990,15 +992,6 @@ export default function DoNothingScreen() {
         </View>
       </Pressable>
 
-      {/* Journey tags */}
-      {!started && (
-        <JourneyTags
-          theme={theme}
-          dailyGoalMinutes={dailyGoalMinutes}
-          todayDuration={stats.today}
-        />
-      )}
-
       {/* Week dots */}
       {weekStats.length > 0 && (
         <View style={styles.weekSection}>
@@ -1040,6 +1033,15 @@ export default function DoNothingScreen() {
             })}
           </View>
         </View>
+      )}
+
+      {/* Journey tags */}
+      {!started && (
+        <JourneyTags
+          theme={theme}
+          dailyGoalMinutes={dailyGoalMinutes}
+          todayDuration={stats.today}
+        />
       )}
 
       {/* Bottom buttons */}
