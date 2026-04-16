@@ -261,7 +261,7 @@ export default function BlockPickerContent({
       </Text>
       <View style={[styles.timeCard, { borderColor: strongBorder }]}>
         <View style={styles.timeRow}>
-          <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Starts</Text>
+          <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '400' }]}>Starts</Text>
           {Platform.OS === 'ios' ? (
             <DateTimePicker
               value={dateFromMinutes(startMinutes)}
@@ -280,7 +280,7 @@ export default function BlockPickerContent({
         </View>
         <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />
         <View style={styles.timeRow}>
-          <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Ends</Text>
+          <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '400' }]}>Ends</Text>
           {Platform.OS === 'ios' ? (
             <DateTimePicker
               value={dateFromMinutes(endMinutes)}

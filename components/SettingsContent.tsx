@@ -83,7 +83,7 @@ function GroupEditorContent({
         style={[styles.nameInput, {
           color: theme.text,
           borderColor: theme.border,
-          fontFamily: Fonts!.serif,
+          fontFamily: Fonts!.mono,
         }]}
         maxLength={40}
         returnKeyType="done"
@@ -380,7 +380,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 style={[styles.groupCardCol, { borderColor: count > 0 ? theme.accent : theme.border }]}
               >
                 <View style={styles.groupCardHeader}>
-                  <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
+                  <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.mono, flex: 1 }]}>
                     {g.name || 'Untitled list'}
                   </Text>
                 </View>
@@ -426,7 +426,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               style={[styles.groupCardCol, { borderColor: theme.accent }]}
             >
               <View style={styles.groupCardHeader}>
-                <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.serif, flex: 1 }]}>
+                <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.mono, flex: 1 }]}>
                   {neverBlockCount === 1 ? '1 exception' : `${neverBlockCount} exceptions`}
                 </Text>
                 <Pressable
@@ -532,7 +532,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 );
               })()}
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-                {groupLabel(b.groupId)} · goal {b.unlockGoalMinutes} min
+                <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal' }}>
+                  {groupLabel(b.groupId)}
+                </Text>
+                {` · goal ${b.unlockGoalMinutes} min`}
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
@@ -840,8 +843,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    fontSize: 18,
-    fontWeight: '400',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
     marginBottom: 18,
   },
   editorRow: {
@@ -889,7 +893,8 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 17,
-    fontWeight: '400',
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
   groupSub: {
     fontSize: 12,
