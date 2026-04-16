@@ -520,11 +520,19 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             }]}
           >
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
-                {formatTime12(b.hour, b.minute)}
-              </Text>
+              {(() => {
+                const startMin = b.hour * 60 + b.minute;
+                const endMin = (startMin + b.durationMinutes) % (24 * 60);
+                const endH = Math.floor(endMin / 60);
+                const endM = endMin % 60;
+                return (
+                  <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
+                    {formatTime12(b.hour, b.minute)} — {formatTime12(endH, endM)}
+                  </Text>
+                );
+              })()}
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-                {b.durationMinutes} min · {groupLabel(b.groupId)}
+                {groupLabel(b.groupId)} · goal {b.unlockGoalMinutes} min
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
@@ -718,8 +726,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
-  cardTime: { fontSize: 28, fontWeight: '300' },
-  cardLabel: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
+  cardTime: { fontSize: 21, fontWeight: '400' },
+  cardLabel: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
 
@@ -1012,21 +1020,21 @@ const styles = StyleSheet.create({
   },
   cardDays: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
+    gap: 9,
+    marginTop: 8,
   },
   cardDayCol: {
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   cardDot: {
-    width: 5.5,
-    height: 5.5,
-    borderRadius: 2.75,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 1,
   },
   cardDayText: {
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '400',
   },
   dayHint: {
