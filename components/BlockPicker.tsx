@@ -186,6 +186,8 @@ export default function BlockPickerContent({
           ticks={[5, 15, 30, 45, 60]}
           scaleLabels={['0', '5', '15', '30', '60', '90']}
           accentColor={theme.accent}
+          trackBgColor={theme.text}
+          trackStrokeWidth={3.5}
           scaleLabelStyle={{ color: theme.text, fontWeight: '500', fontSize: 12 }}
           hideLabel
         />
@@ -212,7 +214,7 @@ export default function BlockPickerContent({
             entering={FadeIn.duration(180)}
             exiting={FadeOut.duration(120)}
           >
-            <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono }]}>
               {selectedAppName}
             </Text>
             <View style={[styles.appsChangeChip, { backgroundColor: theme.accent }]}>
@@ -235,8 +237,8 @@ export default function BlockPickerContent({
                 {i > 0 && <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />}
                 <Pressable onPress={() => pickGroup(item.id)} style={styles.timeRow}>
                   <Text style={[
-                    styles.timeRowLabel,
-                    { color: active ? theme.accent : theme.text, fontFamily: Fonts!.serif },
+                    styles.selectedAppName,
+                    { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono },
                   ]}>
                     {item.name}
                   </Text>
@@ -295,33 +297,35 @@ export default function BlockPickerContent({
             </Text>
           )}
         </View>
-      </View>
-
-      <Text style={[styles.dayRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-        on these days
-      </Text>
-      <View style={styles.dayRow}>
-        {WEEKDAY_LABELS.map((label, i) => {
-          const day = WEEKDAY_VALUES[i];
-          const active = selectedDays.includes(day);
-          return (
-            <Pressable key={day} onPress={() => toggleDay(day)} hitSlop={4}>
-              <View style={[
-                styles.dayCircle,
-                active
-                  ? { backgroundColor: theme.text, borderColor: theme.text }
-                  : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
-              ]}>
-                <Text style={[
-                  styles.dayLabel,
-                  { color: active ? theme.bg : theme.textSecondary },
-                ]}>
-                  {label}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+        <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />
+        <View style={styles.daysSection}>
+          <Text style={[styles.daysLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+            on these days
+          </Text>
+          <View style={styles.dayRow}>
+            {WEEKDAY_LABELS.map((label, i) => {
+              const day = WEEKDAY_VALUES[i];
+              const active = selectedDays.includes(day);
+              return (
+                <Pressable key={day} onPress={() => toggleDay(day)} hitSlop={4} style={styles.dayPressable}>
+                  <View style={[
+                    styles.dayCircle,
+                    active
+                      ? { backgroundColor: theme.text, borderColor: theme.text }
+                      : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
+                  ]}>
+                    <Text style={[
+                      styles.dayLabel,
+                      { color: active ? theme.bg : theme.textSecondary },
+                    ]}>
+                      {label}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
       </View>
 
       <View style={{ height: 44 }} />
@@ -394,6 +398,11 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginVertical: 28,
   },
+  selectedAppName: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
   appsChangeChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -444,28 +453,33 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '400',
   },
-  dayRowLabel: {
-    fontSize: 13,
+  daysSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  daysLabel: {
+    fontSize: 15,
     fontWeight: '300',
     fontStyle: 'italic',
-    marginTop: 16,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   dayRow: {
     flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
+    gap: 4,
+  },
+  dayPressable: {
+    flex: 1,
   },
   dayCircle: {
-    width: 44,
-    height: 38,
-    borderRadius: 19,
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 100,
     borderWidth: 1.2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
   },
 });

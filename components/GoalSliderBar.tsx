@@ -81,6 +81,8 @@ interface GoalSliderBarProps {
   thumbRadius?: number;
   /** Override track stroke width (default 2.5 fill / 2 bg) */
   trackStrokeWidth?: number;
+  /** Override background (unfilled) track color — defaults to theme.textTertiary */
+  trackBgColor?: string;
 
   /** Override scale label text style */
   scaleLabelStyle?: TextStyle;
@@ -106,6 +108,7 @@ export default function GoalSliderBar({
   sliderHeight,
   thumbRadius: thumbR,
   trackStrokeWidth,
+  trackBgColor,
   scaleLabelStyle,
   progress: externalProgress,
   width: fixedWidth,
@@ -221,7 +224,7 @@ export default function GoalSliderBar({
         {/* Track */}
         <SvgLine
           x1={pad} y1={cy} x2={width - pad} y2={cy}
-          stroke={theme.textTertiary}
+          stroke={trackBgColor ?? theme.textTertiary}
           strokeWidth={bgSW}
           strokeLinecap="round"
         />
@@ -233,8 +236,8 @@ export default function GoalSliderBar({
             <SvgLine
               key={m}
               x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
-              stroke={filled ? color : theme.textTertiary}
-              strokeWidth={1}
+              stroke={filled ? color : (trackBgColor ?? theme.textTertiary)}
+              strokeWidth={1.5}
             />
           );
         })}
