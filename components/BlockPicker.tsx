@@ -5,8 +5,7 @@ import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
-  FadeInDown,
-  FadeInUp,
+  FadeIn,
   FadeOut,
   LinearTransition,
 } from 'react-native-reanimated';
@@ -191,8 +190,8 @@ export default function BlockPickerContent({
             key="collapsed"
             onPress={toggleAppsExpanded}
             style={styles.timeRow}
-            entering={FadeInDown.duration(220)}
-            exiting={FadeOut.duration(140)}
+            entering={FadeIn.duration(180)}
+            exiting={FadeOut.duration(120)}
           >
             <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
               {selectedAppName}
@@ -205,17 +204,12 @@ export default function BlockPickerContent({
           appItems.map((item, i) => {
             const active = item.id === groupId;
             const dist = Math.abs(i - selectedAppIndex);
-            const delay = dist * 45;
-            const entering = i < selectedAppIndex
-              ? FadeInUp.delay(delay).duration(260)
-              : i > selectedAppIndex
-                ? FadeInDown.delay(delay).duration(260)
-                : FadeInDown.duration(220);
+            const delay = i === selectedAppIndex ? 0 : 60 + dist * 40;
             return (
               <Animated.View
                 key={item.id ?? '__null'}
-                entering={entering}
-                exiting={FadeOut.duration(140)}
+                entering={FadeIn.delay(delay).duration(220)}
+                exiting={FadeOut.duration(120)}
               >
                 {i > 0 && <View style={[styles.timeDivider, { backgroundColor: theme.border }]} />}
                 <Pressable onPress={() => pickGroup(item.id)} style={styles.timeRow}>
