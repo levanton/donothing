@@ -3,13 +3,21 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  LinearTransition,
+} from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
-import PillPicker from '@/components/PillPicker';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const MIN_DURATION = 15;
 const STEP = 5;
@@ -80,6 +88,7 @@ export default function BlockPickerContent({
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
   const [groupId, setGroupId] = useState<string | null>(initialGroupId ?? null);
   const [unlockGoal, setUnlockGoal] = useState<number>(initialUnlockGoal ?? DEFAULT_UNLOCK);
+  const [appsExpanded, setAppsExpanded] = useState(false);
 
   const toggleDay = (day: number) => {
     Haptics.selectionAsync();
@@ -118,11 +127,27 @@ export default function BlockPickerContent({
     { id: null as string | null, name: 'All apps' },
     ...groups.map((g) => ({ id: g.id as string | null, name: g.name })),
   ];
+  const selectedAppName = appItems.find((it) => it.id === groupId)?.name ?? 'All apps';
+
+  const toggleAppsExpanded = () => {
+    Haptics.selectionAsync();
+    setAppsExpanded((v) => !v);
+  };
+
+  const pickGroup = (id: string | null) => {
+    Haptics.selectionAsync();
+    setGroupId(id);
+    setAppsExpanded(false);
+  };
+
+  const selectedAppIndex = Math.max(0, appItems.findIndex((it) => it.id === groupId));
 
   return (
     <BottomSheetScrollView
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
+      bounces={false}
+      overScrollMode="never"
     >
       <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
         {title ?? 'Add screen block'}
@@ -157,14 +182,56 @@ export default function BlockPickerContent({
       <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
         Which list of apps to block
       </Text>
-      <View style={styles.pillPickerWrap}>
-        <PillPicker
-          items={appItems}
-          selectedId={groupId}
-          onSelect={setGroupId}
-          theme={theme}
-        />
-      </View>
+      <Animated.View
+        layout={LinearTransition.duration(260)}
+        style={[styles.timeCard, { borderColor: theme.border }]}
+      >
+        {!appsExpanded ? (
+          <AnimatedPressable
+            key="collapsed"
+            onPress={toggleAppsExpanded}
+            style={styles.timeRow}
+            entering={FadeInDown.duration(220)}
+            exiting={FadeOut.duration(140)}
+          >
+            <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {selectedAppName}
+            </Text>
+            <Text style={[styles.appsChangeLabel, { color: theme.accent, fontFamily: Fonts!.serif }]}>
+              change
+            </Text>
+          </AnimatedPressable>
+        ) : (
+          appItems.map((item, i) => {
+            const active = item.id === groupId;
+            const dist = Math.abs(i - selectedAppIndex);
+            const delay = dist * 45;
+            const entering = i < selectedAppIndex
+              ? FadeInUp.delay(delay).duration(260)
+              : i > selectedAppIndex
+                ? FadeInDown.delay(delay).duration(260)
+                : FadeInDown.duration(220);
+            return (
+              <Animated.View
+                key={item.id ?? '__null'}
+                entering={entering}
+                exiting={FadeOut.duration(140)}
+              >
+                {i > 0 && <View style={[styles.timeDivider, { backgroundColor: theme.border }]} />}
+                <Pressable onPress={() => pickGroup(item.id)} style={styles.timeRow}>
+                  <Text style={[
+                    styles.timeRowLabel,
+                    { color: active ? theme.accent : theme.text, fontFamily: Fonts!.serif },
+                  ]}>
+                    {item.name}
+                  </Text>
+                  {active && <Feather name="check" size={18} color={theme.accent} />}
+                </Pressable>
+              </Animated.View>
+            );
+          })
+        )}
+      </Animated.View>
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
@@ -255,7 +322,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: SHEET_PAD,
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 40,
   },
   sheetButtons: {
     flexDirection: 'row',
@@ -308,8 +375,9 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginVertical: 28,
   },
-  pillPickerWrap: {
-    marginHorizontal: -SHEET_PAD,
+  appsChangeLabel: {
+    fontSize: 15,
+    fontWeight: '400',
   },
   chipRow: {
     flexDirection: 'row',
