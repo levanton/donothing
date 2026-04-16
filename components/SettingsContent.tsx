@@ -309,10 +309,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       </View>
 
       {/* Daily Goal */}
-      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        Daily goal
-      </Text>
-      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+      <View style={styles.titleRow}>
+        <Feather name="target" size={30} color={theme.accent} />
+        <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          Daily goal
+        </Text>
+      </View>
+      <Text style={[styles.sectionHint, styles.hintIndent, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
         {dailyGoalMinutes > 0
           ? `Do nothing for ${dailyGoalMinutes} min every day`
           : 'Set a daily goal to track your progress'}
@@ -330,12 +333,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         <>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <View style={styles.sectionHeaderRow}>
-            <View style={{ flex: 1 }}>
+            <View style={[styles.titleRow, { flex: 1 }]}>
+              <Feather name="grid" size={30} color={theme.accent} />
               <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
                 Apps to block
-              </Text>
-              <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-                Create lists of apps, then pick one per schedule
               </Text>
             </View>
             <Pressable
@@ -354,6 +355,9 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               />
             </Pressable>
           </View>
+          <Text style={[styles.sectionHint, styles.hintIndent, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+            Create lists of apps, then pick one per schedule
+          </Text>
 
           {/* User groups */}
           {blockGroups.length === 0 && (
@@ -406,7 +410,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
           {/* Never-block allowlist — sub-section of "Apps to block" */}
           <View style={{ height: 28 }} />
-          <Text style={[styles.subSectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          <Text style={[styles.subSectionTitle, { color: theme.text, fontFamily: Fonts!.serif, marginBottom: 6 }]}>
             Always allowed
           </Text>
           <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
@@ -477,10 +481,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
       {/* Scheduled Blocking */}
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        Screen block
-      </Text>
-      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+      <View style={styles.titleRow}>
+        <Feather name="clock" size={30} color={theme.accent} />
+        <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+          Screen block
+        </Text>
+      </View>
+      <Text style={[styles.sectionHint, styles.hintIndent, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
         Block apps during specific time windows
       </Text>
       {scheduledBlocks.length === 0 && (
@@ -681,9 +688,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  sectionTitle: { fontSize: 24, fontWeight: '400', marginBottom: 6 },
-  subSectionTitle: { fontSize: 17, fontWeight: '400', marginBottom: 4 },
+  sectionTitle: { fontSize: 24, fontWeight: '400' },
+  subSectionTitle: { fontSize: 17, fontWeight: '400' },
   sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', marginBottom: 16 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
+  hintIndent: { marginLeft: 44 },
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
