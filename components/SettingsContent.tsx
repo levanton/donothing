@@ -515,7 +515,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
               blockSheetRef.current?.expand();
             }}
             style={[styles.card, {
-              borderColor: active ? theme.accent : theme.border,
+              borderColor: active ? theme.accent : theme.text,
               opacity: disabled ? 0.4 : 1,
             }]}
           >
@@ -532,10 +532,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 );
               })()}
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-                <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal' }}>
+                <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
                   {groupLabel(b.groupId)}
                 </Text>
-                {` · goal ${b.unlockGoalMinutes} min`}
+                {' · goal '}
+                <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
+                  {b.unlockGoalMinutes} min
+                </Text>
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
