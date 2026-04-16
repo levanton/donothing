@@ -309,8 +309,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       </View>
 
       {/* Daily Goal */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DAILY GOAL</Text>
-      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Daily goal
+      </Text>
+      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
         {dailyGoalMinutes > 0
           ? `Do nothing for ${dailyGoalMinutes} min every day`
           : 'Set a daily goal to track your progress'}
@@ -329,10 +331,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <View style={styles.sectionHeaderRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-                APPS TO BLOCK
+              <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                Apps to block
               </Text>
-              <Text style={[styles.sectionHint, { color: theme.textTertiary, marginBottom: 12 }]}>
+              <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
                 Create lists of apps, then pick one per schedule
               </Text>
             </View>
@@ -354,6 +356,17 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           </View>
 
           {/* User groups */}
+          {blockGroups.length === 0 && (
+            <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
+              <Feather name="layers" size={22} color={theme.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                No lists yet
+              </Text>
+              <Text style={[styles.emptySub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+                Group apps you want to block together
+              </Text>
+            </View>
+          )}
           {blockGroups.map((g) => {
             const count = groupCounts[g.id] ?? 0;
             return (
@@ -391,12 +404,12 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             onPress={handleAddGroup}
           />
 
-          {/* Never-block allowlist */}
+          {/* Never-block allowlist — sub-section of "Apps to block" */}
           <View style={{ height: 28 }} />
-          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            ALWAYS ALLOWED
+          <Text style={[styles.subSectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            Always allowed
           </Text>
-          <Text style={[styles.sectionHint, { color: theme.textTertiary, marginBottom: 12 }]}>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
             These stay unlocked during any block
           </Text>
           {neverBlockCount > 0 ? (
@@ -463,16 +476,20 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       )}
 
       {/* Scheduled Blocking */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
-        SCREEN BLOCK
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Screen block
+      </Text>
+      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+        Block apps during specific time windows
       </Text>
       {scheduledBlocks.length === 0 && (
         <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
           <Feather name="smartphone" size={22} color={theme.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+          <Text style={[styles.emptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
             No scheduled blocks yet
           </Text>
-          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
+          <Text style={[styles.emptySub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
             Schedule time to block distractions
           </Text>
         </View>
@@ -664,8 +681,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 12 },
-  sectionHint: { fontSize: 13, fontWeight: '300', fontStyle: 'italic', marginBottom: 4 },
+  sectionTitle: { fontSize: 24, fontWeight: '400', marginBottom: 6 },
+  subSectionTitle: { fontSize: 17, fontWeight: '400', marginBottom: 4 },
+  sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', marginBottom: 16 },
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -907,7 +925,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: 28 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 36 },
   emptyCard: {
     borderWidth: 1,
     borderStyle: 'dashed',
