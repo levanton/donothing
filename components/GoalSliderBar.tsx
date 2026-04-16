@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, TextStyle, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -82,6 +82,9 @@ interface GoalSliderBarProps {
   /** Override track stroke width (default 2.5 fill / 2 bg) */
   trackStrokeWidth?: number;
 
+  /** Override scale label text style */
+  scaleLabelStyle?: TextStyle;
+
   // --- Controlled mode (main screen): pass progress + width, gesture is external ---
   progress?: Animated.SharedValue<number>;
   width?: number;
@@ -103,6 +106,7 @@ export default function GoalSliderBar({
   sliderHeight,
   thumbRadius: thumbR,
   trackStrokeWidth,
+  scaleLabelStyle,
   progress: externalProgress,
   width: fixedWidth,
   value,
@@ -272,7 +276,7 @@ export default function GoalSliderBar({
                   width: 40,
                 }}
               >
-                <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>
+                <Text style={[styles.scaleLabel, { color: theme.textTertiary }, scaleLabelStyle]}>
                   {label}
                 </Text>
               </View>
@@ -282,7 +286,7 @@ export default function GoalSliderBar({
       ) : (
         <View style={[styles.scaleRow, { width, paddingHorizontal: pad - 4 }]}>
           {scaleLabels.map((label, i) => (
-            <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }]}>{label}</Text>
+            <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }, scaleLabelStyle]}>{label}</Text>
           ))}
         </View>
       )}

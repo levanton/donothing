@@ -90,6 +90,10 @@ export default function BlockPickerContent({
   const [unlockGoal, setUnlockGoal] = useState<number>(initialUnlockGoal ?? DEFAULT_UNLOCK);
   const [appsExpanded, setAppsExpanded] = useState(false);
 
+  const isLight = theme.bg === '#F9F2E0';
+  const strongBorder = theme.text;
+  const softDivider = isLight ? '#CFC4AF' : '#6B6B68';
+
   const toggleDay = (day: number) => {
     Haptics.selectionAsync();
     setSelectedDays((prev) => {
@@ -182,11 +186,12 @@ export default function BlockPickerContent({
           ticks={[5, 15, 30, 45, 60]}
           scaleLabels={['0', '5', '15', '30', '60', '90']}
           accentColor={theme.accent}
+          scaleLabelStyle={{ color: theme.text, fontWeight: '500', fontSize: 12 }}
           hideLabel
         />
       </View>
 
-      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      <View style={[styles.divider, { backgroundColor: softDivider }]} />
 
       {/* 2. APPS */}
       <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
@@ -197,7 +202,7 @@ export default function BlockPickerContent({
       </Text>
       <Animated.View
         layout={LinearTransition.duration(260)}
-        style={[styles.timeCard, { borderColor: theme.border }]}
+        style={[styles.timeCard, { borderColor: strongBorder }]}
       >
         {!appsExpanded ? (
           <AnimatedPressable
@@ -210,9 +215,11 @@ export default function BlockPickerContent({
             <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
               {selectedAppName}
             </Text>
-            <Text style={[styles.appsChangeLabel, { color: theme.accent, fontFamily: Fonts!.serif }]}>
-              change
-            </Text>
+            <View style={[styles.appsChangeChip, { backgroundColor: theme.accent }]}>
+              <Text style={[styles.appsChangeLabel, { color: theme.accentText, fontFamily: Fonts!.serif }]}>
+                change
+              </Text>
+            </View>
           </AnimatedPressable>
         ) : (
           appItems.map((item, i) => {
@@ -225,7 +232,7 @@ export default function BlockPickerContent({
                 entering={FadeIn.delay(delay).duration(220)}
                 exiting={FadeOut.duration(120)}
               >
-                {i > 0 && <View style={[styles.timeDivider, { backgroundColor: theme.border }]} />}
+                {i > 0 && <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />}
                 <Pressable onPress={() => pickGroup(item.id)} style={styles.timeRow}>
                   <Text style={[
                     styles.timeRowLabel,
@@ -241,7 +248,7 @@ export default function BlockPickerContent({
         )}
       </Animated.View>
 
-      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      <View style={[styles.divider, { backgroundColor: softDivider }]} />
 
       {/* 3. TIME — native iOS compact time picker rows */}
       <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
@@ -250,7 +257,7 @@ export default function BlockPickerContent({
       <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
         When the block window starts and ends
       </Text>
-      <View style={[styles.timeCard, { borderColor: theme.border }]}>
+      <View style={[styles.timeCard, { borderColor: strongBorder }]}>
         <View style={styles.timeRow}>
           <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Starts</Text>
           {Platform.OS === 'ios' ? (
@@ -269,7 +276,7 @@ export default function BlockPickerContent({
             </Text>
           )}
         </View>
-        <View style={[styles.timeDivider, { backgroundColor: theme.border }]} />
+        <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />
         <View style={styles.timeRow}>
           <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Ends</Text>
           {Platform.OS === 'ios' ? (
@@ -387,9 +394,15 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginVertical: 28,
   },
+  appsChangeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 100,
+  },
   appsChangeLabel: {
-    fontSize: 15,
-    fontWeight: '400',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.2,
   },
   chipRow: {
     flexDirection: 'row',
@@ -407,8 +420,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   timeCard: {
-    borderWidth: 1,
-    borderRadius: 14,
+    borderWidth: 1.2,
+    borderRadius: 16,
     overflow: 'hidden',
   },
   timeRow: {

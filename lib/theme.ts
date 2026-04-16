@@ -7,7 +7,7 @@ export const palette = {
   white:      '#FFFFFF',
   charcoal:   '#444444',
   brown:      '#333431',
-  terracotta: '#CF644D',
+  terracotta: '#DF5C44',
   salmon:     '#E8A99A',
   umber:      '#5C4033',
   danger:     '#D94040',
