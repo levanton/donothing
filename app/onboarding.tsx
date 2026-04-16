@@ -7,12 +7,10 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
-import { themes, palette } from '@/lib/theme';
+import { palette } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
 import { saveOnboardingData } from '@/lib/onboarding-persistence';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
-import PickerSheet from '@/components/PickerSheet';
-import TimePickerContent from '@/components/TimePicker';
 import PillButton from '@/components/PillButton';
 
 // Screens
@@ -24,7 +22,6 @@ import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
 import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuizScreen';
 import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
 import SetGoalScreen from '@/components/onboarding/screens/SetGoalScreen';
-import ScheduleScreen from '@/components/onboarding/screens/ScheduleScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
 import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
 import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
@@ -54,10 +51,9 @@ export default function OnboardingRoute() {
       painPoints: flow.painPoints,
       screenTime: flow.screenTime,
       goal: flow.goal,
-      reminders: flow.reminders,
       router,
     });
-  }, [flow.painPoints, flow.screenTime, flow.goal, flow.reminders, router]);
+  }, [flow.painPoints, flow.screenTime, flow.goal, router]);
 
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;
 
@@ -77,8 +73,7 @@ export default function OnboardingRoute() {
       case 'testimonials':    return <TestimonialsScreen {...props} />;
       case 'howItWorks':      return <HowItWorksScreen {...props} />;
       case 'setGoal':         return <SetGoalScreen {...props} selected={flow.goal} onSelect={flow.setGoal} screenTimeAnswer={flow.screenTime[0] ?? ''} />;
-      case 'schedule':        return <ScheduleScreen {...props} reminders={flow.reminders} onRemindersChange={flow.setReminders} onEditReminder={flow.handleEditReminder} />;
-      case 'personalResult':  return <PersonalizedResultScreen {...props} painPoints={flow.painPoints} screenTime={flow.screenTime[0] ?? ''} goal={flow.goal[0] ?? '5m'} reminders={flow.reminders} />;
+      case 'personalResult':  return <PersonalizedResultScreen {...props} painPoints={flow.painPoints} screenTime={flow.screenTime[0] ?? ''} goal={flow.goal[0] ?? '5m'} />;
       case 'paywall':         return <PaywallScreen {...props} onFinish={handleFinish} />;
       default:                return null;
     }
@@ -136,22 +131,6 @@ export default function OnboardingRoute() {
             </View>
           )}
         </View>
-      )}
-
-      {/* Schedule reminder picker */}
-      {currentPage.id === 'schedule' && (
-        <PickerSheet ref={flow.reminderSheetRef} theme={themes.light} onDismiss={flow.dismissReminderSheet}>
-          <TimePickerContent
-            key={flow.editingReminderId ?? 'new'}
-            theme={themes.light}
-            title={flow.editingReminderId ? 'Edit reminder' : 'Add reminder'}
-            initialHour={flow.editingReminder?.hour}
-            initialMinute={flow.editingReminder?.minute}
-            initialDays={flow.editingReminder?.weekdays}
-            onConfirm={flow.handleConfirmReminder}
-            onCancel={() => flow.reminderSheetRef.current?.close()}
-          />
-        </PickerSheet>
       )}
 
       {/* DEV: Page jumper */}

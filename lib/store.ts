@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { initDatabase } from './db';
 import {
@@ -7,13 +6,6 @@ import {
   deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
 } from './db/sessions';
-import {
-  getAllReminders,
-  insertReminder,
-  updateReminder as dbUpdateReminder,
-  deleteReminder as dbDeleteReminder,
-  toggleReminder as dbToggleReminder,
-} from './db/reminders';
 import {
   getAllScheduledBlocks,
   insertScheduledBlock,
@@ -29,18 +21,16 @@ import {
 } from './db/block-groups';
 import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/settings';
 import {
-  getNotificationIds,
   clearNotificationIds,
 } from './db/notification-state';
-import type { Reminder, ScheduledBlock, CheckinRow, BlockGroup } from './db/types';
+import type { ScheduledBlock, CheckinRow, BlockGroup } from './db/types';
 import { getWeekStats, WeekDay, getISOWeekKey } from './stats';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
 import { evaluateAndSaveNewMilestones } from './milestones';
 import { getCheckinByWeek, getPreviousCheckin, getLatestCheckin, insertCheckin } from './db/checkins';
 import {
-  configureNotifications, requestPermission,
-  syncReminders, cancelNotification,
+  configureNotifications,
 } from './notifications';
 
 // Module-level refs (not state, not serializable)
@@ -72,7 +62,6 @@ export interface AppState {
   // Settings
   settingsOpen: boolean;
   dailyGoalMinutes: number;
-  reminders: Reminder[];
   scheduledBlocks: ScheduledBlock[];
   blockGroups: BlockGroup[];
 
@@ -130,10 +119,6 @@ export interface AppState {
   openSettings: () => void;
   closeSettings: () => void;
   setDailyGoal: (minutes: number) => Promise<void>;
-  addReminder: (hour: number, minute: number, weekdays: number[]) => Promise<void>;
-  editReminder: (id: string, hour: number, minute: number, weekdays: number[]) => Promise<void>;
-  removeReminder: (id: string) => Promise<void>;
-  toggleReminder: (id: string) => Promise<void>;
   addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => Promise<void>;
   editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => Promise<void>;
   removeScheduledBlock: (id: string) => Promise<void>;
@@ -183,7 +168,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Settings
   settingsOpen: false,
   dailyGoalMinutes: 0,
-  reminders: [],
   scheduledBlocks: [],
   blockGroups: [],
 
@@ -205,12 +189,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
     const onboardingComplete = getSetting('onboardingComplete') === '1';
     const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
-    const reminders = getAllReminders();
     const scheduledBlocks = getAllScheduledBlocks();
     const blockGroups = getAllBlockGroups();
-
-    // Sync notifications (async)
-    await syncReminders(reminders);
 
     // Reconcile native monitors with DB state, then re-register what's valid.
     try {
@@ -232,7 +212,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       themeMode,
       dailyGoalMinutes,
       onboardingComplete,
-      reminders,
       scheduledBlocks,
       blockGroups,
       achievedMilestones,
@@ -395,53 +374,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDailyGoal: async (minutes) => {
     set({ dailyGoalMinutes: minutes });
     setSetting('dailyGoal', String(minutes));
-  },
-
-  addReminder: async (hour, minute, weekdays) => {
-    const status = await requestPermission();
-    if (status === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'Enable notifications in Settings to receive reminders.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ],
-      );
-      return;
-    }
-    if (status !== 'granted') return;
-    const reminder = insertReminder(hour, minute, weekdays);
-    const reminders = getAllReminders();
-    await syncReminders(reminders);
-    set({ reminders });
-  },
-
-  editReminder: async (id, hour, minute, weekdays) => {
-    dbUpdateReminder(id, hour, minute, weekdays);
-    const reminders = getAllReminders();
-    await syncReminders(reminders);
-    set({ reminders });
-  },
-
-  removeReminder: async (id) => {
-    // Cancel notifications before deleting
-    const notifIds = getNotificationIds('reminder', id);
-    for (const nid of notifIds) {
-      try { await cancelNotification(nid); } catch {}
-    }
-    clearNotificationIds('reminder', id);
-    dbDeleteReminder(id);
-    set({ reminders: getAllReminders() });
-  },
-
-  toggleReminder: async (id) => {
-    dbToggleReminder(id);
-    const reminders = getAllReminders();
-    // Optimistically update UI
-    set({ reminders });
-    await syncReminders(reminders);
-    set({ reminders: getAllReminders() });
   },
 
   addScheduledBlock: async (hour, minute, durationMinutes, weekdays, groupId, unlockGoalMinutes) => {

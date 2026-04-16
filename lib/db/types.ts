@@ -5,14 +5,6 @@ export interface Session {
   mood?: string;
 }
 
-export interface Reminder {
-  id: string;
-  hour: number;
-  minute: number;
-  weekdays: number[];
-  enabled: boolean;
-}
-
 export interface ScheduledBlock {
   id: string;
   hour: number;

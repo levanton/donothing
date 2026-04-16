@@ -4,8 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
 import { GOAL_MINUTES } from '@/lib/onboarding-data';
-import { formatTime12 } from '@/components/TimePicker';
-import type { ReminderDraft } from './ScheduleScreen';
 
 interface Props {
   isActive: boolean;
@@ -13,7 +11,6 @@ interface Props {
   painPoints: string[];
   screenTime: string;
   goal: string;
-  reminders: ReminderDraft[];
   theme: { text: string; bg: string };
 }
 
@@ -23,18 +20,12 @@ export default function PersonalizedResultScreen({
   painPoints,
   screenTime,
   goal,
-  reminders,
   theme,
 }: Props) {
   const goalMinutes = GOAL_MINUTES[goal] ?? (parseInt(goal) || 5);
-  const enabledReminders = reminders.filter((r) => r.enabled);
-  const scheduleLabel = enabledReminders.length > 0
-    ? enabledReminders.map((r) => formatTime12(r.hour, r.minute)).join(', ')
-    : 'Morning';
 
   const lines = [
     { icon: 'target' as const, text: `Goal: ${goalMinutes} min/day` },
-    { icon: 'clock' as const, text: `Reminder: ${scheduleLabel}` },
   ];
 
   return (

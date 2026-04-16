@@ -18,11 +18,10 @@ import { AppTheme, themes, palette } from '@/lib/theme';
 import GoalSliderBar from './GoalSliderBar';
 import GoalWheel from './GoalWheel';
 import { useAppStore } from '@/lib/store';
-import type { Reminder, ScheduledBlock, BlockGroup } from '@/lib/db/types';
+import type { ScheduledBlock, BlockGroup } from '@/lib/db/types';
 import { getAuth, requestAuth, type AuthStatus } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
-import ReminderCard from '@/components/ReminderCard';
-import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
+import { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
 import BlockPickerContent from '@/components/BlockPicker';
 
 const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
@@ -139,13 +138,10 @@ function GroupEditorContent({
 export default function SettingsContent({ onClose, insets }: SettingsContentProps) {
   const themeMode = useAppStore((s) => s.themeMode);
   const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
-  const reminders = useAppStore((s) => s.reminders);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
   const blockGroups = useAppStore((s) => s.blockGroups);
   const theme = themes[themeMode];
 
-  const [showReminderPicker, setShowReminderPicker] = useState(false);
-  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [pickerGroupId, setPickerGroupId] = useState<string | null>(null);
@@ -185,7 +181,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     setGroupCounts(next);
   }, [blockGroups]);
 
-  const reminderSheetRef = useRef<BottomSheet>(null);
   const blockSheetRef = useRef<BottomSheet>(null);
   const groupSheetRef = useRef<BottomSheet>(null);
 
@@ -194,16 +189,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const handleGoalChange = (minutes: number) => {
     store().setDailyGoal(minutes);
-  };
-
-  const handleConfirmReminder = (hour: number, minute: number, weekdays: number[]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (editingReminder) {
-      store().editReminder(editingReminder.id, hour, minute, weekdays);
-    } else {
-      store().addReminder(hour, minute, weekdays);
-    }
-    reminderSheetRef.current?.close();
   };
 
   const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
@@ -337,57 +322,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           theme={theme}
         />
       </View>
-
-      {/* Reminders */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
-        REMINDERS
-      </Text>
-      {reminders.length === 0 && (
-        <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
-          <Feather name="bell-off" size={22} color={theme.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
-            No reminders yet
-          </Text>
-          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
-            Add one to remember to pause
-          </Text>
-        </View>
-      )}
-      {reminders.map((r) => (
-        <ReminderCard
-          key={r.id}
-          hour={r.hour}
-          minute={r.minute}
-          weekdays={r.weekdays}
-          enabled={r.enabled}
-          theme={theme}
-          onPress={() => {
-            Haptics.selectionAsync();
-            setEditingReminder(r);
-            reminderSheetRef.current?.expand();
-          }}
-          onToggle={() => {
-            Haptics.selectionAsync();
-            store().toggleReminder(r.id);
-          }}
-          onRemove={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            store().removeReminder(r.id);
-          }}
-        />
-      ))}
-      <PillButton
-        label="+ add reminder"
-        color={theme.text}
-        variant="outline"
-        size="small"
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setEditingReminder(null);
-          setShowReminderPicker(true);
-          reminderSheetRef.current?.expand();
-        }}
-      />
 
       {/* App groups for blocking */}
       {Platform.OS === 'ios' && (
@@ -624,24 +558,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         }}
       />
     </ScrollView>
-
-    {/* Bottom sheet for reminder picker */}
-    <PickerSheet
-      ref={reminderSheetRef}
-      theme={theme}
-      onDismiss={() => { setShowReminderPicker(false); setEditingReminder(null); }}
-    >
-      <TimePickerContent
-        key={editingReminder?.id ?? 'new'}
-        theme={theme}
-        title={editingReminder ? 'Edit reminder' : 'Add reminder'}
-        initialHour={editingReminder?.hour}
-        initialMinute={editingReminder?.minute}
-        initialDays={editingReminder?.weekdays}
-        onConfirm={handleConfirmReminder}
-        onCancel={() => reminderSheetRef.current?.close()}
-      />
-    </PickerSheet>
 
     {/* Bottom sheet for block picker */}
     <PickerSheet
