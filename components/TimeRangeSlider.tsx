@@ -4,25 +4,34 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import Svg, { Line as SvgLine } from 'react-native-svg';
+import Svg, {
+  Circle as SvgCircle,
+  Line as SvgLine,
+  Path as SvgPath,
+  Text as SvgText,
+} from 'react-native-svg';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 
-const AnimatedLine = Animated.createAnimatedComponent(SvgLine);
+const AnimatedPath = Animated.createAnimatedComponent(SvgPath);
+const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 const MINUTES_PER_DAY = 24 * 60;
-const SLIDER_H = 44;
-const THUMB_R = 14;
-const THUMB_STROKE = 3;
-const THUMB_SIZE = (THUMB_R + THUMB_STROKE) * 2;
-const TRACK_SW = 3;
-const FILL_SW = 4;
+const TWO_PI = 2 * Math.PI;
+const MAX_DIAL = 260;
+const NUMBER_OFFSET = 14;
+const NUMBER_FONT_SIZE = 10;
+const NUMBER_PADDING = 22; // outer space for hour numbers
+const THUMB_R = 10;
+const THUMB_DOT_R = 2.5;
+const THUMB_STROKE = 2;
+const TRACK_SW = 2;
+const FILL_SW = 5;
 
 function pad2(n: number) {
   'worklet';
@@ -31,7 +40,7 @@ function pad2(n: number) {
 
 function formatTime(m: number) {
   'worklet';
-  const c = Math.max(0, Math.min(MINUTES_PER_DAY, Math.round(m)));
+  const c = ((Math.round(m) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const h = Math.floor(c / 60);
   const mm = c % 60;
   return `${pad2(h)}:${pad2(mm)}`;
@@ -44,6 +53,13 @@ function formatDuration(m: number) {
   const mm = total % 60;
   if (h === 0) return `${mm}m`;
   return `${h}h ${pad2(mm)}m`;
+}
+
+// Clockwise distance from a (in [0, 1440)) going around to b (in [0, 1440)).
+function cwDistance(a: number, b: number) {
+  'worklet';
+  const d = b - a;
+  return d >= 0 ? d : d + MINUTES_PER_DAY;
 }
 
 interface Props {
@@ -65,18 +81,21 @@ export default function TimeRangeSlider({
   minGap = 15,
   centerLabel = 'length',
 }: Props) {
-  const [width, setWidth] = useState(0);
+  const [size, setSize] = useState(0);
 
-  const snap = useCallback((v: number) => Math.round(v / step) * step, [step]);
+  const snap = useCallback((v: number) => {
+    const m = ((Math.round(v / step) * step) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+    return m;
+  }, [step]);
 
   const startSV = useSharedValue(snap(startMinutes));
   const endSV = useSharedValue(snap(endMinutes));
-  const trackW = useSharedValue(0);
+  const cxSV = useSharedValue(0);
+  const cySV = useSharedValue(0);
+  const rSV = useSharedValue(0);
   const activeThumb = useSharedValue<0 | 1 | 2>(0);
   const lastStepStart = useSharedValue(snap(startMinutes));
   const lastStepEnd = useSharedValue(snap(endMinutes));
-
-  const cy = SLIDER_H / 2;
 
   const commit = useCallback(() => {
     onChange(snap(startSV.value), snap(endSV.value));
@@ -93,51 +112,70 @@ export default function TimeRangeSlider({
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
-    setWidth(w);
-    requestAnimationFrame(() => {
-      trackW.value = w;
-    });
-  }, [trackW]);
+    setSize(Math.min(w, MAX_DIAL));
+  }, []);
+
+  // Geometry
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = Math.max(0, size / 2 - NUMBER_PADDING);
+
+  useEffect(() => {
+    cxSV.value = cx;
+    cySV.value = cy;
+    rSV.value = R;
+  }, [cx, cy, R, cxSV, cySV, rSV]);
 
   const gesture = Gesture.Pan()
-    .failOffsetY([-12, 12])
     .onStart((e) => {
       'worklet';
-      const twVal = trackW.value;
-      if (twVal <= 0) return;
-      const touchMin = Math.max(
-        0,
-        Math.min(MINUTES_PER_DAY, (e.x / twVal) * MINUTES_PER_DAY),
+      const r = rSV.value;
+      if (r <= 0) return;
+      const dx = e.x - cxSV.value;
+      const dy = e.y - cySV.value;
+      let touchAngle = Math.atan2(dx, -dy);
+      if (touchAngle < 0) touchAngle += TWO_PI;
+      const touchMin = (touchAngle / TWO_PI) * MINUTES_PER_DAY;
+
+      // Pick closest thumb (angularly)
+      const dStart = Math.min(
+        Math.abs(touchMin - startSV.value),
+        MINUTES_PER_DAY - Math.abs(touchMin - startSV.value),
       );
-      const distStart = Math.abs(touchMin - startSV.value);
-      const distEnd = Math.abs(touchMin - endSV.value);
-      const mid = (startSV.value + endSV.value) / 2;
-      const picked: 1 | 2 =
-        distStart < distEnd
-          ? 1
-          : distEnd < distStart
-            ? 2
-            : touchMin < mid
-              ? 1
-              : 2;
+      const dEnd = Math.min(
+        Math.abs(touchMin - endSV.value),
+        MINUTES_PER_DAY - Math.abs(touchMin - endSV.value),
+      );
+      const picked: 1 | 2 = dStart <= dEnd ? 1 : 2;
       activeThumb.value = picked;
+
+      const snapped = ((Math.round(touchMin / step) * step) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY;
       if (picked === 1) {
-        const clamped = Math.max(0, Math.min(endSV.value - minGap, touchMin));
-        const snapped = Math.round(clamped / step) * step;
-        if (snapped !== startSV.value) {
-          startSV.value = snapped;
-          if (snapped !== lastStepStart.value) {
-            lastStepStart.value = snapped;
+        // Need to ensure cwDistance(snapped, end) >= minGap
+        const gap = cwDistance(snapped, endSV.value);
+        let next = snapped;
+        if (gap < minGap) {
+          next = (endSV.value - minGap + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+          next = Math.round(next / step) * step;
+        }
+        if (next !== startSV.value) {
+          startSV.value = next;
+          if (next !== lastStepStart.value) {
+            lastStepStart.value = next;
             runOnJS(Haptics.selectionAsync)();
           }
         }
       } else {
-        const clamped = Math.min(MINUTES_PER_DAY, Math.max(startSV.value + minGap, touchMin));
-        const snapped = Math.round(clamped / step) * step;
-        if (snapped !== endSV.value) {
-          endSV.value = snapped;
-          if (snapped !== lastStepEnd.value) {
-            lastStepEnd.value = snapped;
+        const gap = cwDistance(startSV.value, snapped);
+        let next = snapped;
+        if (gap < minGap) {
+          next = (startSV.value + minGap) % MINUTES_PER_DAY;
+          next = Math.round(next / step) * step;
+        }
+        if (next !== endSV.value) {
+          endSV.value = next;
+          if (next !== lastStepEnd.value) {
+            lastStepEnd.value = next;
             runOnJS(Haptics.selectionAsync)();
           }
         }
@@ -145,29 +183,40 @@ export default function TimeRangeSlider({
     })
     .onUpdate((e) => {
       'worklet';
-      const twVal = trackW.value;
-      if (twVal <= 0 || activeThumb.value === 0) return;
-      const touchMin = Math.max(
-        0,
-        Math.min(MINUTES_PER_DAY, (e.x / twVal) * MINUTES_PER_DAY),
-      );
+      const r = rSV.value;
+      if (r <= 0 || activeThumb.value === 0) return;
+      const dx = e.x - cxSV.value;
+      const dy = e.y - cySV.value;
+      let touchAngle = Math.atan2(dx, -dy);
+      if (touchAngle < 0) touchAngle += TWO_PI;
+      const touchMin = (touchAngle / TWO_PI) * MINUTES_PER_DAY;
+      const snapped = ((Math.round(touchMin / step) * step) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+
       if (activeThumb.value === 1) {
-        const clamped = Math.max(0, Math.min(endSV.value - minGap, touchMin));
-        const snapped = Math.round(clamped / step) * step;
-        if (snapped !== startSV.value) {
-          startSV.value = snapped;
-          if (snapped !== lastStepStart.value) {
-            lastStepStart.value = snapped;
+        const gap = cwDistance(snapped, endSV.value);
+        let next = snapped;
+        if (gap < minGap) {
+          next = (endSV.value - minGap + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+          next = Math.round(next / step) * step;
+        }
+        if (next !== startSV.value) {
+          startSV.value = next;
+          if (next !== lastStepStart.value) {
+            lastStepStart.value = next;
             runOnJS(Haptics.selectionAsync)();
           }
         }
       } else {
-        const clamped = Math.min(MINUTES_PER_DAY, Math.max(startSV.value + minGap, touchMin));
-        const snapped = Math.round(clamped / step) * step;
-        if (snapped !== endSV.value) {
-          endSV.value = snapped;
-          if (snapped !== lastStepEnd.value) {
-            lastStepEnd.value = snapped;
+        const gap = cwDistance(startSV.value, snapped);
+        let next = snapped;
+        if (gap < minGap) {
+          next = (startSV.value + minGap) % MINUTES_PER_DAY;
+          next = Math.round(next / step) * step;
+        }
+        if (next !== endSV.value) {
+          endSV.value = next;
+          if (next !== lastStepEnd.value) {
+            lastStepEnd.value = next;
             runOnJS(Haptics.selectionAsync)();
           }
         }
@@ -183,20 +232,40 @@ export default function TimeRangeSlider({
       runOnJS(commit)();
     });
 
-  const startThumbStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: (startSV.value / MINUTES_PER_DAY) * trackW.value - THUMB_SIZE / 2 },
-    ],
-  }));
-  const endThumbStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: (endSV.value / MINUTES_PER_DAY) * trackW.value - THUMB_SIZE / 2 },
-    ],
-  }));
-  const activeLineProps = useAnimatedProps(() => ({
-    x1: (startSV.value / MINUTES_PER_DAY) * trackW.value,
-    x2: (endSV.value / MINUTES_PER_DAY) * trackW.value,
-  }));
+  const startThumbProps = useAnimatedProps(() => {
+    const r = rSV.value;
+    const angle = (startSV.value / MINUTES_PER_DAY) * TWO_PI;
+    return {
+      cx: cxSV.value + r * Math.sin(angle),
+      cy: cySV.value - r * Math.cos(angle),
+    };
+  });
+
+  const endThumbProps = useAnimatedProps(() => {
+    const r = rSV.value;
+    const angle = (endSV.value / MINUTES_PER_DAY) * TWO_PI;
+    return {
+      cx: cxSV.value + r * Math.sin(angle),
+      cy: cySV.value - r * Math.cos(angle),
+    };
+  });
+
+  const activeArcProps = useAnimatedProps(() => {
+    const r = rSV.value;
+    if (r <= 0) return { d: '' };
+    const cxV = cxSV.value;
+    const cyV = cySV.value;
+    const sAng = (startSV.value / MINUTES_PER_DAY) * TWO_PI;
+    let eAng = (endSV.value / MINUTES_PER_DAY) * TWO_PI;
+    while (eAng <= sAng) eAng += TWO_PI;
+    const span = eAng - sAng;
+    const sx = cxV + r * Math.sin(sAng);
+    const sy = cyV - r * Math.cos(sAng);
+    const ex = cxV + r * Math.sin(eAng);
+    const ey = cyV - r * Math.cos(eAng);
+    const largeArc = span > Math.PI ? 1 : 0;
+    return { d: `M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} 1 ${ex} ${ey}` };
+  });
 
   const startTextProps = useAnimatedProps(() => {
     const t = formatTime(startSV.value);
@@ -207,126 +276,162 @@ export default function TimeRangeSlider({
     return { text: t, defaultValue: t } as unknown as Record<string, string>;
   });
   const durationTextProps = useAnimatedProps(() => {
-    const t = formatDuration(endSV.value - startSV.value);
+    const e = endSV.value >= startSV.value
+      ? endSV.value - startSV.value
+      : endSV.value + MINUTES_PER_DAY - startSV.value;
+    const t = formatDuration(e);
     return { text: t, defaultValue: t } as unknown as Record<string, string>;
+  });
+
+  // Tick marks every 30 minutes (48 ticks). Hours are major, halves minor.
+  const allTicks = Array.from({ length: 48 }, (_, i) => i);
+  const tickMarks = allTicks.map((i) => {
+    const m = i * 30;
+    const angle = (m / MINUTES_PER_DAY) * TWO_PI;
+    const isHour = m % 60 === 0;
+    const isMajor = m % 360 === 0; // every 6h
+    const len = isMajor ? 8 : isHour ? 4 : 2;
+    const inner = R - len;
+    return {
+      i,
+      angle,
+      x1: cx + inner * Math.sin(angle),
+      y1: cy - inner * Math.cos(angle),
+      x2: cx + R * Math.sin(angle),
+      y2: cy - R * Math.cos(angle),
+      isMajor,
+      isHour,
+    };
+  });
+
+  // Hour labels — every 3 hours (8 labels), just outside the ring.
+  const labelR = R + NUMBER_OFFSET;
+  const hourLabels = [0, 3, 6, 9, 12, 15, 18, 21].map((h) => {
+    const angle = (h / 24) * TWO_PI;
+    const x = cx + labelR * Math.sin(angle);
+    const y = cy - labelR * Math.cos(angle);
+    return { h, x, y };
   });
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow]}>
         <View style={styles.sideCol}>
-          <Text style={[styles.headerLabel, { color: theme.textTertiary }]}>start</Text>
+          <Text style={[styles.fieldLabel, { color: theme.textTertiary }]}>start</Text>
           <AnimatedTextInput
             editable={false}
             underlineColorAndroid="transparent"
-            style={[styles.timeValue, { color: theme.text, fontFamily: Fonts!.mono }]}
+            style={[styles.endpointValue, { color: theme.text, fontFamily: Fonts!.mono }]}
             animatedProps={startTextProps}
           />
         </View>
-        <View style={styles.centerCol}>
-          <Text style={[styles.headerLabel, { color: theme.textTertiary }]}>{centerLabel}</Text>
-          <AnimatedTextInput
-            editable={false}
-            underlineColorAndroid="transparent"
-            style={[styles.durationValue, { color: theme.text, fontFamily: Fonts!.mono }]}
-            animatedProps={durationTextProps}
-          />
-        </View>
         <View style={[styles.sideCol, styles.rightAlign]}>
-          <Text style={[styles.headerLabel, { color: theme.textTertiary, textAlign: 'right' }]}>
-            end
-          </Text>
+          <Text style={[styles.fieldLabel, { color: theme.textTertiary, textAlign: 'right' }]}>end</Text>
           <AnimatedTextInput
             editable={false}
             underlineColorAndroid="transparent"
-            style={[styles.timeValue, styles.rightText, { color: theme.text, fontFamily: Fonts!.mono }]}
+            style={[styles.endpointValue, styles.rightText, { color: theme.text, fontFamily: Fonts!.mono }]}
             animatedProps={endTextProps}
           />
         </View>
       </View>
 
-      <GestureDetector gesture={gesture}>
-        <View style={styles.trackArea} onLayout={onLayout}>
-          {width > 0 && (
-            <>
-              <Svg width={width} height={SLIDER_H} style={styles.svg}>
-                <SvgLine
-                  x1={0}
-                  y1={cy}
-                  x2={width}
-                  y2={cy}
-                  stroke={theme.textTertiary}
-                  strokeWidth={TRACK_SW}
-                  strokeLinecap="round"
-                />
-                {[6, 12, 18].map((h) => {
-                  const tx = (h / 24) * width;
-                  return (
+      <View style={styles.dialWrap} onLayout={onLayout}>
+        <GestureDetector gesture={gesture}>
+          <View style={[styles.dialSquare, { width: size, height: size }]}>
+            {size > 0 && (
+              <>
+                <Svg width={size} height={size}>
+                  {/* Background ring */}
+                  <SvgCircle
+                    cx={cx}
+                    cy={cy}
+                    r={R}
+                    fill="none"
+                    stroke={theme.textTertiary}
+                    strokeOpacity={0.45}
+                    strokeWidth={TRACK_SW}
+                  />
+                  {/* 15-min tick marks; hours and 6h marks are bolder */}
+                  {tickMarks.map((t) => (
                     <SvgLine
-                      key={h}
-                      x1={tx}
-                      y1={cy - 5}
-                      x2={tx}
-                      y2={cy + 5}
+                      key={t.i}
+                      x1={t.x1}
+                      y1={t.y1}
+                      x2={t.x2}
+                      y2={t.y2}
                       stroke={theme.textTertiary}
-                      strokeWidth={1}
+                      strokeOpacity={t.isMajor ? 0.85 : t.isHour ? 0.55 : 0.3}
+                      strokeWidth={t.isMajor ? 1.6 : t.isHour ? 1.1 : 0.8}
                     />
-                  );
-                })}
-                <AnimatedLine
-                  y1={cy}
-                  y2={cy}
-                  stroke={theme.accent}
-                  strokeWidth={FILL_SW}
-                  strokeLinecap="round"
-                  animatedProps={activeLineProps}
-                />
-              </Svg>
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.thumb,
-                  {
-                    top: cy - THUMB_SIZE / 2,
-                    backgroundColor: theme.bg,
-                    borderColor: theme.accent,
-                  },
-                  startThumbStyle,
-                ]}
-              />
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.thumb,
-                  {
-                    top: cy - THUMB_SIZE / 2,
-                    backgroundColor: theme.bg,
-                    borderColor: theme.accent,
-                  },
-                  endThumbStyle,
-                ]}
-              />
-              <View style={styles.scaleRow}>
-                {['00', '06', '12', '18', '24'].map((l, i) => (
-                  <Text
-                    key={l}
-                    style={[
-                      styles.scaleLabel,
-                      {
-                        color: theme.textTertiary,
-                        fontFamily: Fonts!.mono,
-                        textAlign: i === 0 ? 'left' : i === 4 ? 'right' : 'center',
-                      },
-                    ]}
-                  >
-                    {l}
+                  ))}
+
+                  {/* Active arc */}
+                  <AnimatedPath
+                    fill="none"
+                    stroke={theme.accent}
+                    strokeWidth={FILL_SW}
+                    strokeLinecap="round"
+                    animatedProps={activeArcProps}
+                  />
+
+                  {/* All 24 hour labels just outside the ring */}
+                  {hourLabels.map(({ h, x, y }) => (
+                    <SvgText
+                      key={h}
+                      x={x}
+                      y={y + NUMBER_FONT_SIZE / 3}
+                      fontSize={NUMBER_FONT_SIZE}
+                      fontFamily={Fonts!.mono}
+                      fill={theme.textTertiary}
+                      fillOpacity={h % 6 === 0 ? 1 : 0.55}
+                      textAnchor="middle"
+                    >
+                      {pad2(h)}
+                    </SvgText>
+                  ))}
+
+                  {/* Start thumb — filled accent */}
+                  <AnimatedCircle
+                    r={THUMB_R}
+                    fill={theme.accent}
+                    animatedProps={startThumbProps}
+                  />
+                  <AnimatedCircle
+                    r={THUMB_DOT_R}
+                    fill={theme.bg}
+                    animatedProps={startThumbProps}
+                  />
+                  {/* End thumb — filled accent */}
+                  <AnimatedCircle
+                    r={THUMB_R}
+                    fill={theme.accent}
+                    animatedProps={endThumbProps}
+                  />
+                  <AnimatedCircle
+                    r={THUMB_DOT_R}
+                    fill={theme.bg}
+                    animatedProps={endThumbProps}
+                  />
+                </Svg>
+
+                {/* Center: length value (serif) */}
+                <View pointerEvents="none" style={styles.centerOverlay}>
+                  <Text style={[styles.fieldLabel, { color: theme.textTertiary, textAlign: 'center' }]}>
+                    {centerLabel}
                   </Text>
-                ))}
-              </View>
-            </>
-          )}
-        </View>
-      </GestureDetector>
+                  <AnimatedTextInput
+                    editable={false}
+                    underlineColorAndroid="transparent"
+                    style={[styles.lengthValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+                    animatedProps={durationTextProps}
+                  />
+                </View>
+              </>
+            )}
+          </View>
+        </GestureDetector>
+      </View>
     </View>
   );
 }
@@ -334,73 +439,65 @@ export default function TimeRangeSlider({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    alignItems: 'center',
   },
   headerRow: {
     flexDirection: 'row',
+    width: '100%',
     alignItems: 'flex-end',
-    marginBottom: 20,
+    marginBottom: 8,
   },
   sideCol: {
-    minWidth: 84,
-  },
-  centerCol: {
-    alignItems: 'center',
     flex: 1,
   },
   rightAlign: {
     alignItems: 'flex-end',
   },
-  headerLabel: {
+  rightText: {
+    textAlign: 'right',
+  },
+  fieldLabel: {
     fontSize: 10,
     fontWeight: '400',
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  timeValue: {
-    fontSize: 32,
-    fontWeight: '200',
-    padding: 0,
-    margin: 0,
-    includeFontPadding: false,
-    minWidth: 84,
-  },
-  rightText: {
-    textAlign: 'right',
-  },
-  durationValue: {
-    fontSize: 22,
+  endpointValue: {
+    fontSize: 24,
     fontWeight: '300',
     padding: 0,
     margin: 0,
     includeFontPadding: false,
-    textAlign: 'center',
   },
-  trackArea: {
-    height: SLIDER_H + 26,
-    justifyContent: 'flex-start',
+  dialWrap: {
+    width: '100%',
+    maxWidth: MAX_DIAL,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialSquare: {
+    position: 'relative',
     overflow: 'visible',
   },
-  svg: {
-    overflow: 'visible',
-  },
-  thumb: {
+  centerOverlay: {
     position: 'absolute',
     left: 0,
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    borderWidth: THUMB_STROKE,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  scaleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  scaleLabel: {
-    fontSize: 10,
+  lengthValue: {
+    fontSize: 32,
     fontWeight: '400',
-    letterSpacing: 1,
-    flex: 1,
+    padding: 0,
+    margin: 0,
+    includeFontPadding: false,
+    textAlign: 'center',
+    minWidth: 140,
+    letterSpacing: -0.5,
   },
 });

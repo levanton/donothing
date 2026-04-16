@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import Animated, {
   interpolate,
+  interpolateColor,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
+import { NativeViewGestureHandler } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -23,10 +25,19 @@ import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+const AnimatedText = Animated.createAnimatedComponent(Text);
 
-const ITEM_WIDTH = 160;
-const PICKER_HEIGHT = 72;
-const FADE_WIDTH = 56;
+const ITEM_WIDTH = 180;
+const PICKER_HEIGHT = 100;
+const ACTIVE_X = 24;
+const RIGHT_FADE_WIDTH = 56;
+const RIGHT_PAD_EXTRA = 32;
+
+const FONT_ACTIVE = 34;
+const FONT_BASE = 18;
+const OPACITY_BASE = 0.55;
+const DESCENDER_RATIO = 0.13;
+const TEXT_BOTTOM_OFFSET = 28;
 
 export interface PillPickerItem<T extends string | null> {
   id: T;
@@ -90,55 +101,46 @@ export default function PillPicker<T extends string | null>({
     }
   };
 
-  const pad = viewportW > 0 ? (viewportW - ITEM_WIDTH) / 2 : 0;
+  const paddingRight = viewportW > 0 ? Math.max(0, viewportW - ACTIVE_X - ITEM_WIDTH) + RIGHT_PAD_EXTRA : 0;
 
   return (
     <View onLayout={onLayout} style={styles.container}>
       {viewportW > 0 && (
         <>
-          <AnimatedScrollView
-            ref={scrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={ITEM_WIDTH}
-            decelerationRate="fast"
-            contentContainerStyle={{ paddingHorizontal: pad }}
-            onScroll={scrollHandler}
-            onMomentumScrollEnd={handleMomentumEnd}
-            scrollEventThrottle={16}
-          >
-            {items.map((item, i) => (
-              <PillItem
-                key={item.id ?? '__null'}
-                name={item.name}
-                index={i}
-                scrollX={scrollX}
-                theme={theme}
-                onPress={() => {
-                  scrollRef.current?.scrollTo({ x: i * ITEM_WIDTH, animated: true });
-                }}
-              />
-            ))}
-          </AnimatedScrollView>
+          <NativeViewGestureHandler disallowInterruption>
+            <AnimatedScrollView
+              ref={scrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={ITEM_WIDTH}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingLeft: ACTIVE_X, paddingRight }}
+              onScroll={scrollHandler}
+              onMomentumScrollEnd={handleMomentumEnd}
+              scrollEventThrottle={16}
+            >
+              {items.map((item, i) => (
+                <PillItem
+                  key={item.id ?? '__null'}
+                  name={item.name}
+                  index={i}
+                  scrollX={scrollX}
+                  theme={theme}
+                  onPress={() => {
+                    scrollRef.current?.scrollTo({ x: i * ITEM_WIDTH, animated: true });
+                  }}
+                />
+              ))}
+            </AnimatedScrollView>
+          </NativeViewGestureHandler>
 
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.bg, `${theme.bg}00`]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={[styles.fade, { left: 0, width: FADE_WIDTH }]}
-          />
           <LinearGradient
             pointerEvents="none"
             colors={[`${theme.bg}00`, theme.bg]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={[styles.fade, { right: 0, width: FADE_WIDTH }]}
+            style={[styles.fade, { right: 0, width: RIGHT_FADE_WIDTH }]}
           />
-
-          <View pointerEvents="none" style={styles.indicatorWrap}>
-            <View style={[styles.indicatorLine, { backgroundColor: theme.accent }]} />
-          </View>
         </>
       )}
     </View>
@@ -156,25 +158,24 @@ interface PillItemProps {
 function PillItem({ name, index, scrollX, theme, onPress }: PillItemProps) {
   const animatedStyle = useAnimatedStyle(() => {
     const distance = Math.abs(scrollX.value - index * ITEM_WIDTH);
-    const scale = interpolate(distance, [0, ITEM_WIDTH], [1, 0.78], 'clamp');
-    const opacity = interpolate(distance, [0, ITEM_WIDTH], [1, 0.55], 'clamp');
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
+    const t = Math.min(1, distance / ITEM_WIDTH);
+    const fontSize = FONT_ACTIVE + (FONT_BASE - FONT_ACTIVE) * t;
+    const opacity = interpolate(t, [0, 1], [1, OPACITY_BASE], 'clamp');
+    const color = interpolateColor(t, [0, 1], [theme.accent, theme.text]);
+    const bottom = TEXT_BOTTOM_OFFSET - DESCENDER_RATIO * fontSize;
+    const lineHeight = fontSize;
+    return { fontSize, opacity, color, bottom, lineHeight };
   });
 
   return (
     <Pressable onPress={onPress} style={styles.slot}>
-      <Animated.View style={[styles.item, animatedStyle]}>
-        <Text
-          style={[styles.itemLabel, { color: theme.text, fontFamily: Fonts!.serif }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {name}
-        </Text>
-      </Animated.View>
+      <AnimatedText
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        style={[styles.itemLabel, { fontFamily: Fonts!.serif }, animatedStyle]}
+      >
+        {name}
+      </AnimatedText>
     </Pressable>
   );
 }
@@ -187,34 +188,20 @@ const styles = StyleSheet.create({
   slot: {
     width: ITEM_WIDTH,
     height: PICKER_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  item: {
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   itemLabel: {
-    fontSize: 26,
+    position: 'absolute',
+    left: 0,
+    right: 0,
     fontWeight: '400',
     letterSpacing: 0.2,
+    textAlign: 'left',
+    includeFontPadding: false,
   },
   fade: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-  },
-  indicatorWrap: {
-    position: 'absolute',
-    bottom: 8,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  indicatorLine: {
-    width: 16,
-    height: 2,
-    borderRadius: 1,
   },
 });

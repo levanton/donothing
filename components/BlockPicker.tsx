@@ -1,21 +1,22 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
-import TimeRangeSlider from '@/components/TimeRangeSlider';
 import PillPicker from '@/components/PillPicker';
-import GoalWheel from '@/components/GoalWheel';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
 
 const MIN_DURATION = 15;
 const STEP = 5;
-const UNLOCK_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
+const UNLOCK_OPTIONS = [1, 3, 5, 10, 15] as const;
 const DEFAULT_UNLOCK = 5;
 const SHEET_PAD = 24;
+const MINUTES_PER_DAY = 24 * 60;
 
 interface BlockPickerProps {
   onConfirm: (
@@ -42,6 +43,21 @@ function snap(v: number) {
   return Math.round(v / STEP) * STEP;
 }
 
+function dateFromMinutes(m: number): Date {
+  const d = new Date();
+  d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+  return d;
+}
+
+function pad2(n: number) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function formatTime(m: number) {
+  const c = ((Math.round(m) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  return `${pad2(Math.floor(c / 60))}:${pad2(c % 60)}`;
+}
+
 export default function BlockPickerContent({
   onConfirm,
   onCancel,
@@ -56,10 +72,8 @@ export default function BlockPickerContent({
   groups,
 }: BlockPickerProps) {
   const initStart = snap((initialHour ?? 14) * 60 + (initialMinute ?? 0));
-  const initEnd = Math.min(
-    24 * 60,
-    initStart + Math.max(MIN_DURATION, snap(initialDuration ?? MIN_DURATION)),
-  );
+  const initDur = Math.max(MIN_DURATION, snap(initialDuration ?? MIN_DURATION));
+  const initEnd = (initStart + initDur) % MINUTES_PER_DAY;
 
   const [startMinutes, setStartMinutes] = useState(initStart);
   const [endMinutes, setEndMinutes] = useState(initEnd);
@@ -78,15 +92,25 @@ export default function BlockPickerContent({
     });
   };
 
-  const handleRangeChange = (start: number, end: number) => {
-    setStartMinutes(start);
-    setEndMinutes(end);
+  const onStartChange = (_e: DateTimePickerEvent, d?: Date) => {
+    if (!d) return;
+    const m = snap(d.getHours() * 60 + d.getMinutes());
+    setStartMinutes(m);
+  };
+
+  const onEndChange = (_e: DateTimePickerEvent, d?: Date) => {
+    if (!d) return;
+    const m = snap(d.getHours() * 60 + d.getMinutes());
+    setEndMinutes(m);
   };
 
   const handleConfirm = () => {
     const hour = Math.floor(startMinutes / 60);
     const minute = startMinutes % 60;
-    const duration = Math.max(MIN_DURATION, endMinutes - startMinutes);
+    const rawDur = endMinutes >= startMinutes
+      ? endMinutes - startMinutes
+      : endMinutes + MINUTES_PER_DAY - startMinutes;
+    const duration = Math.max(MIN_DURATION, rawDur);
     onConfirm(hour, minute, duration, selectedDays, groupId, unlockGoal);
   };
 
@@ -96,23 +120,104 @@ export default function BlockPickerContent({
   ];
 
   return (
-    <View style={styles.sheetContent}>
+    <BottomSheetScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
         {title ?? 'Add screen block'}
       </Text>
 
-      <TimeRangeSlider
-        startMinutes={startMinutes}
-        endMinutes={endMinutes}
-        onChange={handleRangeChange}
-        theme={theme}
-        step={STEP}
-        minGap={MIN_DURATION}
-        centerLabel="length"
-      />
+      {/* 1. UNLOCK GOAL */}
+      <View style={styles.unlockHeader}>
+        <View style={styles.unlockHeaderText}>
+          <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif, marginBottom: 4 }]}>
+            Unlock goal
+          </Text>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif, marginBottom: 0 }]}>
+            Do nothing for this long to lift the block
+          </Text>
+        </View>
+        <View style={styles.unlockValueWrap}>
+          <Text style={[styles.unlockValue, { color: theme.accent, fontFamily: Fonts!.serif }]}>
+            {unlockGoal}
+          </Text>
+          <Text style={[styles.unlockUnit, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+            min
+          </Text>
+        </View>
+      </View>
 
-      <View style={{ height: 28 }} />
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
+      {/* 2. APPS */}
+      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Apps
+      </Text>
+      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+        Which list of apps to block
+      </Text>
+      <View style={styles.pillPickerWrap}>
+        <PillPicker
+          items={appItems}
+          selectedId={groupId}
+          onSelect={setGroupId}
+          theme={theme}
+        />
+      </View>
+
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+      {/* 3. TIME — native iOS compact time picker rows */}
+      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+        Time
+      </Text>
+      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+        When the block window starts and ends
+      </Text>
+      <View style={[styles.timeCard, { borderColor: theme.border }]}>
+        <View style={styles.timeRow}>
+          <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Starts</Text>
+          {Platform.OS === 'ios' ? (
+            <DateTimePicker
+              value={dateFromMinutes(startMinutes)}
+              mode="time"
+              display="compact"
+              minuteInterval={5}
+              onChange={onStartChange}
+              themeVariant={theme.bg === '#F9F2E0' ? 'light' : 'dark'}
+              accentColor={theme.accent}
+            />
+          ) : (
+            <Text style={[styles.timeRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+              {formatTime(startMinutes)}
+            </Text>
+          )}
+        </View>
+        <View style={[styles.timeDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.timeRow}>
+          <Text style={[styles.timeRowLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>Ends</Text>
+          {Platform.OS === 'ios' ? (
+            <DateTimePicker
+              value={dateFromMinutes(endMinutes)}
+              mode="time"
+              display="compact"
+              minuteInterval={5}
+              onChange={onEndChange}
+              themeVariant={theme.bg === '#F9F2E0' ? 'light' : 'dark'}
+              accentColor={theme.accent}
+            />
+          ) : (
+            <Text style={[styles.timeRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
+              {formatTime(endMinutes)}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <Text style={[styles.dayRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+        on these days
+      </Text>
       <View style={styles.dayRow}>
         {WEEKDAY_LABELS.map((label, i) => {
           const day = WEEKDAY_VALUES[i];
@@ -137,91 +242,137 @@ export default function BlockPickerContent({
         })}
       </View>
 
-      <View style={{ height: 28 }} />
-
-      <Text style={[styles.sheetFieldLabel, { color: theme.textTertiary }]}>UNLOCK GOAL</Text>
-      <Text style={[styles.sheetFieldHint, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
-        do nothing for this long to lift the block
-      </Text>
-      <View style={styles.pillPickerWrap}>
-        <GoalWheel
-          value={unlockGoal}
-          onChange={setUnlockGoal}
-          theme={theme}
-          options={UNLOCK_OPTIONS}
-        />
-      </View>
-
-      <View style={{ height: 20 }} />
-
-      <Text style={[styles.sheetFieldLabel, { color: theme.textTertiary }]}>APPS</Text>
-      <View style={styles.pillPickerWrap}>
-        <PillPicker
-          items={appItems}
-          selectedId={groupId}
-          onSelect={setGroupId}
-          theme={theme}
-        />
-      </View>
-
-      <View style={{ height: 32 }} />
+      <View style={{ height: 44 }} />
       <View style={styles.sheetButtons}>
         <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} outline flex />
         <PillButton label="add" onPress={handleConfirm} color={theme.accent} filled flex />
       </View>
-    </View>
+    </BottomSheetScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheetContent: {
-    alignItems: 'center',
+  scrollContent: {
     paddingHorizontal: SHEET_PAD,
     paddingTop: 8,
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '400',
-    marginBottom: 28,
+    paddingBottom: 16,
   },
   sheetButtons: {
     flexDirection: 'row',
     gap: 12,
-    width: '100%',
   },
-  sheetFieldLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 2,
-    marginBottom: 6,
-    alignSelf: 'flex-start',
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: '400',
+    textAlign: 'center',
+    marginBottom: 28,
   },
-  sheetFieldHint: {
-    fontSize: 12,
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '400',
+    marginBottom: 4,
+  },
+  sectionHint: {
+    fontSize: 13,
     fontWeight: '300',
     fontStyle: 'italic',
-    marginBottom: 12,
-    alignSelf: 'flex-start',
+    marginBottom: 14,
+  },
+  unlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  unlockHeaderText: {
+    flex: 1,
+  },
+  unlockValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  unlockValue: {
+    fontSize: 64,
+    fontWeight: '300',
+    letterSpacing: -1,
+    lineHeight: 64,
+    includeFontPadding: false,
+  },
+  unlockUnit: {
+    fontSize: 14,
+    fontWeight: '300',
+    fontStyle: 'italic',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 28,
+  },
+  pillPickerWrap: {
+    marginHorizontal: -SHEET_PAD,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 1.2,
+    borderRadius: 100,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  chipLabel: {
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  timeCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 52,
+  },
+  timeDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
+  },
+  timeRowLabel: {
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  timeRowValue: {
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  dayRowLabel: {
+    fontSize: 13,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginTop: 16,
+    marginBottom: 10,
   },
   dayRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     justifyContent: 'center',
   },
   dayCircle: {
-    width: 40,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1.2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
-  },
-  pillPickerWrap: {
-    alignSelf: 'stretch',
-    marginHorizontal: -SHEET_PAD,
   },
 });
