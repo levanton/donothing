@@ -14,6 +14,7 @@ import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
+import GoalSliderBar from '@/components/GoalSliderBar';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -170,6 +171,19 @@ export default function BlockPickerContent({
             min
           </Text>
         </View>
+      </View>
+      <View style={styles.unlockSliderWrap}>
+        <GoalSliderBar
+          value={unlockGoal}
+          onChange={setUnlockGoal}
+          theme={theme}
+          maxMinutes={90}
+          breakpoints={{ b1Val: 15, b1Pos: 0.45, b2Val: 45, b2Pos: 0.78 }}
+          ticks={[5, 15, 30, 45, 60]}
+          scaleLabels={['0', '5', '15', '30', '60', '90']}
+          accentColor={theme.accent}
+          hideLabel
+        />
       </View>
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -364,6 +378,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '300',
     fontStyle: 'italic',
+  },
+  unlockSliderWrap: {
+    marginTop: 16,
+    marginHorizontal: -4,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
