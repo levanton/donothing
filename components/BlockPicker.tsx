@@ -8,11 +8,12 @@ import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import TimeRangeSlider from '@/components/TimeRangeSlider';
 import PillPicker from '@/components/PillPicker';
+import GoalWheel from '@/components/GoalWheel';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
 
 const MIN_DURATION = 15;
 const STEP = 5;
-const UNLOCK_OPTIONS = [1, 3, 5, 10, 15] as const;
+const UNLOCK_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
 const DEFAULT_UNLOCK = 5;
 const SHEET_PAD = 24;
 
@@ -93,7 +94,6 @@ export default function BlockPickerContent({
     { id: null as string | null, name: 'All apps' },
     ...groups.map((g) => ({ id: g.id as string | null, name: g.name })),
   ];
-  const unlockItems = UNLOCK_OPTIONS.map((n) => ({ id: String(n), name: `${n}m` }));
 
   return (
     <View style={styles.sheetContent}>
@@ -144,11 +144,11 @@ export default function BlockPickerContent({
         do nothing for this long to lift the block
       </Text>
       <View style={styles.pillPickerWrap}>
-        <PillPicker
-          items={unlockItems}
-          selectedId={String(unlockGoal)}
-          onSelect={(id) => setUnlockGoal(Number(id))}
+        <GoalWheel
+          value={unlockGoal}
+          onChange={setUnlockGoal}
           theme={theme}
+          options={UNLOCK_OPTIONS}
         />
       </View>
 
