@@ -41,7 +41,6 @@ import PillButton from '@/components/PillButton';
 import PostSessionReflection from '@/components/PostSessionReflection';
 import MilestoneOverlay from '@/components/MilestoneOverlay';
 import { MILESTONES } from '@/lib/milestones';
-import JourneyTags from '@/components/JourneyTags';
 import TimerDisplay from '@/components/TimerDisplay';
 
 const FOCUS_OPTIONS = [
@@ -91,7 +90,6 @@ export default function DoNothingScreen() {
   const focusRemaining = useAppStore((s) => s.focusRemaining);
   const focusTotal = useAppStore((s) => s.focusTotal);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
-  const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
   const reflectionVisible = useAppStore((s) => s.reflectionVisible);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const milestoneQueue = useAppStore((s) => s.milestoneQueue);
@@ -120,7 +118,7 @@ export default function DoNothingScreen() {
   }));
 
   // --- Entry animations ---
-  const timerOpacity = useSharedValue(0.15);
+  const timerOpacity = useSharedValue(0.9);
   const dotProgress = useSharedValue(0);
   const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
   const buttonSize = useSharedValue(100);     // 100 = button, 12 = dot
@@ -325,13 +323,12 @@ export default function DoNothingScreen() {
   const handleGoalToggle = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const s = useAppStore.getState();
-    if (s.showGoalSlider || s.goalSeconds > 0) {
+    if (s.showGoalSlider) {
       s.cancelGoal();
-      timerOpacity.value = withTiming(0.15, { duration: 300 });
     } else {
-      goalSliderX.value = 5 / 60;
+      const mins = s.goalSeconds > 0 ? Math.round(s.goalSeconds / 60) : 10;
+      goalSliderX.value = mins / 60;
       s.openGoalSlider();
-      timerOpacity.value = withTiming(0.75, { duration: 300 });
     }
   }, []);
 
@@ -515,7 +512,7 @@ export default function DoNothingScreen() {
     orbitAmount.value = withTiming(0, { duration: 600 });
     buttonSize.value = withTiming(100, { duration: 600 });
     playIconOpacity.value = withTiming(1, { duration: 900 });
-    timerOpacity.value = withTiming(0.15, { duration: 700 });
+    timerOpacity.value = withTiming(0.9, { duration: 700 });
     // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
@@ -863,7 +860,7 @@ export default function DoNothingScreen() {
             </Animated.Text>
           ) : (
             <TimerDisplay
-              seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
+              seconds={Math.max(0, goalSeconds - elapsed)}
               color={theme.text}
               fontSize={64}
               style={{ letterSpacing: 4 }}
@@ -903,7 +900,7 @@ export default function DoNothingScreen() {
 
       </View>
 
-        {/* Goal button — to the right of play */}
+        {/* Duration picker — to the right of play */}
         <Pressable
           onPress={handleGoalToggle}
           disabled={started}
@@ -911,18 +908,13 @@ export default function DoNothingScreen() {
             styles.goalButton,
             {
               borderColor: theme.border,
-              backgroundColor: (showGoalSlider || goalSeconds > 0) ? theme.border : 'transparent',
+              backgroundColor: showGoalSlider ? theme.border : 'transparent',
               opacity: started ? 0 : 1,
             },
           ]}
           hitSlop={20}
         >
-          <Text style={[styles.goalButtonText, {
-            color: theme.text,
-            fontFamily: Fonts!.serif,
-          }]}>
-            {(showGoalSlider || goalSeconds > 0) ? 'cancel' : 'goal'}
-          </Text>
+          <Feather name="clock" size={20} color={theme.text} style={{ opacity: 0.9 }} />
         </Pressable>
       </View>
 
@@ -969,11 +961,6 @@ export default function DoNothingScreen() {
               <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
                 {formatTimeStat(stats.today + elapsed).unit}
               </Text>
-              {dailyGoalMinutes > 0 && (
-                <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                  {' / '}{dailyGoalMinutes}m
-                </Text>
-              )}
             </View>
           </View>
           <Text style={[styles.statDot, { color: theme.textTertiary }]}>·</Text>
@@ -1039,15 +1026,6 @@ export default function DoNothingScreen() {
           </View>
         </View>
       )}
-
-      {/* Journey tags */}
-      <View style={{ opacity: started ? 0 : 1 }} pointerEvents={started ? 'none' : 'auto'}>
-        <JourneyTags
-          theme={theme}
-          dailyGoalMinutes={dailyGoalMinutes}
-          todayDuration={stats.today}
-        />
-      </View>
 
       {/* Bottom buttons */}
       <View
@@ -1392,12 +1370,8 @@ const styles = StyleSheet.create({
     right: 15,
     borderWidth: 1,
     borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  goalButtonText: {
-    fontSize: 13,
-    fontWeight: '400',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   messageSliderArea: {
     width: 300,

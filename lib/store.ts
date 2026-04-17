@@ -136,9 +136,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   weekStats: [],
   ready: false,
   themeMode: 'dark',
-  goalSeconds: 0,
+  goalSeconds: 10 * 60,
   showGoalSlider: false,
-  sliderMinutes: 5,
+  sliderMinutes: 10,
   focusStep: 'hidden',
   focusRemaining: 0,
   focusTotal: 0,
@@ -310,11 +310,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // --- Goal ---
   openGoalSlider: () => {
-    set({ showGoalSlider: true, sliderMinutes: 5, goalSeconds: 5 * 60 });
+    const current = get().goalSeconds > 0 ? Math.round(get().goalSeconds / 60) : 10;
+    set({ showGoalSlider: true, sliderMinutes: current });
   },
 
   cancelGoal: () => {
-    set({ goalSeconds: 0, showGoalSlider: false });
+    set({ showGoalSlider: false });
   },
 
   setSliderMinutes: (m) => set({ sliderMinutes: m }),
