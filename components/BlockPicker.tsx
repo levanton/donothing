@@ -138,9 +138,9 @@ export default function BlockPickerContent({
           onChange={setUnlockGoal}
           theme={theme}
           maxMinutes={90}
-          breakpoints={{ b1Val: 15, b1Pos: 0.45, b2Val: 45, b2Pos: 0.78 }}
-          ticks={[5, 15, 30, 45, 60]}
-          scaleLabels={['0', '5', '15', '30', '60', '90']}
+          breakpoints={{ b1Val: 15, b1Pos: 0.33, b2Val: 45, b2Pos: 0.67 }}
+          ticks={[5, 10, 30, 60, 75]}
+          scaleLabels={['0', '15', '45', '90']}
           accentColor={theme.accent}
           trackBgColor={theme.text}
           trackStrokeWidth={3.5}
