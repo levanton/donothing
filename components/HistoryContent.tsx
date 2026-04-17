@@ -11,7 +11,6 @@ import { formatTimeStat } from '@/lib/format';
 import { getStats, getStreak } from '@/lib/stats';
 import { getDurationSince, getSessionCount, getLongestSessionDuration, getActiveDaysCount, getWeekDurations } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
-import MilestonesList from './MilestonesList';
 import { useAppStore } from '@/lib/store';
 
 // ── Zen quotes ────────────────────────────────────────────────────────
@@ -34,7 +33,6 @@ interface HistoryContentProps {
 export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
   useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
-  const achievedMilestones = useAppStore((s) => s.achievedMilestones);
   const theme = themes[themeMode];
 
   const totalStats = getStats();
@@ -152,15 +150,6 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
       {/* Calendar */}
       <ActivityCalendar theme={theme} />
 
-      {/* Divider */}
-      <View style={styles.dividerOuter}>
-        <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-      </View>
-
-      {/* Milestones */}
-      <Text style={[styles.sectionLabel, { color: theme.text }]}>MILESTONES</Text>
-      <MilestonesList theme={theme} achievedMilestones={achievedMilestones} />
-
       {/* Footer */}
       <View style={styles.quoteContainer}>
         <Text style={[styles.quoteText, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>{quote}</Text>
@@ -201,13 +190,6 @@ const styles = StyleSheet.create({
   statsSmallValue: { fontSize: 18, fontWeight: '300' },
   statsSmallUnit: { fontSize: 13, fontWeight: '300' },
   statsSmallLabel: { fontSize: 11, fontWeight: '400', marginTop: 2 },
-
-  // Divider
-  dividerOuter: { alignItems: 'center', marginVertical: 28 },
-  dividerLine: { width: 40, height: 1 },
-
-  // Section labels
-  sectionLabel: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 16 },
 
   // Footer
   quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center', marginBottom: 20 },
