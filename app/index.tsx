@@ -32,7 +32,7 @@ import { themes, palette } from '@/lib/theme';
 import { timerDisplay, formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
-import { blockAppsById, unblockAppsById, isBlockActive } from '@/lib/screen-time';
+import { blockAppsById, unblockAppsById, isBlockActive, forceUnblockAll } from '@/lib/screen-time';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
@@ -469,6 +469,8 @@ export default function DoNothingScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
+    const groupIds: string[] = [];
+    forceUnblockAll(groupIds).catch(() => {});
     unblockAppsById('donothing-scheduled-block').catch(() => {});
     useAppStore.getState().unlockFocus();
   }, []);
@@ -484,7 +486,12 @@ export default function DoNothingScreen() {
   const [debugBlocked, setDebugBlocked] = useState(false);
   const handleDebugBlock = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (debugBlocked) {
+    const anyActive = (() => {
+      try { return isBlockActive(); } catch { return false; }
+    })();
+    if (debugBlocked || anyActive) {
+      const groupIds: string[] = [];
+      await forceUnblockAll(groupIds).catch(() => {});
       await unblockAppsById('donothing-scheduled-block').catch(() => {});
       setDebugBlocked(false);
     } else {

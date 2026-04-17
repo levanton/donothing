@@ -3,21 +3,13 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Feather } from '@expo/vector-icons';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-} from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
-import type { AppTheme } from '@/lib/theme';
+import { CARD_BORDER_WIDTH, type AppTheme } from '@/lib/theme';
 import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const MIN_DURATION = 15;
 const STEP = 5;
@@ -44,7 +36,7 @@ interface BlockPickerProps {
   initialDays?: number[];
   initialGroupId?: string | null;
   initialUnlockGoal?: number;
-  groups: BlockGroup[];
+  groups?: BlockGroup[];
 }
 
 function snap(v: number) {
@@ -73,22 +65,14 @@ export default function BlockPickerContent({
   title,
   initialHour,
   initialMinute,
-  initialDuration,
   initialDays,
-  initialGroupId,
   initialUnlockGoal,
-  groups,
 }: BlockPickerProps) {
   const initStart = snap((initialHour ?? 14) * 60 + (initialMinute ?? 0));
-  const initDur = Math.max(MIN_DURATION, snap(initialDuration ?? MIN_DURATION));
-  const initEnd = (initStart + initDur) % MINUTES_PER_DAY;
 
   const [startMinutes, setStartMinutes] = useState(initStart);
-  const [endMinutes, setEndMinutes] = useState(initEnd);
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
-  const [groupId, setGroupId] = useState<string | null>(initialGroupId ?? null);
   const [unlockGoal, setUnlockGoal] = useState<number>(initialUnlockGoal ?? DEFAULT_UNLOCK);
-  const [appsExpanded, setAppsExpanded] = useState(false);
 
   const isLight = theme.bg === '#F9F2E0';
   const strongBorder = theme.text;
@@ -111,40 +95,12 @@ export default function BlockPickerContent({
     setStartMinutes(m);
   };
 
-  const onEndChange = (_e: DateTimePickerEvent, d?: Date) => {
-    if (!d) return;
-    const m = snap(d.getHours() * 60 + d.getMinutes());
-    setEndMinutes(m);
-  };
-
   const handleConfirm = () => {
     const hour = Math.floor(startMinutes / 60);
     const minute = startMinutes % 60;
-    const rawDur = endMinutes >= startMinutes
-      ? endMinutes - startMinutes
-      : endMinutes + MINUTES_PER_DAY - startMinutes;
-    const duration = Math.max(MIN_DURATION, rawDur);
-    onConfirm(hour, minute, duration, selectedDays, groupId, unlockGoal);
+    // Block runs until manually unlocked — use full-day duration sentinel
+    onConfirm(hour, minute, 1439, selectedDays, null, unlockGoal);
   };
-
-  const appItems = [
-    { id: null as string | null, name: 'All apps' },
-    ...groups.map((g) => ({ id: g.id as string | null, name: g.name })),
-  ];
-  const selectedAppName = appItems.find((it) => it.id === groupId)?.name ?? 'All apps';
-
-  const toggleAppsExpanded = () => {
-    Haptics.selectionAsync();
-    setAppsExpanded((v) => !v);
-  };
-
-  const pickGroup = (id: string | null) => {
-    Haptics.selectionAsync();
-    setGroupId(id);
-    setAppsExpanded(false);
-  };
-
-  const selectedAppIndex = Math.max(0, appItems.findIndex((it) => it.id === groupId));
 
   return (
     <BottomSheetScrollView
@@ -195,73 +151,16 @@ export default function BlockPickerContent({
 
       <View style={[styles.divider, { backgroundColor: softDivider }]} />
 
-      {/* 2. APPS */}
-      <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        Apps
-      </Text>
-      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-        Which list of apps to block
-      </Text>
-      <Animated.View
-        layout={LinearTransition.duration(260)}
-        style={[styles.timeCard, { borderColor: strongBorder }]}
-      >
-        {!appsExpanded ? (
-          <AnimatedPressable
-            key="collapsed"
-            onPress={toggleAppsExpanded}
-            style={styles.timeRow}
-            entering={FadeIn.duration(180)}
-            exiting={FadeOut.duration(120)}
-          >
-            <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono }]}>
-              {selectedAppName}
-            </Text>
-            <View style={[styles.appsChangeChip, { backgroundColor: theme.accent }]}>
-              <Text style={[styles.appsChangeLabel, { color: theme.accentText, fontFamily: Fonts!.serif }]}>
-                change
-              </Text>
-            </View>
-          </AnimatedPressable>
-        ) : (
-          appItems.map((item, i) => {
-            const active = item.id === groupId;
-            const dist = Math.abs(i - selectedAppIndex);
-            const delay = i === selectedAppIndex ? 0 : 60 + dist * 40;
-            return (
-              <Animated.View
-                key={item.id ?? '__null'}
-                entering={FadeIn.delay(delay).duration(220)}
-                exiting={FadeOut.duration(120)}
-              >
-                {i > 0 && <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />}
-                <Pressable onPress={() => pickGroup(item.id)} style={styles.timeRow}>
-                  <Text style={[
-                    styles.selectedAppName,
-                    { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono },
-                  ]}>
-                    {item.name}
-                  </Text>
-                  {active && <Feather name="check" size={18} color={theme.accent} />}
-                </Pressable>
-              </Animated.View>
-            );
-          })
-        )}
-      </Animated.View>
-
-      <View style={[styles.divider, { backgroundColor: softDivider }]} />
-
-      {/* 3. TIME — native iOS compact time picker rows */}
+      {/* 2. TIME */}
       <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
         Time
       </Text>
       <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-        When the block window starts and ends
+        When blocking starts each day
       </Text>
       <View style={[styles.timeCard, { borderColor: strongBorder }]}>
         <View style={styles.timeRow}>
-          <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '400' }]}>Starts</Text>
+          <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '400' }]}>Starts at</Text>
           {Platform.OS === 'ios' ? (
             <DateTimePicker
               value={dateFromMinutes(startMinutes)}
@@ -275,25 +174,6 @@ export default function BlockPickerContent({
           ) : (
             <Text style={[styles.timeRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
               {formatTime(startMinutes)}
-            </Text>
-          )}
-        </View>
-        <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />
-        <View style={styles.timeRow}>
-          <Text style={[styles.selectedAppName, { color: theme.text, fontFamily: Fonts!.mono, fontWeight: '400' }]}>Ends</Text>
-          {Platform.OS === 'ios' ? (
-            <DateTimePicker
-              value={dateFromMinutes(endMinutes)}
-              mode="time"
-              display="compact"
-              minuteInterval={5}
-              onChange={onEndChange}
-              themeVariant={theme.bg === '#F9F2E0' ? 'light' : 'dark'}
-              accentColor={theme.accent}
-            />
-          ) : (
-            <Text style={[styles.timeRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-              {formatTime(endMinutes)}
             </Text>
           )}
         </View>
@@ -403,33 +283,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.3,
   },
-  appsChangeChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 100,
-  },
-  appsChangeLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1.2,
-    borderRadius: 100,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  chipLabel: {
-    fontSize: 15,
-    fontWeight: '400',
-  },
   timeCard: {
-    borderWidth: 1.2,
+    borderWidth: CARD_BORDER_WIDTH,
     borderRadius: 16,
     overflow: 'hidden',
   },
