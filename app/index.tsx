@@ -69,7 +69,7 @@ function getFocusMessage(remaining: number, total: number): string {
   return 'just a little more.';
 }
 
-const RING_R = 42;
+const RING_R = 64;
 
 // ===========================================================================
 // Main Screen
@@ -121,7 +121,7 @@ export default function DoNothingScreen() {
   const timerOpacity = useSharedValue(0.9);
   const dotProgress = useSharedValue(0);
   const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
-  const buttonSize = useSharedValue(100);     // 100 = button, 12 = dot
+  const buttonSize = useSharedValue(140);     // 140 = button, 12 = dot
   const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
@@ -510,7 +510,7 @@ export default function DoNothingScreen() {
     await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
-    buttonSize.value = withTiming(100, { duration: 600 });
+    buttonSize.value = withTiming(140, { duration: 600 });
     playIconOpacity.value = withTiming(1, { duration: 900 });
     timerOpacity.value = withTiming(0.9, { duration: 700 });
     // "ing" disappears
@@ -888,12 +888,14 @@ export default function DoNothingScreen() {
         >
           <Animated.View
             style={[
-              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
+              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
               unifiedDotStyle,
             ]}
           >
             <Animated.View style={{ opacity: playIconOpacity }}>
-              <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
+              <Text style={[styles.nothingLabel, { color: theme.accentText, fontFamily: Fonts!.serif }]}>
+                nothing
+              </Text>
             </Animated.View>
           </Animated.View>
         </Pressable>
@@ -1364,6 +1366,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  nothingLabel: {
+    fontSize: 22,
+    fontWeight: '400',
+    letterSpacing: 0.5,
   },
   goalButton: {
     position: 'absolute',
