@@ -40,8 +40,8 @@ import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
-import PostSessionReflection from '@/components/PostSessionReflection';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
+import SessionEndedView from '@/components/SessionEndedView';
 import MilestoneOverlay from '@/components/MilestoneOverlay';
 import { MILESTONES } from '@/lib/milestones';
 import TimerDisplay from '@/components/TimerDisplay';
@@ -113,11 +113,11 @@ export default function DoNothingScreen() {
   const focusRemaining = useAppStore((s) => s.focusRemaining);
   const focusTotal = useAppStore((s) => s.focusTotal);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
-  const reflectionVisible = useAppStore((s) => s.reflectionVisible);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
   const milestoneQueue = useAppStore((s) => s.milestoneQueue);
+  const sessionEndedVisible = useAppStore((s) => s.sessionEndedVisible);
 
   const isActiveRef = useRef(true);
 
@@ -191,6 +191,20 @@ export default function DoNothingScreen() {
     hideWidth.value = withTiming(1, { duration: 690 });
     hideOpacity.value = withTiming(1, { duration: 1125 });
   }, [completionVisible]);
+
+  // --- Reset main screen visuals when a session was cancelled ---
+  useEffect(() => {
+    if (!sessionEndedVisible) return;
+    setDistractionFree(false);
+    orbitAmount.value = 0;
+    buttonSize.value = 140;
+    playIconOpacity.value = 1;
+    timerOpacity.value = 0.9;
+    showOpacity.value = 0;
+    showWidth.value = 0;
+    hideWidth.value = 1;
+    hideOpacity.value = 1;
+  }, [sessionEndedVisible]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
@@ -436,13 +450,16 @@ export default function DoNothingScreen() {
   // --- AppState ---
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState) => {
-      if ((nextState === 'background' || nextState === 'inactive') && isActiveRef.current) {
+      // Only 'background' ends a session flow. 'inactive' covers Control
+      // Center / notification drawer / incoming-call preview — those don't
+      // count as leaving the app.
+      if (nextState === 'background' && isActiveRef.current) {
         isActiveRef.current = false;
         deactivateKeepAwake('session');
         await useAppStore.getState().handleBackground();
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
-        await useAppStore.getState().handleForeground();
+        useAppStore.getState().handleForeground();
         // Check if block is active when returning to foreground
         if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
           useAppStore.getState().showUnlock();
@@ -558,10 +575,6 @@ export default function DoNothingScreen() {
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
   }, []);
 
-  const handleReflectionDone = useCallback(() => {
-    useAppStore.getState().dismissReflection();
-  }, []);
-
   const handleCompletionClose = useCallback(() => {
     useAppStore.getState().dismissCompletion();
   }, []);
@@ -587,6 +600,18 @@ export default function DoNothingScreen() {
   if (!ready) {
     return (
       <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />
+    );
+  }
+
+  // =========================================================================
+  // Session ended — shown when the previous session was cancelled (backgrounded)
+  // =========================================================================
+  if (sessionEndedVisible) {
+    return (
+      <SessionEndedView
+        themeMode={themeMode}
+        onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
+      />
     );
   }
 
@@ -952,7 +977,7 @@ export default function DoNothingScreen() {
           >
             <Animated.View style={{ opacity: playIconOpacity }}>
               <Text style={[styles.nothingLabel, { color: theme.accentText, fontFamily: Fonts!.serif }]}>
-                nothing
+                yes
               </Text>
             </Animated.View>
           </Animated.View>
@@ -1151,14 +1176,6 @@ export default function DoNothingScreen() {
       />
     </Animated.View>
     </GestureDetector>
-
-    {/* Post-session reflection overlay */}
-    <PostSessionReflection
-      visible={reflectionVisible}
-      sessionId={lastSessionId}
-      theme={theme}
-      onDone={handleReflectionDone}
-    />
 
     {/* Countdown completion screen */}
     <SessionCompleteScreen

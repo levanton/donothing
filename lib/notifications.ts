@@ -46,6 +46,24 @@ export async function cancelNotification(notificationId: string): Promise<void> 
   await Notifications.cancelScheduledNotificationAsync(notificationId);
 }
 
+export async function scheduleSessionCompleteNotification(
+  secondsFromNow: number,
+  durationMinutes: number,
+): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Do Nothing',
+      body: `You were in silence for ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.`,
+      sound: 'default',
+      data: { type: 'sessionComplete' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.floor(secondsFromNow)),
+    },
+  });
+}
+
 const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export async function scheduleWeeklyNotification(

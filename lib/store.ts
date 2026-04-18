@@ -17,7 +17,7 @@ import {
 import {
   getAllBlockGroups,
 } from './db/block-groups';
-import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/settings';
+import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
 import {
   clearNotificationIds,
 } from './db/notification-state';
@@ -28,6 +28,8 @@ import { getAchievedMilestones } from './db/milestones-db';
 import { evaluateAndSaveNewMilestones } from './milestones';
 import {
   configureNotifications,
+  scheduleSessionCompleteNotification,
+  cancelNotification,
 } from './notifications';
 
 // Module-level refs (not state, not serializable)
@@ -35,6 +37,31 @@ let timerInterval: ReturnType<typeof setInterval> | null = null;
 let focusInterval: ReturnType<typeof setInterval> | null = null;
 let sessionStartTime = 0;
 let focusEndTime = 0;
+let sessionNotificationId: string | null = null;
+
+const PENDING_SESSION_KEY = 'session_pending';
+const SESSION_CANCELLED_KEY = 'session_cancelled';
+
+interface PendingSession {
+  startedAt: number;
+  goalSeconds: number;
+  notificationId: string | null;
+}
+
+function writePendingSession(p: PendingSession): void {
+  try { setDeviceState(PENDING_SESSION_KEY, JSON.stringify(p)); } catch {}
+}
+
+function readPendingSession(): PendingSession | null {
+  try {
+    const raw = getDeviceState(PENDING_SESSION_KEY);
+    return raw ? (JSON.parse(raw) as PendingSession) : null;
+  } catch { return null; }
+}
+
+function clearPendingSession(): void {
+  try { deleteDeviceState(PENDING_SESSION_KEY); } catch {}
+}
 
 export interface AppState {
   // Timer / Session
@@ -61,8 +88,7 @@ export interface AppState {
   dailyGoalMinutes: number;
   scheduledBlocks: ScheduledBlock[];
 
-  // Post-session reflection
-  reflectionVisible: boolean;
+  // Last session metadata (used by SessionCompleteScreen)
   lastSessionId: string;
   lastSessionDuration: number;
 
@@ -73,13 +99,13 @@ export interface AppState {
   milestoneQueue: string[];
   achievedMilestones: Map<string, number>;
 
+  // Session interruption
+  sessionEndedVisible: boolean;
+  cancelReason: 'backgrounded' | null;
+
   // Onboarding
   onboardingComplete: boolean;
   setOnboardingComplete: () => void;
-
-  // Reflection actions
-  showReflection: () => void;
-  dismissReflection: () => void;
 
   // Completion actions
   completeSession: () => Promise<void>;
@@ -88,6 +114,10 @@ export interface AppState {
   // Milestone actions
   checkMilestones: () => void;
   dismissMilestone: () => void;
+
+  // Interruption actions
+  cancelSession: (reason: 'backgrounded') => Promise<void>;
+  dismissSessionEnded: () => void;
 
   // Actions
   init: () => Promise<void>;
@@ -141,8 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusRemaining: 0,
   focusTotal: 0,
 
-  // Post-session reflection
-  reflectionVisible: false,
+  // Last session metadata
   lastSessionId: '',
   lastSessionDuration: 0,
 
@@ -152,6 +181,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Milestones
   milestoneQueue: [],
   achievedMilestones: new Map(),
+
+  // Session interruption
+  sessionEndedVisible: false,
+  cancelReason: null,
 
   // Settings
   settingsOpen: false,
@@ -196,6 +229,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load milestones
     const achievedMilestones = getAchievedMilestones();
 
+    // Cold-start recovery: if a session was pending when the app was killed,
+    // treat it as cancelled (we can't verify the user wasn't on another app).
+    const pending = readPendingSession();
+    let sessionEndedVisible = getDeviceState(SESSION_CANCELLED_KEY) === '1';
+    let cancelReason: 'backgrounded' | null = sessionEndedVisible ? 'backgrounded' : null;
+    if (pending) {
+      if (pending.notificationId) {
+        try { await cancelNotification(pending.notificationId); } catch {}
+      }
+      clearPendingSession();
+      setDeviceState(SESSION_CANCELLED_KEY, '1');
+      sessionEndedVisible = true;
+      cancelReason = 'backgrounded';
+    }
+
     set({
       themeMode,
       dailyGoalMinutes,
@@ -203,6 +251,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       scheduledBlocks,
       achievedMilestones,
       weekStats: getWeekStats(),
+      sessionEndedVisible,
+      cancelReason,
       ready: true,
     });
   },
@@ -210,11 +260,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Timer ---
   startSession: () => {
     sessionStartTime = Date.now();
+    const goalSeconds = get().goalSeconds;
     set({ started: true, elapsed: 0, showGoalSlider: false });
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
+    // Schedule completion notification only for countdown sessions.
+    sessionNotificationId = null;
+    if (goalSeconds > 0) {
+      scheduleSessionCompleteNotification(goalSeconds, Math.round(goalSeconds / 60))
+        .then((id) => {
+          sessionNotificationId = id;
+          writePendingSession({
+            startedAt: sessionStartTime,
+            goalSeconds,
+            notificationId: id,
+          });
+        })
+        .catch(() => {
+          writePendingSession({ startedAt: sessionStartTime, goalSeconds, notificationId: null });
+        });
+    } else {
+      writePendingSession({ startedAt: sessionStartTime, goalSeconds: 0, notificationId: null });
+    }
   },
 
   stopSession: async () => {
@@ -222,6 +291,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
     const session = dbAddSession(duration);
     set({
@@ -230,24 +304,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
     });
-    get().showReflection();
     get().checkMilestones();
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
-
-  // --- Reflection ---
-  showReflection: () => {
-    if (get().lastSessionDuration >= 10) {
-      set({ reflectionVisible: true });
-    }
-  },
-
-  dismissReflection: () => {
-    set({ reflectionVisible: false });
-    // Check milestones after reflection
-    get().checkMilestones();
-  },
 
   // --- Completion (countdown reached 00:00) ---
   completeSession: async () => {
@@ -256,6 +316,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
     const session = dbAddSession(duration);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -413,24 +478,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // --- Interruption handling ---
+  cancelSession: async (reason) => {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
+    setDeviceState(SESSION_CANCELLED_KEY, '1');
+    set({
+      started: false,
+      elapsed: 0,
+      sessionEndedVisible: true,
+      cancelReason: reason,
+    });
+  },
+
+  dismissSessionEnded: () => {
+    try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
+    set({ sessionEndedVisible: false, cancelReason: null });
+  },
+
   // --- AppState ---
   handleBackground: async () => {
     const { started } = get();
-    if (started) {
-      const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-      }
-      const session = dbAddSession(duration);
-      set({
-        started: false,
-        weekStats: getWeekStats(),
-        lastSessionId: session?.id ?? '',
-        lastSessionDuration: duration,
-      });
-      get().checkMilestones();
-    }
+    if (!started) return;
+    await get().cancelSession('backgrounded');
   },
 
   handleForeground: () => {
