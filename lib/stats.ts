@@ -113,19 +113,6 @@ function isSundayStartLocale(): boolean {
   }
 }
 
-/** Returns ISO week key like "2026-W15" */
-export function getISOWeekKey(date?: Date): string {
-  const d = new Date(date ?? new Date());
-  d.setHours(0, 0, 0, 0);
-  // Thursday in current week decides the year
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const week = Math.ceil(
-    ((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7,
-  );
-  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
-}
-
 export function getDailyStats(days: number = 30): DayStats[] {
   const now = new Date();
   const todayKey = dateKey(now);

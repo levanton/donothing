@@ -21,6 +21,14 @@ import BlockPickerContent from '@/components/BlockPicker';
 
 const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
 
+function countFromMeta(meta: {
+  applicationCount?: number;
+  categoryCount?: number;
+  webDomainCount?: number;
+} | null | undefined): number {
+  return (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0) + (meta?.webDomainCount ?? 0);
+}
+
 interface SettingsContentProps {
   onClose: () => void;
   insets: { top: number; bottom: number };
@@ -51,7 +59,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     if (Platform.OS !== 'ios') return 0;
     try {
       const meta = activitySelectionMetadata({ activitySelectionId: id });
-      return (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0);
+      return countFromMeta(meta);
     } catch { return 0; }
   };
 
@@ -303,7 +311,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       onClose={() => {
         try {
           const meta = activitySelectionMetadata({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
-          setNeverBlockCount((meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0) + (meta?.webDomainCount ?? 0));
+          setNeverBlockCount(countFromMeta(meta));
         } catch {}
         setShowNeverBlockPicker(false);
       }}

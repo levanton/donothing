@@ -129,6 +129,8 @@ export async function scheduleBlock(
   hour: number,
   minute: number,
   durationMinutes: number,
+  // Reserved for future native shield-side enforcement; today only JS gates on it.
+  _unlockGoalMinutes?: number,
 ): Promise<void> {
   const activityName = `block-${blockId}`;
 

@@ -21,12 +21,11 @@ import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/set
 import {
   clearNotificationIds,
 } from './db/notification-state';
-import type { ScheduledBlock, CheckinRow } from './db/types';
-import { getWeekStats, WeekDay, getISOWeekKey } from './stats';
+import type { ScheduledBlock } from './db/types';
+import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
 import { evaluateAndSaveNewMilestones } from './milestones';
-import { getCheckinByWeek, getPreviousCheckin, getLatestCheckin, insertCheckin } from './db/checkins';
 import {
   configureNotifications,
 } from './notifications';
@@ -74,10 +73,6 @@ export interface AppState {
   milestoneQueue: string[];
   achievedMilestones: Map<string, number>;
 
-  // Weekly check-in
-  weeklyCheckinVisible: boolean;
-  previousCheckin: import('./db/types').CheckinRow | null;
-
   // Onboarding
   onboardingComplete: boolean;
   setOnboardingComplete: () => void;
@@ -93,11 +88,6 @@ export interface AppState {
   // Milestone actions
   checkMilestones: () => void;
   dismissMilestone: () => void;
-
-  // Weekly check-in actions
-  checkAndShowWeeklyCheckin: () => void;
-  submitCheckin: (data: { sleep: number; anxiety: number; focus: number; energy: number }) => void;
-  dismissCheckin: () => void;
 
   // Actions
   init: () => Promise<void>;
@@ -162,10 +152,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Milestones
   milestoneQueue: [],
   achievedMilestones: new Map(),
-
-  // Weekly check-in
-  weeklyCheckinVisible: false,
-  previousCheckin: null,
 
   // Settings
   settingsOpen: false,
@@ -244,6 +230,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
     });
+    get().showReflection();
+    get().checkMilestones();
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
@@ -300,33 +288,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   dismissMilestone: () => {
     const queue = get().milestoneQueue.slice(1);
     set({ milestoneQueue: queue });
-  },
-
-  // --- Weekly Check-in ---
-  checkAndShowWeeklyCheckin: () => {
-    const weekKey = getISOWeekKey();
-    const existing = getCheckinByWeek(weekKey);
-    if (existing) return; // Already done this week
-
-    const latest = getLatestCheckin();
-    if (latest) {
-      // Show only if >= 6 days since last check-in
-      const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
-      if (Date.now() - latest.timestamp < sixDaysMs) return;
-    }
-
-    const previous = getPreviousCheckin(weekKey);
-    set({ weeklyCheckinVisible: true, previousCheckin: previous });
-  },
-
-  submitCheckin: (data: { sleep: number; anxiety: number; focus: number; energy: number }) => {
-    const weekKey = getISOWeekKey();
-    insertCheckin(weekKey, data.sleep, data.anxiety, data.focus, data.energy);
-    set({ weeklyCheckinVisible: false });
-  },
-
-  dismissCheckin: () => {
-    set({ weeklyCheckinVisible: false });
   },
 
   deleteSession: async (id: string) => {
@@ -461,8 +422,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         clearInterval(timerInterval);
         timerInterval = null;
       }
-      set({ started: false });
-      dbAddSession(duration);
+      const session = dbAddSession(duration);
+      set({
+        started: false,
+        weekStats: getWeekStats(),
+        lastSessionId: session?.id ?? '',
+        lastSessionDuration: duration,
+      });
+      get().checkMilestones();
     }
   },
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   AppState,
   Dimensions,
   Platform,
@@ -32,6 +33,7 @@ import { themes, palette } from '@/lib/theme';
 import { timerDisplay, formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
+import type { ScheduledBlock } from '@/lib/db/types';
 import { blockAppsById, unblockAppsById, isBlockActive, forceUnblockAll } from '@/lib/screen-time';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar from '@/components/GoalSliderBar';
@@ -71,6 +73,26 @@ function getFocusMessage(remaining: number, total: number): string {
 }
 
 const RING_R = 64;
+
+function findActiveBlock(
+  blocks: ScheduledBlock[],
+  now: Date,
+): ScheduledBlock | null {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const today = now.getDay();
+  for (const b of blocks) {
+    if (!b.enabled) continue;
+    if (b.weekdays.length > 0 && !b.weekdays.includes(today)) continue;
+    const start = b.hour * 60 + b.minute;
+    const end = start + b.durationMinutes;
+    if (end <= 24 * 60) {
+      if (nowMinutes >= start && nowMinutes < end) return b;
+    } else {
+      if (nowMinutes >= start || nowMinutes < end - 24 * 60) return b;
+    }
+  }
+  return null;
+}
 
 // ===========================================================================
 // Main Screen
@@ -463,6 +485,19 @@ export default function DoNothingScreen() {
   }, []);
 
   const handleUnlock = useCallback(() => {
+    const { scheduledBlocks, lastSessionDuration } = useAppStore.getState();
+    const activeBlock = findActiveBlock(scheduledBlocks, new Date());
+    const goalMin = activeBlock?.unlockGoalMinutes ?? 0;
+    if (goalMin > 0 && lastSessionDuration < goalMin * 60) {
+      const remainingSec = goalMin * 60 - lastSessionDuration;
+      const remainingMin = Math.ceil(remainingSec / 60);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        'Do nothing first',
+        `Spend ${remainingMin} more minute${remainingMin === 1 ? '' : 's'} doing nothing before unlocking.`,
+      );
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');

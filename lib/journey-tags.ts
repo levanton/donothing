@@ -32,11 +32,7 @@ export function getJourneyTags(dailyGoalMinutes: number, todayDuration: number):
   }
 
   // ── Streak tags ─────────────────────────────────────────────────
-  if (streak >= 30) {
-    tags.push({ id: 'streak', label: `${streak}-day streak`, type: 'streak' });
-  } else if (streak >= 7) {
-    tags.push({ id: 'streak', label: `${streak}-day streak`, type: 'streak' });
-  } else if (streak >= 3) {
+  if (streak >= 3) {
     tags.push({ id: 'streak', label: `${streak}-day streak`, type: 'streak' });
   }
 
