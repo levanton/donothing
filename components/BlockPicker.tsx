@@ -117,10 +117,10 @@ export default function BlockPickerContent({
       <View style={styles.unlockHeader}>
         <View style={styles.unlockHeaderText}>
           <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif, marginBottom: 4 }]}>
-            Unlock goal
+            Nothing to unlock
           </Text>
           <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif, marginBottom: 0 }]}>
-            Do nothing for this long to lift the block
+            Do nothing for this long.
           </Text>
         </View>
         <View style={styles.unlockValueWrap}>
@@ -137,11 +137,11 @@ export default function BlockPickerContent({
           value={unlockGoal}
           onChange={setUnlockGoal}
           theme={theme}
-          maxMinutes={90}
+          maxMinutes={60}
           minMinutes={1}
-          breakpoints={{ b1Val: 15, b1Pos: 0.33, b2Val: 45, b2Pos: 0.67 }}
-          ticks={[1, 5, 10, 15, 30, 45, 60, 90]}
-          scaleLabels={['1', '5', '10', '15', '30', '45', '60', '90']}
+          breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
+          ticks={[1, 5, 10, 20, 30, 45, 60]}
+          scaleLabels={['1', '5', '10', '20', '30', '45', '60']}
           accentColor={theme.accent}
           trackBgColor={theme.text}
           trackStrokeWidth={3.5}

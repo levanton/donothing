@@ -1,15 +1,12 @@
-import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
 
 import { Fonts } from '@/constants/theme';
-import { themes, palette } from '@/lib/theme';
-import type { AppTheme } from '@/lib/theme';
+import { themes } from '@/lib/theme';
 import { formatTimeStat } from '@/lib/format';
-import { getStats, getStreak } from '@/lib/stats';
-import { getDurationSince, getSessionCount, getLongestSessionDuration, getActiveDaysCount, getWeekDurations } from '@/lib/db/sessions';
+import { getDurationSince, getSessionCount, getLongestSessionDuration } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
@@ -35,37 +32,13 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
 
-  const totalStats = getStats();
-  const streak = getStreak();
   const totalSessions = getSessionCount();
-  const avgSession = totalSessions > 0
-    ? formatTimeStat(Math.round(totalStats.year / totalSessions))
-    : { value: '0', unit: 'min' };
   const longestSession = formatTimeStat(getLongestSessionDuration());
-  const daysActive = getActiveDaysCount();
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const thisMonth = getDurationSince(startOfMonth);
   const thisMonthStat = formatTimeStat(thisMonth);
-
-  // Weekly insight
-  const weekInsight = useMemo(() => {
-    const thisWeekTotal = totalStats.week;
-    const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
-    const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - dayOfWeek * 86400000;
-    const lastWeekStart = thisWeekStart - 7 * 86400000;
-    const lastWeekDurations = getWeekDurations(lastWeekStart, thisWeekStart);
-    let lastWeekTotal = 0;
-    lastWeekDurations.forEach((v) => { lastWeekTotal += v; });
-    if (thisWeekTotal === 0 && lastWeekTotal === 0) return null;
-    if (lastWeekTotal === 0 && thisWeekTotal > 0) return 'a fresh start this week.';
-    if (thisWeekTotal === 0) return 'no stillness yet this week.';
-    const pct = Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100);
-    if (pct > 10) return `${pct}% more stillness than last week.`;
-    if (pct < -10) return `${Math.abs(pct)}% less than last week. that's okay.`;
-    return 'about the same as last week. steady.';
-  }, [totalStats.week]);
 
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
@@ -91,59 +64,25 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         </Pressable>
       </View>
 
-      {/* Stats — clean layout */}
+      {/* Stats — month total as hero, two supporting facts beneath */}
       <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.statsBlock}>
-        {/* Top row: two big numbers */}
-        <View style={styles.statsBigRow}>
-          <View style={styles.statsBigCell}>
-            <Text style={[styles.statsBigValue, { color: theme.accent, fontFamily: Fonts.serif }]}>
-              {streak}
-            </Text>
-            <Text style={[styles.statsBigLabel, { color: theme.text, fontFamily: Fonts.serif }]}>
-              day streak
-            </Text>
-          </View>
-          <View style={[styles.statsDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statsBigCell}>
-            <Text style={[styles.statsBigValue, { color: theme.text, fontFamily: Fonts.serif }]}>
-              {thisMonthStat.value}
-              <Text style={styles.statsBigUnit}> {thisMonthStat.unit}</Text>
-            </Text>
-            <Text style={[styles.statsBigLabel, { color: theme.text, fontFamily: Fonts.serif }]}>
-              this month
-            </Text>
-          </View>
+        <View style={styles.heroCell}>
+          <Text style={[styles.heroValue, { color: theme.text, fontFamily: Fonts.serif }]}>
+            {thisMonthStat.value}
+            <Text style={styles.heroUnit}> {thisMonthStat.unit}</Text>
+          </Text>
+          <Text style={[styles.heroLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+            this month
+          </Text>
         </View>
 
-        {/* Insight */}
-        {weekInsight && (
-          <Text style={[styles.insightText, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-            {weekInsight}
+        <View style={styles.factsRow}>
+          <Text style={[styles.factText, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+            longest: <Text style={{ color: theme.text }}>{longestSession.value} {longestSession.unit}</Text>
           </Text>
-        )}
-
-        {/* Bottom row: four small stats */}
-        <View style={styles.statsSmallRow}>
-          <View style={styles.statsSmallCell}>
-            <Text style={[styles.statsSmallValue, { color: theme.text, fontFamily: Fonts.serif }]}>
-              {avgSession.value}<Text style={styles.statsSmallUnit}> {avgSession.unit}</Text>
-            </Text>
-            <Text style={[styles.statsSmallLabel, { color: theme.textSecondary }]}>avg session</Text>
-          </View>
-          <View style={styles.statsSmallCell}>
-            <Text style={[styles.statsSmallValue, { color: theme.text, fontFamily: Fonts.serif }]}>
-              {longestSession.value}<Text style={styles.statsSmallUnit}> {longestSession.unit}</Text>
-            </Text>
-            <Text style={[styles.statsSmallLabel, { color: theme.textSecondary }]}>longest</Text>
-          </View>
-          <View style={styles.statsSmallCell}>
-            <Text style={[styles.statsSmallValue, { color: theme.text, fontFamily: Fonts.serif }]}>{totalSessions}</Text>
-            <Text style={[styles.statsSmallLabel, { color: theme.textSecondary }]}>sessions</Text>
-          </View>
-          <View style={styles.statsSmallCell}>
-            <Text style={[styles.statsSmallValue, { color: theme.text, fontFamily: Fonts.serif }]}>{daysActive}</Text>
-            <Text style={[styles.statsSmallLabel, { color: theme.textSecondary }]}>days active</Text>
-          </View>
+          <Text style={[styles.factText, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+            sessions: <Text style={{ color: theme.text }}>{totalSessions}</Text>
+          </Text>
         </View>
       </Animated.View>
 
@@ -172,24 +111,12 @@ const styles = StyleSheet.create({
 
   // Stats block
   statsBlock: { marginBottom: 32 },
-
-  // Big stats row
-  statsBigRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  statsBigCell: { flex: 1, alignItems: 'center' },
-  statsBigValue: { fontSize: 48, fontWeight: '200' },
-  statsBigUnit: { fontSize: 16, fontWeight: '300' },
-  statsBigLabel: { fontSize: 14, fontWeight: '400', marginTop: 2 },
-  statsDivider: { width: 1, height: 48, },
-
-  // Insight
-  insightText: { fontSize: 15, fontWeight: '400', textAlign: 'center', lineHeight: 22, marginBottom: 20 },
-
-  // Small stats row
-  statsSmallRow: { flexDirection: 'row' },
-  statsSmallCell: { flex: 1, alignItems: 'center' },
-  statsSmallValue: { fontSize: 18, fontWeight: '300' },
-  statsSmallUnit: { fontSize: 13, fontWeight: '300' },
-  statsSmallLabel: { fontSize: 11, fontWeight: '400', marginTop: 2 },
+  heroCell: { alignItems: 'center', marginBottom: 20 },
+  heroValue: { fontSize: 56, fontWeight: '500', letterSpacing: -0.5 },
+  heroUnit: { fontSize: 18, fontWeight: '400' },
+  heroLabel: { fontSize: 15, fontWeight: '400', marginTop: 4 },
+  factsRow: { flexDirection: 'row', justifyContent: 'center', gap: 28 },
+  factText: { fontSize: 14, fontWeight: '400' },
 
   // Footer
   quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center', marginBottom: 20 },

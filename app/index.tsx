@@ -34,7 +34,7 @@ import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { blockAppsById, unblockAppsById, isBlockActive, forceUnblockAll } from '@/lib/screen-time';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
-import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
+import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
@@ -208,34 +208,11 @@ export default function DoNothingScreen() {
 
   // --- Goal slider ---
   const SLIDER_W = 300;
-  const goalSliderX = useSharedValue(0);
-
-  const lastHapticMin = useRef(0);
-  const onSliderUpdate = useCallback((mins: number) => {
-    if (mins !== lastHapticMin.current) {
-      lastHapticMin.current = mins;
-      Haptics.selectionAsync();
-    }
-    useAppStore.getState().setSliderMinutes(mins);
+  const handleSliderChange = useCallback((mins: number) => {
+    const s = useAppStore.getState();
+    s.setSliderMinutes(mins);
+    s.setGoalFromSlider(mins);
   }, []);
-
-  const onSliderEnd = useCallback((mins: number) => {
-    useAppStore.getState().setGoalFromSlider(mins);
-  }, []);
-
-  const goalSliderGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      'worklet';
-      const x = Math.max(0, Math.min(1, (e.x - SLIDER_PAD) / (SLIDER_W - SLIDER_PAD * 2)));
-      goalSliderX.value = x;
-      const mins = Math.round(x * 60);
-      runOnJS(onSliderUpdate)(mins);
-    })
-    .onEnd(() => {
-      'worklet';
-      const mins = Math.round(goalSliderX.value * 60);
-      runOnJS(onSliderEnd)(mins);
-    });
 
 
   // --- History slide ---
@@ -351,8 +328,6 @@ export default function DoNothingScreen() {
     if (s.showGoalSlider) {
       s.cancelGoal();
     } else {
-      const mins = s.goalSeconds > 0 ? Math.round(s.goalSeconds / 60) : 10;
-      goalSliderX.value = mins / 60;
       s.openGoalSlider();
     }
   }, []);
@@ -981,15 +956,24 @@ export default function DoNothingScreen() {
           </Text>
         </Animated.View>
         {showGoalSlider && !started && (
-          <GestureDetector gesture={goalSliderGesture}>
-            <View style={styles.goalSliderWrap}>
-              <GoalSliderBar
-                progress={goalSliderX}
-                theme={theme}
-                width={SLIDER_W}
-              />
-            </View>
-          </GestureDetector>
+          <View style={styles.goalSliderWrap}>
+            <GoalSliderBar
+              theme={theme}
+              value={sliderMinutes}
+              onChange={handleSliderChange}
+              width={SLIDER_W}
+              maxMinutes={60}
+              minMinutes={1}
+              ticks={[1, 5, 10, 20, 30, 45, 60]}
+              scaleLabels={['1', '5', '10', '20', '30', '45', '60']}
+              breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
+              accentColor={theme.accent}
+              trackBgColor={theme.text}
+              trackStrokeWidth={3.5}
+              scaleLabelStyle={{ color: theme.text, fontWeight: '500', fontSize: 12 }}
+              hideLabel
+            />
+          </View>
         )}
       </View>
 
