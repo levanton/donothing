@@ -93,10 +93,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       </View>
 
       {/* Screen block */}
-      <View style={styles.sectionHeaderRow}>
-        <View style={[styles.titleRow, { flex: 1 }]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderText}>
           <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
             Screen block
+          </Text>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+            Block all apps at a set time, unlock by doing nothing
           </Text>
         </View>
         {Platform.OS === 'ios' && (
@@ -117,9 +120,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           </Pressable>
         )}
       </View>
-      <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-        Block all apps at a set time, unlock by doing nothing
-      </Text>
       {scheduledBlocks.length === 0 && (
         <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
           <Feather name="smartphone" size={22} color={theme.textSecondary} />
@@ -214,51 +214,42 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       {Platform.OS === 'ios' && (
         <>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <View style={styles.titleRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              Always allowed
-            </Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                Always allowed
+              </Text>
+              <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+                These stay unlocked during any block
+              </Text>
+            </View>
+            {neverBlockCount > 0 && (
+              <Pressable
+                onPress={async () => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const status = await requestAuth();
+                  if (status === 'approved') setShowNeverBlockPicker(true);
+                }}
+                hitSlop={10}
+                style={[styles.changeChip, { borderColor: theme.accent }]}
+              >
+                <Feather name="edit-2" size={11} color={theme.accent} />
+                <Text style={[styles.changeChipLabel, { color: theme.accent }]}>edit</Text>
+              </Pressable>
+            )}
           </View>
-          <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-            These stay unlocked during any block
-          </Text>
           {neverBlockCount > 0 ? (
-            <Pressable
-              onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                const status = await requestAuth();
-                if (status === 'approved') setShowNeverBlockPicker(true);
-              }}
-              style={[styles.groupCardCol, { borderColor: theme.accent }]}
-            >
-              <View style={styles.groupCardHeader}>
-                <Text style={[styles.groupName, { color: theme.text, fontFamily: Fonts!.mono, flex: 1 }]}>
-                  {neverBlockCount === 1 ? '1 exception' : `${neverBlockCount} exceptions`}
-                </Text>
-                <Pressable
-                  onPress={async () => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    const status = await requestAuth();
-                    if (status === 'approved') setShowNeverBlockPicker(true);
-                  }}
-                  hitSlop={10}
-                  style={[styles.changeChip, { borderColor: theme.accent }]}
-                >
-                  <Feather name="edit-2" size={11} color={theme.accent} />
-                  <Text style={[styles.changeChipLabel, { color: theme.accent }]}>edit</Text>
-                </Pressable>
-              </View>
-              <AppLabelsView
-                activitySelectionId={NEVER_BLOCK_SELECTION_ID}
-                iconSize={38}
-                maxItems={8}
-                overlap={14}
-                layout="row"
-                tintColor={theme.text}
-                ringColor={theme.bg}
-                style={[styles.labelStrip, { height: 42 }]}
-              />
-            </Pressable>
+            <AppLabelsView
+              activitySelectionId={NEVER_BLOCK_SELECTION_ID}
+              iconSize={64}
+              layout="grid"
+              tintColor={theme.text}
+              ringColor={theme.bg}
+              style={[
+                styles.labelGrid,
+                { height: Math.ceil(neverBlockCount / 4) * 90 },
+              ]}
+            />
           ) : (
             <Pressable
               onPress={async () => {
@@ -327,9 +318,9 @@ const styles = StyleSheet.create({
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
   sectionTitle: { fontSize: 24, fontWeight: '400' },
-  sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', marginBottom: 16 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
-  hintIndent: { marginLeft: 44 },
+  sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  sectionHeaderText: { flex: 1, gap: 4 },
 
   // Card style for reminders & blocks
   card: {
@@ -343,7 +334,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
-  cardTime: { fontSize: 21, fontWeight: '400' },
+  cardTime: { fontSize: 28, fontWeight: '500' },
   cardLabel: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
@@ -364,22 +355,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  groupCardCol: {
-    borderWidth: CARD_BORDER_WIDTH,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 10,
-  },
-  groupCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  labelStrip: {
-    height: 36,
+  labelGrid: {
     width: '100%',
+    marginTop: 4,
+    marginBottom: 8,
   },
   allowEmpty: {
     flexDirection: 'row',
@@ -421,11 +400,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.3,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
   },
   authLock: {
     width: 44,

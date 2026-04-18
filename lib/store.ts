@@ -5,6 +5,7 @@ import {
   addSession as dbAddSession,
   deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
+  cleanupInvalidSessions,
 } from './db/sessions';
 import {
   getAllScheduledBlocks,
@@ -66,6 +67,9 @@ export interface AppState {
   lastSessionId: string;
   lastSessionDuration: number;
 
+  // Session completion (countdown reached 00:00)
+  completionVisible: boolean;
+
   // Milestones
   milestoneQueue: string[];
   achievedMilestones: Map<string, number>;
@@ -81,6 +85,10 @@ export interface AppState {
   // Reflection actions
   showReflection: () => void;
   dismissReflection: () => void;
+
+  // Completion actions
+  completeSession: () => Promise<void>;
+  dismissCompletion: () => void;
 
   // Milestone actions
   checkMilestones: () => void;
@@ -148,6 +156,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastSessionId: '',
   lastSessionDuration: 0,
 
+  // Session completion
+  completionVisible: false,
+
   // Milestones
   milestoneQueue: [],
   achievedMilestones: new Map(),
@@ -171,6 +182,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Init ---
   init: async () => {
     await initDatabase();
+    // Drop any sessions with bogus duration (timestamp-sized, negative, etc.)
+    try { cleanupInvalidSessions(); } catch {}
     configureNotifications();
     // Copy shield icon to app group (fire and forget)
     import('./screen-time').then(({ copyShieldIcon }) => copyShieldIcon()).catch(() => {});
@@ -245,6 +258,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   dismissReflection: () => {
     set({ reflectionVisible: false });
     // Check milestones after reflection
+    get().checkMilestones();
+  },
+
+  // --- Completion (countdown reached 00:00) ---
+  completeSession: async () => {
+    if (!get().started) return;
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const session = dbAddSession(duration);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    set({
+      started: false,
+      elapsed: 0,
+      weekStats: getWeekStats(),
+      lastSessionId: session?.id ?? '',
+      lastSessionDuration: duration,
+      completionVisible: true,
+    });
+  },
+
+  dismissCompletion: () => {
+    set({ completionVisible: false });
     get().checkMilestones();
   },
 

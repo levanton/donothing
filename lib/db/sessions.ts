@@ -12,8 +12,14 @@ interface SessionRow {
   duration: number;
 }
 
+// Sanity cap — no single session can plausibly last longer than 24 hours.
+// This also protects against timestamp-sized values leaking in via bad state
+// (e.g. sessionStartTime not being set before a save).
+const MAX_SESSION_DURATION = 24 * 60 * 60;
+
 export function addSession(duration: number): Session | null {
   if (duration < 1) return null;
+  if (duration > MAX_SESSION_DURATION) return null;
   const db = getDb();
   const id = generateId();
   const timestamp = Date.now();
@@ -22,6 +28,16 @@ export function addSession(duration: number): Session | null {
     id, timestamp, duration,
   );
   return { id, timestamp, duration };
+}
+
+/** Delete any rows with absurd durations (e.g. timestamp-sized values). */
+export function cleanupInvalidSessions(): number {
+  const db = getDb();
+  const result = db.runSync(
+    'DELETE FROM sessions WHERE duration > ? OR duration < 1',
+    MAX_SESSION_DURATION,
+  );
+  return result.changes;
 }
 
 export function getAllSessions(): Session[] {

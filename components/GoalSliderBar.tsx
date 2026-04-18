@@ -94,6 +94,8 @@ interface GoalSliderBarProps {
   // --- Interactive mode (settings): pass value + onChange, gesture is built-in ---
   value?: number;
   onChange?: (minutes: number) => void;
+  /** Lower bound for interactive snapping (default 0) */
+  minMinutes?: number;
 }
 
 export default function GoalSliderBar({
@@ -114,6 +116,7 @@ export default function GoalSliderBar({
   width: fixedWidth,
   value,
   onChange,
+  minMinutes = 0,
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
   const color = accentColor ?? theme.textSecondary;
@@ -153,7 +156,8 @@ export default function GoalSliderBar({
       if (twVal === 0) return;
       const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
       const raw = posToValue(x, maxMinutes, bp);
-      const snapped = snapToNearest(raw);
+      let snapped = snapToNearest(raw);
+      if (snapped < minMinutes) snapped = minMinutes;
       internalProgress.value = valueToPos(snapped, maxMinutes, bp);
       runOnJS(handleDisplayUpdate)(snapped);
     });

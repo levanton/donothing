@@ -39,6 +39,7 @@ import HistoryContent from '@/components/HistoryContent';
 import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
 import PostSessionReflection from '@/components/PostSessionReflection';
+import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import MilestoneOverlay from '@/components/MilestoneOverlay';
 import { MILESTONES } from '@/lib/milestones';
 import TimerDisplay from '@/components/TimerDisplay';
@@ -92,6 +93,8 @@ export default function DoNothingScreen() {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const reflectionVisible = useAppStore((s) => s.reflectionVisible);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
+  const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
+  const completionVisible = useAppStore((s) => s.completionVisible);
   const milestoneQueue = useAppStore((s) => s.milestoneQueue);
 
   const isActiveRef = useRef(true);
@@ -144,6 +147,28 @@ export default function DoNothingScreen() {
     showWidth.value = withTiming(1, { duration: 690 });
     showOpacity.value = withTiming(1, { duration: 1125 });
   }, [started]);
+
+  // --- Countdown complete: auto-end session when timer reaches 00:00 ---
+  useEffect(() => {
+    if (started && goalSeconds > 0 && elapsed >= goalSeconds) {
+      deactivateKeepAwake('session');
+      setDistractionFree(false);
+      useAppStore.getState().completeSession();
+    }
+  }, [elapsed, started, goalSeconds]);
+
+  // --- Reset main screen visuals while completion overlay is showing ---
+  useEffect(() => {
+    if (!completionVisible) return;
+    orbitAmount.value = withTiming(0, { duration: 600 });
+    buttonSize.value = withTiming(140, { duration: 600 });
+    playIconOpacity.value = withTiming(1, { duration: 900 });
+    timerOpacity.value = withTiming(0.9, { duration: 700 });
+    showOpacity.value = withTiming(0, { duration: 400 });
+    showWidth.value = withTiming(0, { duration: 860 });
+    hideWidth.value = withTiming(1, { duration: 690 });
+    hideOpacity.value = withTiming(1, { duration: 1125 });
+  }, [completionVisible]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
@@ -527,6 +552,10 @@ export default function DoNothingScreen() {
     useAppStore.getState().dismissReflection();
   }, []);
 
+  const handleCompletionClose = useCallback(() => {
+    useAppStore.getState().dismissCompletion();
+  }, []);
+
   const handleMilestoneDismiss = useCallback(() => {
     useAppStore.getState().dismissMilestone();
   }, []);
@@ -779,31 +808,50 @@ export default function DoNothingScreen() {
         <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
       </Pressable>
 
-      {/* Onboarding test button — top right */}
-      <Pressable
-        onPress={() => router.push('/onboarding')}
-        disabled={started}
-        style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 96, opacity: started ? 0 : 1 }]}
-        hitSlop={16}
-      >
-        <Feather name="play" size={20} color={theme.text} style={{ opacity: 0.9 }} />
-      </Pressable>
-
-      {/* Debug block button — top right (iOS only) */}
-      {Platform.OS === 'ios' && (
-        <Pressable
-          onPress={handleDebugBlock}
-          disabled={started}
-          style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 60, opacity: started ? 0 : 1 }]}
-          hitSlop={16}
+      {/* Dev tools cluster — only in dev builds, hidden while session is active */}
+      {__DEV__ && (
+        <View
+          style={[styles.devCluster, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
+          pointerEvents={started ? 'none' : 'auto'}
         >
-          <Feather
-            name={debugBlocked ? 'unlock' : 'lock'}
-            size={20}
-            color={debugBlocked ? theme.accent : theme.text}
-            style={{ opacity: 0.9 }}
-          />
-        </Pressable>
+          <Pressable
+            onPress={() => router.push('/onboarding')}
+            disabled={started}
+            style={styles.devIconBtn}
+            hitSlop={12}
+          >
+            <Feather name="play" size={18} color={theme.text} style={{ opacity: 0.9 }} />
+          </Pressable>
+
+          {Platform.OS === 'ios' && (
+            <Pressable
+              onPress={handleDebugBlock}
+              disabled={started}
+              style={styles.devIconBtn}
+              hitSlop={12}
+            >
+              <Feather
+                name={debugBlocked ? 'unlock' : 'lock'}
+                size={18}
+                color={debugBlocked ? theme.accent : theme.text}
+                style={{ opacity: 0.9 }}
+              />
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={() => useAppStore.setState({
+              completionVisible: true,
+              lastSessionId: 'dev-preview',
+              lastSessionDuration: 60,
+            })}
+            disabled={started}
+            style={styles.devIconBtn}
+            hitSlop={12}
+          >
+            <Feather name="flag" size={18} color={theme.text} style={{ opacity: 0.9 }} />
+          </Pressable>
+        </View>
       )}
 
       {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
@@ -1093,6 +1141,15 @@ export default function DoNothingScreen() {
       onDone={handleReflectionDone}
     />
 
+    {/* Countdown completion screen */}
+    <SessionCompleteScreen
+      visible={completionVisible}
+      sessionId={lastSessionId}
+      durationSeconds={lastSessionDuration}
+      todaySeconds={stats.today}
+      onClose={handleCompletionClose}
+    />
+
     {/* Milestone celebration overlay */}
     <MilestoneOverlay
       milestone={currentMilestone}
@@ -1366,6 +1423,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  devCluster: {
+    position: 'absolute',
+    right: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  devIconBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   nothingLabel: {
     fontSize: 22,

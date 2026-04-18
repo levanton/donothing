@@ -5,7 +5,7 @@ import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { Fonts } from '@/constants/theme';
-import { CARD_BORDER_WIDTH, type AppTheme } from '@/lib/theme';
+import { type AppTheme } from '@/lib/theme';
 import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import GoalSliderBar from '@/components/GoalSliderBar';
@@ -138,9 +138,10 @@ export default function BlockPickerContent({
           onChange={setUnlockGoal}
           theme={theme}
           maxMinutes={90}
+          minMinutes={1}
           breakpoints={{ b1Val: 15, b1Pos: 0.33, b2Val: 45, b2Pos: 0.67 }}
-          ticks={[5, 10, 30, 60, 75]}
-          scaleLabels={['0', '15', '45', '90']}
+          ticks={[1, 5, 10, 15, 30, 45, 60, 90]}
+          scaleLabels={['1', '5', '10', '15', '30', '45', '60', '90']}
           accentColor={theme.accent}
           trackBgColor={theme.text}
           trackStrokeWidth={3.5}
@@ -279,37 +280,32 @@ const styles = StyleSheet.create({
     marginVertical: 28,
   },
   selectedAppName: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
     letterSpacing: -0.3,
   },
   timeCard: {
-    borderWidth: CARD_BORDER_WIDTH,
-    borderRadius: 16,
     overflow: 'hidden',
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     paddingVertical: 14,
     minHeight: 52,
   },
   timeDivider: {
     height: StyleSheet.hairlineWidth,
-    marginHorizontal: 16,
   },
   timeRowLabel: {
     fontSize: 17,
     fontWeight: '400',
   },
   timeRowValue: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '400',
   },
   daysSection: {
-    paddingHorizontal: 16,
     paddingVertical: 16,
   },
   daysLabel: {
@@ -334,7 +330,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
   },
 });

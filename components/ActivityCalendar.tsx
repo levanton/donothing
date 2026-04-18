@@ -39,7 +39,6 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const weekStats = useAppStore((s) => s.weekStats);
   const deleteSessionsByDate = useAppStore((s) => s.deleteSessionsByDate);
   const deleteSession = useAppStore((s) => s.deleteSession);
@@ -88,26 +87,6 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
     return cells;
   }, [viewYear, viewMonth]);
 
-  // Current week only (for collapsed view)
-  const currentWeekDays = useMemo(() => {
-    const jsDay = today.getDay();
-    const offset = jsDay === 0 ? 6 : jsDay - 1; // Mon=0
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - offset);
-
-    const days: Array<{ day: number; key: string; dayLabel: string }> = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      days.push({
-        day: d.getDate(),
-        key: dateKey(d),
-        dayLabel: DAY_LABELS[i],
-      });
-    }
-    return days;
-  }, []);
-
   const goToPrevMonth = useCallback(() => {
     Haptics.selectionAsync();
     if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
@@ -122,12 +101,6 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
     else setViewMonth(viewMonth + 1);
     setSelectedDate(null);
   }, [viewYear, viewMonth, isCurrentMonth]);
-
-  const handleExpand = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(!expanded);
-    if (expanded) setSelectedDate(null);
-  }, [expanded]);
 
   const handleDeleteDay = useCallback(() => {
     if (!selectedDate) return;
@@ -186,33 +159,19 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
   return (
     <View style={styles.container}>
-      {/* Header — month name or "This week" + toggle button on the right */}
+      {/* Header — month name with prev/next navigation */}
       <View style={styles.headerRow}>
-        {expanded ? (
-          <View style={styles.monthNav}>
-            <Pressable onPress={goToPrevMonth} hitSlop={16}>
-              <Feather name="chevron-left" size={20} color={theme.textSecondary} />
-            </Pressable>
-            <Text style={[styles.monthLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              {MONTH_NAMES[viewMonth]}{!isCurrentMonth || viewYear !== today.getFullYear() ? ` ${viewYear}` : ''}
-            </Text>
-            <Pressable onPress={goToNextMonth} hitSlop={16}>
-              <Feather name="chevron-right" size={20} color={isCurrentMonth ? theme.border : theme.textSecondary} />
-            </Pressable>
-          </View>
-        ) : (
+        <View style={styles.monthNav}>
+          <Pressable onPress={goToPrevMonth} hitSlop={16}>
+            <Feather name="chevron-left" size={20} color={theme.textSecondary} />
+          </Pressable>
           <Text style={[styles.monthLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            This week
+            {MONTH_NAMES[viewMonth]}{!isCurrentMonth || viewYear !== today.getFullYear() ? ` ${viewYear}` : ''}
           </Text>
-        )}
-
-        <Pressable onPress={handleExpand} hitSlop={12} style={styles.toggleBtn}>
-          <Feather
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={theme.text}
-          />
-        </Pressable>
+          <Pressable onPress={goToNextMonth} hitSlop={16}>
+            <Feather name="chevron-right" size={20} color={isCurrentMonth ? theme.border : theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Day-of-week headers */}
@@ -222,16 +181,9 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
         ))}
       </View>
 
-      {/* Grid — collapsed (week) or expanded (full month) */}
-      {expanded ? (
-        <Animated.View entering={FadeIn.duration(300)} style={styles.grid}>
-          {calendarDays.map((cell, i) => renderDayCell(cell, i))}
-        </Animated.View>
-      ) : (
-        <View style={styles.weekRow}>
-          {currentWeekDays.map((day, i) => renderDayCell(day, i))}
-        </View>
-      )}
+      <View style={styles.grid}>
+        {calendarDays.map((cell, i) => renderDayCell(cell, i))}
+      </View>
 
 
       {/* Selected day detail */}
@@ -307,17 +259,15 @@ const styles = StyleSheet.create({
   container: { marginBottom: 28 },
 
   // Headers
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 },
   monthNav: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   monthLabel: { fontSize: 18, fontWeight: '400' },
-  toggleBtn: { padding: 4 },
 
   dayHeaders: { flexDirection: 'row', marginBottom: 8 },
   dayHeaderLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '400', letterSpacing: 0.5 },
 
   // Grid
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  weekRow: { flexDirection: 'row' },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   dayCircle: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: CELL_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
   dayNumber: { fontSize: 15, fontWeight: '300', zIndex: 1, position: 'absolute' },

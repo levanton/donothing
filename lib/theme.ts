@@ -13,6 +13,8 @@ export const palette = {
   danger:     '#D94040',
 } as const;
 
+export const CARD_BORDER_WIDTH = 1.5;
+
 // ── Opacity helpers ──────────────────────────────────────────────────────
 const alpha = (hex: string, opacity: number): string => {
   const r = parseInt(hex.slice(1, 3), 16);

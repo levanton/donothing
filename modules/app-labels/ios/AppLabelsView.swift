@@ -181,9 +181,11 @@ struct AppLabelsContent: View {
 
   @ViewBuilder
   private func gridBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
-    // Fixed 5-column grid with tight spacing — looks like Apple's Home Screen.
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
-    LazyVGrid(columns: columns, alignment: .center, spacing: 16) {
+    // Adaptive grid — columns size themselves to the icon, so iconSize from
+    // JS controls the actual rendered size rather than being squashed by a
+    // fixed column count.
+    let columns = [GridItem(.adaptive(minimum: model.iconSize + 4), spacing: 16)]
+    LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
       ForEach(Array(displayed.enumerated()), id: \.offset) { _, token in
         TokenIcon(token: token, size: model.iconSize, tint: tint)
       }
