@@ -34,16 +34,26 @@ const MOODS = ['restless', 'calm', 'lighter', 'refreshed', 'grateful'] as const;
 // Colors per mood — maps roughly to their emotional tone. Used for thumb morph
 // and the gradient track behind it.
 const MOOD_COLORS = [
-  '#B55D4F', // restless — muted red
-  '#6B7A85', // calm — muted slate blue
-  '#D9B383', // lighter — warm sand
-  '#8AA885', // refreshed — sage green
+  '#C75B3A', // restless — warm red
+  '#4E6D80', // calm — deep slate blue
+  '#E0A653', // lighter — amber
+  '#5D8F5B', // refreshed — forest green
   '#DF5C44', // grateful — terracotta (app accent)
 ] as const;
 
-const SLIDER_W = 260;
-const THUMB_SIZE = 22;
+const SLIDER_W = 300;
+const THUMB_SIZE = 26;
 const SLIDER_TRAVEL = SLIDER_W - THUMB_SIZE;
+
+// Per-mood background tints — subtle cream washes that pick up the current
+// mood's hue so the whole screen breathes with the selection.
+const MOOD_BG = [
+  '#F3E4DC', // restless — warm pinkish cream
+  '#E6EAEE', // calm — cool blue-grey cream
+  '#F9EAC8', // lighter — amber cream
+  '#E6EEDE', // refreshed — soft green cream
+  '#F9DFD4', // grateful — warm terracotta cream
+] as const;
 
 interface Props {
   visible: boolean;
@@ -95,12 +105,6 @@ function formatMinutes(seconds: number, locale: Locale = 'en'): { value: string;
   const m = Math.max(1, Math.round(seconds / 60));
   return { value: String(m), unit: pluralizeMinutes(m, locale) };
 }
-
-// Background tints for the mood slider. Cream stays as the center value;
-// extremes are subtle ±hue shifts (cooler at "restless", warmer toward
-// "grateful") that the user feels rather than sees.
-const BG_COOL = '#F4F1E4';
-const BG_WARM = '#FCEED8';
 
 function SessionCompleteScreen({
   visible,
@@ -243,14 +247,11 @@ function SessionCompleteScreen({
     interpolateColor(thumbX.value, colorStops, MOOD_COLORS),
   );
 
+  const bgStops = MOODS.map((_, i) => (i / (MOODS.length - 1)) * SLIDER_TRAVEL);
   const contentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
     pointerEvents: contentOpacity.value > 0.5 ? 'auto' : 'none',
-    backgroundColor: interpolateColor(
-      thumbX.value,
-      [0, SLIDER_TRAVEL / 2, SLIDER_TRAVEL],
-      [BG_COOL, palette.cream, BG_WARM],
-    ),
+    backgroundColor: interpolateColor(thumbX.value, bgStops, MOOD_BG as unknown as string[]),
   }));
   const ensoStyle = useAnimatedStyle(() => ({
     opacity: ensoOpacity.value,
@@ -276,7 +277,7 @@ function SessionCompleteScreen({
   const fillStyle = useAnimatedStyle(() => ({
     width: thumbX.value + THUMB_SIZE / 2,
     backgroundColor: thumbColor.value,
-    opacity: 0.22,
+    opacity: 0.25,
   }));
 
   // Ripple that expands out of the thumb on mood select.
@@ -353,8 +354,11 @@ function SessionCompleteScreen({
               style={[
                 styles.moodLabel,
                 {
-                  color: activeMood ? textColor : tertiaryText,
+                  color: activeMood
+                    ? MOOD_COLORS[MOODS.indexOf(activeMood as typeof MOODS[number])]
+                    : tertiaryText,
                   fontFamily: Fonts.serif,
+                  fontWeight: activeMood ? '500' : '300',
                 },
               ]}
             >
@@ -363,17 +367,36 @@ function SessionCompleteScreen({
 
             <GestureDetector gesture={sliderGesture}>
               <View style={styles.sliderTouch}>
-                {/* Gradient backdrop — subtle mood spectrum behind the line */}
+                {/* Gradient track — full-width mood spectrum */}
                 <LinearGradient
                   colors={MOOD_COLORS}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
-                  style={styles.gradientHint}
+                  style={styles.gradientTrack}
                 />
-                {/* Neutral track line on top of gradient */}
-                <View style={[styles.track, { backgroundColor: trackColor }]} />
-                {/* Filled portion that follows the thumb, tinted by mood */}
+                {/* Filled portion that reinforces the current mood */}
                 <Animated.View style={[styles.trackFill, fillStyle]} />
+
+                {/* Tick dots, one per mood — anchored to each mood color */}
+                {MOODS.map((_, i) => {
+                  const isActive = MOODS[i] === activeMood;
+                  const cx = (i / (MOODS.length - 1)) * SLIDER_TRAVEL + THUMB_SIZE / 2;
+                  return (
+                    <View
+                      key={i}
+                      pointerEvents="none"
+                      style={[
+                        styles.tick,
+                        {
+                          left: cx - 3,
+                          backgroundColor: MOOD_COLORS[i],
+                          transform: [{ scale: isActive ? 1.4 : 1 }],
+                          opacity: isActive ? 1 : 0.55,
+                        },
+                      ]}
+                    />
+                  );
+                })}
 
                 {/* Ripple burst on mood confirm */}
                 <Animated.View pointerEvents="none" style={[styles.ripple, rippleStyle]} />
@@ -398,6 +421,7 @@ function SessionCompleteScreen({
                       {
                         color: isActive ? MOOD_COLORS[i] : tertiaryText,
                         fontFamily: Fonts.serif,
+                        fontWeight: isActive ? '600' : '400',
                       },
                     ]}
                     numberOfLines={1}
@@ -478,38 +502,38 @@ const styles = StyleSheet.create({
   },
   sliderTouch: {
     width: SLIDER_W,
-    height: 48,
+    height: 56,
     justifyContent: 'center',
   },
-  gradientHint: {
+  gradientTrack: {
     position: 'absolute',
-    height: 6,
+    height: 5,
     width: SLIDER_W,
-    top: 21,
+    top: 25.5,
     left: 0,
     borderRadius: 3,
-    opacity: 0.22,
-  },
-  track: {
-    height: 1,
-    width: '100%',
-    position: 'absolute',
-    top: 23.5,
-    left: 0,
+    opacity: 0.5,
   },
   trackFill: {
     position: 'absolute',
-    height: 2,
-    top: 23,
+    height: 5,
+    top: 25.5,
     left: 0,
-    borderRadius: 1,
+    borderRadius: 3,
+  },
+  tick: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    top: 25,
   },
   ripple: {
     position: 'absolute',
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
-    top: 13,
+    top: 15,
     left: 0,
   },
   thumb: {
@@ -517,10 +541,12 @@ const styles = StyleSheet.create({
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
     position: 'absolute',
-    top: 13,
+    top: 15,
     left: 0,
+    borderWidth: 2,
+    borderColor: palette.cream,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
@@ -528,12 +554,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: SLIDER_W + 20,
-    marginTop: 18,
+    marginTop: 22,
     paddingHorizontal: 0,
   },
   moodRowLabel: {
-    fontSize: 11,
-    fontWeight: '400',
+    fontSize: 12,
     letterSpacing: 0.3,
     textAlign: 'center',
     flex: 1,
