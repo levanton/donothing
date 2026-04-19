@@ -155,10 +155,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 {formatTime12(b.hour, b.minute)}
               </Text>
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-                {'goal '}
                 <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
                   {b.unlockGoalMinutes} min
                 </Text>
+                {' nothing to unlock'}
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   },
   cardContent: { gap: 4 },
   cardTime: { fontSize: 28, fontWeight: '500' },
-  cardLabel: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
+  cardLabel: { fontSize: 14, fontWeight: '300' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
 

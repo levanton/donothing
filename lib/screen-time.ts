@@ -182,6 +182,24 @@ export async function scheduleBlock(
   // Update shield appearance
   await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
 
+  // iOS DeviceActivityMonitor fires intervalDidStart immediately if the current
+  // time is inside the [start, end] window. That would block apps right as the
+  // user adds the block. Skip registration this cycle if we're inside — it will
+  // fire normally on the next occurrence (tomorrow).
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startMin = hour * 60 + minute;
+  const endMin = startMin + durationMinutes;
+  const insideWindow =
+    endMin <= 24 * 60
+      ? nowMin >= startMin && nowMin < endMin
+      : nowMin >= startMin || nowMin < endMin - 24 * 60;
+
+  if (insideWindow) {
+    console.log('[ScreenTime] Current time inside window — deferring registration to next cycle');
+    return;
+  }
+
   // Start monitoring with the schedule
   await startMonitoring(
     activityName,

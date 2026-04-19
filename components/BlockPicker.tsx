@@ -98,8 +98,9 @@ export default function BlockPickerContent({
   const handleConfirm = () => {
     const hour = Math.floor(startMinutes / 60);
     const minute = startMinutes % 60;
-    // Block runs until manually unlocked — use full-day duration sentinel
-    onConfirm(hour, minute, 1439, selectedDays, null, unlockGoal);
+    // Trigger fires at start; block persists until user unlocks. A short interval
+    // avoids the wrap where iOS sees "now" as inside the window and fires immediately.
+    onConfirm(hour, minute, 15, selectedDays, null, unlockGoal);
   };
 
   return (
