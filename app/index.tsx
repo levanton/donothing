@@ -691,7 +691,7 @@ export default function DoNothingScreen() {
             </Animated.Text>
           ) : (
             <TimerDisplay
-              seconds={Math.max(0, goalSeconds - elapsed)}
+              seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
               color={theme.text}
               fontSize={64}
               style={{ letterSpacing: 4 }}
@@ -754,9 +754,9 @@ export default function DoNothingScreen() {
               onChange={handleSliderChange}
               width={SLIDER_W}
               maxMinutes={60}
-              minMinutes={1}
-              ticks={[1, 5, 10, 20, 30, 45, 60]}
-              scaleLabels={['1', '5', '10', '20', '30', '45', '60']}
+              minMinutes={0}
+              ticks={[0, 5, 10, 20, 30, 45, 60]}
+              scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
               breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
               accentColor={theme.accent}
               trackBgColor={theme.text}
