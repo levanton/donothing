@@ -22,7 +22,6 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -42,15 +41,6 @@ import PillButton from '@/components/PillButton';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
 import TimerDisplay from '@/components/TimerDisplay';
-
-function getMessage(seconds: number): string {
-  if (seconds < 10) return '';
-  if (seconds < 30) return 'breathe.';
-  if (seconds < 60) return 'good. keep going.';
-  if (seconds < 180) return "you're doing nothing great.";
-  if (seconds < 300) return 'the world can wait.';
-  return 'just be.';
-}
 
 const RING_R = 64;
 
@@ -106,7 +96,6 @@ export default function DoNothingScreen() {
 
   const theme = themes[themeMode];
   const stats = getStats();
-  const message = getMessage(elapsed);
 
   // --- Theme animation ---
   const themeProgress = useSharedValue(0);
@@ -348,28 +337,6 @@ export default function DoNothingScreen() {
       historyScrollY.value = e.contentOffset.y;
     },
   });
-
-  // --- Message fade ---
-  const messageOpacity = useSharedValue(0);
-  const prevMessageRef = useRef('');
-
-  useEffect(() => {
-    if (message !== prevMessageRef.current) {
-      if (prevMessageRef.current === '') {
-        messageOpacity.value = withTiming(1, { duration: 400 });
-      } else {
-        messageOpacity.value = withSequence(
-          withTiming(0, { duration: 200 }),
-          withTiming(1, { duration: 200 }),
-        );
-      }
-      prevMessageRef.current = message;
-    }
-  }, [message]);
-
-  const messageFadeStyle = useAnimatedStyle(() => ({
-    opacity: messageOpacity.value,
-  }));
 
   // Deactivate keep awake when focus ends (unblock only happens on explicit unlock)
   useEffect(() => {
@@ -734,18 +701,8 @@ export default function DoNothingScreen() {
       </View>
       </View>
 
-      {/* Message + goal slider overlay */}
+      {/* Goal slider */}
       <View style={[styles.messageSliderArea, { opacity: started || blockWaiting ? 0 : 1 }]} pointerEvents={started || blockWaiting ? 'none' : 'auto'}>
-        <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
-          <Text
-            style={[
-              styles.message,
-              { color: theme.textSecondary, fontFamily: Fonts!.serif },
-            ]}
-          >
-            {message}
-          </Text>
-        </Animated.View>
         {!started && !blockWaiting && (
           <View style={styles.goalSliderWrap}>
             <GoalSliderBar
@@ -755,8 +712,8 @@ export default function DoNothingScreen() {
               width={SLIDER_W}
               maxMinutes={60}
               minMinutes={0}
-              ticks={[0, 5, 10, 20, 30, 45, 60]}
-              scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
+              ticks={[5, 10, 15, 20, 30, 45, 60]}
+              scaleLabels={['5', '10', '15', '20', '30', '45', '60']}
               breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
               accentColor={theme.accent}
               trackBgColor={theme.text}
@@ -986,16 +943,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontWeight: '200',
     letterSpacing: 4,
-  },
-  messageContainer: {
-    height: 24,
-    justifyContent: 'center',
-  },
-  message: {
-    fontSize: 17,
-    fontWeight: '400',
-    fontStyle: 'italic',
-    textAlign: 'center',
   },
   orbitCenter: {
     position: 'absolute',
