@@ -246,7 +246,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           {neverBlockCount > 0 ? (
             <View
               style={{
-                height: 360,
+                height: 240,
                 borderWidth: 1,
                 borderColor: theme.border,
                 borderRadius: 16,
