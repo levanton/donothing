@@ -105,7 +105,6 @@ export default function DoNothingScreen() {
   const ready = useAppStore((s) => s.ready);
   const started = useAppStore((s) => s.started);
   const goalSeconds = useAppStore((s) => s.goalSeconds);
-  const showGoalSlider = useAppStore((s) => s.showGoalSlider);
   const sliderMinutes = useAppStore((s) => s.sliderMinutes);
   const focusStep = useAppStore((s) => s.focusStep);
   const focusRemaining = useAppStore((s) => s.focusRemaining);
@@ -356,16 +355,6 @@ export default function DoNothingScreen() {
       historyScrollY.value = e.contentOffset.y;
     },
   });
-
-  const handleGoalToggle = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const s = useAppStore.getState();
-    if (s.showGoalSlider) {
-      s.cancelGoal();
-    } else {
-      s.openGoalSlider();
-    }
-  }, []);
 
   // --- Message fade ---
   const messageOpacity = useSharedValue(0);
@@ -923,7 +912,7 @@ export default function DoNothingScreen() {
       {/* Timer */}
       <View style={{ opacity: distractionFree ? 0 : 1 }} pointerEvents={distractionFree ? 'none' : 'auto'}>
         <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-          {showGoalSlider && !started ? (
+          {!started ? (
             <Animated.Text
               style={[
                 styles.timer,
@@ -975,23 +964,6 @@ export default function DoNothingScreen() {
         </Pressable>
 
       </View>
-
-        {/* Duration picker — to the right of play */}
-        <Pressable
-          onPress={handleGoalToggle}
-          disabled={started}
-          style={[
-            styles.goalButton,
-            {
-              borderColor: theme.border,
-              backgroundColor: showGoalSlider ? theme.border : 'transparent',
-              opacity: started ? 0 : 1,
-            },
-          ]}
-          hitSlop={20}
-        >
-          <Feather name="clock" size={20} color={theme.text} style={{ opacity: 0.9 }} />
-        </Pressable>
       </View>
 
       {/* Message + goal slider overlay */}
@@ -1006,7 +978,7 @@ export default function DoNothingScreen() {
             {message}
           </Text>
         </Animated.View>
-        {showGoalSlider && !started && (
+        {!started && (
           <View style={styles.goalSliderWrap}>
             <GoalSliderBar
               theme={theme}
@@ -1461,14 +1433,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '400',
     letterSpacing: 0.5,
-  },
-  goalButton: {
-    position: 'absolute',
-    right: 15,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
   },
   messageSliderArea: {
     width: 300,

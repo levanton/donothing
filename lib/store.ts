@@ -75,7 +75,6 @@ export interface AppState {
 
   // Goal
   goalSeconds: number;
-  showGoalSlider: boolean;
   sliderMinutes: number;
 
   // Focus lock
@@ -125,8 +124,6 @@ export interface AppState {
   toggleTheme: () => void;
 
   // Goal actions
-  openGoalSlider: () => void;
-  cancelGoal: () => void;
   setSliderMinutes: (m: number) => void;
   setGoalFromSlider: (m: number) => void;
 
@@ -163,7 +160,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   themeMode: 'dark',
   goalSeconds: 10 * 60,
-  showGoalSlider: false,
   sliderMinutes: 10,
   focusStep: 'hidden',
   focusRemaining: 0,
@@ -258,7 +254,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   startSession: () => {
     sessionStartTime = Date.now();
     const goalSeconds = get().goalSeconds;
-    set({ started: true, elapsed: 0, showGoalSlider: false });
+    set({ started: true, elapsed: 0 });
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
@@ -362,15 +358,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // --- Goal ---
-  openGoalSlider: () => {
-    const current = get().goalSeconds > 0 ? Math.round(get().goalSeconds / 60) : 10;
-    set({ showGoalSlider: true, sliderMinutes: current });
-  },
-
-  cancelGoal: () => {
-    set({ showGoalSlider: false });
-  },
-
   setSliderMinutes: (m) => set({ sliderMinutes: m }),
 
   setGoalFromSlider: (m) => set({ goalSeconds: m * 60 }),
