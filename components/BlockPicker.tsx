@@ -68,7 +68,16 @@ export default function BlockPickerContent({
   initialDays,
   initialUnlockGoal,
 }: BlockPickerProps) {
-  const initStart = snap((initialHour ?? 14) * 60 + (initialMinute ?? 0));
+  // For new blocks, default to 2 hours from now (rounded to 5 min) so the
+  // schedule is safely in the future and doesn't trigger the too-close alert.
+  const defaultStart = (() => {
+    const now = new Date();
+    const m = snap((now.getHours() * 60 + now.getMinutes()) + 120);
+    return m % MINUTES_PER_DAY;
+  })();
+  const initStart = initialHour !== undefined
+    ? snap(initialHour * 60 + (initialMinute ?? 0))
+    : defaultStart;
 
   const [startMinutes, setStartMinutes] = useState(initStart);
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);

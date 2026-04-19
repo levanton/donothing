@@ -712,8 +712,8 @@ export default function DoNothingScreen() {
               width={SLIDER_W}
               maxMinutes={60}
               minMinutes={0}
-              ticks={[5, 10, 15, 20, 30, 45, 60]}
-              scaleLabels={['5', '10', '15', '20', '30', '45', '60']}
+              ticks={[5, 10, 20, 30, 45]}
+              scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
               breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
               accentColor={theme.accent}
               trackBgColor={theme.text}

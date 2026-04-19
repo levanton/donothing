@@ -27,6 +27,7 @@ interface PendingBlockParams {
   weekdays: number[];
   groupId: string | null;
   unlockGoalMinutes: number;
+  conflictTime?: string | null;
 }
 
 const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
@@ -93,13 +94,24 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
     const params: PendingBlockParams = { hour, minute, duration, weekdays, groupId, unlockGoalMinutes };
-    // iOS DeviceActivity needs wall-clock time; warn if the start is less than
-    // an hour from now, where the user may expect it to fire today but the
-    // registration will be deferred to the next cycle (tomorrow).
-    const now = new Date();
-    const gap = ((hour * 60 + minute) - (now.getHours() * 60 + now.getMinutes()) + 24 * 60) % (24 * 60);
-    if (!editingBlock && gap > 0 && gap < 60) {
-      setPendingBlock(params);
+    const startMin = hour * 60 + minute;
+
+    // Reject blocks sitting within an hour of an existing one (wall-clock,
+    // circular over 24h). Catches duplicates and near-duplicates.
+    let conflictTime: string | null = null;
+    for (const b of scheduledBlocks) {
+      if (editingBlock && editingBlock.id === b.id) continue;
+      const otherMin = b.hour * 60 + b.minute;
+      const d = Math.abs(startMin - otherMin);
+      const circular = Math.min(d, 24 * 60 - d);
+      if (circular < 60) {
+        conflictTime = formatTime12(b.hour, b.minute);
+        break;
+      }
+    }
+
+    if (conflictTime) {
+      setPendingBlock({ ...params, conflictTime });
       return;
     }
     commitBlock(params);
@@ -333,20 +345,19 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       />
     </PickerSheet>
 
-    {/* Interval-too-small warning */}
+    {/* Inter-block spacing warning — blocking (no override) */}
     <AlertModal
       visible={pendingBlock !== null}
       theme={theme}
-      title="Interval is too small"
-      message="This block starts in less than an hour. It may only fire on the next cycle, not today."
-      confirmLabel="Add anyway"
-      cancelLabel="Cancel"
-      onConfirm={() => {
-        const p = pendingBlock;
-        setPendingBlock(null);
-        if (p) commitBlock(p);
-      }}
-      onCancel={() => setPendingBlock(null)}
+      icon="clock"
+      title="Too close to another block"
+      message={
+        pendingBlock?.conflictTime
+          ? `You already have a block at ${pendingBlock.conflictTime}. Blocks must be at least an hour apart.`
+          : ''
+      }
+      closeLabel="got it"
+      onClose={() => setPendingBlock(null)}
     />
 
     {/* App picker: never-block */}

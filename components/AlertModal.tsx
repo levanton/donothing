@@ -1,17 +1,26 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
+import { Feather } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
+import PillButton from '@/components/PillButton';
+
+type IconName = 'clock' | 'alert-triangle' | 'info';
 
 interface Props {
   visible: boolean;
   theme: AppTheme;
   title: string;
   message: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  onConfirm: () => void;
-  onCancel: () => void;
+  closeLabel?: string;
+  onClose: () => void;
+  icon?: IconName;
 }
 
 export default function AlertModal({
@@ -19,91 +28,113 @@ export default function AlertModal({
   theme,
   title,
   message,
-  confirmLabel,
-  cancelLabel,
-  onConfirm,
-  onCancel,
+  closeLabel = 'ok',
+  onClose,
+  icon = 'alert-triangle',
 }: Props) {
+  const sheetRef = useRef<BottomSheetModal>(null);
+
+  // Sit the card near the bottom third of the screen.
+  const bottomInset = useMemo(() => {
+    const { height } = Dimensions.get('window');
+    return Math.max(40, Math.round(height * 0.14));
+  }, []);
+
+  useEffect(() => {
+    if (visible) sheetRef.current?.present();
+    else sheetRef.current?.dismiss();
+  }, [visible]);
+
+  const renderBackdrop = (props: any) => (
+    <BottomSheetBackdrop
+      {...props}
+      disappearsOnIndex={-1}
+      appearsOnIndex={0}
+      opacity={0.5}
+      pressBehavior="close"
+    />
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel}>
-        <Pressable
-          style={[styles.card, { backgroundColor: theme.bg, borderColor: theme.border }]}
-          onPress={() => {}}
-        >
+    <BottomSheetModal
+      ref={sheetRef}
+      enableDynamicSizing
+      detached
+      bottomInset={bottomInset}
+      enablePanDownToClose
+      enableOverDrag={false}
+      backdropComponent={renderBackdrop}
+      stackBehavior="push"
+      onDismiss={() => {
+        if (visible) onClose();
+      }}
+      handleComponent={null}
+      backgroundStyle={{
+        backgroundColor: theme.bg,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: theme.border,
+      }}
+      style={styles.sheetStyle}
+    >
+      <BottomSheetView>
+        <View style={styles.content}>
+          <View style={[styles.iconWrap, { backgroundColor: theme.subtle }]}>
+            <Feather name={icon} size={22} color={theme.accent} />
+          </View>
           <Text style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
             {title}
           </Text>
           <Text style={[styles.message, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
             {message}
           </Text>
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <View style={styles.buttons}>
-            <Pressable onPress={onCancel} style={styles.btn} hitSlop={4}>
-              <Text style={[styles.btnText, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-                {cancelLabel}
-              </Text>
-            </Pressable>
-            <View style={[styles.vDivider, { backgroundColor: theme.border }]} />
-            <Pressable onPress={onConfirm} style={styles.btn} hitSlop={4}>
-              <Text style={[styles.btnText, { color: theme.accent, fontFamily: Fonts!.serif, fontWeight: '600' }]}>
-                {confirmLabel}
-              </Text>
-            </Pressable>
+          <View style={styles.btnRow}>
+            <PillButton
+              label={closeLabel}
+              onPress={onClose}
+              color={theme.text}
+              outline
+            />
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </View>
+      </BottomSheetView>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+  sheetStyle: {
+    marginHorizontal: 32,
   },
-  card: {
-    width: '100%',
-    maxWidth: 320,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingTop: 22,
-    overflow: 'hidden',
+  content: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 28,
+  },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '500',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   message: {
     fontSize: 14,
     fontWeight: '300',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
     lineHeight: 20,
+    marginBottom: 24,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-  },
-  vDivider: {
-    width: StyleSheet.hairlineWidth,
-  },
-  buttons: {
-    flexDirection: 'row',
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 14,
+  btnRow: {
+    alignSelf: 'stretch',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: {
-    fontSize: 15,
   },
 });
