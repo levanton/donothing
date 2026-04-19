@@ -18,6 +18,16 @@ import { getAuth, requestAuth, type AuthStatus } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
 import BlockPickerContent from '@/components/BlockPicker';
+import AlertModal from '@/components/AlertModal';
+
+interface PendingBlockParams {
+  hour: number;
+  minute: number;
+  duration: number;
+  weekdays: number[];
+  groupId: string | null;
+  unlockGoalMinutes: number;
+}
 
 const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
 
@@ -69,14 +79,30 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
   const store = useAppStore.getState;
 
-  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
+  const [pendingBlock, setPendingBlock] = useState<PendingBlockParams | null>(null);
+
+  const commitBlock = (p: PendingBlockParams) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (editingBlock) {
-      store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays, groupId, unlockGoalMinutes);
+      store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
     } else {
-      store().addScheduledBlock(hour, minute, duration, weekdays, groupId, unlockGoalMinutes);
+      store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
     }
     blockSheetRef.current?.close();
+  };
+
+  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
+    const params: PendingBlockParams = { hour, minute, duration, weekdays, groupId, unlockGoalMinutes };
+    // iOS DeviceActivity needs wall-clock time; warn if the start is less than
+    // an hour from now, where the user may expect it to fire today but the
+    // registration will be deferred to the next cycle (tomorrow).
+    const now = new Date();
+    const gap = ((hour * 60 + minute) - (now.getHours() * 60 + now.getMinutes()) + 24 * 60) % (24 * 60);
+    if (!editingBlock && gap > 0 && gap < 60) {
+      setPendingBlock(params);
+      return;
+    }
+    commitBlock(params);
   };
 
   return (
@@ -306,6 +332,22 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         onCancel={() => blockSheetRef.current?.close()}
       />
     </PickerSheet>
+
+    {/* Interval-too-small warning */}
+    <AlertModal
+      visible={pendingBlock !== null}
+      theme={theme}
+      title="Interval is too small"
+      message="This block starts in less than an hour. It may only fire on the next cycle, not today."
+      confirmLabel="Add anyway"
+      cancelLabel="Cancel"
+      onConfirm={() => {
+        const p = pendingBlock;
+        setPendingBlock(null);
+        if (p) commitBlock(p);
+      }}
+      onCancel={() => setPendingBlock(null)}
+    />
 
     {/* App picker: never-block */}
     <AppPickerSheet
