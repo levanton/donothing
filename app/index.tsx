@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   AppState,
   Dimensions,
   Platform,
@@ -30,7 +29,7 @@ import Animated, {
 import { Fonts } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { themes, palette } from '@/lib/theme';
-import { timerDisplay, formatTimeStat } from '@/lib/format';
+import { formatTimeStat } from '@/lib/format';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import type { ScheduledBlock } from '@/lib/db/types';
@@ -44,13 +43,6 @@ import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
 import TimerDisplay from '@/components/TimerDisplay';
 
-const FOCUS_OPTIONS = [
-  { label: '15 min', seconds: 15 * 60 },
-  { label: '30 min', seconds: 30 * 60 },
-  { label: '1 hour', seconds: 60 * 60 },
-  { label: '2 hours', seconds: 2 * 60 * 60 },
-];
-
 function getMessage(seconds: number): string {
   if (seconds < 10) return '';
   if (seconds < 30) return 'breathe.';
@@ -58,16 +50,6 @@ function getMessage(seconds: number): string {
   if (seconds < 180) return "you're doing nothing great.";
   if (seconds < 300) return 'the world can wait.';
   return 'just be.';
-}
-
-function getFocusMessage(remaining: number, total: number): string {
-  const progress = 1 - remaining / total;
-  if (progress < 0.1) return 'settle in.';
-  if (progress < 0.25) return 'let go of the urge.';
-  if (progress < 0.5) return 'you don\u2019t need your phone.';
-  if (progress < 0.75) return 'halfway there.';
-  if (progress < 0.9) return 'almost free.';
-  return 'just a little more.';
 }
 
 const RING_R = 64;
@@ -107,8 +89,6 @@ export default function DoNothingScreen() {
   const goalSeconds = useAppStore((s) => s.goalSeconds);
   const sliderMinutes = useAppStore((s) => s.sliderMinutes);
   const focusStep = useAppStore((s) => s.focusStep);
-  const focusRemaining = useAppStore((s) => s.focusRemaining);
-  const focusTotal = useAppStore((s) => s.focusTotal);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
@@ -178,6 +158,12 @@ export default function DoNothingScreen() {
     if (started && goalSeconds > 0 && elapsed >= goalSeconds) {
       deactivateKeepAwake('session');
       setDistractionFree(false);
+      // If a scheduled block is still enforcing a shield, the user has earned
+      // their unlock by completing the countdown.
+      if (isBlockActive()) {
+        forceUnblockAll([]).catch(() => {});
+        unblockAppsById('donothing-scheduled-block').catch(() => {});
+      }
       useAppStore.getState().completeSession();
     }
   }, [elapsed, started, goalSeconds]);
@@ -367,21 +353,6 @@ export default function DoNothingScreen() {
   const messageOpacity = useSharedValue(0);
   const prevMessageRef = useRef('');
 
-  // --- Unlock slider ---
-  const UNLOCK_TRACK_W = SCREEN_W * 0.75;
-  const UNLOCK_THUMB = 56;
-  const UNLOCK_MAX = UNLOCK_TRACK_W - UNLOCK_THUMB - 8;
-  const unlockX = useSharedValue(0);
-  const unlockStartX = useSharedValue(0);
-
-  const unlockThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: unlockX.value }],
-  }));
-
-  const unlockTextStyle = useAnimatedStyle(() => ({
-    opacity: 1 - unlockX.value / UNLOCK_MAX,
-  }));
-
   useEffect(() => {
     if (message !== prevMessageRef.current) {
       if (prevMessageRef.current === '') {
@@ -483,42 +454,6 @@ export default function DoNothingScreen() {
     useAppStore.getState().closeSettings();
   }, []);
 
-  // --- Focus lock ---
-  const handleStartFocus = useCallback((seconds: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    activateKeepAwakeAsync('focus');
-    useAppStore.getState().startFocus(seconds);
-  }, []);
-
-  const cancelFocus = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    deactivateKeepAwake('focus');
-    useAppStore.getState().cancelFocus();
-  }, []);
-
-  const handleUnlock = useCallback(() => {
-    const { scheduledBlocks, lastSessionDuration } = useAppStore.getState();
-    const activeBlock = findActiveBlock(scheduledBlocks, new Date());
-    const goalMin = activeBlock?.unlockGoalMinutes ?? 0;
-    if (goalMin > 0 && lastSessionDuration < goalMin * 60) {
-      const remainingSec = goalMin * 60 - lastSessionDuration;
-      const remainingMin = Math.ceil(remainingSec / 60);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(
-        'Do nothing first',
-        `Spend ${remainingMin} more minute${remainingMin === 1 ? '' : 's'} doing nothing before unlocking.`,
-      );
-      return;
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    deactivateKeepAwake('focus');
-    deactivateKeepAwake('scheduled-block');
-    const groupIds: string[] = [];
-    forceUnblockAll(groupIds).catch(() => {});
-    unblockAppsById('donothing-scheduled-block').catch(() => {});
-    useAppStore.getState().unlockFocus();
-  }, []);
-
   // Emergency unlock: bypasses the do-nothing gate. Shown on the block-waiting
   // main screen so the user always has an out.
   const handleForceUnlock = useCallback(() => {
@@ -532,8 +467,18 @@ export default function DoNothingScreen() {
 
   const handleStartBlockSession = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    activateKeepAwakeAsync('focus');
-    useAppStore.getState().startFocus(unlockMin * 60);
+    activateKeepAwakeAsync('session');
+    // Jump the header morph to the "Doing nothing" state so the user doesn't
+    // see a flash of "Ready to Do nothing?" when leaving the block-waiting UI.
+    hideOpacity.value = 0;
+    hideWidth.value = 0;
+    showOpacity.value = 1;
+    showWidth.value = 1;
+    useAppStore.setState({
+      focusStep: 'hidden',
+      goalSeconds: unlockMin * 60,
+    });
+    useAppStore.getState().startSession();
   }, [unlockMin]);
 
   // --- Distraction-free mode: hide timer & button while running ---
@@ -616,156 +561,6 @@ export default function DoNothingScreen() {
         themeMode={themeMode}
         onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
       />
-    );
-  }
-
-  // =========================================================================
-  // Focus lock overlay — active session
-  // =========================================================================
-  if (focusStep === 'active') {
-    const progress = focusTotal > 0 ? 1 - focusRemaining / focusTotal : 0;
-    const focusMsg = getFocusMessage(focusRemaining, focusTotal);
-    const ringSize = 200;
-    const strokeWidth = 3;
-
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <Text style={[styles.focusLabel, { color: theme.accent }]}>
-          FOCUS MODE
-        </Text>
-
-        {/* Circular progress */}
-        <View style={{ width: ringSize, height: ringSize, marginTop: 24 }}>
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { alignItems: 'center', justifyContent: 'center' },
-            ]}
-          >
-            <View
-              style={{
-                width: ringSize,
-                height: ringSize,
-                borderRadius: ringSize / 2,
-                borderWidth: strokeWidth,
-                borderColor: theme.cardBorder,
-                position: 'absolute',
-              }}
-            />
-          </View>
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { alignItems: 'center', justifyContent: 'center' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.focusTimer,
-                { color: theme.text, fontFamily: Fonts!.mono },
-              ]}
-            >
-              {timerDisplay(focusRemaining)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Focus message */}
-        <Text
-          style={[
-            styles.focusMessage,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          {focusMsg}
-        </Text>
-
-        {/* Progress bar */}
-        <View
-          style={[styles.progressTrack, { backgroundColor: theme.subtle }]}
-        >
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: theme.dot,
-                width: `${Math.min(progress * 100, 100)}%`,
-              },
-            ]}
-          />
-        </View>
-
-        {/* Quit button */}
-        <Pressable
-          onPress={cancelFocus}
-          style={[
-            styles.quitButton,
-            { backgroundColor: theme.accent, borderColor: theme.accent },
-          ]}
-        >
-          <Text style={[styles.quitText, { color: theme.accentText }]}>
-            give up
-          </Text>
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  // =========================================================================
-  // Focus — pick duration
-  // =========================================================================
-  if (focusStep === 'pickTime') {
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <Text
-          style={[
-            styles.pickerTitle,
-            { color: theme.text, fontFamily: Fonts!.serif },
-          ]}
-        >
-          Lock yourself in
-        </Text>
-        <Text
-          style={[
-            styles.pickerSubtitle,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          Choose how long to do nothing
-        </Text>
-
-        <View style={styles.pickerOptions}>
-          {FOCUS_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.seconds}
-              onPress={() => handleStartFocus(opt.seconds)}
-              style={[styles.pickerOption, { borderColor: theme.cardBorder }]}
-            >
-              <Text style={[styles.pickerOptionText, { color: theme.text }]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            useAppStore.getState().cancelFocus();
-          }}
-          style={styles.pickerCancel}
-        >
-          <Text
-            style={[styles.pickerCancelText, { color: theme.textSecondary }]}
-          >
-            cancel
-          </Text>
-        </Pressable>
-      </Animated.View>
     );
   }
 
@@ -1178,10 +973,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
   },
-  lockIcon: {
-    fontSize: 20,
-    opacity: 0.25,
-  },
   themeToggle: {
     position: 'absolute',
     right: 24,
@@ -1296,109 +1087,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '300',
     letterSpacing: 0.5,
-  },
-  // --- Focus picker ---
-  pickerTitle: {
-    fontSize: 28,
-    fontWeight: '400',
-    letterSpacing: 0.5,
-  },
-  pickerSubtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    fontStyle: 'italic',
-    marginTop: 8,
-    marginBottom: 40,
-  },
-  pickerOptions: {
-    gap: 12,
-    width: '100%',
-    maxWidth: 260,
-  },
-  pickerOption: {
-    borderWidth: 1.2,
-    borderRadius: 24,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  pickerOptionText: {
-    fontSize: 17,
-    fontWeight: '300',
-    letterSpacing: 1,
-  },
-  pickerCancel: {
-    marginTop: 32,
-    padding: 12,
-  },
-  pickerCancelText: {
-    fontSize: 14,
-    fontWeight: '300',
-  },
-  // --- Focus active ---
-  focusLabel: {
-    fontSize: 11,
-    letterSpacing: 4,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-  },
-  focusTimer: {
-    fontSize: 48,
-    fontWeight: '200',
-    letterSpacing: 2,
-  },
-  focusMessage: {
-    fontSize: 16,
-    fontWeight: '300',
-    marginTop: 24,
-    textAlign: 'center',
-  },
-  progressTrack: {
-    width: '60%',
-    height: 3,
-    borderRadius: 1.5,
-    marginTop: 40,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 3,
-    borderRadius: 1.5,
-  },
-  quitButton: {
-    marginTop: 48,
-    borderWidth: 1.2,
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-  },
-  quitText: {
-    fontSize: 14,
-    fontWeight: '400',
-    fontStyle: 'italic',
-  },
-  doNothingBtn: {
-    borderWidth: 1.2,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-  },
-  unlockTrack: {
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  unlockLabel: {
-    fontSize: 16,
-    fontWeight: '300',
-    letterSpacing: 1,
-    position: 'absolute',
-  },
-  unlockThumb: {
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    left: 4,
   },
   distractionFreeButton: {
     position: 'absolute',
