@@ -1011,7 +1011,7 @@ export default function DoNothingScreen() {
             </Text>
             <View style={styles.statRowValueRow}>
               <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}
               >
                 {formatTimeStat(stats.today + elapsed).value}
               </Text>
@@ -1029,7 +1029,7 @@ export default function DoNothingScreen() {
             </Text>
             <View style={styles.statRowValueRow}>
               <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}
               >
                 {formatTimeStat(stats.week + elapsed).value}
               </Text>
@@ -1240,7 +1240,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statsColumn: {
-    marginTop: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 19,
@@ -1436,8 +1435,7 @@ const styles = StyleSheet.create({
   },
   messageSliderArea: {
     width: 300,
-    height: 40,
-    marginTop: 12,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
