@@ -95,8 +95,7 @@ export interface AppState {
   // Session completion (countdown reached 00:00)
   completionVisible: boolean;
 
-  // Milestones
-  milestoneQueue: string[];
+  // Milestones (data only — no overlay UI)
   achievedMilestones: Map<string, number>;
 
   // Session interruption
@@ -113,7 +112,6 @@ export interface AppState {
 
   // Milestone actions
   checkMilestones: () => void;
-  dismissMilestone: () => void;
 
   // Interruption actions
   cancelSession: (reason: 'backgrounded') => Promise<void>;
@@ -178,8 +176,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Session completion
   completionVisible: false,
 
-  // Milestones
-  milestoneQueue: [],
+  // Milestones (data only — no overlay UI)
   achievedMilestones: new Map(),
 
   // Session interruption
@@ -343,16 +340,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   checkMilestones: () => {
     const newIds = evaluateAndSaveNewMilestones();
     if (newIds.length > 0) {
-      set({
-        milestoneQueue: newIds,
-        achievedMilestones: getAchievedMilestones(),
-      });
+      set({ achievedMilestones: getAchievedMilestones() });
     }
-  },
-
-  dismissMilestone: () => {
-    const queue = get().milestoneQueue.slice(1);
-    set({ milestoneQueue: queue });
   },
 
   deleteSession: async (id: string) => {

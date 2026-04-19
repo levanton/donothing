@@ -42,8 +42,6 @@ import SettingsContent from '@/components/SettingsContent';
 import PillButton from '@/components/PillButton';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
-import MilestoneOverlay from '@/components/MilestoneOverlay';
-import { MILESTONES } from '@/lib/milestones';
 import TimerDisplay from '@/components/TimerDisplay';
 
 const FOCUS_OPTIONS = [
@@ -116,7 +114,6 @@ export default function DoNothingScreen() {
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
-  const milestoneQueue = useAppStore((s) => s.milestoneQueue);
   const sessionEndedVisible = useAppStore((s) => s.sessionEndedVisible);
 
   const isActiveRef = useRef(true);
@@ -276,6 +273,7 @@ export default function DoNothingScreen() {
 
   // Swipe up on main → open history
   const mainVerticalPan = Gesture.Pan()
+    .enabled(!started)
     .activeOffsetY(-20)
     .failOffsetX([-15, 15])
     .onUpdate((e) => {
@@ -294,6 +292,7 @@ export default function DoNothingScreen() {
     useAppStore.getState().openSettings();
   }, []);
   const mainHorizontalPan = Gesture.Pan()
+    .enabled(!started)
     .activeOffsetX(20)
     .failOffsetY([-15, 15])
     .onUpdate((e) => {
@@ -578,14 +577,6 @@ export default function DoNothingScreen() {
   const handleCompletionClose = useCallback(() => {
     useAppStore.getState().dismissCompletion();
   }, []);
-
-  const handleMilestoneDismiss = useCallback(() => {
-    useAppStore.getState().dismissMilestone();
-  }, []);
-
-  const currentMilestone = milestoneQueue.length > 0
-    ? MILESTONES.find((m) => m.id === milestoneQueue[0]) ?? null
-    : null;
 
   const handleHistory = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1184,13 +1175,6 @@ export default function DoNothingScreen() {
       durationSeconds={lastSessionDuration}
       todaySeconds={stats.today}
       onClose={handleCompletionClose}
-    />
-
-    {/* Milestone celebration overlay */}
-    <MilestoneOverlay
-      milestone={currentMilestone}
-      theme={theme}
-      onDismiss={handleMilestoneDismiss}
     />
 
     </View>

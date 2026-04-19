@@ -36,9 +36,11 @@ struct TokenIcon: View {
   let size: CGFloat
   let tint: Color
 
+  /// Modest scale boost beyond iOS FamilyControls' native cap (~48pt) to
+  /// reach visually larger icons. A small factor keeps blur imperceptible.
+  private static let iconScale: CGFloat = 1.25
+
   var body: some View {
-    // Render at natural font size — no .frame() so there's no transparent
-    // padding around the icon when laid out in HStack.
     Group {
       switch token {
       case .app(let t):
@@ -51,6 +53,8 @@ struct TokenIcon: View {
     }
     .font(.system(size: size))
     .foregroundColor(tint)
+    .scaleEffect(Self.iconScale)
+    .frame(width: size * Self.iconScale, height: size * Self.iconScale, alignment: .center)
   }
 }
 
@@ -61,23 +65,35 @@ struct TokenRow: View {
   let tint: Color
 
   var body: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: 12) {
+      // Icon only, sized explicitly via font
       Group {
         switch token {
-        case .app(let t): Label(t)
-        case .category(let t): Label(t)
-        case .web(let t): Label(t)
+        case .app(let t): Label(t).labelStyle(IconOnlyLabelStyle())
+        case .category(let t): Label(t).labelStyle(IconOnlyLabelStyle())
+        case .web(let t): Label(t).labelStyle(IconOnlyLabelStyle())
         }
       }
-      .labelStyle(.titleAndIcon)
+      .font(.system(size: iconSize))
+      .frame(width: iconSize, height: iconSize, alignment: .center)
+
+      // Title only
+      Group {
+        switch token {
+        case .app(let t): Label(t).labelStyle(TitleOnlyLabelStyle())
+        case .category(let t): Label(t).labelStyle(TitleOnlyLabelStyle())
+        case .web(let t): Label(t).labelStyle(TitleOnlyLabelStyle())
+        }
+      }
       .font(.system(size: 16))
       .foregroundColor(tint)
       .lineLimit(1)
       .truncationMode(.tail)
+
       Spacer(minLength: 0)
     }
-    .padding(.vertical, 10)
-    .padding(.horizontal, 4)
+    .padding(.horizontal, 14)
+    .frame(height: iconSize + 2)
   }
 }
 
@@ -138,15 +154,10 @@ struct AppLabelsContent: View {
 
   @ViewBuilder
   private func listBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
-    ScrollView(showsIndicators: false) {
+    ScrollView(.vertical, showsIndicators: true) {
       LazyVStack(spacing: 0) {
-        ForEach(Array(displayed.enumerated()), id: \.offset) { idx, token in
+        ForEach(Array(displayed.enumerated()), id: \.offset) { _, token in
           TokenRow(token: token, iconSize: model.iconSize, tint: tint)
-          if idx < displayed.count - 1 {
-            Rectangle()
-              .fill(Color.secondary.opacity(0.18))
-              .frame(height: 0.5)
-          }
         }
         if remaining > 0 {
           HStack {
@@ -156,9 +167,10 @@ struct AppLabelsContent: View {
             Spacer()
           }
           .padding(.vertical, 10)
-          .padding(.horizontal, 4)
+          .padding(.horizontal, 14)
         }
       }
+      .padding(.vertical, 0)
     }
   }
 
@@ -181,11 +193,10 @@ struct AppLabelsContent: View {
 
   @ViewBuilder
   private func gridBody(displayed: [AnyActivityToken], remaining: Int) -> some View {
-    // Adaptive grid — columns size themselves to the icon, so iconSize from
-    // JS controls the actual rendered size rather than being squashed by a
-    // fixed column count.
-    let columns = [GridItem(.adaptive(minimum: model.iconSize + 4), spacing: 16)]
-    LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
+    // Fixed 4-column layout with tight spacing — avoids `.adaptive` blowing
+    // out inter-icon gaps when cells overflow the column minimum.
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    LazyVGrid(columns: columns, alignment: .center, spacing: 12) {
       ForEach(Array(displayed.enumerated()), id: \.offset) { _, token in
         TokenIcon(token: token, size: model.iconSize, tint: tint)
       }
@@ -248,11 +259,28 @@ class AppLabelsView: ExpoView {
     let tint = tintHex.flatMap(uiColor(fromHex:)).map(Color.init) ?? .primary
     let ring = ringHex.flatMap(uiColor(fromHex:)).map(Color.init) ?? Color(.systemBackground)
 
+    // Derive color scheme from the bg luminance so FamilyControls Label's
+    // system-rendered title text (which ignores .foregroundColor) picks the
+    // right appearance — light text on dark bg, dark text on light bg.
+    let isDarkBg: Bool = {
+      guard let uic = ringHex.flatMap(uiColor(fromHex:)) else { return false }
+      var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+      uic.getRed(&r, green: &g, blue: &b, alpha: &a)
+      return (0.299 * r + 0.587 * g + 0.114 * b) < 0.5
+    }()
+    let scheme: ColorScheme = isDarkBg ? .dark : .light
+
     if #available(iOS 15.2, *) {
       let host = UIHostingController(
         rootView: AppLabelsContent(model: model, tint: tint, ringColor: ring)
+          .environment(\.colorScheme, scheme)
       )
       host.view.backgroundColor = .clear
+      // UIKit-level override — FamilyControls renders its Label title
+      // through a hosted UIView that respects the trait collection's
+      // interface style but ignores SwiftUI's colorScheme environment.
+      host.overrideUserInterfaceStyle = isDarkBg ? .dark : .light
+      host.view.overrideUserInterfaceStyle = isDarkBg ? .dark : .light
       addSubview(host.view)
       hostController = host
     } else {

@@ -181,7 +181,7 @@ export default function BlockPickerContent({
         <View style={[styles.timeDivider, { backgroundColor: softDivider }]} />
         <View style={styles.daysSection}>
           <Text style={[styles.daysLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-            on these days
+            {selectedDays.length === WEEKDAY_VALUES.length ? 'every day' : 'on these days'}
           </Text>
           <View style={styles.dayRow}>
             {WEEKDAY_LABELS.map((label, i) => {

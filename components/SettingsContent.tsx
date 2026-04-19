@@ -92,9 +92,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     >
       {/* Header */}
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          Settings
-        </Text>
         <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
@@ -247,17 +244,24 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             )}
           </View>
           {neverBlockCount > 0 ? (
-            <AppLabelsView
-              activitySelectionId={NEVER_BLOCK_SELECTION_ID}
-              iconSize={64}
-              layout="grid"
-              tintColor={theme.text}
-              ringColor={theme.bg}
-              style={[
-                styles.labelGrid,
-                { height: Math.ceil(neverBlockCount / 4) * 90 },
-              ]}
-            />
+            <View
+              style={{
+                height: 360,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 16,
+                overflow: 'hidden',
+              }}
+            >
+              <AppLabelsView
+                activitySelectionId={NEVER_BLOCK_SELECTION_ID}
+                iconSize={44}
+                layout="list"
+                tintColor={theme.text}
+                ringColor={theme.bg}
+                style={{ flex: 1 }}
+              />
+            </View>
           ) : (
             <Pressable
               onPress={async () => {
@@ -321,7 +325,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
