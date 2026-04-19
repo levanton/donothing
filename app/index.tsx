@@ -114,6 +114,13 @@ export default function DoNothingScreen() {
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
   const sessionEndedVisible = useAppStore((s) => s.sessionEndedVisible);
+  const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
+
+  // Block-waiting state: a scheduled block fired and apps are locked until the
+  // user either does nothing for the required time, or force-unlocks.
+  const blockWaiting = focusStep === 'done';
+  const activeBlock = blockWaiting ? findActiveBlock(scheduledBlocks, new Date()) : null;
+  const unlockMin = activeBlock?.unlockGoalMinutes ?? 15;
 
   const isActiveRef = useRef(true);
 
@@ -272,7 +279,7 @@ export default function DoNothingScreen() {
 
   // Swipe up on main → open history
   const mainVerticalPan = Gesture.Pan()
-    .enabled(!started)
+    .enabled(!started && !blockWaiting)
     .activeOffsetY(-20)
     .failOffsetX([-15, 15])
     .onUpdate((e) => {
@@ -291,7 +298,7 @@ export default function DoNothingScreen() {
     useAppStore.getState().openSettings();
   }, []);
   const mainHorizontalPan = Gesture.Pan()
-    .enabled(!started)
+    .enabled(!started && !blockWaiting)
     .activeOffsetX(20)
     .failOffsetY([-15, 15])
     .onUpdate((e) => {
@@ -512,6 +519,23 @@ export default function DoNothingScreen() {
     useAppStore.getState().unlockFocus();
   }, []);
 
+  // Emergency unlock: bypasses the do-nothing gate. Shown on the block-waiting
+  // main screen so the user always has an out.
+  const handleForceUnlock = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    deactivateKeepAwake('focus');
+    deactivateKeepAwake('scheduled-block');
+    forceUnblockAll([]).catch(() => {});
+    unblockAppsById('donothing-scheduled-block').catch(() => {});
+    useAppStore.getState().unlockFocus();
+  }, []);
+
+  const handleStartBlockSession = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    activateKeepAwakeAsync('focus');
+    useAppStore.getState().startFocus(unlockMin * 60);
+  }, [unlockMin]);
+
   // --- Distraction-free mode: hide timer & button while running ---
   const [distractionFree, setDistractionFree] = useState(false);
   const toggleDistractionFree = useCallback(() => {
@@ -592,65 +616,6 @@ export default function DoNothingScreen() {
         themeMode={themeMode}
         onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
       />
-    );
-  }
-
-  // =========================================================================
-  // Focus done — unlock screen
-  // =========================================================================
-  if (focusStep === 'done') {
-    const doNothingMins = focusTotal > 0 ? Math.round(focusTotal / 60) : 15;
-
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle, { justifyContent: 'space-between', paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <View />
-
-        <View style={{ alignItems: 'center' }}>
-          <Feather name="lock" size={40} color={theme.textTertiary} style={{ marginBottom: 32 }} />
-
-          <Text
-            style={[
-              styles.focusMessage,
-              { color: theme.text, fontFamily: Fonts!.serif, fontSize: 22, marginBottom: 12 },
-            ]}
-          >
-            your apps are blocked.
-          </Text>
-
-          <Text
-            style={[
-              styles.focusMessage,
-              { color: theme.textTertiary, fontFamily: Fonts!.serif, marginBottom: 48 },
-            ]}
-          >
-            do nothing to unlock them.
-          </Text>
-
-          <Pressable
-            style={[styles.doNothingBtn, { backgroundColor: theme.accent }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              useAppStore.getState().startFocus(doNothingMins * 60);
-              activateKeepAwakeAsync('focus');
-            }}
-          >
-            <Text style={{ color: palette.white, fontFamily: Fonts!.serif, fontSize: 17, fontWeight: '400' }}>
-              do nothing for {doNothingMins} min
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={handleUnlock}
-          hitSlop={16}
-        >
-          <Text style={{ color: theme.textTertiary, fontFamily: Fonts!.serif, fontSize: 14, fontWeight: '300' }}>
-            unlock now
-          </Text>
-        </Pressable>
-      </Animated.View>
     );
   }
 
@@ -816,8 +781,8 @@ export default function DoNothingScreen() {
       {/* Settings button — top left */}
       <Pressable
         onPress={handleSettingsPress}
-        disabled={started}
-        style={[styles.lockButton, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
+        disabled={started || blockWaiting}
+        style={[styles.lockButton, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
         hitSlop={16}
       >
         <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
@@ -826,8 +791,8 @@ export default function DoNothingScreen() {
       {/* Dev tools cluster — only in dev builds, hidden while session is active */}
       {__DEV__ && (
         <View
-          style={[styles.devCluster, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
-          pointerEvents={started ? 'none' : 'auto'}
+          style={[styles.devCluster, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
+          pointerEvents={started || blockWaiting ? 'none' : 'auto'}
         >
           <Pressable
             onPress={() => router.push('/onboarding')}
@@ -869,36 +834,44 @@ export default function DoNothingScreen() {
         </View>
       )}
 
-      {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
+      {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing", or static "Time to Do nothing." when block is waiting */}
       <View style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]} pointerEvents={distractionFree ? 'none' : 'auto'}>
-        <Animated.View style={hideStyle}>
+        {blockWaiting ? (
           <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            Ready to{' '}
+            Time to Do nothing.
           </Text>
-        </Animated.View>
-        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          Do
-        </Text>
-        <Animated.View style={showStyle}>
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            ing
-          </Text>
-        </Animated.View>
-        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          {' '}nothing
-        </Text>
-        <Animated.View style={hideStyle}>
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            ?
-          </Text>
-        </Animated.View>
+        ) : (
+          <>
+            <Animated.View style={hideStyle}>
+              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                Ready to{' '}
+              </Text>
+            </Animated.View>
+            <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              Do
+            </Text>
+            <Animated.View style={showStyle}>
+              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                ing
+              </Text>
+            </Animated.View>
+            <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {' '}nothing
+            </Text>
+            <Animated.View style={hideStyle}>
+              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                ?
+              </Text>
+            </Animated.View>
+          </>
+        )}
       </View>
 
       {/* Theme toggle — top right */}
       <Pressable
         onPress={toggleTheme}
-        disabled={started}
-        style={[styles.themeToggle, { top: insets.top + 12, opacity: started ? 0 : 1 }]}
+        disabled={started || blockWaiting}
+        style={[styles.themeToggle, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
         hitSlop={16}
       >
         <View
@@ -919,7 +892,7 @@ export default function DoNothingScreen() {
                 { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
               ]}
             >
-              {`${String(sliderMinutes).padStart(2, '0')}:00`}
+              {`${String(blockWaiting ? unlockMin : sliderMinutes).padStart(2, '0')}:00`}
             </Animated.Text>
           ) : (
             <TimerDisplay
@@ -946,7 +919,7 @@ export default function DoNothingScreen() {
         </Animated.View>
         {/* Unified element: play button ↔ orbit dot */}
         <Pressable
-          onPress={started ? handleStop : handleStart}
+          onPress={started ? handleStop : blockWaiting ? handleStartBlockSession : handleStart}
           style={styles.orbitCenter}
         >
           <Animated.View
@@ -967,7 +940,7 @@ export default function DoNothingScreen() {
       </View>
 
       {/* Message + goal slider overlay */}
-      <View style={[styles.messageSliderArea, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
+      <View style={[styles.messageSliderArea, { opacity: started || blockWaiting ? 0 : 1 }]} pointerEvents={started || blockWaiting ? 'none' : 'auto'}>
         <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
           <Text
             style={[
@@ -978,7 +951,7 @@ export default function DoNothingScreen() {
             {message}
           </Text>
         </Animated.View>
-        {!started && (
+        {!started && !blockWaiting && (
           <View style={styles.goalSliderWrap}>
             <GoalSliderBar
               theme={theme}
@@ -1001,7 +974,7 @@ export default function DoNothingScreen() {
       </View>
 
       {/* Stats — with goal slider overlaid */}
-      <Pressable onPress={handleHistory} disabled={started} style={{ opacity: started ? 0 : 1 }}>
+      <Pressable onPress={handleHistory} disabled={started || blockWaiting} style={{ opacity: started || blockWaiting ? 0 : 1 }}>
         <View style={styles.statsColumn}>
           <View style={styles.statRow}>
             <Text
@@ -1043,7 +1016,7 @@ export default function DoNothingScreen() {
 
       {/* Week dots */}
       {weekStats.length > 0 && (
-        <View style={[styles.weekSection, { opacity: started ? 0 : 1 }]} pointerEvents={started ? 'none' : 'auto'}>
+        <View style={[styles.weekSection, { opacity: started || blockWaiting ? 0 : 1 }]} pointerEvents={started || blockWaiting ? 'none' : 'auto'}>
           <View style={styles.weekGrid}>
             {weekStats.map((day) => {
               const maxDur = Math.max(
@@ -1092,12 +1065,25 @@ export default function DoNothingScreen() {
         ]}
         pointerEvents={started ? 'none' : 'auto'}
       >
-        <PillButton
-          label="Journey"
-          onPress={handleHistory}
-          color={themeMode === 'dark' ? palette.cream : palette.brown}
-          outline
-        />
+        {blockWaiting ? (
+          <Pressable
+            onPress={handleForceUnlock}
+            hitSlop={16}
+            style={[styles.forceUnlockBtn, { borderColor: theme.textTertiary }]}
+          >
+            <Feather name="unlock" size={15} color={theme.textSecondary} />
+            <Text style={[styles.forceUnlockText, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+              unlock now
+            </Text>
+          </Pressable>
+        ) : (
+          <PillButton
+            label="Journey"
+            onPress={handleHistory}
+            color={themeMode === 'dark' ? palette.cream : palette.brown}
+            outline
+          />
+        )}
       </View>
 
       {/* Distraction-free toggle — visible only while timer is running */}
@@ -1297,10 +1283,19 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'absolute',
   },
-  pillText: {
-    fontSize: 15,
+  forceUnlockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  forceUnlockText: {
+    fontSize: 14,
+    fontWeight: '300',
     letterSpacing: 0.5,
-    fontWeight: '500',
   },
   // --- Focus picker ---
   pickerTitle: {
