@@ -36,7 +36,10 @@ import { blockAppsById, unblockAppsById, isBlockActive, forceUnblockAll } from '
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
+import PaywallGate from '@/components/PaywallGate';
 import SettingsContent from '@/components/SettingsContent';
+import AccountSheet from '@/components/AccountSheet';
+import type BottomSheet from '@gorhom/bottom-sheet';
 import PillButton from '@/components/PillButton';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
@@ -80,6 +83,16 @@ export default function DoNothingScreen() {
   const sliderMinutes = useAppStore((s) => s.sliderMinutes);
   const focusStep = useAppStore((s) => s.focusStep);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
+  const isSubscribed = useAppStore((s) => s.isSubscribed);
+
+  const accountSheetRef = useRef<BottomSheet>(null);
+  const handleOpenAccount = useCallback(() => {
+    accountSheetRef.current?.expand();
+  }, []);
+  const handleDeleteAccount = useCallback(async () => {
+    // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
+    console.warn('[Account] delete tapped — stub; no-op until wired');
+  }, []);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
@@ -865,6 +878,14 @@ export default function DoNothingScreen() {
         onScroll={historyScrollHandler}
         nativeScrollGesture={historyScrollNativeGesture}
       />
+      <PaywallGate
+        visible={!isSubscribed}
+        themeMode={themeMode}
+        insets={insets}
+        onClose={handleHistoryClose}
+        title="unlock your journey"
+        body="Every minute you've reclaimed, at a glance. Join to open Journey and keep the thread of your practice."
+      />
     </Animated.View>
     </GestureDetector>
 
@@ -874,9 +895,26 @@ export default function DoNothingScreen() {
       <SettingsContent
         onClose={handleSettingsClose}
         insets={insets}
+        onOpenAccount={handleOpenAccount}
+      />
+      <PaywallGate
+        visible={!isSubscribed}
+        themeMode={themeMode}
+        insets={insets}
+        onClose={handleSettingsClose}
+        onOpenAccount={handleOpenAccount}
+        title="unlock donothing"
+        body="Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way."
       />
     </Animated.View>
     </GestureDetector>
+
+    {/* Shared account sheet — available from Settings header and from both gates */}
+    <AccountSheet
+      ref={accountSheetRef}
+      theme={theme}
+      onDeleteAccount={handleDeleteAccount}
+    />
 
     {/* Countdown completion screen */}
     <SessionCompleteScreen

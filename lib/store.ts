@@ -73,6 +73,10 @@ export interface AppState {
   // Theme
   themeMode: ThemeMode;
 
+  // Subscription — gates premium features (Settings, Journey, etc.)
+  // Default false; flip to true once RevenueCat entitlement is active.
+  isSubscribed: boolean;
+
   // Goal
   goalSeconds: number;
   sliderMinutes: number;
@@ -122,6 +126,7 @@ export interface AppState {
   stopSession: () => Promise<void>;
   resetElapsed: () => void;
   toggleTheme: () => void;
+  setSubscription: (isSubscribed: boolean) => void;
 
   // Goal actions
   setSliderMinutes: (m: number) => void;
@@ -159,6 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   weekStats: [],
   ready: false,
   themeMode: 'dark',
+  isSubscribed: false,
   goalSeconds: 10 * 60,
   sliderMinutes: 10,
   focusStep: 'hidden',
@@ -355,6 +361,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = get().themeMode === 'dark' ? 'light' : 'dark';
     set({ themeMode: next });
     setDeviceState('theme', next);
+  },
+
+  setSubscription: (isSubscribed: boolean) => {
+    set({ isSubscribed });
   },
 
   // --- Goal ---

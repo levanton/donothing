@@ -17,7 +17,6 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
-import AccountSheet from '@/components/AccountSheet';
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
@@ -52,9 +51,10 @@ function countFromMeta(meta: {
 interface SettingsContentProps {
   onClose: () => void;
   insets: { top: number; bottom: number };
+  onOpenAccount: () => void;
 }
 
-export default function SettingsContent({ onClose, insets }: SettingsContentProps) {
+export default function SettingsContent({ onClose, insets, onOpenAccount }: SettingsContentProps) {
   const themeMode = useAppStore((s) => s.themeMode);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
   const theme = themes[themeMode];
@@ -166,17 +166,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [neverBlockCount, setNeverBlockCount] = useState(() => readCount(NEVER_BLOCK_SELECTION_ID));
 
   const blockSheetRef = useRef<BottomSheet>(null);
-  const accountSheetRef = useRef<BottomSheet>(null);
 
   const handleOpenAccount = () => {
     Haptics.selectionAsync();
-    accountSheetRef.current?.expand();
-  };
-
-  const handleDeleteAccount = async () => {
-    // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
-    // For now this is a stub so the confirm dialog does something visible.
-    console.warn('[Settings] delete account tapped — no-op stub');
+    onOpenAccount();
   };
 
   const store = useAppStore.getState;
@@ -232,8 +225,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       {/* Header */}
       <View style={styles.headerRow}>
         <PillButton
-          label="account"
-          icon="user"
+          label="My account"
           onPress={handleOpenAccount}
           color={theme.text}
           variant="outline"
@@ -479,13 +471,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         </>
       )}
     </ScrollView>
-
-    {/* Bottom sheet for account & legal */}
-    <AccountSheet
-      ref={accountSheetRef}
-      theme={theme}
-      onDeleteAccount={handleDeleteAccount}
-    />
 
     {/* Bottom sheet for block picker */}
     <PickerSheet
