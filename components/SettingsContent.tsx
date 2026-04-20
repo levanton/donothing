@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
+import AccountSheet from '@/components/AccountSheet';
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
@@ -165,6 +166,18 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [neverBlockCount, setNeverBlockCount] = useState(() => readCount(NEVER_BLOCK_SELECTION_ID));
 
   const blockSheetRef = useRef<BottomSheet>(null);
+  const accountSheetRef = useRef<BottomSheet>(null);
+
+  const handleOpenAccount = () => {
+    Haptics.selectionAsync();
+    accountSheetRef.current?.expand();
+  };
+
+  const handleDeleteAccount = async () => {
+    // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
+    // For now this is a stub so the confirm dialog does something visible.
+    console.warn('[Settings] delete account tapped — no-op stub');
+  };
 
   const store = useAppStore.getState;
 
@@ -218,6 +231,20 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     >
       {/* Header */}
       <View style={styles.headerRow}>
+        <PillButton
+          label="account"
+          icon="user"
+          onPress={handleOpenAccount}
+          color={theme.text}
+          variant="outline"
+          size="small"
+          style={{
+            alignSelf: 'flex-start',
+            borderWidth: 1.2,
+            paddingVertical: 6,
+            paddingHorizontal: 14,
+          }}
+        />
         <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
@@ -453,6 +480,13 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
       )}
     </ScrollView>
 
+    {/* Bottom sheet for account & legal */}
+    <AccountSheet
+      ref={accountSheetRef}
+      theme={theme}
+      onDeleteAccount={handleDeleteAccount}
+    />
+
     {/* Bottom sheet for block picker */}
     <PickerSheet
       ref={blockSheetRef}
@@ -505,7 +539,7 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 24 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },

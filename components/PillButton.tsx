@@ -1,8 +1,11 @@
-import { Pressable, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
 import { palette } from '@/lib/theme';
 
 type Variant = 'outline' | 'filled' | 'chip';
 type Size = 'small' | 'medium' | 'large';
+type FeatherName = ComponentProps<typeof Feather>['name'];
 
 interface PillButtonProps {
   label: string;
@@ -13,6 +16,8 @@ interface PillButtonProps {
   size?: Size;
   /** Override background color (for filled/chip) */
   bg?: string;
+  /** Optional leading icon (Feather name). */
+  icon?: FeatherName;
   flex?: boolean;
   style?: ViewStyle;
   labelStyle?: TextStyle;
@@ -25,10 +30,13 @@ interface PillButtonProps {
   outline?: boolean;
 }
 
+const ICON_SIZE_BY_SIZE: Record<Size, number> = { small: 14, medium: 16, large: 18 };
+const GAP_BY_SIZE: Record<Size, number> = { small: 6, medium: 8, large: 10 };
+
 export default function PillButton({
   label, onPress, color,
   variant: variantProp, size: sizeProp, bg,
-  flex, style, labelStyle,
+  icon, flex, style, labelStyle,
   // legacy
   filled, fillColor, chipBg, small, outline,
 }: PillButtonProps) {
@@ -38,6 +46,19 @@ export default function PillButton({
 
   const sizeStyle = SIZE_STYLES[size];
 
+  const renderInner = (textColor: string) => {
+    const text = (
+      <Text style={[styles.baseText, sizeStyle.text, { color: textColor }, labelStyle]}>{label}</Text>
+    );
+    if (!icon) return text;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: GAP_BY_SIZE[size] }}>
+        <Feather name={icon} size={ICON_SIZE_BY_SIZE[size]} color={textColor} />
+        {text}
+      </View>
+    );
+  };
+
   if (variant === 'outline') {
     const bgColor = bg ?? 'transparent';
     return (
@@ -45,7 +66,7 @@ export default function PillButton({
         onPress={onPress}
         style={[styles.base, sizeStyle.outline, flex && { flex: 1 }, { borderColor: color, backgroundColor: bgColor }, style]}
       >
-        <Text style={[styles.baseText, sizeStyle.text, { color }, labelStyle]}>{label}</Text>
+        {renderInner(color)}
       </Pressable>
     );
   }
@@ -58,19 +79,20 @@ export default function PillButton({
         onPress={onPress}
         style={[styles.base, sizeStyle.filled, flex && { flex: 1 }, { backgroundColor: bgColor, borderColor: bgColor }, style]}
       >
-        <Text style={[styles.baseText, sizeStyle.text, { color: textColor }, labelStyle]}>{label}</Text>
+        {renderInner(textColor)}
       </Pressable>
     );
   }
 
   // chip
   const bgColor = bg ?? chipBg ?? palette.cream;
+  const chipTextColor = filled ? palette.cream : palette.charcoal;
   return (
     <Pressable
       onPress={onPress}
       style={[styles.base, sizeStyle.chip, flex && { flex: 1 }, { backgroundColor: bgColor, borderColor: bgColor }, style]}
     >
-      <Text style={[styles.baseText, sizeStyle.text, { color: filled ? palette.cream : palette.charcoal }, labelStyle]}>{label}</Text>
+      {renderInner(chipTextColor)}
     </Pressable>
   );
 }
