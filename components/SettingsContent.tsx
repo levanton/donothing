@@ -1,5 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
 import {
@@ -7,6 +14,7 @@ import {
 } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
 
@@ -55,10 +63,59 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   const [showNeverBlockPicker, setShowNeverBlockPicker] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('notDetermined');
 
+  // iOS notification permission — banner appears when not granted
+  type NotifStatus = 'granted' | 'denied' | 'undetermined';
+  const [notifStatus, setNotifStatus] = useState<NotifStatus | null>(null);
+  const bannerOpacity = useSharedValue(0);
+  const bannerY = useSharedValue(10);
+
+  const checkNotifStatus = useCallback(async () => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status === 'granted') setNotifStatus('granted');
+      else if (status === 'denied') setNotifStatus('denied');
+      else setNotifStatus('undetermined');
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     getAuth().then(setAuthStatus).catch(() => {});
-  }, []);
+    checkNotifStatus();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') checkNotifStatus();
+    });
+    return () => sub.remove();
+  }, [checkNotifStatus]);
+
+  // Fade the banner in once we know the user hasn't granted permission
+  useEffect(() => {
+    if (notifStatus === 'denied' || notifStatus === 'undetermined') {
+      bannerOpacity.value = withDelay(120, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
+      bannerY.value = withDelay(120, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
+    } else {
+      bannerOpacity.value = 0;
+      bannerY.value = 10;
+    }
+  }, [notifStatus]);
+
+  const bannerStyle = useAnimatedStyle(() => ({
+    opacity: bannerOpacity.value,
+    transform: [{ translateY: bannerY.value }],
+  }));
+
+  const handleNotifTap = useCallback(async () => {
+    Haptics.selectionAsync();
+    if (notifStatus === 'undetermined') {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        setNotifStatus(status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined');
+      } catch {}
+    } else if (notifStatus === 'denied') {
+      try { await Linking.openSettings(); } catch {}
+    }
+  }, [notifStatus]);
 
   const handleAuthTap = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -134,6 +191,31 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
       </View>
+
+      {/* Notification permission banner — shown first so it's impossible to miss */}
+      {Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
+        <Animated.View style={bannerStyle}>
+          <Pressable
+            onPress={handleNotifTap}
+            style={[styles.notifBanner, { backgroundColor: 'rgba(232, 169, 154, 0.6)' }]}
+          >
+            <View style={[styles.notifIconWrap, { backgroundColor: 'rgba(232, 169, 154, 0.9)' }]}>
+              <Feather name="bell-off" size={18} color={theme.text} />
+            </View>
+            <View style={styles.notifText}>
+              <Text style={[styles.notifTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                {notifStatus === 'denied' ? 'Notifications are off' : 'Enable notifications'}
+              </Text>
+              <Text style={[styles.notifSub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+                {notifStatus === 'denied'
+                  ? "We can't remind you about blocks or session ends. Tap to turn them on."
+                  : "So we can gently remind you about scheduled blocks and session ends."}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+          </Pressable>
+        </Animated.View>
+      )}
 
       {/* Screen block */}
       <View style={styles.sectionHeader}>
@@ -382,6 +464,37 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
+
+  notifBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 28,
+    gap: 14,
+  },
+  notifIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifText: { flex: 1 },
+  notifTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginBottom: 3,
+  },
+  notifSub: {
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0.15,
+  },
+
   sectionTitle: { fontSize: 24, fontWeight: '400' },
   sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
