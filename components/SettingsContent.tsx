@@ -401,10 +401,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                   if (status === 'approved') setShowNeverBlockPicker(true);
                 }}
                 hitSlop={10}
-                style={[styles.changeChip, { borderColor: theme.accent }]}
+                style={[styles.changeChip, { borderColor: theme.text }]}
               >
-                <Feather name="edit-2" size={11} color={theme.accent} />
-                <Text style={[styles.changeChipLabel, { color: theme.accent }]}>edit</Text>
+                <Feather name="edit-2" size={12} color={theme.text} />
+                <Text style={[styles.changeChipLabel, { color: theme.text }]}>edit</Text>
               </Pressable>
             )}
           </View>
@@ -613,14 +613,14 @@ const styles = StyleSheet.create({
   changeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 1.2,
+    gap: 5,
+    borderWidth: 1.5,
     borderRadius: 100,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
   },
   changeChipLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
     letterSpacing: 0.3,
   },
