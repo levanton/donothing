@@ -164,7 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   weekStats: [],
   ready: false,
   themeMode: 'dark',
-  isSubscribed: false,
+  isSubscribed: true,
   goalSeconds: 10 * 60,
   sliderMinutes: 10,
   focusStep: 'hidden',
