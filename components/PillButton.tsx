@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 import { palette } from '@/lib/theme';
 
 type Variant = 'outline' | 'filled' | 'chip';
@@ -15,6 +15,7 @@ interface PillButtonProps {
   bg?: string;
   flex?: boolean;
   style?: ViewStyle;
+  labelStyle?: TextStyle;
 
   // Legacy props — kept for backwards compatibility
   filled?: boolean;
@@ -27,7 +28,7 @@ interface PillButtonProps {
 export default function PillButton({
   label, onPress, color,
   variant: variantProp, size: sizeProp, bg,
-  flex, style,
+  flex, style, labelStyle,
   // legacy
   filled, fillColor, chipBg, small, outline,
 }: PillButtonProps) {
@@ -44,7 +45,7 @@ export default function PillButton({
         onPress={onPress}
         style={[styles.base, sizeStyle.outline, flex && { flex: 1 }, { borderColor: color, backgroundColor: bgColor }, style]}
       >
-        <Text style={[styles.baseText, sizeStyle.text, { color }]}>{label}</Text>
+        <Text style={[styles.baseText, sizeStyle.text, { color }, labelStyle]}>{label}</Text>
       </Pressable>
     );
   }
@@ -57,7 +58,7 @@ export default function PillButton({
         onPress={onPress}
         style={[styles.base, sizeStyle.filled, flex && { flex: 1 }, { backgroundColor: bgColor, borderColor: bgColor }, style]}
       >
-        <Text style={[styles.baseText, sizeStyle.text, { color: textColor }]}>{label}</Text>
+        <Text style={[styles.baseText, sizeStyle.text, { color: textColor }, labelStyle]}>{label}</Text>
       </Pressable>
     );
   }
@@ -69,7 +70,7 @@ export default function PillButton({
       onPress={onPress}
       style={[styles.base, sizeStyle.chip, flex && { flex: 1 }, { backgroundColor: bgColor, borderColor: bgColor }, style]}
     >
-      <Text style={[styles.baseText, sizeStyle.text, { color: filled ? palette.cream : palette.charcoal }]}>{label}</Text>
+      <Text style={[styles.baseText, sizeStyle.text, { color: filled ? palette.cream : palette.charcoal }, labelStyle]}>{label}</Text>
     </Pressable>
   );
 }
@@ -86,10 +87,10 @@ const styles = StyleSheet.create({
 
 const SIZE_STYLES = {
   small: StyleSheet.create({
-    outline: { borderWidth: 1, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end' },
+    outline: { borderWidth: 1.75, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end' },
     filled: { borderWidth: 0, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end' },
     chip: { borderWidth: 0, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-end' },
-    text: { fontSize: 14, fontWeight: '400' },
+    text: { fontSize: 14, fontWeight: '500' },
   }),
   medium: StyleSheet.create({
     outline: { borderWidth: 1.5, borderRadius: 100, paddingVertical: 14, paddingHorizontal: 28 },

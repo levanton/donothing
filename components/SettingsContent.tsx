@@ -372,7 +372,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         color={theme.text}
         variant="outline"
         size="small"
-        style={{ borderWidth: 1.75 }}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setEditingBlock(null);
