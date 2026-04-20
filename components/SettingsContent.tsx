@@ -66,8 +66,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
   // iOS notification permission — banner appears when not granted
   type NotifStatus = 'granted' | 'denied' | 'undetermined';
   const [notifStatus, setNotifStatus] = useState<NotifStatus | null>(null);
-  const bannerOpacity = useSharedValue(0);
-  const bannerY = useSharedValue(10);
+  const notifBannerOpacity = useSharedValue(0);
+  const notifBannerY = useSharedValue(10);
+  const stBannerOpacity = useSharedValue(0);
+  const stBannerY = useSharedValue(10);
 
   const checkNotifStatus = useCallback(async () => {
     if (Platform.OS !== 'ios') return;
@@ -79,30 +81,55 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     } catch {}
   }, []);
 
+  const checkAuthStatus = useCallback(async () => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      const s = await getAuth();
+      setAuthStatus(s);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
-    getAuth().then(setAuthStatus).catch(() => {});
+    checkAuthStatus();
     checkNotifStatus();
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') checkNotifStatus();
+      if (next === 'active') {
+        checkNotifStatus();
+        checkAuthStatus();
+      }
     });
     return () => sub.remove();
-  }, [checkNotifStatus]);
+  }, [checkNotifStatus, checkAuthStatus]);
 
-  // Fade the banner in once we know the user hasn't granted permission
+  // Fade each banner in once we know the user hasn't granted that permission
   useEffect(() => {
     if (notifStatus === 'denied' || notifStatus === 'undetermined') {
-      bannerOpacity.value = withDelay(120, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
-      bannerY.value = withDelay(120, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
+      notifBannerOpacity.value = withDelay(120, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
+      notifBannerY.value = withDelay(120, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
     } else {
-      bannerOpacity.value = 0;
-      bannerY.value = 10;
+      notifBannerOpacity.value = 0;
+      notifBannerY.value = 10;
     }
   }, [notifStatus]);
 
-  const bannerStyle = useAnimatedStyle(() => ({
-    opacity: bannerOpacity.value,
-    transform: [{ translateY: bannerY.value }],
+  useEffect(() => {
+    if (authStatus === 'denied' || authStatus === 'notDetermined') {
+      stBannerOpacity.value = withDelay(180, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
+      stBannerY.value = withDelay(180, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
+    } else {
+      stBannerOpacity.value = 0;
+      stBannerY.value = 10;
+    }
+  }, [authStatus]);
+
+  const notifBannerStyle = useAnimatedStyle(() => ({
+    opacity: notifBannerOpacity.value,
+    transform: [{ translateY: notifBannerY.value }],
+  }));
+  const stBannerStyle = useAnimatedStyle(() => ({
+    opacity: stBannerOpacity.value,
+    transform: [{ translateY: stBannerY.value }],
   }));
 
   const handleNotifTap = useCallback(async () => {
@@ -117,11 +144,15 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     }
   }, [notifStatus]);
 
-  const handleAuthTap = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const status = await requestAuth();
-    setAuthStatus(status);
-  };
+  const handleScreenTimeBannerTap = useCallback(async () => {
+    Haptics.selectionAsync();
+    if (authStatus === 'denied') {
+      try { await Linking.openSettings(); } catch {}
+    } else {
+      const status = await requestAuth();
+      setAuthStatus(status);
+    }
+  }, [authStatus]);
 
   const readCount = (id: string) => {
     if (Platform.OS !== 'ios') return 0;
@@ -194,10 +225,16 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
 
       {/* Notification permission banner — shown first so it's impossible to miss */}
       {Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
-        <Animated.View style={bannerStyle}>
+        <Animated.View style={notifBannerStyle}>
           <Pressable
             onPress={handleNotifTap}
-            style={[styles.notifBanner, { backgroundColor: 'rgba(232, 169, 154, 0.6)' }]}
+            style={[
+              styles.notifBanner,
+              {
+                backgroundColor: 'rgba(232, 169, 154, 0.6)',
+                marginBottom: (authStatus === 'denied' || authStatus === 'notDetermined') ? 12 : 28,
+              },
+            ]}
           >
             <View style={[styles.notifIconWrap, { backgroundColor: 'rgba(232, 169, 154, 0.9)' }]}>
               <Feather name="bell-off" size={18} color={theme.text} />
@@ -217,6 +254,31 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         </Animated.View>
       )}
 
+      {/* Screen Time permission banner — amber-tinted to differ from notif salmon */}
+      {Platform.OS === 'ios' && (authStatus === 'denied' || authStatus === 'notDetermined') && (
+        <Animated.View style={stBannerStyle}>
+          <Pressable
+            onPress={handleScreenTimeBannerTap}
+            style={[styles.notifBanner, { backgroundColor: 'rgba(224, 166, 83, 0.55)' }]}
+          >
+            <View style={[styles.notifIconWrap, { backgroundColor: 'rgba(224, 166, 83, 0.9)' }]}>
+              <Feather name="smartphone" size={18} color={theme.text} />
+            </View>
+            <View style={styles.notifText}>
+              <Text style={[styles.notifTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                {authStatus === 'denied' ? 'Screen Time access is off' : 'Enable Screen Time access'}
+              </Text>
+              <Text style={[styles.notifSub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+                {authStatus === 'denied'
+                  ? "Without it we can't block or unblock apps for you. Tap to turn it on."
+                  : "We need it to schedule app blocks. Tap to grant access."}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+          </Pressable>
+        </Animated.View>
+      )}
+
       {/* Screen block */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderText}>
@@ -227,23 +289,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             Block all apps at a set time, unlock by doing nothing
           </Text>
         </View>
-        {Platform.OS === 'ios' && (
-          <Pressable
-            onPress={handleAuthTap}
-            disabled={authStatus === 'approved'}
-            hitSlop={8}
-            style={[styles.authLock, authStatus === 'approved'
-              ? { backgroundColor: theme.accent, borderColor: theme.accent }
-              : { backgroundColor: 'transparent', borderColor: theme.text },
-            ]}
-          >
-            <Feather
-              name="lock"
-              size={18}
-              color={authStatus === 'approved' ? theme.accentText : theme.text}
-            />
-          </Pressable>
-        )}
       </View>
       {scheduledBlocks.length === 0 && (
         <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
@@ -578,15 +623,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.3,
-  },
-  authLock: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -4,
   },
   groupName: {
     fontSize: 17,
