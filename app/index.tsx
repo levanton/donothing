@@ -884,6 +884,7 @@ export default function DoNothingScreen() {
       sessionId={lastSessionId}
       durationSeconds={lastSessionDuration}
       todaySeconds={stats.today}
+      themeMode={themeMode}
       onClose={handleCompletionClose}
     />
 
