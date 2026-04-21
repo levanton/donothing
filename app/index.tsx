@@ -1095,7 +1095,7 @@ export default function DoNothingScreen() {
                         },
                       ]}
                     >
-                      Journey
+                      My Journey
                     </Text>
                   </View>
                   <Animated.View
@@ -1212,7 +1212,7 @@ export default function DoNothingScreen() {
             journeyProxyStyle,
           ]}
         >
-          Journey
+          My Journey
         </Animated.Text>
       )}
 

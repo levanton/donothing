@@ -110,7 +110,7 @@ export default function HistoryContent({
       <View style={styles.headerRow}>
         <View ref={headingRef} collapsable={false}>
           <Text style={[styles.title, { color: theme.text, fontFamily: Fonts.serif, opacity: 0 }]}>
-            Journey
+            My Journey
           </Text>
         </View>
         <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
