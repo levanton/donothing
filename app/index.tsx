@@ -16,12 +16,14 @@ import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import Animated, {
+  Easing,
   interpolate,
   interpolateColor,
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -540,6 +542,81 @@ export default function DoNothingScreen() {
     useAppStore.getState().startSession();
   }, [unlockMin]);
 
+  // --- Launch splash — terracotta fills the screen, then shrinks in place
+  // onto the yes button. Animates real width/height (not scale) so the
+  // edge stays crisp, and lands exactly on the measured yes-button position
+  // so the splash literally becomes the button with no visible handoff.
+  const [splashDone, setSplashDone] = useState(false);
+  const yesButtonRef = useRef<View>(null);
+  const [yesBtnRect, setYesBtnRect] = useState<Rect | null>(null);
+  const measureYesButton = useCallback(() => {
+    requestAnimationFrame(() => {
+      yesButtonRef.current?.measureInWindow((x, y, w, h) => {
+        if (w > 0 && h > 0) setYesBtnRect({ x, y, w, h });
+      });
+    });
+  }, []);
+
+  const { width: SCREEN_W_INIT, height: SCREEN_H_INIT } = Dimensions.get('window');
+  const YES_SIZE = 140;
+  // Shared values drive the animated style — seeded with safe "cover the
+  // screen" defaults so the splash is opaque from the very first frame
+  // even before the yes button is measured.
+  const splashProgress = useSharedValue(0);
+  const splashCenterX = useSharedValue(SCREEN_W_INIT / 2);
+  const splashCenterY = useSharedValue(SCREEN_H_INIT / 2);
+  const splashInitialSize = useSharedValue(Math.max(SCREEN_W_INIT, SCREEN_H_INIT) * 2.5);
+
+  // Recompute the splash's anchor + cover size once the yes button has been
+  // measured. For a circle centred at (cx, cy) to cover the screen we need
+  // the radius to reach the farthest corner — so use corner distances, not
+  // Manhattan half-extents.
+  useEffect(() => {
+    if (!yesBtnRect) return;
+    const cx = yesBtnRect.x + yesBtnRect.w / 2;
+    const cy = yesBtnRect.y + yesBtnRect.h / 2;
+    const maxDist = Math.max(
+      Math.hypot(cx, cy),
+      Math.hypot(SCREEN_W_INIT - cx, cy),
+      Math.hypot(cx, SCREEN_H_INIT - cy),
+      Math.hypot(SCREEN_W_INIT - cx, SCREEN_H_INIT - cy),
+    );
+    splashCenterX.value = cx;
+    splashCenterY.value = cy;
+    splashInitialSize.value = maxDist * 2 + 80;
+  }, [yesBtnRect]);
+
+  useEffect(() => {
+    if (!ready || splashDone || !yesBtnRect) return;
+    splashProgress.value = withDelay(
+      200,
+      withTiming(
+        1,
+        { duration: 1200, easing: Easing.bezier(0.16, 1, 0.3, 1) },
+        (finished) => {
+          if (finished) runOnJS(setSplashDone)(true);
+        },
+      ),
+    );
+  }, [ready, splashDone, yesBtnRect]);
+
+  const splashStyle = useAnimatedStyle(() => {
+    const size =
+      splashInitialSize.value + splashProgress.value * (YES_SIZE - splashInitialSize.value);
+    return {
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      left: splashCenterX.value - size / 2,
+      top: splashCenterY.value - size / 2,
+    };
+  });
+  // The inline yes label stays visible only when the splash is small enough
+  // to actually read as the button — fades in over the tail of the anim.
+  const splashLabelStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, Math.min(1, (splashProgress.value - 0.6) / 0.3)),
+  }));
+
   // --- Distraction-free mode: hide timer & button while running ---
   const [distractionFree, setDistractionFree] = useState(false);
 
@@ -852,6 +929,8 @@ export default function DoNothingScreen() {
               </Animated.View>
               {/* Unified element: play button ↔ orbit dot */}
               <Pressable
+                ref={yesButtonRef}
+                onLayout={measureYesButton}
                 onPress={
                   started
                     ? handleStop
@@ -1230,6 +1309,30 @@ export default function DoNothingScreen() {
         themeMode={themeMode}
         onClose={handleCompletionClose}
       />
+
+      {/* Launch splash — terracotta sheet that covers the screen and
+          shrinks in place onto the measured yes button */}
+      {!splashDone && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.splashCircle,
+            { backgroundColor: theme.accent },
+            splashStyle,
+          ]}
+        >
+          <Animated.View style={[splashLabelStyle, styles.splashLabelWrap]}>
+            <Text
+              style={[
+                styles.splashLabel,
+                { color: theme.accentText, fontFamily: Fonts!.serif },
+              ]}
+            >
+              yes
+            </Text>
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -1426,6 +1529,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nothingLabel: {
+    fontSize: 22,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+  },
+  splashCircle: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 500,
+    overflow: 'hidden',
+  },
+  splashLabelWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLabel: {
     fontSize: 22,
     fontWeight: '400',
     letterSpacing: 0.5,
