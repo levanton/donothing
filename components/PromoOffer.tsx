@@ -14,6 +14,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -71,6 +72,16 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
       statusBarTranslucent
     >
       <View style={styles.backdrop}>
+        <BlurView
+          intensity={28}
+          tint="dark"
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={styles.tint} pointerEvents="none" />
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={handleClose}
+        />
         <Animated.View
           style={[
             styles.card,
@@ -158,9 +169,12 @@ export default memo(PromoOffer);
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(60, 60, 60, 0.55)',
     paddingHorizontal: 16,
     justifyContent: 'center',
+  },
+  tint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20, 20, 20, 0.35)',
   },
   card: {
     backgroundColor: palette.terracotta,
