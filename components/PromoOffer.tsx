@@ -119,21 +119,21 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
             {/* Headline */}
             <Text style={[styles.headline, { fontFamily: Fonts!.serif }]}>
               What if your first year{'\n'}was{' '}
-              <Text style={styles.headlineBold}>half off</Text>?
+              <Text style={styles.headlineBold}>HALF OFF</Text>?
             </Text>
 
             {/* Bullet list */}
             <View style={styles.bullets}>
               <View style={styles.bulletRow}>
-                <Feather name="check" size={14} color={palette.cream} />
+                <Feather name="check" size={16} color={palette.cream} />
                 <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
                   cancel any time
                 </Text>
               </View>
               <View style={styles.bulletRow}>
-                <Feather name="check" size={14} color={palette.cream} />
+                <Feather name="check" size={16} color={palette.cream} />
                 <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                  unlimited access to donothing
+                  unlimited access
                 </Text>
               </View>
             </View>
@@ -150,9 +150,14 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
                   Then 49,99 USD/year
                 </Text>
               </View>
-              <Text style={[styles.priceValue, { fontFamily: Fonts!.mono }]}>
-                22,99 USD
-              </Text>
+              <View style={styles.priceRight}>
+                <Text style={[styles.priceOld, { fontFamily: Fonts!.mono }]}>
+                  49,99
+                </Text>
+                <Text style={[styles.priceValue, { fontFamily: Fonts!.mono }]}>
+                  22,99 USD
+                </Text>
+              </View>
             </View>
 
             {/* CTA */}
@@ -220,26 +225,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   bullets: {
-    marginTop: 14,
-    gap: 6,
+    marginTop: 16,
+    gap: 8,
   },
   bulletRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   bulletText: {
     color: palette.cream,
-    fontSize: 14,
-    fontWeight: '300',
+    fontSize: 16,
+    fontWeight: '400',
     letterSpacing: 0.2,
   },
   priceCard: {
     marginTop: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     borderRadius: 14,
     borderWidth: 1.2,
     borderColor: 'rgba(249, 242, 224, 0.55)',
@@ -247,22 +252,34 @@ const styles = StyleSheet.create({
   },
   priceTitle: {
     color: palette.cream,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
   priceSubtitle: {
     color: palette.cream,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '300',
     opacity: 0.85,
-    marginTop: 2,
+    marginTop: 3,
     letterSpacing: 0.2,
+  },
+  priceRight: {
+    alignItems: 'flex-end',
+  },
+  priceOld: {
+    color: palette.cream,
+    fontSize: 15,
+    fontWeight: '400',
+    opacity: 0.7,
+    letterSpacing: 0.3,
+    textDecorationLine: 'line-through',
+    marginBottom: 3,
   },
   priceValue: {
     color: palette.cream,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 19,
+    fontWeight: '600',
     letterSpacing: 0.4,
   },
   cta: {
