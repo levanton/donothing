@@ -31,7 +31,7 @@ import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import PaywallGate from '@/components/PaywallGate';
-import PromoOffer from '@/components/PromoOffer';
+import PromoOffer from '@/components/promo/PromoOffer';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
 import SettingsContent from '@/components/SettingsContent';
@@ -544,13 +544,15 @@ export default function DoNothingScreen() {
   const [distractionFree, setDistractionFree] = useState(false);
 
   // --- Promo offer modal (for users without subscription) ---
-  const [promoVisible, setPromoVisible] = useState(false);
+  // Lives in the store so the standalone paywall route can trigger it
+  // when the user dismisses without buying.
+  const promoVisible = useAppStore((s) => s.promoOfferVisible);
   const handleOpenPromo = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPromoVisible(true);
+    useAppStore.getState().showPromoOffer();
   }, []);
   const handleClosePromo = useCallback(() => {
-    setPromoVisible(false);
+    useAppStore.getState().hidePromoOffer();
   }, []);
   const toggleDistractionFree = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1188,8 +1190,10 @@ export default function DoNothingScreen() {
       />
 
       {/* Floating Journey label — the one shared element that morphs between the
-        home pill and the Journey heading as the panel slides up. */}
-      {btnRect && headingRect && (
+        home pill and the Journey heading as the panel slides up. Hidden while
+        a session is running or a scheduled block is waiting so the timer UI
+        gets the spotlight. */}
+      {btnRect && headingRect && !started && !blockWaiting && (
         <Animated.Text
           pointerEvents='none'
           style={[

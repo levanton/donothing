@@ -77,6 +77,11 @@ export interface AppState {
   // Default false; flip to true once RevenueCat entitlement is active.
   isSubscribed: boolean;
 
+  // Win-back promo offer shown after the user closes the main paywall
+  promoOfferVisible: boolean;
+  showPromoOffer: () => void;
+  hidePromoOffer: () => void;
+
   // Goal
   goalSeconds: number;
   sliderMinutes: number;
@@ -366,6 +371,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSubscription: (isSubscribed: boolean) => {
     set({ isSubscribed });
   },
+
+  promoOfferVisible: false,
+  showPromoOffer: () => set({ promoOfferVisible: true }),
+  hidePromoOffer: () => set({ promoOfferVisible: false }),
 
   // --- Goal ---
   setSliderMinutes: (m) => set({ sliderMinutes: m }),
