@@ -44,6 +44,11 @@ export async function getAuth(): Promise<AuthStatus> {
 
 export async function requestAuth(): Promise<AuthStatus> {
   try {
+    // Only show the system prompt if the user hasn't decided yet. Calling
+    // requestAuthorization repeatedly when status is already approved/denied
+    // can re-trigger the iOS Screen Time prompt on every render.
+    const current = await getAuth();
+    if (current !== 'notDetermined') return current;
     await requestAuthorization('individual');
     return getAuth();
   } catch {
@@ -141,8 +146,15 @@ export async function scheduleBlock(
   endMinute = endMinute % 60;
   endHour = endHour % 24;
 
-  // Ensure authorization
-  await requestAuth();
+  // Ensure authorization — but never trigger the system prompt here. Init
+  // and re-scheduling can call this for many blocks at once, and surprising
+  // the user with a prompt outside of an explicit tap is bad UX. The caller
+  // (Settings UI) requests auth via a tap before scheduling the first block.
+  const auth = await getAuth();
+  if (auth !== 'approved') {
+    console.log('[ScreenTime] scheduleBlock skipped — auth status:', auth);
+    return;
+  }
 
   const startActions: any[] = [
     { type: 'clearWhitelist' },
