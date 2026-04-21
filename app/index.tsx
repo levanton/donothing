@@ -312,6 +312,7 @@ export default function DoNothingScreen() {
   const journeyProxyStyle = useAnimatedStyle(() => {
     if (!btnRect || !headingRect) return { opacity: 0 };
     const p = historySlide.value;
+    const s = settingsSlide.value;
     const startCX = btnRect.x + btnRect.w / 2;
     const startCY = btnRect.y + btnRect.h / 2;
     const endCX = headingRect.x + headingRect.w / 2;
@@ -320,7 +321,9 @@ export default function DoNothingScreen() {
     const cy = interpolate(p, [0, 1], [startCY, endCY]);
     const scale = interpolate(p, [0, 1], [19 / 32, 1]);
     return {
-      opacity: 1,
+      // Hide the proxy when Settings is open — it only belongs to the
+      // home ↔ history transition, not the sideways Settings panel.
+      opacity: 1 - s,
       transform: [
         { translateX: cx - headingRect.w / 2 },
         { translateY: cy - headingRect.h / 2 },
