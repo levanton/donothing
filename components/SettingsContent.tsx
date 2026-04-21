@@ -258,7 +258,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               },
             ]}
           >
-            <View style={[styles.notifIconWrap, { backgroundColor: palette.salmon }]}>
+            <View style={[styles.notifIconWrap, { backgroundColor: palette.cream }]}>
               <Feather name="bell-off" size={18} color={palette.brown} />
             </View>
             <View style={styles.notifText}>
@@ -286,7 +286,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               { backgroundColor: isDark ? 'rgba(224, 166, 83, 0.95)' : 'rgba(224, 166, 83, 0.55)' },
             ]}
           >
-            <View style={[styles.notifIconWrap, { backgroundColor: '#E0A653' }]}>
+            <View style={[styles.notifIconWrap, { backgroundColor: palette.cream }]}>
               <Feather name="smartphone" size={18} color={palette.brown} />
             </View>
             <View style={styles.notifText}>
