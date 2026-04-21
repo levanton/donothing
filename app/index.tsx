@@ -546,28 +546,6 @@ export default function DoNothingScreen() {
     setDistractionFree((v) => !v);
   }, []);
 
-  // --- Debug: manual block toggle ---
-  const [debugBlocked, setDebugBlocked] = useState(false);
-  const handleDebugBlock = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const anyActive = (() => {
-      try {
-        return isBlockActive();
-      } catch {
-        return false;
-      }
-    })();
-    if (debugBlocked || anyActive) {
-      const groupIds: string[] = [];
-      await forceUnblockAll(groupIds).catch(() => {});
-      await unblockAppsById('donothing-scheduled-block').catch(() => {});
-      setDebugBlocked(false);
-    } else {
-      await blockAppsById('donothing-scheduled-block').catch(() => {});
-      setDebugBlocked(true);
-    }
-  }, [debugBlocked]);
-
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     activateKeepAwakeAsync('session');
@@ -683,22 +661,6 @@ export default function DoNothingScreen() {
                   style={{ opacity: 0.9 }}
                 />
               </Pressable>
-
-              {Platform.OS === 'ios' && (
-                <Pressable
-                  onPress={handleDebugBlock}
-                  disabled={started}
-                  style={styles.devIconBtn}
-                  hitSlop={12}
-                >
-                  <Feather
-                    name={debugBlocked ? 'unlock' : 'lock'}
-                    size={18}
-                    color={debugBlocked ? theme.accent : theme.text}
-                    style={{ opacity: 0.9 }}
-                  />
-                </Pressable>
-              )}
 
               <Pressable
                 onPress={() =>
