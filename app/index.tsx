@@ -321,11 +321,12 @@ export default function DoNothingScreen() {
     const cy = interpolate(p, [0, 1], [startCY, endCY]);
     const scale = interpolate(p, [0, 1], [19 / 32, 1]);
     return {
-      // Hide the proxy when Settings is open — it only belongs to the
-      // home ↔ history transition, not the sideways Settings panel.
-      opacity: 1 - s,
+      opacity: 1,
+      // Base position (home ↔ history morph) + sideways offset that follows
+      // the home container when Settings slides in from the right. The proxy
+      // should feel like it lives on the home screen.
       transform: [
-        { translateX: cx - headingRect.w / 2 },
+        { translateX: cx - headingRect.w / 2 + s * SCREEN_W },
         { translateY: cy - headingRect.h / 2 },
         { scale },
       ],
