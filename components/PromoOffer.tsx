@@ -1,7 +1,6 @@
 import { memo, useEffect } from 'react';
 import {
   Image,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -38,21 +37,29 @@ interface Props {
 function PromoOffer({ visible, onClose, onPurchase }: Props) {
   const insets = useSafeAreaInsets();
 
+  const backdropOpacity = useSharedValue(0);
   const cardOpacity = useSharedValue(0);
   const cardY = useSharedValue(40);
   const cardScale = useSharedValue(0.96);
 
   useEffect(() => {
     if (visible) {
+      backdropOpacity.value = withTiming(1, { duration: 240, easing: EASE_OUT });
       cardOpacity.value = withTiming(1, { duration: 320, easing: EASE_OUT });
       cardY.value = withTiming(0, { duration: 480, easing: EASE_OUT });
       cardScale.value = withTiming(1, { duration: 480, easing: EASE_OUT });
     } else {
-      cardOpacity.value = 0;
-      cardY.value = 40;
-      cardScale.value = 0.96;
+      backdropOpacity.value = withTiming(0, { duration: 200, easing: EASE_OUT });
+      cardOpacity.value = withTiming(0, { duration: 200, easing: EASE_OUT });
+      cardY.value = withTiming(40, { duration: 240, easing: EASE_OUT });
+      cardScale.value = withTiming(0.96, { duration: 240, easing: EASE_OUT });
     }
   }, [visible]);
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+    pointerEvents: backdropOpacity.value > 0.01 ? 'auto' : 'none',
+  }));
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
@@ -70,12 +77,9 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={handleClose}
-      statusBarTranslucent
+    <Animated.View
+      style={[styles.root, backdropStyle]}
+      pointerEvents={visible ? 'auto' : 'none'}
     >
       <View style={styles.backdrop}>
         <BlurView
@@ -170,13 +174,17 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
           </View>
         </Animated.View>
       </View>
-    </Modal>
+    </Animated.View>
   );
 }
 
 export default memo(PromoOffer);
 
 const styles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+  },
   backdrop: {
     flex: 1,
     paddingHorizontal: 16,
