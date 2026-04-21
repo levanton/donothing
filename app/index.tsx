@@ -31,6 +31,7 @@ import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import PaywallGate from '@/components/PaywallGate';
+import PromoOffer from '@/components/PromoOffer';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
 import SettingsContent from '@/components/SettingsContent';
@@ -541,6 +542,16 @@ export default function DoNothingScreen() {
 
   // --- Distraction-free mode: hide timer & button while running ---
   const [distractionFree, setDistractionFree] = useState(false);
+
+  // --- Promo offer modal (for users without subscription) ---
+  const [promoVisible, setPromoVisible] = useState(false);
+  const handleOpenPromo = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPromoVisible(true);
+  }, []);
+  const handleClosePromo = useCallback(() => {
+    setPromoVisible(false);
+  }, []);
   const toggleDistractionFree = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDistractionFree((v) => !v);
@@ -676,6 +687,20 @@ export default function DoNothingScreen() {
               >
                 <Feather
                   name='flag'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={handleOpenPromo}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='gift'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}
@@ -1181,6 +1206,16 @@ export default function DoNothingScreen() {
           My Journey
         </Animated.Text>
       )}
+
+      {/* Promo offer — shown to users without an active subscription */}
+      <PromoOffer
+        visible={promoVisible}
+        onClose={handleClosePromo}
+        onPurchase={() => {
+          // TODO: hook into RevenueCat purchase flow
+          handleClosePromo();
+        }}
+      />
 
       {/* Countdown completion screen */}
       <SessionCompleteScreen
