@@ -1,3 +1,5 @@
+import { Entypo, Feather } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
@@ -8,15 +10,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import Animated, {
+  interpolate,
   interpolateColor,
   runOnJS,
   useAnimatedScrollHandler,
@@ -24,26 +24,31 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Fonts } from '@/constants/theme';
-import { useRouter } from 'expo-router';
-import { themes, palette } from '@/lib/theme';
-import { formatTimeStat } from '@/lib/format';
-import { getStats } from '@/lib/stats';
-import { useAppStore } from '@/lib/store';
-import type { ScheduledBlock } from '@/lib/db/types';
-import { blockAppsById, unblockAppsById, isBlockActive, forceUnblockAll } from '@/lib/screen-time';
-import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
+import AccountSheet from '@/components/AccountSheet';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import HistoryContent from '@/components/HistoryContent';
+import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import PaywallGate from '@/components/PaywallGate';
-import SettingsContent from '@/components/SettingsContent';
-import AccountSheet from '@/components/AccountSheet';
-import type BottomSheet from '@gorhom/bottom-sheet';
-import PillButton from '@/components/PillButton';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedView from '@/components/SessionEndedView';
+import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
+import { Fonts } from '@/constants/theme';
+import type { ScheduledBlock } from '@/lib/db/types';
+import { formatTimeStat } from '@/lib/format';
+import {
+  blockAppsById,
+  forceUnblockAll,
+  isBlockActive,
+  unblockAppsById,
+} from '@/lib/screen-time';
+import { getStats } from '@/lib/stats';
+import { useAppStore } from '@/lib/store';
+import { palette, themes } from '@/lib/theme';
+import type BottomSheet from '@gorhom/bottom-sheet';
+import { useRouter } from 'expo-router';
 
 const RING_R = 64;
 
@@ -93,6 +98,28 @@ export default function DoNothingScreen() {
     // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
     console.warn('[Account] delete tapped — stub; no-op until wired');
   }, []);
+
+  // Shared element: Journey pill on home ↔ Journey heading in history.
+  // We measure both on-screen rects and float a proxy Text that smoothly
+  // travels + scales between them, driven by historySlide.
+  type Rect = { x: number; y: number; w: number; h: number };
+  const journeyBtnRef = useRef<View>(null);
+  const [btnRect, setBtnRect] = useState<Rect | null>(null);
+  const [headingRect, setHeadingRect] = useState<Rect | null>(null);
+
+  const measureJourneyBtn = useCallback(() => {
+    // Home container has translateY = 0 whenever the pill is visible (slide = 0),
+    // so measureInWindow gives us the at-rest screen coords directly.
+    requestAnimationFrame(() => {
+      journeyBtnRef.current?.measureInWindow((x, y, w, h) => {
+        if (w > 0 && h > 0) setBtnRect({ x, y, w, h });
+      });
+    });
+  }, []);
+
+  const handleHeadingLayout = useCallback((rect: Rect) => {
+    setHeadingRect(rect);
+  }, []);
   const lastSessionId = useAppStore((s) => s.lastSessionId);
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
@@ -102,7 +129,9 @@ export default function DoNothingScreen() {
   // Block-waiting state: a scheduled block fired and apps are locked until the
   // user either does nothing for the required time, or force-unlocks.
   const blockWaiting = focusStep === 'done';
-  const activeBlock = blockWaiting ? findActiveBlock(scheduledBlocks, new Date()) : null;
+  const activeBlock = blockWaiting
+    ? findActiveBlock(scheduledBlocks, new Date())
+    : null;
   const unlockMin = activeBlock?.unlockGoalMinutes ?? 15;
 
   const isActiveRef = useRef(true);
@@ -130,8 +159,8 @@ export default function DoNothingScreen() {
   // --- Entry animations ---
   const timerOpacity = useSharedValue(0.9);
   const dotProgress = useSharedValue(0);
-  const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
-  const buttonSize = useSharedValue(140);     // 140 = button, 12 = dot
+  const orbitAmount = useSharedValue(0); // 0 = centered (button), 1 = orbiting (dot)
+  const buttonSize = useSharedValue(140); // 140 = button, 12 = dot
   const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
@@ -241,7 +270,6 @@ export default function DoNothingScreen() {
     s.setGoalFromSlider(mins);
   }, []);
 
-
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
   const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
@@ -264,6 +292,42 @@ export default function DoNothingScreen() {
   const historySlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - historySlide.value) * SCREEN_H }],
   }));
+
+  // Pill border fades out in the first half of the swipe — the word has already
+  // started travelling via the proxy, leaving the empty border hanging there
+  // would look strange.
+  const journeyPillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(historySlide.value, [0, 0.5, 1], [1, 0, 0]),
+  }));
+
+  // Chevron disappears instantly at the first sign of a swipe — the shared-
+  // element morph is enough of a signal; the chevron only hinted at rest.
+  const journeyChevronStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(historySlide.value, [0, 0.05], [1, 0]),
+  }));
+
+  // Shared element — floating Journey label that travels between pill and heading.
+  // Both endpoints' centres drive a single translate + scale; the pill/heading
+  // texts stay invisible so the proxy is the only glyph the user sees.
+  const journeyProxyStyle = useAnimatedStyle(() => {
+    if (!btnRect || !headingRect) return { opacity: 0 };
+    const p = historySlide.value;
+    const startCX = btnRect.x + btnRect.w / 2;
+    const startCY = btnRect.y + btnRect.h / 2;
+    const endCX = headingRect.x + headingRect.w / 2;
+    const endCY = headingRect.y + headingRect.h / 2;
+    const cx = interpolate(p, [0, 1], [startCX, endCX]);
+    const cy = interpolate(p, [0, 1], [startCY, endCY]);
+    const scale = interpolate(p, [0, 1], [19 / 32, 1]);
+    return {
+      opacity: 1,
+      transform: [
+        { translateX: cx - headingRect.w / 2 },
+        { translateY: cy - headingRect.h / 2 },
+        { scale },
+      ],
+    };
+  });
 
   // Swipe up on main → open history
   const mainVerticalPan = Gesture.Pan()
@@ -361,12 +425,15 @@ export default function DoNothingScreen() {
 
   // --- Init ---
   useEffect(() => {
-    useAppStore.getState().init().then(() => {
-      // Check if a block is currently active (app was closed during block)
-      if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
-        useAppStore.getState().showUnlock();
-      }
-    });
+    useAppStore
+      .getState()
+      .init()
+      .then(() => {
+        // Check if a block is currently active (app was closed during block)
+        if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
+          useAppStore.getState().showUnlock();
+        }
+      });
   }, []);
 
   // --- Notification listener for scheduled blocks ---
@@ -381,16 +448,23 @@ export default function DoNothingScreen() {
     };
 
     // When notification received while app is in foreground
-    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
-      handleScheduledBlock(notification.request.content.data ?? {});
-    });
+    const sub1 = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        handleScheduledBlock(notification.request.content.data ?? {});
+      },
+    );
 
     // When user taps notification (app was in background)
-    const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
-      handleScheduledBlock(response.notification.request.content.data ?? {});
-    });
+    const sub2 = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        handleScheduledBlock(response.notification.request.content.data ?? {});
+      },
+    );
 
-    return () => { sub1.remove(); sub2.remove(); };
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
   }, []);
 
   // --- AppState ---
@@ -473,7 +547,11 @@ export default function DoNothingScreen() {
   const handleDebugBlock = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const anyActive = (() => {
-      try { return isBlockActive(); } catch { return false; }
+      try {
+        return isBlockActive();
+      } catch {
+        return false;
+      }
     })();
     if (debugBlocked || anyActive) {
       const groupIds: string[] = [];
@@ -549,387 +627,607 @@ export default function DoNothingScreen() {
   // =========================================================================
   return (
     <View style={[styles.screenStack, { backgroundColor: theme.bg }]}>
-    <GestureDetector gesture={mainPanGesture}>
-    <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
-      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-      {/* Settings button — top left */}
-      <Pressable
-        onPress={handleSettingsPress}
-        disabled={started || blockWaiting}
-        style={[styles.lockButton, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
-        hitSlop={16}
-      >
-        <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
-      </Pressable>
-
-      {/* Dev tools cluster — only in dev builds, hidden while session is active */}
-      {__DEV__ && (
-        <View
-          style={[styles.devCluster, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
-          pointerEvents={started || blockWaiting ? 'none' : 'auto'}
+      <GestureDetector gesture={mainPanGesture}>
+        <Animated.View
+          style={[styles.container, animatedContainerStyle, mainSlideStyle]}
         >
+          <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+
+          {/* Settings button — top left */}
           <Pressable
-            onPress={() => router.push('/onboarding')}
-            disabled={started}
-            style={styles.devIconBtn}
-            hitSlop={12}
+            onPress={handleSettingsPress}
+            disabled={started || blockWaiting}
+            style={[
+              styles.lockButton,
+              {
+                top: insets.top + 12,
+                opacity: started || blockWaiting ? 0 : 1,
+              },
+            ]}
+            hitSlop={16}
           >
-            <Feather name="play" size={18} color={theme.text} style={{ opacity: 0.9 }} />
+            <Feather
+              name='sliders'
+              size={24}
+              color={theme.text}
+              style={{ opacity: 0.9 }}
+            />
           </Pressable>
 
-          {Platform.OS === 'ios' && (
+          {/* Dev tools cluster — only in dev builds, hidden while session is active */}
+          {__DEV__ && (
+            <View
+              style={[
+                styles.devCluster,
+                {
+                  top: insets.top + 12,
+                  opacity: started || blockWaiting ? 0 : 1,
+                },
+              ]}
+              pointerEvents={started || blockWaiting ? 'none' : 'auto'}
+            >
+              <Pressable
+                onPress={() => router.push('/onboarding')}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='play'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              {Platform.OS === 'ios' && (
+                <Pressable
+                  onPress={handleDebugBlock}
+                  disabled={started}
+                  style={styles.devIconBtn}
+                  hitSlop={12}
+                >
+                  <Feather
+                    name={debugBlocked ? 'unlock' : 'lock'}
+                    size={18}
+                    color={debugBlocked ? theme.accent : theme.text}
+                    style={{ opacity: 0.9 }}
+                  />
+                </Pressable>
+              )}
+
+              <Pressable
+                onPress={() =>
+                  useAppStore.setState({
+                    completionVisible: true,
+                    lastSessionId: 'dev-preview',
+                    lastSessionDuration: 60,
+                  })
+                }
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='flag'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing", or static "Time to Do nothing." when block is waiting */}
+          <View
+            style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            {blockWaiting ? (
+              <Text
+                style={[
+                  styles.header,
+                  { color: theme.text, fontFamily: Fonts!.serif },
+                ]}
+              >
+                Time to Do nothing.
+              </Text>
+            ) : (
+              <>
+                <Animated.View style={hideStyle}>
+                  <Text
+                    style={[
+                      styles.header,
+                      { color: theme.text, fontFamily: Fonts!.serif },
+                    ]}
+                  >
+                    Ready to{' '}
+                  </Text>
+                </Animated.View>
+                <Text
+                  style={[
+                    styles.header,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  Do
+                </Text>
+                <Animated.View style={showStyle}>
+                  <Text
+                    style={[
+                      styles.header,
+                      { color: theme.text, fontFamily: Fonts!.serif },
+                    ]}
+                  >
+                    ing
+                  </Text>
+                </Animated.View>
+                <Text
+                  style={[
+                    styles.header,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  {' '}
+                  nothing
+                </Text>
+                <Animated.View style={hideStyle}>
+                  <Text
+                    style={[
+                      styles.header,
+                      { color: theme.text, fontFamily: Fonts!.serif },
+                    ]}
+                  >
+                    ?
+                  </Text>
+                </Animated.View>
+              </>
+            )}
+          </View>
+
+          {/* Theme toggle — top right */}
+          <Pressable
+            onPress={toggleTheme}
+            disabled={started || blockWaiting}
+            style={[
+              styles.themeToggle,
+              {
+                top: insets.top + 12,
+                opacity: started || blockWaiting ? 0 : 1,
+              },
+            ]}
+            hitSlop={16}
+          >
+            <View
+              style={[
+                styles.themeCircle,
+                { backgroundColor: theme.accent, opacity: 0.7 },
+              ]}
+            />
+          </Pressable>
+
+          {/* Timer */}
+          <View
+            style={{ opacity: distractionFree ? 0 : 1 }}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+              {!started ? (
+                <Animated.Text
+                  style={[
+                    styles.timer,
+                    {
+                      color: theme.text,
+                      fontFamily: Fonts!.mono,
+                      textAlign: 'center',
+                    },
+                  ]}
+                >
+                  {`${String(blockWaiting ? unlockMin : sliderMinutes).padStart(2, '0')}:00`}
+                </Animated.Text>
+              ) : (
+                <TimerDisplay
+                  seconds={
+                    goalSeconds > 0
+                      ? Math.max(0, goalSeconds - elapsed)
+                      : elapsed
+                  }
+                  color={theme.text}
+                  fontSize={64}
+                  style={{ letterSpacing: 4 }}
+                />
+              )}
+            </Animated.View>
+          </View>
+
+          {/* Orbit ring + unified button/dot */}
+          <View
+            style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            <View style={styles.orbitArea}>
+              <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
+                <OrbitRing
+                  color={theme.accent}
+                  faintColor={
+                    themeMode === 'dark' ? palette.cream : palette.charcoal
+                  }
+                  elapsed={elapsed}
+                  onStop={handleStop}
+                  dotProgress={dotProgress}
+                />
+              </Animated.View>
+              {/* Unified element: play button ↔ orbit dot */}
+              <Pressable
+                onPress={
+                  started
+                    ? handleStop
+                    : blockWaiting
+                      ? handleStartBlockSession
+                      : handleStart
+                }
+                style={styles.orbitCenter}
+              >
+                <Animated.View
+                  style={[
+                    {
+                      backgroundColor: theme.accent,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      overflow: 'hidden',
+                    },
+                    unifiedDotStyle,
+                  ]}
+                >
+                  <Animated.View style={{ opacity: playIconOpacity }}>
+                    <Text
+                      style={[
+                        styles.nothingLabel,
+                        { color: theme.accentText, fontFamily: Fonts!.serif },
+                      ]}
+                    >
+                      yes
+                    </Text>
+                  </Animated.View>
+                </Animated.View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Goal slider */}
+          <View
+            style={[
+              styles.messageSliderArea,
+              { opacity: started || blockWaiting ? 0 : 1 },
+            ]}
+            pointerEvents={started || blockWaiting ? 'none' : 'auto'}
+          >
+            {!started && !blockWaiting && (
+              <View style={styles.goalSliderWrap}>
+                <GoalSliderBar
+                  theme={theme}
+                  value={sliderMinutes}
+                  onChange={handleSliderChange}
+                  width={SLIDER_W}
+                  maxMinutes={60}
+                  minMinutes={0}
+                  ticks={[5, 10, 20, 30, 45]}
+                  scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
+                  breakpoints={{
+                    b1Val: 15,
+                    b1Pos: 0.25,
+                    b2Val: 30,
+                    b2Pos: 0.5,
+                  }}
+                  accentColor={theme.accent}
+                  trackBgColor={theme.text}
+                  trackStrokeWidth={3.5}
+                  scaleLabelStyle={{
+                    color: theme.text,
+                    fontWeight: '500',
+                    fontSize: 12,
+                  }}
+                  hideLabel
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Stats — with goal slider overlaid */}
+          <Pressable
+            onPress={handleHistory}
+            disabled={started || blockWaiting}
+            style={{ opacity: started || blockWaiting ? 0 : 1 }}
+          >
+            <View style={styles.statsColumn}>
+              <View style={styles.statRow}>
+                <Text
+                  style={[
+                    styles.statRowLabel,
+                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  today:
+                </Text>
+                <View style={styles.statRowValueRow}>
+                  <Text
+                    style={[
+                      styles.statRowValue,
+                      { color: theme.text, fontFamily: Fonts!.mono },
+                    ]}
+                  >
+                    {formatTimeStat(stats.today + elapsed).value}
+                  </Text>
+                  <Text
+                    style={[styles.statRowUnit, { color: theme.textTertiary }]}
+                  >
+                    {formatTimeStat(stats.today + elapsed).unit}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.statDot, { color: theme.textTertiary }]}>
+                ·
+              </Text>
+              <View style={styles.statRow}>
+                <Text
+                  style={[
+                    styles.statRowLabel,
+                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  week:
+                </Text>
+                <View style={styles.statRowValueRow}>
+                  <Text
+                    style={[
+                      styles.statRowValue,
+                      { color: theme.text, fontFamily: Fonts!.mono },
+                    ]}
+                  >
+                    {formatTimeStat(stats.week + elapsed).value}
+                  </Text>
+                  <Text
+                    style={[styles.statRowUnit, { color: theme.textTertiary }]}
+                  >
+                    {formatTimeStat(stats.week + elapsed).unit}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Week dots */}
+          {weekStats.length > 0 && (
+            <View
+              style={[
+                styles.weekSection,
+                { opacity: started || blockWaiting ? 0 : 1 },
+              ]}
+              pointerEvents={started || blockWaiting ? 'none' : 'auto'}
+            >
+              <View style={styles.weekGrid}>
+                {weekStats.map((day) => {
+                  const maxDur = Math.max(
+                    ...weekStats.map((d) => d.duration),
+                    1,
+                  );
+                  const size =
+                    day.duration > 0 ? 10 + (day.duration / maxDur) * 20 : 4;
+                  return (
+                    <View key={day.date} style={styles.weekDayCol}>
+                      <View
+                        style={{
+                          width: size,
+                          height: size,
+                          borderRadius: size / 2,
+                          backgroundColor:
+                            day.duration > 0 ? theme.accent : theme.border,
+                        }}
+                      />
+                      <Text
+                        style={[
+                          styles.weekDayLabel,
+                          {
+                            color: day.isToday
+                              ? theme.text
+                              : theme.textTertiary,
+                          },
+                        ]}
+                      >
+                        {day.dayName}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Bottom buttons */}
+          <View
+            style={[
+              styles.bottomButtons,
+              { bottom: 12, opacity: started ? 0 : 1 },
+            ]}
+            pointerEvents={started ? 'none' : 'auto'}
+          >
+            {blockWaiting ? (
+              <Pressable
+                onPress={handleForceUnlock}
+                hitSlop={16}
+                style={[
+                  styles.forceUnlockBtn,
+                  { borderColor: theme.textTertiary },
+                ]}
+              >
+                <Feather name='unlock' size={15} color={theme.textSecondary} />
+                <Text
+                  style={[
+                    styles.forceUnlockText,
+                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  unlock now
+                </Text>
+              </Pressable>
+            ) : (
+              <Animated.View style={journeyPillStyle}>
+                <Pressable
+                  onPress={handleHistory}
+                  hitSlop={16}
+                  style={styles.journeyBtn}
+                >
+                  <View
+                    ref={journeyBtnRef}
+                    onLayout={measureJourneyBtn}
+                    collapsable={false}
+                  >
+                    <Text
+                      style={[
+                        styles.journeyPillText,
+                        {
+                          color:
+                            themeMode === 'dark'
+                              ? palette.cream
+                              : palette.brown,
+                          fontFamily: Fonts!.serif,
+                          opacity: 0,
+                        },
+                      ]}
+                    >
+                      Journey
+                    </Text>
+                  </View>
+                  <Animated.View
+                    style={[styles.journeyArrow, journeyChevronStyle]}
+                    pointerEvents='none'
+                  >
+                    <Entypo
+                      name='chevron-thin-down'
+                      size={20}
+                      color={
+                        themeMode === 'dark' ? palette.cream : palette.brown
+                      }
+                    />
+                  </Animated.View>
+                </Pressable>
+              </Animated.View>
+            )}
+          </View>
+
+          {/* Distraction-free toggle — visible only while timer is running */}
+          {started && (
             <Pressable
-              onPress={handleDebugBlock}
-              disabled={started}
-              style={styles.devIconBtn}
-              hitSlop={12}
+              onPress={toggleDistractionFree}
+              style={[
+                styles.distractionFreeButton,
+                { bottom: insets.bottom + 24, borderColor: theme.border },
+              ]}
+              hitSlop={16}
             >
               <Feather
-                name={debugBlocked ? 'unlock' : 'lock'}
-                size={18}
-                color={debugBlocked ? theme.accent : theme.text}
-                style={{ opacity: 0.9 }}
+                name={distractionFree ? 'eye' : 'eye-off'}
+                size={20}
+                color={theme.textSecondary}
               />
             </Pressable>
           )}
+        </Animated.View>
+      </GestureDetector>
 
-          <Pressable
-            onPress={() => useAppStore.setState({
-              completionVisible: true,
-              lastSessionId: 'dev-preview',
-              lastSessionDuration: 60,
-            })}
-            disabled={started}
-            style={styles.devIconBtn}
-            hitSlop={12}
-          >
-            <Feather name="flag" size={18} color={theme.text} style={{ opacity: 0.9 }} />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing", or static "Time to Do nothing." when block is waiting */}
-      <View style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]} pointerEvents={distractionFree ? 'none' : 'auto'}>
-        {blockWaiting ? (
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            Time to Do nothing.
-          </Text>
-        ) : (
-          <>
-            <Animated.View style={hideStyle}>
-              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                Ready to{' '}
-              </Text>
-            </Animated.View>
-            <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              Do
-            </Text>
-            <Animated.View style={showStyle}>
-              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                ing
-              </Text>
-            </Animated.View>
-            <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              {' '}nothing
-            </Text>
-            <Animated.View style={hideStyle}>
-              <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                ?
-              </Text>
-            </Animated.View>
-          </>
-        )}
-      </View>
-
-      {/* Theme toggle — top right */}
-      <Pressable
-        onPress={toggleTheme}
-        disabled={started || blockWaiting}
-        style={[styles.themeToggle, { top: insets.top + 12, opacity: started || blockWaiting ? 0 : 1 }]}
-        hitSlop={16}
-      >
-        <View
+      {/* History screen — always rendered, positioned off-screen when hidden */}
+      <GestureDetector gesture={historyPanGesture}>
+        <Animated.View
           style={[
-            styles.themeCircle,
-            { backgroundColor: theme.accent, opacity: 0.7 },
+            styles.historyContainer,
+            animatedContainerStyle,
+            historySlideStyle,
           ]}
-        />
-      </Pressable>
-
-      {/* Timer */}
-      <View style={{ opacity: distractionFree ? 0 : 1 }} pointerEvents={distractionFree ? 'none' : 'auto'}>
-        <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-          {!started ? (
-            <Animated.Text
-              style={[
-                styles.timer,
-                { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
-              ]}
-            >
-              {`${String(blockWaiting ? unlockMin : sliderMinutes).padStart(2, '0')}:00`}
-            </Animated.Text>
-          ) : (
-            <TimerDisplay
-              seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
-              color={theme.text}
-              fontSize={64}
-              style={{ letterSpacing: 4 }}
-            />
-          )}
-        </Animated.View>
-      </View>
-
-      {/* Orbit ring + unified button/dot */}
-      <View style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]} pointerEvents={distractionFree ? 'none' : 'auto'}>
-      <View style={styles.orbitArea}>
-        <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
-          <OrbitRing
-            color={theme.accent}
-            faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
-            elapsed={elapsed}
-            onStop={handleStop}
-            dotProgress={dotProgress}
+        >
+          <HistoryContent
+            onClose={handleHistoryClose}
+            insets={insets}
+            onScroll={historyScrollHandler}
+            nativeScrollGesture={historyScrollNativeGesture}
+            onHeadingLayout={handleHeadingLayout}
+            historySlide={historySlide}
+          />
+          <PaywallGate
+            visible={!isSubscribed}
+            themeMode={themeMode}
+            insets={insets}
+            onClose={handleHistoryClose}
+            title='unlock your journey'
+            body="Every minute you've reclaimed, at a glance. Join to open Journey and keep the thread of your practice."
           />
         </Animated.View>
-        {/* Unified element: play button ↔ orbit dot */}
-        <Pressable
-          onPress={started ? handleStop : blockWaiting ? handleStartBlockSession : handleStart}
-          style={styles.orbitCenter}
+      </GestureDetector>
+
+      {/* Settings screen */}
+      <GestureDetector gesture={settingsSwipeBack}>
+        <Animated.View
+          style={[
+            styles.historyContainer,
+            animatedContainerStyle,
+            settingsSlideStyle,
+          ]}
         >
-          <Animated.View
-            style={[
-              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-              unifiedDotStyle,
-            ]}
-          >
-            <Animated.View style={{ opacity: playIconOpacity }}>
-              <Text style={[styles.nothingLabel, { color: theme.accentText, fontFamily: Fonts!.serif }]}>
-                yes
-              </Text>
-            </Animated.View>
-          </Animated.View>
-        </Pressable>
+          <SettingsContent
+            onClose={handleSettingsClose}
+            insets={insets}
+            onOpenAccount={handleOpenAccount}
+          />
+          <PaywallGate
+            visible={!isSubscribed}
+            themeMode={themeMode}
+            insets={insets}
+            onClose={handleSettingsClose}
+            onOpenAccount={handleOpenAccount}
+            title='unlock donothing'
+            body='Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way.'
+          />
+        </Animated.View>
+      </GestureDetector>
 
-      </View>
-      </View>
+      {/* Shared account sheet — available from Settings header and from both gates */}
+      <AccountSheet
+        ref={accountSheetRef}
+        theme={theme}
+        onDeleteAccount={handleDeleteAccount}
+      />
 
-      {/* Goal slider */}
-      <View style={[styles.messageSliderArea, { opacity: started || blockWaiting ? 0 : 1 }]} pointerEvents={started || blockWaiting ? 'none' : 'auto'}>
-        {!started && !blockWaiting && (
-          <View style={styles.goalSliderWrap}>
-            <GoalSliderBar
-              theme={theme}
-              value={sliderMinutes}
-              onChange={handleSliderChange}
-              width={SLIDER_W}
-              maxMinutes={60}
-              minMinutes={0}
-              ticks={[5, 10, 20, 30, 45]}
-              scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
-              breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
-              accentColor={theme.accent}
-              trackBgColor={theme.text}
-              trackStrokeWidth={3.5}
-              scaleLabelStyle={{ color: theme.text, fontWeight: '500', fontSize: 12 }}
-              hideLabel
-            />
-          </View>
-        )}
-      </View>
-
-      {/* Stats — with goal slider overlaid */}
-      <Pressable onPress={handleHistory} disabled={started || blockWaiting} style={{ opacity: started || blockWaiting ? 0 : 1 }}>
-        <View style={styles.statsColumn}>
-          <View style={styles.statRow}>
-            <Text
-              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
-            >
-              today:
-            </Text>
-            <View style={styles.statRowValueRow}>
-              <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}
-              >
-                {formatTimeStat(stats.today + elapsed).value}
-              </Text>
-              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                {formatTimeStat(stats.today + elapsed).unit}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.statDot, { color: theme.textTertiary }]}>·</Text>
-          <View style={styles.statRow}>
-            <Text
-              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
-            >
-              week:
-            </Text>
-            <View style={styles.statRowValueRow}>
-              <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.mono }]}
-              >
-                {formatTimeStat(stats.week + elapsed).value}
-              </Text>
-              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                {formatTimeStat(stats.week + elapsed).unit}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Pressable>
-
-      {/* Week dots */}
-      {weekStats.length > 0 && (
-        <View style={[styles.weekSection, { opacity: started || blockWaiting ? 0 : 1 }]} pointerEvents={started || blockWaiting ? 'none' : 'auto'}>
-          <View style={styles.weekGrid}>
-            {weekStats.map((day) => {
-              const maxDur = Math.max(
-                ...weekStats.map((d) => d.duration),
-                1,
-              );
-              const size =
-                day.duration > 0
-                  ? 10 + (day.duration / maxDur) * 20
-                  : 4;
-              return (
-                <View key={day.date} style={styles.weekDayCol}>
-                  <View
-                    style={{
-                      width: size,
-                      height: size,
-                      borderRadius: size / 2,
-                      backgroundColor:
-                        day.duration > 0 ? theme.accent : theme.border,
-                    }}
-                  />
-                  <Text
-                    style={[
-                      styles.weekDayLabel,
-                      {
-                        color: day.isToday
-                          ? theme.text
-                          : theme.textTertiary,
-                      },
-                    ]}
-                  >
-                    {day.dayName}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+      {/* Floating Journey label — the one shared element that morphs between the
+        home pill and the Journey heading as the panel slides up. */}
+      {btnRect && headingRect && (
+        <Animated.Text
+          pointerEvents='none'
+          style={[
+            styles.journeyProxy,
+            {
+              color: theme.text,
+              fontFamily: Fonts!.serif,
+              width: headingRect.w,
+              height: headingRect.h,
+            },
+            journeyProxyStyle,
+          ]}
+        >
+          Journey
+        </Animated.Text>
       )}
 
-      {/* Bottom buttons */}
-      <View
-        style={[
-          styles.bottomButtons,
-          { bottom: insets.bottom + 16, opacity: started ? 0 : 1 },
-        ]}
-        pointerEvents={started ? 'none' : 'auto'}
-      >
-        {blockWaiting ? (
-          <Pressable
-            onPress={handleForceUnlock}
-            hitSlop={16}
-            style={[styles.forceUnlockBtn, { borderColor: theme.textTertiary }]}
-          >
-            <Feather name="unlock" size={15} color={theme.textSecondary} />
-            <Text style={[styles.forceUnlockText, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
-              unlock now
-            </Text>
-          </Pressable>
-        ) : (
-          <PillButton
-            label="Journey"
-            onPress={handleHistory}
-            color={themeMode === 'dark' ? palette.cream : palette.brown}
-            outline
-          />
-        )}
-      </View>
-
-      {/* Distraction-free toggle — visible only while timer is running */}
-      {started && (
-        <Pressable
-          onPress={toggleDistractionFree}
-          style={[styles.distractionFreeButton, { bottom: insets.bottom + 24, borderColor: theme.border }]}
-          hitSlop={16}
-        >
-          <Feather
-            name={distractionFree ? 'eye' : 'eye-off'}
-            size={20}
-            color={theme.textSecondary}
-          />
-        </Pressable>
-      )}
-
-    </Animated.View>
-    </GestureDetector>
-
-    {/* History screen — always rendered, positioned off-screen when hidden */}
-    <GestureDetector gesture={historyPanGesture}>
-    <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
-      <HistoryContent
-        onClose={handleHistoryClose}
-        insets={insets}
-        onScroll={historyScrollHandler}
-        nativeScrollGesture={historyScrollNativeGesture}
-      />
-      <PaywallGate
-        visible={!isSubscribed}
+      {/* Countdown completion screen */}
+      <SessionCompleteScreen
+        visible={completionVisible}
+        sessionId={lastSessionId}
+        durationSeconds={lastSessionDuration}
+        todaySeconds={stats.today}
         themeMode={themeMode}
-        insets={insets}
-        onClose={handleHistoryClose}
-        title="unlock your journey"
-        body="Every minute you've reclaimed, at a glance. Join to open Journey and keep the thread of your practice."
+        onClose={handleCompletionClose}
       />
-    </Animated.View>
-    </GestureDetector>
-
-    {/* Settings screen */}
-    <GestureDetector gesture={settingsSwipeBack}>
-    <Animated.View style={[styles.historyContainer, animatedContainerStyle, settingsSlideStyle]}>
-      <SettingsContent
-        onClose={handleSettingsClose}
-        insets={insets}
-        onOpenAccount={handleOpenAccount}
-      />
-      <PaywallGate
-        visible={!isSubscribed}
-        themeMode={themeMode}
-        insets={insets}
-        onClose={handleSettingsClose}
-        onOpenAccount={handleOpenAccount}
-        title="unlock donothing"
-        body="Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way."
-      />
-    </Animated.View>
-    </GestureDetector>
-
-    {/* Shared account sheet — available from Settings header and from both gates */}
-    <AccountSheet
-      ref={accountSheetRef}
-      theme={theme}
-      onDeleteAccount={handleDeleteAccount}
-    />
-
-    {/* Countdown completion screen */}
-    <SessionCompleteScreen
-      visible={completionVisible}
-      sessionId={lastSessionId}
-      durationSeconds={lastSessionDuration}
-      todaySeconds={stats.today}
-      themeMode={themeMode}
-      onClose={handleCompletionClose}
-    />
-
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   screenStack: {
@@ -1059,6 +1357,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     position: 'absolute',
+  },
+  journeyBtn: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+  },
+  journeyArrow: {
+    alignItems: 'center',
+  },
+  journeyPillText: {
+    fontSize: 19,
+    fontWeight: '400',
+    lineHeight: 22,
+    letterSpacing: 0.3,
+  },
+  journeyProxy: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    fontSize: 32,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+    textAlign: 'left',
+    zIndex: 110,
   },
   forceUnlockBtn: {
     flexDirection: 'row',

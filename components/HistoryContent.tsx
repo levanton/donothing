@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef } from 'react';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, runOnJS, useAnimatedReaction, type SharedValue } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
 
@@ -9,6 +10,8 @@ import { formatTimeStat } from '@/lib/format';
 import { getDurationSince, getSessionCount, getLongestSessionDuration } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
+
+const { height: SCREEN_H } = Dimensions.get('window');
 
 // ── Zen quotes ────────────────────────────────────────────────────────
 const ZEN_QUOTES = [
@@ -25,12 +28,58 @@ interface HistoryContentProps {
   insets: { top: number; bottom: number };
   onScroll?: any;
   nativeScrollGesture?: GestureType;
+  onHeadingLayout?: (rect: { x: number; y: number; w: number; h: number }) => void;
+  historySlide?: SharedValue<number>;
 }
 
-export default function HistoryContent({ onClose, insets, onScroll, nativeScrollGesture }: HistoryContentProps) {
+export default function HistoryContent({
+  onClose,
+  insets,
+  onScroll,
+  nativeScrollGesture,
+  onHeadingLayout,
+  historySlide,
+}: HistoryContentProps) {
   useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
+
+  const headingRef = useRef<View>(null);
+  // Measure window coords and compensate for the panel's current translateY
+  // so the stored rect is always the at-rest (slide = 1) position, regardless
+  // of when we happen to measure.
+  const measureHeading = useCallback(() => {
+    if (!onHeadingLayout) return;
+    const slide = historySlide?.value ?? 0;
+    const panelOffset = (1 - slide) * SCREEN_H;
+    headingRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) {
+        onHeadingLayout({ x, y: y - panelOffset, w, h });
+      }
+    });
+  }, [onHeadingLayout, historySlide]);
+
+  // Measure once on mount (before user swipes) so the proxy has both endpoints
+  // from the first frame.
+  useEffect(() => {
+    const t = setTimeout(measureHeading, 180);
+    return () => clearTimeout(t);
+  }, [measureHeading]);
+
+  // Re-measure when the panel is fully open — definitive, even if the first
+  // measurement was off due to transform quirks.
+  useAnimatedReaction(
+    () => {
+      'worklet';
+      return historySlide ? historySlide.value : 0;
+    },
+    (slide, prev) => {
+      'worklet';
+      if (slide > 0.98 && (prev ?? 0) <= 0.98) {
+        runOnJS(measureHeading)();
+      }
+    },
+  );
 
   const totalSessions = getSessionCount();
   const longestSession = formatTimeStat(getLongestSessionDuration());
@@ -56,9 +105,14 @@ export default function HistoryContent({ onClose, insets, onScroll, nativeScroll
         paddingBottom: insets.bottom + 40,
       }}
     >
-      {/* Header */}
+      {/* Header — heading text is kept invisible; a floating proxy in the parent
+          renders the word and morphs between this heading and the home pill. */}
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text, fontFamily: Fonts.serif }]}>Journey</Text>
+        <View ref={headingRef} collapsable={false}>
+          <Text style={[styles.title, { color: theme.text, fontFamily: Fonts.serif, opacity: 0 }]}>
+            Journey
+          </Text>
+        </View>
         <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
