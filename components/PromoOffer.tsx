@@ -17,11 +17,17 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Asset } from 'expo-asset';
 
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
+
+const HERO_IMAGE = require('@/assets/images/present.png');
+// Kick off decode at module load so the bitmap is ready the first time
+// the modal opens — otherwise iOS shows a brief blank frame.
+Asset.fromModule(HERO_IMAGE).downloadAsync().catch(() => {});
 
 interface Props {
   visible: boolean;
@@ -92,72 +98,71 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
             cardStyle,
           ]}
         >
-          {/* Top row — close X on left */}
-          <View style={styles.topRow}>
-            <Pressable
-              onPress={handleClose}
-              hitSlop={16}
-              style={styles.closeBtn}
-            >
-              <Feather name="x" size={22} color={palette.cream} />
+          {/* Hero illustration — flush to the very top of the card */}
+          <Image
+            source={HERO_IMAGE}
+            style={styles.hero}
+            resizeMode="contain"
+            fadeDuration={0}
+          />
+
+          {/* Close X — floats over the image */}
+          <Pressable
+            onPress={handleClose}
+            hitSlop={16}
+            style={styles.closeBtn}
+          >
+            <Feather name="x" size={22} color={palette.cream} />
+          </Pressable>
+
+          <View style={styles.content}>
+            {/* Headline */}
+            <Text style={[styles.headline, { fontFamily: Fonts!.serif }]}>
+              What if your first year{'\n'}was{' '}
+              <Text style={styles.headlineBold}>half off</Text>?
+            </Text>
+
+            {/* Bullet list */}
+            <View style={styles.bullets}>
+              <View style={styles.bulletRow}>
+                <Feather name="check" size={14} color={palette.cream} />
+                <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
+                  cancel any time
+                </Text>
+              </View>
+              <View style={styles.bulletRow}>
+                <Feather name="check" size={14} color={palette.cream} />
+                <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
+                  unlimited access to donothing
+                </Text>
+              </View>
+            </View>
+
+            {/* Price card */}
+            <View style={styles.priceCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.priceTitle, { fontFamily: Fonts!.serif }]}>
+                  First year
+                </Text>
+                <Text
+                  style={[styles.priceSubtitle, { fontFamily: Fonts!.serif }]}
+                >
+                  Then 49,99 USD/year
+                </Text>
+              </View>
+              <Text style={[styles.priceValue, { fontFamily: Fonts!.mono }]}>
+                22,99 USD
+              </Text>
+            </View>
+
+            {/* CTA */}
+            <Pressable onPress={handlePurchase} style={styles.cta}>
+              <Text style={[styles.ctaText, { fontFamily: Fonts!.serif }]}>
+                Try{' '}
+                <Text style={styles.ctaTextBold}>donothing+</Text> now
+              </Text>
             </Pressable>
           </View>
-
-          {/* Hero illustration */}
-          <View style={styles.heroWrap}>
-            <Image
-              source={require('@/assets/images/grass.png')}
-              style={styles.hero}
-              resizeMode="contain"
-            />
-          </View>
-
-          {/* Headline */}
-          <Text style={[styles.headline, { fontFamily: Fonts!.serif }]}>
-            What if your first year{'\n'}was{' '}
-            <Text style={styles.headlineBold}>half off</Text>?
-          </Text>
-
-          {/* Bullet list */}
-          <View style={styles.bullets}>
-            <View style={styles.bulletRow}>
-              <Feather name="check" size={14} color={palette.cream} />
-              <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                cancel any time
-              </Text>
-            </View>
-            <View style={styles.bulletRow}>
-              <Feather name="check" size={14} color={palette.cream} />
-              <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                unlimited access to donothing
-              </Text>
-            </View>
-          </View>
-
-          {/* Price card */}
-          <View style={styles.priceCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.priceTitle, { fontFamily: Fonts!.serif }]}>
-                First year
-              </Text>
-              <Text
-                style={[styles.priceSubtitle, { fontFamily: Fonts!.serif }]}
-              >
-                Then 49,99 USD/year
-              </Text>
-            </View>
-            <Text style={[styles.priceValue, { fontFamily: Fonts!.mono }]}>
-              22,99 USD
-            </Text>
-          </View>
-
-          {/* CTA */}
-          <Pressable onPress={handlePurchase} style={styles.cta}>
-            <Text style={[styles.ctaText, { fontFamily: Fonts!.serif }]}>
-              Try{' '}
-              <Text style={styles.ctaTextBold}>donothing+</Text> now
-            </Text>
-          </Pressable>
         </Animated.View>
       </View>
     </Modal>
@@ -179,23 +184,30 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: palette.terracotta,
     borderRadius: 28,
-    paddingHorizontal: 22,
-    paddingTop: 18,
     paddingBottom: 22,
+    overflow: 'hidden',
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  content: {
+    paddingHorizontal: 22,
   },
-  closeBtn: { padding: 4 },
-  heroWrap: {
+  closeBtn: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 18,
+    justifyContent: 'center',
+    zIndex: 2,
   },
   hero: {
     width: 200,
-    height: 160,
+    height: 180,
+    alignSelf: 'center',
+    marginTop: 0,
+    marginBottom: 12,
   },
   headline: {
     color: palette.cream,
