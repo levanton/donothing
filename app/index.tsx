@@ -44,6 +44,7 @@ import { formatTimeStat } from '@/lib/format';
 import {
   blockAppsById,
   forceUnblockAll,
+  getAuth,
   isBlockActive,
   unblockAppsById,
 } from '@/lib/screen-time';
@@ -445,13 +446,23 @@ export default function DoNothingScreen() {
 
   // --- Notification listener for scheduled blocks ---
   useEffect(() => {
-    const handleScheduledBlock = (data: Record<string, unknown>) => {
-      if (data?.type === 'scheduledBlock' && data?.durationMinutes) {
-        const durationSec = (data.durationMinutes as number) * 60;
-        blockAppsById('donothing-scheduled-block').catch(() => {});
-        activateKeepAwakeAsync('scheduled-block');
-        useAppStore.getState().startFocus(durationSec);
+    const handleScheduledBlock = async (data: Record<string, unknown>) => {
+      if (!(data?.type === 'scheduledBlock' && data?.durationMinutes)) return;
+      // Block can only act if Screen Time access is approved AND notifications
+      // are granted. If either was revoked after the block was scheduled,
+      // skip silently — the gated Settings UI will surface the missing perm.
+      const [auth, notif] = await Promise.all([
+        getAuth(),
+        Notifications.getPermissionsAsync(),
+      ]);
+      if (auth !== 'approved' || notif.status !== 'granted') {
+        console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
+        return;
       }
+      const durationSec = (data.durationMinutes as number) * 60;
+      blockAppsById('donothing-scheduled-block').catch(() => {});
+      activateKeepAwakeAsync('scheduled-block');
+      useAppStore.getState().startFocus(durationSec);
     };
 
     // When notification received while app is in foreground
