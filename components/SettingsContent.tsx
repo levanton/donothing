@@ -304,6 +304,23 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         </Animated.View>
       )}
 
+      {/* Screen block + Always allowed — gated behind iOS Screen Time and
+          Notifications permissions. When either is missing the whole block
+          reads as inactive and rejects touches until the banners above are
+          dismissed by granting access. */}
+      <View
+        pointerEvents={
+          Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
+            ? 'none'
+            : 'auto'
+        }
+        style={{
+          opacity:
+            Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
+              ? 0.4
+              : 1,
+        }}
+      >
       {/* Screen block */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderText}>
@@ -476,6 +493,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           )}
         </>
       )}
+      </View>
     </ScrollView>
 
     {/* Bottom sheet for block picker */}
