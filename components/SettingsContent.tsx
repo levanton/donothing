@@ -58,6 +58,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const themeMode = useAppStore((s) => s.themeMode);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
   const theme = themes[themeMode];
+  const isDark = themeMode === 'dark';
 
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
@@ -242,7 +243,9 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         </Pressable>
       </View>
 
-      {/* Notification permission banner — shown first so it's impossible to miss */}
+      {/* Notification permission banner — shown first so it's impossible to miss.
+          Banner is its own warm chip regardless of theme: saturated peach/amber
+          background with dark text so it stays readable on cream AND charcoal. */}
       {Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
         <Animated.View style={notifBannerStyle}>
           <Pressable
@@ -250,25 +253,25 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
             style={[
               styles.notifBanner,
               {
-                backgroundColor: 'rgba(232, 169, 154, 0.6)',
+                backgroundColor: isDark ? 'rgba(232, 169, 154, 0.95)' : 'rgba(232, 169, 154, 0.6)',
                 marginBottom: (authStatus === 'denied' || authStatus === 'notDetermined') ? 12 : 28,
               },
             ]}
           >
-            <View style={[styles.notifIconWrap, { backgroundColor: 'rgba(232, 169, 154, 0.9)' }]}>
-              <Feather name="bell-off" size={18} color={theme.text} />
+            <View style={[styles.notifIconWrap, { backgroundColor: palette.salmon }]}>
+              <Feather name="bell-off" size={18} color={palette.brown} />
             </View>
             <View style={styles.notifText}>
-              <Text style={[styles.notifTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              <Text style={[styles.notifTitle, { color: palette.brown, fontFamily: Fonts!.serif }]}>
                 {notifStatus === 'denied' ? 'Notifications are off' : 'Enable notifications'}
               </Text>
-              <Text style={[styles.notifSub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+              <Text style={[styles.notifSub, { color: 'rgba(51, 52, 49, 0.75)', fontFamily: Fonts!.serif }]}>
                 {notifStatus === 'denied'
                   ? "We can't remind you about blocks or session ends. Tap to turn them on."
                   : "So we can gently remind you about scheduled blocks and session ends."}
               </Text>
             </View>
-            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            <Feather name="chevron-right" size={18} color="rgba(51, 52, 49, 0.55)" />
           </Pressable>
         </Animated.View>
       )}
@@ -278,22 +281,25 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         <Animated.View style={stBannerStyle}>
           <Pressable
             onPress={handleScreenTimeBannerTap}
-            style={[styles.notifBanner, { backgroundColor: 'rgba(224, 166, 83, 0.55)' }]}
+            style={[
+              styles.notifBanner,
+              { backgroundColor: isDark ? 'rgba(224, 166, 83, 0.95)' : 'rgba(224, 166, 83, 0.55)' },
+            ]}
           >
-            <View style={[styles.notifIconWrap, { backgroundColor: 'rgba(224, 166, 83, 0.9)' }]}>
-              <Feather name="smartphone" size={18} color={theme.text} />
+            <View style={[styles.notifIconWrap, { backgroundColor: '#E0A653' }]}>
+              <Feather name="smartphone" size={18} color={palette.brown} />
             </View>
             <View style={styles.notifText}>
-              <Text style={[styles.notifTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              <Text style={[styles.notifTitle, { color: palette.brown, fontFamily: Fonts!.serif }]}>
                 {authStatus === 'denied' ? 'Screen Time access is off' : 'Enable Screen Time access'}
               </Text>
-              <Text style={[styles.notifSub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+              <Text style={[styles.notifSub, { color: 'rgba(51, 52, 49, 0.75)', fontFamily: Fonts!.serif }]}>
                 {authStatus === 'denied'
                   ? "Without it we can't block or unblock apps for you. Tap to turn it on."
                   : "We need it to schedule app blocks. Tap to grant access."}
               </Text>
             </View>
-            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            <Feather name="chevron-right" size={18} color="rgba(51, 52, 49, 0.55)" />
           </Pressable>
         </Animated.View>
       )}
