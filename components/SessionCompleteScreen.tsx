@@ -7,18 +7,20 @@ import Animated, {
   Easing,
   interpolateColor,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Ellipse, Line, Path } from 'react-native-svg';
+
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 import { Fonts } from '@/constants/theme';
-import { themes, type ThemeMode } from '@/lib/theme';
+import { palette, themes, type ThemeMode } from '@/lib/theme';
 import { updateSessionMood } from '@/lib/db/sessions';
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -26,39 +28,29 @@ const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 const CONTENT_FADE_MS = 500;
 
 const MOODS = ['restless', 'calm', 'lighter', 'refreshed', 'grateful'] as const;
-// Colors per mood — maps roughly to their emotional tone. Drives the circle
-// colour morph and the page's subtle background wash.
-const MOOD_COLORS = [
-  '#C75B3A', // restless — warm red
-  '#4E6D80', // calm — deep slate blue
-  '#E0A653', // lighter — amber
-  '#5D8F5B', // refreshed — forest green
-  '#DF5C44', // grateful — terracotta (app accent)
-] as const;
 
-// Adaptive circle travelling inside a vessel-shaped track. The vessel widens
-// gently from MIN on the left to MAX on the right, with semicircular caps
-// closing each end — the circle fits flush at any progress.
-const CIRCLE_MIN_SIZE = 56;
+// Adaptive ball travelling inside a cone that comes to a sharp point on the
+// left and opens into a perspective ellipse on the right. Ball size tracks
+// the cone opening at its current x, so it grows from 0 at the tip to the
+// full CIRCLE_MAX_SIZE at the wide end.
 const CIRCLE_MAX_SIZE = 120;
-const CONE_WIDTH = 180;
-const CONE_PAD_LEFT = CIRCLE_MIN_SIZE / 2;
+const CONE_WIDTH = 200;
 const CONE_PAD_RIGHT = CIRCLE_MAX_SIZE / 2;
-const CONE_BOX_WIDTH = CONE_PAD_LEFT + CONE_WIDTH + CONE_PAD_RIGHT;
+const CONE_BOX_WIDTH = CONE_WIDTH + CONE_PAD_RIGHT + 8;
 const CONE_BOX_HEIGHT = CIRCLE_MAX_SIZE + 20;
 const CONE_MID_Y = CONE_BOX_HEIGHT / 2;
-const CONE_LEFT = CONE_PAD_LEFT;
-const CONE_RIGHT = CONE_PAD_LEFT + CONE_WIDTH;
-// Closed vessel: top diagonal → right semicircle cap → bottom diagonal →
-// left semicircle cap. Rendered as stroke only so it reads as a container.
-const CONE_PATH = [
-  `M ${CONE_LEFT} ${CONE_MID_Y - CIRCLE_MIN_SIZE / 2}`,
-  `L ${CONE_RIGHT} ${CONE_MID_Y - CIRCLE_MAX_SIZE / 2}`,
-  `A ${CIRCLE_MAX_SIZE / 2} ${CIRCLE_MAX_SIZE / 2} 0 0 1 ${CONE_RIGHT} ${CONE_MID_Y + CIRCLE_MAX_SIZE / 2}`,
-  `L ${CONE_LEFT} ${CONE_MID_Y + CIRCLE_MIN_SIZE / 2}`,
-  `A ${CIRCLE_MIN_SIZE / 2} ${CIRCLE_MIN_SIZE / 2} 0 0 1 ${CONE_LEFT} ${CONE_MID_Y - CIRCLE_MIN_SIZE / 2}`,
-  'Z',
-].join(' ');
+const CONE_LEFT = 4;
+const CONE_RIGHT = CONE_LEFT + CONE_WIDTH;
+// Perspective compression for the right end opening — a narrow ellipse
+// reads as a circle tilted away from the camera.
+const PERSPECTIVE_RATIO = 0.32;
+const RIGHT_RX = (CIRCLE_MAX_SIZE / 2) * PERSPECTIVE_RATIO;
+const RIGHT_RY = CIRCLE_MAX_SIZE / 2;
+// Ball travels from the sharp tip (cx=CONE_LEFT, size 0) to the wide cap
+// (cx=CONE_RIGHT, size CIRCLE_MAX_SIZE).
+const BALL_X_START = CONE_LEFT;
+const BALL_X_END = CONE_RIGHT;
+const BALL_TRAVEL = BALL_X_END - BALL_X_START;
 
 // Mood colours at low alpha — tint the "carry on" button with the current hue.
 const MOOD_SOFT = [
@@ -129,11 +121,11 @@ function SessionCompleteScreen({
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
 
-  // Continuous 0..1 value — 0 maps to the smallest/coolest circle, 1 to the
-  // biggest/warmest. Label + stored mood are bucketed to the 5 steps on end.
-  const progress = useSharedValue(0.5);
-  const pulse = useSharedValue(1);
-  const dragStart = useSharedValue(0.5);
+  // Continuous 0..1 value — 0 starts with the smallest position (restless),
+  // 1 ends at the biggest (grateful). Stored mood is still bucketed to the
+  // 5 steps on commit.
+  const progress = useSharedValue(0);
+  const dragStart = useSharedValue(0);
 
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
@@ -146,7 +138,7 @@ function SessionCompleteScreen({
       dismissingRef.current = false;
       setActiveMood(null);
       lastHapticStep.value = -1;
-      progress.value = 0.5;
+      progress.value = 0;
 
       contentOpacity.value = withTiming(1, { duration: CONTENT_FADE_MS, easing: EASE_OUT });
 
@@ -166,18 +158,6 @@ function SessionCompleteScreen({
 
       closeOpacity.value = withDelay(base + 1300, withTiming(1, { duration: 650, easing: EASE_OUT }));
       closeY.value = withDelay(base + 1300, withTiming(0, { duration: 650, easing: EASE_OUT }));
-
-      pulse.value = withDelay(
-        base + 1000,
-        withRepeat(
-          withSequence(
-            withTiming(1.05, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
-            withTiming(1.0, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
-          ),
-          -1,
-          false,
-        ),
-      );
     } else {
       contentOpacity.value = 0;
       glowOpacity.value = 0;
@@ -191,7 +171,6 @@ function SessionCompleteScreen({
       circleBlockY.value = 12;
       closeOpacity.value = 0;
       closeY.value = 14;
-      pulse.value = 1;
     }
   }, [visible]);
 
@@ -223,7 +202,7 @@ function SessionCompleteScreen({
     })
     .onUpdate((e) => {
       'worklet';
-      const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / CONE_WIDTH));
+      const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / BALL_TRAVEL));
       progress.value = next;
       const step = Math.min(MOODS.length - 1, Math.floor(next * MOODS.length));
       if (step !== lastHapticStep.value) {
@@ -270,23 +249,34 @@ function SessionCompleteScreen({
     transform: [{ scale: glowScale.value }],
   }));
 
-  // The circle — its diameter matches the cone's vertical opening at its
-  // centre x, so it fills the cone flush at every progress value. Breath
-  // pulse rides on scale so it doesn't fight the size animation.
-  const circleStyle = useAnimatedStyle(() => {
+  // Moving ball — narrow ellipse with the same PERSPECTIVE_RATIO as the
+  // right cap so it sits in the same tilted space as the rest of the scene.
+  const moodEllipseProps = useAnimatedProps(() => {
     const p = progress.value;
-    const size = CIRCLE_MIN_SIZE + p * (CIRCLE_MAX_SIZE - CIRCLE_MIN_SIZE);
-    const centerX = CONE_LEFT + p * CONE_WIDTH;
+    const cx = BALL_X_START + p * BALL_TRAVEL;
+    const size = ((cx - CONE_LEFT) / CONE_WIDTH) * CIRCLE_MAX_SIZE;
+    const ry = size / 2;
     return {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      left: centerX - size / 2,
-      top: CONE_MID_Y - size / 2,
-      backgroundColor: interpolateColor(progress.value, MOOD_STOPS, MOOD_COLORS as unknown as string[]),
-      transform: [{ scale: pulse.value }],
+      cx,
+      cy: CONE_MID_Y,
+      rx: ry * PERSPECTIVE_RATIO,
+      ry,
     };
   });
+
+  // Progress fill — triangle from the sharp left tip out to the ball's
+  // current centre, closed by a straight vertical at the ball.
+  const fillPathProps = useAnimatedProps(() => {
+    const p = progress.value;
+    const cx = BALL_X_START + p * BALL_TRAVEL;
+    const size = ((cx - CONE_LEFT) / CONE_WIDTH) * CIRCLE_MAX_SIZE;
+    const ry = size / 2;
+    const topCurY = CONE_MID_Y - ry;
+    const botCurY = CONE_MID_Y + ry;
+    const d = `M ${CONE_LEFT} ${CONE_MID_Y} L ${cx} ${topCurY} L ${cx} ${botCurY} Z`;
+    return { d };
+  });
+
 
   if (!visible) return null;
 
@@ -341,34 +331,70 @@ function SessionCompleteScreen({
               <Text
                 style={[
                   styles.prompt,
-                  {
-                    color: activeMood ? softText : tertiaryText,
-                    fontFamily: Fonts.serif,
-                  },
+                  { color: textColor, fontFamily: Fonts.serif },
                 ]}
               >
-                {activeMood ? `i feel ${activeMood}` : 'how do you feel?'}
+                how full do you feel?
               </Text>
 
               <GestureDetector gesture={circleGesture}>
                 <View style={styles.coneTrack}>
-                  {/* Vessel — diagonal walls capped by semicircles at each end */}
                   <Svg
                     width={CONE_BOX_WIDTH}
                     height={CONE_BOX_HEIGHT}
                     style={StyleSheet.absoluteFill}
                     pointerEvents="none"
                   >
-                    <Path
-                      d={CONE_PATH}
-                      stroke={tertiaryText}
+                    {/* Progress fill — terracotta trapezoid from the left cap
+                        up to the ball's centre. Drawn first so the outlines
+                        and the ball sit on top. */}
+                    <AnimatedPath
+                      animatedProps={fillPathProps}
+                      fill={palette.terracotta}
+                    />
+
+                    {/* Cone walls — converge to a sharp point on the left,
+                        open into the right cap on the right */}
+                    <Line
+                      x1={CONE_LEFT}
+                      y1={CONE_MID_Y}
+                      x2={CONE_RIGHT}
+                      y2={CONE_MID_Y - CIRCLE_MAX_SIZE / 2}
+                      stroke={textColor}
                       strokeWidth={1.75}
                       strokeLinecap="round"
-                      strokeLinejoin="round"
+                    />
+                    <Line
+                      x1={CONE_LEFT}
+                      y1={CONE_MID_Y}
+                      x2={CONE_RIGHT}
+                      y2={CONE_MID_Y + CIRCLE_MAX_SIZE / 2}
+                      stroke={textColor}
+                      strokeWidth={1.75}
+                      strokeLinecap="round"
+                    />
+
+                    {/* The moving ball — drawn before the right cap so the
+                        cap outline sits on top of it when they overlap */}
+                    <AnimatedEllipse
+                      animatedProps={moodEllipseProps}
+                      fill={palette.terracotta}
+                      stroke={textColor}
+                      strokeWidth={1.5}
+                    />
+
+                    {/* Right cap — drawn last so it sits on top of the ball
+                        when the ball reaches the wide end */}
+                    <Ellipse
+                      cx={CONE_RIGHT}
+                      cy={CONE_MID_Y}
+                      rx={RIGHT_RX}
+                      ry={RIGHT_RY}
+                      stroke={textColor}
+                      strokeWidth={1.5}
                       fill="none"
                     />
                   </Svg>
-                  <Animated.View pointerEvents="none" style={[styles.circle, circleStyle]} />
                 </View>
               </GestureDetector>
             </Animated.View>
@@ -450,8 +476,7 @@ const styles = StyleSheet.create({
   },
   prompt: {
     fontSize: 15,
-    fontWeight: '300',
-    fontStyle: 'italic',
+    fontWeight: '400',
     letterSpacing: 0.4,
     textAlign: 'center',
     marginBottom: 26,
@@ -460,9 +485,6 @@ const styles = StyleSheet.create({
     width: CONE_BOX_WIDTH,
     height: CONE_BOX_HEIGHT,
     position: 'relative',
-  },
-  circle: {
-    position: 'absolute',
   },
   doneBtn: {
     borderRadius: 100,
