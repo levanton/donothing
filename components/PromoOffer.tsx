@@ -81,7 +81,7 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
             cardStyle,
           ]}
         >
-          {/* Top row — close X on left, app mark on right */}
+          {/* Top row — close X on left */}
           <View style={styles.topRow}>
             <Pressable
               onPress={handleClose}
@@ -90,10 +90,6 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
             >
               <Feather name="x" size={22} color={palette.cream} />
             </Pressable>
-            <View style={styles.appMark}>
-              <View style={styles.appMarkDot} />
-              <View style={styles.appMarkDotSm} />
-            </View>
           </View>
 
           {/* Hero illustration */}
@@ -175,33 +171,9 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   closeBtn: { padding: 4 },
-  appMark: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(249, 242, 224, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 3,
-  },
-  appMarkDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: palette.cream,
-  },
-  appMarkDotSm: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.cream,
-    opacity: 0.7,
-  },
   heroWrap: {
     alignItems: 'center',
     marginTop: 4,
