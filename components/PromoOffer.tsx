@@ -159,7 +159,7 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
             <Pressable onPress={handlePurchase} style={styles.cta}>
               <Text style={[styles.ctaText, { fontFamily: Fonts!.serif }]}>
                 Try{' '}
-                <Text style={styles.ctaTextBold}>donothing+</Text> now
+                <Text style={styles.ctaTextBold}>nothing</Text> now
               </Text>
             </Pressable>
           </View>
@@ -203,8 +203,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   hero: {
-    width: 200,
-    height: 180,
+    width: 240,
+    height: 220,
     alignSelf: 'center',
     marginTop: 0,
     marginBottom: 12,
