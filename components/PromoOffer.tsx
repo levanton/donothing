@@ -73,7 +73,7 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
     >
       <View style={styles.backdrop}>
         <BlurView
-          intensity={28}
+          intensity={18}
           tint="dark"
           style={StyleSheet.absoluteFillObject}
         />
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   tint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(20, 20, 20, 0.35)',
+    backgroundColor: 'rgba(20, 20, 20, 0.15)',
   },
   card: {
     backgroundColor: palette.terracotta,
