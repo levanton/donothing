@@ -354,8 +354,8 @@ function SessionCompleteScreen({
                       // ring gets wider, larger text. Without scaling the
                       // same glyphs look crammed on the small ring and tiny
                       // on the big one.
-                      const fontSize = 12 + i * 1.5;
-                      const letterSpacing = 2 + i;
+                      const fontSize = 12 + i;
+                      const letterSpacing = 2 + i * 0.5;
                       return (
                         <SvgText
                           key={mood}
