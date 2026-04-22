@@ -26,7 +26,7 @@ const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const CONTENT_FADE_MS = 500;
 
-const MOODS = ['restless', 'calm', 'lighter', 'refreshed', 'grateful'] as const;
+const MOODS = ['still', 'calm', 'lighter', 'refreshed', 'full'] as const;
 
 // Concentric mood rings — 5 guide circles sharing a centre, one per mood
 // step. A terracotta circle in the middle grows from a tiny seed to reach
@@ -39,9 +39,9 @@ const RING_BOX_PAD = 28;
 const LABEL_OUTSIDE = 4;
 const RING_BOX_SIZE = (RING_MAX + RING_BOX_PAD) * 2;
 const RING_CENTER = RING_BOX_SIZE / 2;
-const FILL_MIN = 3;
+const FILL_MIN = 12;
 // Extend past the outermost ring so the fill at max progress swallows the
-// grateful label, which sits on an arc just outside ring 4.
+// outermost label, which sits on an arc just outside ring 4.
 const FILL_MAX = RING_MAX + 20;
 const DRAG_TRAVEL = RING_MAX * 2;
 
@@ -70,6 +70,53 @@ interface Props {
 }
 
 type Locale = 'en' | 'uk';
+
+interface MoodLabelProps {
+  mood: string;
+  index: number;
+  active: boolean;
+  color: string;
+}
+
+// Per-label font-size animation via requestAnimationFrame. react-native-svg's
+// Text does not honour reanimated animatedProps for fontSize, so we drive the
+// size through React state and ease it ourselves. The ref captures the live
+// size so a new transition can start smoothly mid-animation.
+const MoodLabel = memo(function MoodLabel({ mood, index, active, color }: MoodLabelProps) {
+  const baseSize = 13 + index;
+  const [size, setSize] = useState(baseSize);
+  const sizeRef = useRef(baseSize);
+  useEffect(() => {
+    const from = sizeRef.current;
+    const to = baseSize + (active ? 3 : 0);
+    const duration = 260;
+    const start = Date.now();
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (to - from) * eased;
+      sizeRef.current = next;
+      setSize(next);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [active, baseSize]);
+  return (
+    <SvgText
+      fontSize={size}
+      fill={color}
+      fontFamily="Georgia"
+      textAnchor="middle"
+      letterSpacing={2 + index * 0.5}
+    >
+      <TextPath href={`#ring-arc-${index}`} startOffset="65%">
+        {mood}
+      </TextPath>
+    </SvgText>
+  );
+});
 
 function pluralizeMinutes(n: number, locale: Locale): string {
   if (locale === 'uk') {
@@ -114,8 +161,8 @@ function SessionCompleteScreen({
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
 
-  // Continuous 0..1 value — 0 starts with the smallest position (restless),
-  // 1 ends at the biggest (grateful). Stored mood is still bucketed to the
+  // Continuous 0..1 value — 0 starts with the smallest position (still),
+  // 1 ends at the biggest (full). Stored mood is still bucketed to the
   // 5 steps on commit.
   const progress = useSharedValue(0);
   const dragStart = useSharedValue(0);
@@ -167,7 +214,7 @@ function SessionCompleteScreen({
     }
   }, [visible]);
 
-  const setPreviewMood = useCallback((mood: string) => {
+  const setPreviewMood = useCallback((mood: string | null) => {
     setActiveMood(mood);
   }, []);
 
@@ -198,17 +245,34 @@ function SessionCompleteScreen({
       'worklet';
       const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / DRAG_TRAVEL));
       progress.value = next;
-      const step = Math.min(MOODS.length - 1, Math.floor(next * MOODS.length));
+      // Step is the largest ring the fill has fully reached — so the
+      // mood only activates when the circle physically touches its ring,
+      // not as soon as the user starts dragging.
+      const fillR = FILL_MIN + next * (FILL_MAX - FILL_MIN);
+      let step = -1;
+      for (let j = 0; j < MOODS.length; j++) {
+        if (fillR >= RING_STEP * (j + 1)) step = j;
+      }
       if (step !== lastHapticStep.value) {
         lastHapticStep.value = step;
-        runOnJS(Haptics.selectionAsync)();
-        runOnJS(setPreviewMood)(MOODS[step]);
+        if (step >= 0) {
+          runOnJS(Haptics.selectionAsync)();
+          runOnJS(setPreviewMood)(MOODS[step]);
+        } else {
+          runOnJS(setPreviewMood)(null);
+        }
       }
     })
     .onEnd(() => {
       'worklet';
-      const step = Math.min(MOODS.length - 1, Math.floor(progress.value * MOODS.length));
-      runOnJS(commitMood)(MOODS[step]);
+      const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
+      let step = -1;
+      for (let j = 0; j < MOODS.length; j++) {
+        if (fillR >= RING_STEP * (j + 1)) step = j;
+      }
+      if (step >= 0) {
+        runOnJS(commitMood)(MOODS[step]);
+      }
     });
 
   const contentStyle = useAnimatedStyle(() => ({
@@ -349,30 +413,15 @@ function SessionCompleteScreen({
                       />
                     ))}
 
-                    {MOODS.map((mood, i) => {
-                      // Scale font and letter spacing with ring size so each
-                      // label feels proportional to its ring's arc — the
-                      // inner ring gets tighter, smaller text, the outer
-                      // ring gets wider, larger text. Without scaling the
-                      // same glyphs look crammed on the small ring and tiny
-                      // on the big one.
-                      const fontSize = 13 + i;
-                      const letterSpacing = 2 + i * 0.5;
-                      return (
-                        <SvgText
-                          key={mood}
-                          fill={textColor}
-                          fontSize={fontSize}
-                          fontFamily="Georgia"
-                          textAnchor="middle"
-                          letterSpacing={letterSpacing}
-                        >
-                          <TextPath href={`#ring-arc-${i}`} startOffset="65%">
-                            {mood}
-                          </TextPath>
-                        </SvgText>
-                      );
-                    })}
+                    {MOODS.map((mood, i) => (
+                      <MoodLabel
+                        key={mood}
+                        mood={mood}
+                        index={i}
+                        active={activeMood === mood}
+                        color={textColor}
+                      />
+                    ))}
                   </Svg>
                 </View>
               </GestureDetector>
