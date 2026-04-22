@@ -25,7 +25,9 @@ const RING_BOX_SIZE = (RING_MAX + RING_BOX_PAD) * 2;
 const RING_CENTER = RING_BOX_SIZE / 2;
 const DISC_MAX_R = RING_MAX + 24;
 const FILL_MIN = 12;
-const FILL_MAX = RING_MAX + 22;
+// Sage fill reaches exactly the cream-disc edge at max drag — otherwise
+// a thin cream halo peeks out around the sage when "full" is active.
+const FILL_MAX = DISC_MAX_R;
 const DRAG_TRAVEL = RING_MAX * 2;
 
 // Soft sage-olive — a muted warm green that sits as a calm cool
@@ -416,7 +418,6 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
             animatedProps={filledCircleProps}
             fill={FILL_COLOR}
             stroke={palette.brown}
-            strokeOpacity={0.5}
             strokeWidth={1.4}
           />
 
