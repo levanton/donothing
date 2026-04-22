@@ -319,8 +319,8 @@ function SessionCompleteScreen({
                         const pr = RING_STEP * (i + 1) + LABEL_OUTSIDE;
                         // CW top arc (via 12 o'clock) on a radius OUTSIDE
                         // the ring itself. startOffset 65% lands the label
-                        // in the upper-right quadrant where the user wants
-                        // it. Text reads left-to-right along the tangent.
+                        // in the upper-right quadrant. Text reads along the
+                        // tangent from upper-left to lower-right.
                         const d = `M ${RING_CENTER - pr} ${RING_CENTER} A ${pr} ${pr} 0 0 1 ${RING_CENTER + pr} ${RING_CENTER}`;
                         return <Path key={i} id={`ring-arc-${i}`} d={d} />;
                       })}
@@ -347,20 +347,30 @@ function SessionCompleteScreen({
                       />
                     ))}
 
-                    {MOODS.map((mood, i) => (
-                      <SvgText
-                        key={mood}
-                        fill={textColor}
-                        fontSize={16}
-                        fontFamily="Georgia"
-                        textAnchor="middle"
-                        letterSpacing={4}
-                      >
-                        <TextPath href={`#ring-arc-${i}`} startOffset="65%">
-                          {mood}
-                        </TextPath>
-                      </SvgText>
-                    ))}
+                    {MOODS.map((mood, i) => {
+                      // Scale font and letter spacing with ring size so each
+                      // label feels proportional to its ring's arc — the
+                      // inner ring gets tighter, smaller text, the outer
+                      // ring gets wider, larger text. Without scaling the
+                      // same glyphs look crammed on the small ring and tiny
+                      // on the big one.
+                      const fontSize = 12 + i * 1.5;
+                      const letterSpacing = 2 + i;
+                      return (
+                        <SvgText
+                          key={mood}
+                          fill={textColor}
+                          fontSize={fontSize}
+                          fontFamily="Georgia"
+                          textAnchor="middle"
+                          letterSpacing={letterSpacing}
+                        >
+                          <TextPath href={`#ring-arc-${i}`} startOffset="65%">
+                            {mood}
+                          </TextPath>
+                        </SvgText>
+                      );
+                    })}
                   </Svg>
                 </View>
               </GestureDetector>
