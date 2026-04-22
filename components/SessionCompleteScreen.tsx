@@ -398,7 +398,7 @@ function SessionCompleteScreen({
                       animatedProps={filledCircleProps}
                       fill={palette.terracotta}
                       stroke={textColor}
-                      strokeWidth={1.5}
+                      strokeWidth={1.2}
                     />
 
                     {Array.from({ length: RING_COUNT }).map((_, i) => (
