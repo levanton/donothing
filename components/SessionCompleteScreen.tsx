@@ -536,11 +536,12 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   prompt: {
-    fontSize: 15,
+    fontSize: 22,
     fontWeight: '400',
-    letterSpacing: 0.4,
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
     textAlign: 'center',
-    marginBottom: 26,
+    marginBottom: 32,
   },
   circleTrack: {
     width: RING_BOX_SIZE,
