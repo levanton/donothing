@@ -162,6 +162,8 @@ function SessionCompleteScreen({
   const circleBlockY = useSharedValue(12);
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
+  const hintOpacity = useSharedValue(0);
+  const hintY = useSharedValue(8);
 
   // Continuous 0..1 value — 0 starts with the smallest position (still),
   // 1 ends at the biggest (full). Stored mood is still bucketed to the
@@ -170,6 +172,7 @@ function SessionCompleteScreen({
   const dragStart = useSharedValue(0);
 
   const [activeMood, setActiveMood] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
 
   const lastHapticStep = useSharedValue(-1);
@@ -179,6 +182,7 @@ function SessionCompleteScreen({
     if (visible) {
       dismissingRef.current = false;
       setActiveMood(null);
+      setHasInteracted(false);
       lastHapticStep.value = -1;
       progress.value = 0;
 
@@ -198,8 +202,13 @@ function SessionCompleteScreen({
       circleBlockOpacity.value = withDelay(base + 900, withTiming(1, { duration: 750, easing: EASE_OUT }));
       circleBlockY.value = withDelay(base + 900, withTiming(0, { duration: 750, easing: EASE_OUT }));
 
-      closeOpacity.value = withDelay(base + 1300, withTiming(1, { duration: 650, easing: EASE_OUT }));
-      closeY.value = withDelay(base + 1300, withTiming(0, { duration: 650, easing: EASE_OUT }));
+      // Hint follows the circle in — and waits there until the user drags.
+      // The done button stays at 0 until hasInteracted flips to true.
+      hintOpacity.value = withDelay(base + 1200, withTiming(1, { duration: 600, easing: EASE_OUT }));
+      hintY.value = withDelay(base + 1200, withTiming(0, { duration: 600, easing: EASE_OUT }));
+
+      closeOpacity.value = 0;
+      closeY.value = 14;
     } else {
       contentOpacity.value = 0;
       glowOpacity.value = 0;
@@ -213,12 +222,23 @@ function SessionCompleteScreen({
       circleBlockY.value = 12;
       closeOpacity.value = 0;
       closeY.value = 14;
+      hintOpacity.value = 0;
+      hintY.value = 8;
     }
   }, [visible]);
 
   const setPreviewMood = useCallback((mood: string | null) => {
     setActiveMood(mood);
+    if (mood !== null) setHasInteracted(true);
   }, []);
+
+  // Once the user touches the first ring, swap the hint for the done button.
+  useEffect(() => {
+    if (!visible || !hasInteracted) return;
+    hintOpacity.value = withTiming(0, { duration: 320, easing: EASE_OUT });
+    closeOpacity.value = withTiming(1, { duration: 520, easing: EASE_OUT });
+    closeY.value = withTiming(0, { duration: 520, easing: EASE_OUT });
+  }, [hasInteracted, visible]);
 
   const commitMood = useCallback(
     (mood: string) => {
@@ -297,6 +317,11 @@ function SessionCompleteScreen({
   const closeStyleAnim = useAnimatedStyle(() => ({
     opacity: closeOpacity.value,
     transform: [{ translateY: closeY.value }],
+    pointerEvents: closeOpacity.value > 0.5 ? 'auto' : 'none',
+  }));
+  const hintStyle = useAnimatedStyle(() => ({
+    opacity: hintOpacity.value,
+    transform: [{ translateY: hintY.value }],
   }));
 
   // Mood-tinted button bg — carries the current hue without shouting.
@@ -458,6 +483,16 @@ function SessionCompleteScreen({
                   </Svg>
                 </View>
               </GestureDetector>
+
+              <Animated.Text
+                style={[
+                  styles.hint,
+                  { color: tertiaryText, fontFamily: Fonts.serif },
+                  hintStyle,
+                ]}
+              >
+                drag outward
+              </Animated.Text>
             </Animated.View>
           </View>
 
@@ -465,7 +500,7 @@ function SessionCompleteScreen({
             <Pressable onPress={handleClose}>
               <Animated.View style={[styles.doneBtn, doneBgStyle]}>
                 <Text style={[styles.doneLabel, { color: textColor, fontFamily: Fonts.serif }]}>
-                  carry on
+                  done
                 </Text>
               </Animated.View>
             </Pressable>
@@ -523,6 +558,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textAlign: 'center',
     marginTop: 6,
+    // Italic `f` in "yourself" clips on the right without a trailing pad.
+    paddingHorizontal: 6,
   },
   subtitle: {
     fontSize: 16,
@@ -533,7 +570,7 @@ const styles = StyleSheet.create({
   },
   interaction: {
     alignItems: 'center',
-    marginTop: 48,
+    marginTop: 24,
   },
   prompt: {
     fontSize: 22,
@@ -541,7 +578,15 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     letterSpacing: 0.3,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 18,
+  },
+  hint: {
+    fontSize: 14,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginTop: 18,
   },
   circleTrack: {
     width: RING_BOX_SIZE,
