@@ -29,10 +29,10 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F9F3E0",
+          "backgroundColor": "#DF5C44",
           "dark": {
             "image": "./assets/images/splash-icon.png",
-            "backgroundColor": "#444444"
+            "backgroundColor": "#DF5C44"
           }
         }
       ],

@@ -15,9 +15,9 @@ configureReanimatedLogger({
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.charcoal }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.terracotta }}>
       <BottomSheetModalProvider>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.charcoal } }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.terracotta } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="paywall" options={{ animation: 'fade', gestureEnabled: false }} />

@@ -688,8 +688,10 @@ export default function DoNothingScreen() {
   }, []);
 
   if (!ready) {
+    // Match the launch splash colour so there is no dark flash between the
+    // native splash hiding and the JS splash overlay mounting.
     return (
-      <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />
+      <View style={[styles.container, { backgroundColor: palette.terracotta }]} />
     );
   }
 
