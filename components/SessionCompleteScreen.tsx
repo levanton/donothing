@@ -12,11 +12,13 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText, TextPath } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
@@ -57,8 +59,17 @@ const MOOD_SOFT = [
 const MOOD_STOPS = MOODS.map((_, i) => i / (MOODS.length - 1));
 
 const grassImage = require('@/assets/images/grass.png');
+const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.28), 260);
+
+// Terracotta reveal disc — starts small at the done-button position and
+// grows out to engulf the whole screen, inverting the palette. On close it
+// shrinks back onto the yes button on the home screen so the handoff is
+// seamless (the home yes button is already terracotta).
+const SPLASH_ORIGIN_X = SCREEN_W / 2;
+const SPLASH_MAX_SIZE = Math.hypot(SCREEN_W, SCREEN_H) * 2;
+const YES_SIZE = 140;
 
 interface Props {
   visible: boolean;
@@ -66,6 +77,7 @@ interface Props {
   durationSeconds: number;
   todaySeconds: number;
   themeMode: ThemeMode;
+  yesBtnRect?: { x: number; y: number; w: number; h: number } | null;
   onClose: () => void;
 }
 
@@ -77,13 +89,16 @@ interface MoodLabelProps {
   active: boolean;
   passed: boolean;
   color: string;
+  reveal: SharedValue<number>;
 }
 
 // Per-label font-size animation via requestAnimationFrame. react-native-svg's
 // Text does not honour reanimated animatedProps for fontSize, so we drive the
 // size through React state and ease it ourselves. The ref captures the live
-// size so a new transition can start smoothly mid-animation.
-const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color }: MoodLabelProps) {
+// size so a new transition can start smoothly mid-animation. Opacity, on the
+// other hand, is handled by reanimated so the reveal stagger matches the
+// ring growth frame-for-frame.
+const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, reveal }: MoodLabelProps) {
   const baseSize = 13 + index;
   const [size, setSize] = useState(baseSize);
   const sizeRef = useRef(baseSize);
@@ -105,8 +120,10 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [active, passed, baseSize]);
+  const opacityProps = useAnimatedProps(() => ({ opacity: reveal.value }));
   return (
-    <SvgText
+    <AnimatedSvgText
+      animatedProps={opacityProps}
       fontSize={size}
       fill={color}
       fontFamily="Georgia"
@@ -116,7 +133,42 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color }
       <TextPath href={`#ring-arc-${index}`} startOffset="65%">
         {mood}
       </TextPath>
-    </SvgText>
+    </AnimatedSvgText>
+  );
+});
+
+// Concentric ring whose radius grows in from zero on mount, and whose stroke
+// darkens as the mood fill crosses its line — giving a visible "reached"
+// state that reads from the ring colour alone.
+interface AnimatedRingProps {
+  index: number;
+  center: number;
+  progress: SharedValue<number>;
+  reveal: SharedValue<number>;
+  mutedColor: string;
+  darkColor: string;
+}
+
+const AnimatedRing = memo(function AnimatedRing({
+  index, center, progress, reveal, mutedColor, darkColor,
+}: AnimatedRingProps) {
+  const targetR = RING_STEP * (index + 1);
+  const animatedProps = useAnimatedProps(() => {
+    const r = targetR * reveal.value;
+    const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
+    const tol = 4;
+    const t = Math.max(0, Math.min(1, (fillR - targetR + tol) / (tol * 2)));
+    const stroke = interpolateColor(t, [0, 1], [mutedColor, darkColor]);
+    return { r, stroke };
+  });
+  return (
+    <AnimatedCircle
+      cx={center}
+      cy={center}
+      animatedProps={animatedProps}
+      strokeWidth={1}
+      fill="none"
+    />
   );
 });
 
@@ -143,6 +195,7 @@ function SessionCompleteScreen({
   durationSeconds,
   todaySeconds,
   themeMode,
+  yesBtnRect,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -164,6 +217,15 @@ function SessionCompleteScreen({
   const closeY = useSharedValue(14);
   const hintOpacity = useSharedValue(0);
   const hintY = useSharedValue(8);
+  const splashSize = useSharedValue(0);
+  const splashCx = useSharedValue(SPLASH_ORIGIN_X);
+  const splashCy = useSharedValue(SCREEN_H);
+  const ringReveal0 = useSharedValue(0);
+  const ringReveal1 = useSharedValue(0);
+  const ringReveal2 = useSharedValue(0);
+  const ringReveal3 = useSharedValue(0);
+  const ringReveal4 = useSharedValue(0);
+  const ringReveals = [ringReveal0, ringReveal1, ringReveal2, ringReveal3, ringReveal4];
 
   // Continuous 0..1 value — 0 starts with the smallest position (still),
   // 1 ends at the biggest (full). Stored mood is still bucketed to the
@@ -186,11 +248,36 @@ function SessionCompleteScreen({
       lastHapticStep.value = -1;
       progress.value = 0;
 
-      contentOpacity.value = withTiming(1, { duration: CONTENT_FADE_MS, easing: EASE_OUT });
+      // Hard-reset every piece first so nothing lingers from a previous
+      // session — especially the done button, which must always start
+      // hidden when the user lands on this screen.
+      closeOpacity.value = 0;
+      closeY.value = 14;
+      hintOpacity.value = 0;
+      hintY.value = 8;
+      splashSize.value = 0;
+      splashCx.value = SPLASH_ORIGIN_X;
+      splashCy.value = SCREEN_H - insets.bottom - 68;
+      ringReveals.forEach((sv) => { sv.value = 0; });
 
-      const base = 220;
-      glowOpacity.value = withDelay(base - 80, withTiming(1, { duration: 1400, easing: EASE_OUT }));
-      glowScale.value = withDelay(base - 80, withTiming(1, { duration: 1400, easing: EASE_OUT }));
+      // When the screen opens right after a timer ends, the JS thread is
+      // briefly busy with DB writes, notification cleanup and week-stats
+      // recompute. Giving every intro animation a short head-start keeps
+      // the first frames from looking rushed — the splash doesn't begin
+      // until that work has settled.
+      const INTRO_DELAY = 240;
+      splashSize.value = withDelay(
+        INTRO_DELAY,
+        withTiming(SPLASH_MAX_SIZE, { duration: 980, easing: EASE_OUT }),
+      );
+      contentOpacity.value = withDelay(
+        INTRO_DELAY,
+        withTiming(1, { duration: CONTENT_FADE_MS + 120, easing: EASE_OUT }),
+      );
+
+      const base = INTRO_DELAY + 600;
+      glowOpacity.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
+      glowScale.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
 
       titleOpacity.value = withDelay(base, withTiming(1, { duration: 1100, easing: EASE_OUT }));
       titleY.value = withDelay(base, withTiming(0, { duration: 1100, easing: EASE_OUT }));
@@ -202,13 +289,23 @@ function SessionCompleteScreen({
       circleBlockOpacity.value = withDelay(base + 900, withTiming(1, { duration: 750, easing: EASE_OUT }));
       circleBlockY.value = withDelay(base + 900, withTiming(0, { duration: 750, easing: EASE_OUT }));
 
-      // Hint follows the circle in — and waits there until the user drags.
-      // The done button stays at 0 until hasInteracted flips to true.
-      hintOpacity.value = withDelay(base + 1200, withTiming(1, { duration: 600, easing: EASE_OUT }));
-      hintY.value = withDelay(base + 1200, withTiming(0, { duration: 600, easing: EASE_OUT }));
+      // Rings grow from the middle outwards, smallest first. Each ring's
+      // reveal also drives its label's opacity so the label fades in just
+      // as its ring finishes settling.
+      const ringRevealBase = base + 1200;
+      const ringStride = 130;
+      const ringDuration = 520;
+      ringReveals.forEach((sv, i) => {
+        sv.value = withDelay(
+          ringRevealBase + i * ringStride,
+          withTiming(1, { duration: ringDuration, easing: EASE_OUT }),
+        );
+      });
 
-      closeOpacity.value = 0;
-      closeY.value = 14;
+      // Hint waits until every ring is visible before inviting the drag.
+      const hintDelay = ringRevealBase + (ringReveals.length - 1) * ringStride + ringDuration - 100;
+      hintOpacity.value = withDelay(hintDelay, withTiming(1, { duration: 600, easing: EASE_OUT }));
+      hintY.value = withDelay(hintDelay, withTiming(0, { duration: 600, easing: EASE_OUT }));
     } else {
       contentOpacity.value = 0;
       glowOpacity.value = 0;
@@ -224,6 +321,9 @@ function SessionCompleteScreen({
       closeY.value = 14;
       hintOpacity.value = 0;
       hintY.value = 8;
+      splashSize.value = 0;
+      ringReveals.forEach((sv) => { sv.value = 0; });
+      setHasInteracted(false);
     }
   }, [visible]);
 
@@ -232,13 +332,15 @@ function SessionCompleteScreen({
     if (mood !== null) setHasInteracted(true);
   }, []);
 
-  // Once the user touches the first ring, swap the hint for the done button.
+  // Once the user touches the first ring, swap the hint for the done
+  // button. Depends ONLY on hasInteracted so a stale `true` can't survive
+  // a re-entry — visible=true always resets the flag to false first.
   useEffect(() => {
-    if (!visible || !hasInteracted) return;
+    if (!hasInteracted) return;
     hintOpacity.value = withTiming(0, { duration: 320, easing: EASE_OUT });
     closeOpacity.value = withTiming(1, { duration: 520, easing: EASE_OUT });
     closeY.value = withTiming(0, { duration: 520, easing: EASE_OUT });
-  }, [hasInteracted, visible]);
+  }, [hasInteracted]);
 
   const commitMood = useCallback(
     (mood: string) => {
@@ -251,9 +353,23 @@ function SessionCompleteScreen({
     if (dismissingRef.current) return;
     dismissingRef.current = true;
     Haptics.selectionAsync();
-    contentOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
-    setTimeout(onClose, 520);
-  }, [onClose]);
+
+    // Collapse the terracotta disc back onto the home-screen yes button —
+    // same shape, same colour, so the handoff is seamless (mirrors the
+    // launch splash). If we don't have a measured yes button yet, just
+    // shrink to 0 at the current origin.
+    const duration = 540;
+    if (yesBtnRect) {
+      splashCx.value = withTiming(yesBtnRect.x + yesBtnRect.w / 2, { duration, easing: EASE_OUT });
+      splashCy.value = withTiming(yesBtnRect.y + yesBtnRect.h / 2, { duration, easing: EASE_OUT });
+      splashSize.value = withTiming(YES_SIZE, { duration, easing: EASE_OUT });
+    } else {
+      splashSize.value = withTiming(0, { duration, easing: EASE_OUT });
+    }
+
+    contentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
+    setTimeout(onClose, duration + 20);
+  }, [onClose, yesBtnRect]);
 
   // Horizontal drag grows the centre circle outward toward the largest
   // ring; dragging back shrinks it. DRAG_TRAVEL worth of movement covers
@@ -300,8 +416,18 @@ function SessionCompleteScreen({
   const contentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
     pointerEvents: contentOpacity.value > 0.5 ? 'auto' : 'none',
-    backgroundColor: theme.bg,
   }));
+
+  const splashAnimStyle = useAnimatedStyle(() => {
+    const size = splashSize.value;
+    return {
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      left: splashCx.value - size / 2,
+      top: splashCy.value - size / 2,
+    };
+  });
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
     transform: [{ translateY: titleY.value }, { scale: titleScale.value }],
@@ -342,9 +468,13 @@ function SessionCompleteScreen({
 
   if (!visible) return null;
 
-  const textColor = theme.text;
-  const softText = theme.textSecondary;
-  const tertiaryText = theme.textTertiary;
+  // Inverse palette — the reveal disc fills the screen with terracotta, so
+  // every label on top of it is cream, and the mood circle in the middle
+  // becomes cream-filled with dark text inside.
+  const textColor = palette.cream;
+  const softText = 'rgba(249, 242, 224, 0.85)';
+  const tertiaryText = 'rgba(249, 242, 224, 0.5)';
+  const clippedLabelColor = palette.brown;
 
   const duration = formatMinutes(durationSeconds);
   const today = formatMinutes(todaySeconds);
@@ -353,7 +483,11 @@ function SessionCompleteScreen({
     <View style={styles.root}>
       <StatusBar style={statusStyle} />
 
-      {/* Cream background + content layer */}
+      {/* Terracotta reveal disc grows from the done-button position to
+          cover the screen before any content fades in. */}
+      <Animated.View pointerEvents="none" style={[styles.splashCircle, splashAnimStyle]} />
+
+      {/* Content layer — transparent, lives on top of the terracotta disc */}
       <Animated.View style={[StyleSheet.absoluteFillObject, contentStyle]}>
         <View
           style={[
@@ -433,18 +567,18 @@ function SessionCompleteScreen({
                       cx={RING_CENTER}
                       cy={RING_CENTER}
                       animatedProps={filledCircleProps}
-                      fill={palette.terracotta}
+                      fill={palette.cream}
                     />
 
-                    {Array.from({ length: RING_COUNT }).map((_, i) => (
-                      <Circle
+                    {ringReveals.map((reveal, i) => (
+                      <AnimatedRing
                         key={i}
-                        cx={RING_CENTER}
-                        cy={RING_CENTER}
-                        r={RING_STEP * (i + 1)}
-                        stroke={tertiaryText}
-                        strokeWidth={1}
-                        fill="none"
+                        index={i}
+                        center={RING_CENTER}
+                        progress={progress}
+                        reveal={reveal}
+                        mutedColor={tertiaryText}
+                        darkColor={palette.brown}
                       />
                     ))}
 
@@ -458,6 +592,7 @@ function SessionCompleteScreen({
                           active={i === activeIndex}
                           passed={activeIndex > i}
                           color={textColor}
+                          reveal={ringReveals[i]}
                         />
                       );
                     })}
@@ -475,7 +610,8 @@ function SessionCompleteScreen({
                             index={i}
                             active={i === activeIndex}
                             passed={activeIndex > i}
-                            color={palette.cream}
+                            color={clippedLabelColor}
+                            reveal={ringReveals[i]}
                           />
                         );
                       })}
@@ -498,11 +634,11 @@ function SessionCompleteScreen({
 
           <Animated.View style={closeStyleAnim}>
             <Pressable onPress={handleClose}>
-              <Animated.View style={[styles.doneBtn, doneBgStyle]}>
-                <Text style={[styles.doneLabel, { color: textColor, fontFamily: Fonts.serif }]}>
+              <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+                <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
                   done
                 </Text>
-              </Animated.View>
+              </View>
             </Pressable>
           </Animated.View>
         </View>
@@ -517,6 +653,11 @@ const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 120,
+    overflow: 'hidden',
+  },
+  splashCircle: {
+    position: 'absolute',
+    backgroundColor: palette.terracotta,
   },
   layout: {
     flex: 1,

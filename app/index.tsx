@@ -1320,6 +1320,7 @@ export default function DoNothingScreen() {
         durationSeconds={lastSessionDuration}
         todaySeconds={stats.today}
         themeMode={themeMode}
+        yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
       />
 

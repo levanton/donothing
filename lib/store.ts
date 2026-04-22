@@ -307,6 +307,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       weekStats: getWeekStats(),
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
+      // Same reason as completeSession — make the next tap start from the
+      // slider's visible value, not whatever the last block session set.
+      goalSeconds: get().sliderMinutes * 60,
     });
     get().checkMilestones();
   },
@@ -335,6 +338,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
       completionVisible: true,
+      // Sync goal back to the slider display — block sessions override
+      // goalSeconds to unlockMin*60, and without this reset a subsequent
+      // normal tap would start a session at the stale block duration
+      // while the UI still shows the slider's value.
+      goalSeconds: get().sliderMinutes * 60,
     });
   },
 
