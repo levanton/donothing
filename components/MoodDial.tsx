@@ -31,6 +31,10 @@ const FILL_MIN = 12;
 const FILL_MAX = RING_MAX + 22;
 const DRAG_TRAVEL = RING_MAX * 2;
 
+// Soft sage-olive — a muted warm green that sits as a calm cool
+// complement to the terracotta backdrop without going dramatic.
+const FILL_COLOR = '#8FA07A';
+
 // How long the disc takes to sweep from centre out to its max radius.
 // Exported so the parent can time the hint fade-in to land right after
 // the disc settles.
@@ -117,17 +121,43 @@ interface RingProps {
   index: number;
   discR: number;
   stroke: string;
+  hidden: boolean;
 }
 
-const Ring = memo(function Ring({ index, discR, stroke }: RingProps) {
+const Ring = memo(function Ring({ index, discR, stroke, hidden }: RingProps) {
   const targetR = RING_STEP * (index + 1);
   const r = Math.min(discR, targetR);
+  const [opacity, setOpacity] = useState(1);
+  const opacityRef = useRef(1);
+
+  // Fade out smoothly when the user's fill surpasses this ring (and
+  // fade back in if they drag back below it).
+  useEffect(() => {
+    const from = opacityRef.current;
+    const to = hidden ? 0 : 1;
+    if (from === to) return;
+    const duration = 320;
+    const start = Date.now();
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (to - from) * eased;
+      opacityRef.current = next;
+      setOpacity(next);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [hidden]);
+
   return (
     <Circle
       cx={RING_CENTER}
       cy={RING_CENTER}
       r={r}
       stroke={stroke}
+      strokeOpacity={opacity}
       strokeWidth={1.6}
       fill="none"
     />
@@ -280,27 +310,42 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
             cx={RING_CENTER}
             cy={RING_CENTER}
             animatedProps={filledCircleProps}
-            fill={palette.terracotta}
+            fill={FILL_COLOR}
+            stroke={palette.brown}
+            strokeOpacity={0.5}
+            strokeWidth={1.4}
           />
 
           {Array.from({ length: RING_COUNT }).map((_, i) => (
-            <Ring key={i} index={i} discR={discR} stroke={palette.brown} />
+            <Ring
+              key={i}
+              index={i}
+              discR={discR}
+              stroke={palette.brown}
+              hidden={activeIndex > i}
+            />
           ))}
 
           {MOODS.map((mood, i) => {
-            const revealed = discR >= RING_STEP * (i + 1);
+            // revealed goes false both before the intro reaches the ring
+            // AND when the user's fill has surpassed it — MoodLabel's
+            // rAF eases the opacity either way.
+            const introRevealed = discR >= RING_STEP * (i + 1);
+            const surpassed = activeIndex > i;
+            const revealed = introRevealed && !surpassed;
             return (
               <MoodLabel
                 key={mood}
                 mood={mood}
                 index={i}
                 active={i === activeIndex}
-                passed={activeIndex > i}
+                passed={surpassed}
                 color={palette.brown}
                 revealed={revealed}
               />
             );
           })}
+
         </Svg>
       </View>
     </GestureDetector>
