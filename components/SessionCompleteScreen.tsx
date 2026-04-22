@@ -89,7 +89,7 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color }
   const sizeRef = useRef(baseSize);
   useEffect(() => {
     const from = sizeRef.current;
-    const delta = active ? 3 : passed ? -1 : 0;
+    const delta = active ? 4 : passed ? -1 : 0;
     const to = baseSize + delta;
     const duration = 260;
     const start = Date.now();
@@ -409,8 +409,6 @@ function SessionCompleteScreen({
                       cy={RING_CENTER}
                       animatedProps={filledCircleProps}
                       fill={palette.terracotta}
-                      stroke={textColor}
-                      strokeWidth={1.2}
                     />
 
                     {Array.from({ length: RING_COUNT }).map((_, i) => (
