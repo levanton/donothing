@@ -14,9 +14,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Path, Text as SvgText, TextPath } from 'react-native-svg';
+import Svg, { Ellipse, Line, Path } from 'react-native-svg';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
@@ -28,20 +29,28 @@ const CONTENT_FADE_MS = 500;
 
 const MOODS = ['restless', 'calm', 'lighter', 'refreshed', 'grateful'] as const;
 
-// Concentric mood rings — 5 guide circles sharing a centre, one per mood
-// step. A terracotta circle in the middle grows from a tiny seed to reach
-// the outermost ring as the user drags horizontally. Wider fill = fuller
-// feeling.
-const RING_COUNT = MOODS.length;
-const RING_STEP = 22;
-const RING_MAX = RING_STEP * RING_COUNT;
-const RING_BOX_PAD = 28;
-const LABEL_OUTSIDE = 4;
-const RING_BOX_SIZE = (RING_MAX + RING_BOX_PAD) * 2;
-const RING_CENTER = RING_BOX_SIZE / 2;
-const FILL_MIN = 3;
-const FILL_MAX = RING_MAX;
-const DRAG_TRAVEL = RING_MAX * 2;
+// Adaptive ball travelling inside a cone that comes to a sharp point on the
+// left and opens into a perspective ellipse on the right. Ball size tracks
+// the cone opening at its current x, so it grows from 0 at the tip to the
+// full CIRCLE_MAX_SIZE at the wide end.
+const CIRCLE_MAX_SIZE = 120;
+const CONE_WIDTH = 200;
+const CONE_PAD_RIGHT = CIRCLE_MAX_SIZE / 2;
+const CONE_BOX_WIDTH = CONE_WIDTH + CONE_PAD_RIGHT + 8;
+const CONE_BOX_HEIGHT = CIRCLE_MAX_SIZE + 20;
+const CONE_MID_Y = CONE_BOX_HEIGHT / 2;
+const CONE_LEFT = 4;
+const CONE_RIGHT = CONE_LEFT + CONE_WIDTH;
+// Perspective compression for the right end opening — a narrow ellipse
+// reads as a circle tilted away from the camera.
+const PERSPECTIVE_RATIO = 0.32;
+const RIGHT_RX = (CIRCLE_MAX_SIZE / 2) * PERSPECTIVE_RATIO;
+const RIGHT_RY = CIRCLE_MAX_SIZE / 2;
+// Ball travels from the sharp tip (cx=CONE_LEFT, size 0) to the wide cap
+// (cx=CONE_RIGHT, size CIRCLE_MAX_SIZE).
+const BALL_X_START = CONE_LEFT;
+const BALL_X_END = CONE_RIGHT;
+const BALL_TRAVEL = BALL_X_END - BALL_X_START;
 
 // Mood colours at low alpha — tint the "carry on" button with the current hue.
 const MOOD_SOFT = [
@@ -86,7 +95,7 @@ function formatMinutes(seconds: number, locale: Locale = 'en'): { value: string;
   return { value: String(m), unit: pluralizeMinutes(m, locale) };
 }
 
-function SessionCompleteScreen({
+function SessionCompleteScreenCone({
   visible,
   sessionId,
   durationSeconds,
@@ -184,9 +193,8 @@ function SessionCompleteScreen({
     setTimeout(onClose, 520);
   }, [onClose]);
 
-  // Horizontal drag grows the centre circle outward toward the largest
-  // ring; dragging back shrinks it. DRAG_TRAVEL worth of movement covers
-  // the full 0..1 mood range.
+  // Horizontal drag on the circle itself — drag right to grow it, left to
+  // shrink. Circle centre tracks finger 1:1 (progress maps to CONE_TRAVEL).
   const circleGesture = Gesture.Pan()
     .onStart(() => {
       'worklet';
@@ -194,7 +202,7 @@ function SessionCompleteScreen({
     })
     .onUpdate((e) => {
       'worklet';
-      const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / DRAG_TRAVEL));
+      const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / BALL_TRAVEL));
       progress.value = next;
       const step = Math.min(MOODS.length - 1, Math.floor(next * MOODS.length));
       if (step !== lastHapticStep.value) {
@@ -241,9 +249,32 @@ function SessionCompleteScreen({
     transform: [{ scale: glowScale.value }],
   }));
 
-  const filledCircleProps = useAnimatedProps(() => {
-    const r = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    return { r };
+  // Moving ball — narrow ellipse with the same PERSPECTIVE_RATIO as the
+  // right cap so it sits in the same tilted space as the rest of the scene.
+  const moodEllipseProps = useAnimatedProps(() => {
+    const p = progress.value;
+    const cx = BALL_X_START + p * BALL_TRAVEL;
+    const size = ((cx - CONE_LEFT) / CONE_WIDTH) * CIRCLE_MAX_SIZE;
+    const ry = size / 2;
+    return {
+      cx,
+      cy: CONE_MID_Y,
+      rx: ry * PERSPECTIVE_RATIO,
+      ry,
+    };
+  });
+
+  // Progress fill — triangle from the sharp left tip out to the ball's
+  // current centre, closed by a straight vertical at the ball.
+  const fillPathProps = useAnimatedProps(() => {
+    const p = progress.value;
+    const cx = BALL_X_START + p * BALL_TRAVEL;
+    const size = ((cx - CONE_LEFT) / CONE_WIDTH) * CIRCLE_MAX_SIZE;
+    const ry = size / 2;
+    const topCurY = CONE_MID_Y - ry;
+    const botCurY = CONE_MID_Y + ry;
+    const d = `M ${CONE_LEFT} ${CONE_MID_Y} L ${cx} ${topCurY} L ${cx} ${botCurY} Z`;
+    return { d };
   });
 
 
@@ -307,60 +338,62 @@ function SessionCompleteScreen({
               </Text>
 
               <GestureDetector gesture={circleGesture}>
-                <View style={styles.circleTrack}>
+                <View style={styles.coneTrack}>
                   <Svg
-                    width={RING_BOX_SIZE}
-                    height={RING_BOX_SIZE}
+                    width={CONE_BOX_WIDTH}
+                    height={CONE_BOX_HEIGHT}
                     style={StyleSheet.absoluteFill}
                     pointerEvents="none"
                   >
-                    <Defs>
-                      {Array.from({ length: RING_COUNT }).map((_, i) => {
-                        const pr = RING_STEP * (i + 1) + LABEL_OUTSIDE;
-                        // CW top arc (via 12 o'clock) on a radius OUTSIDE
-                        // the ring itself. startOffset 65% lands the label
-                        // in the upper-right quadrant where the user wants
-                        // it. Text reads left-to-right along the tangent.
-                        const d = `M ${RING_CENTER - pr} ${RING_CENTER} A ${pr} ${pr} 0 0 1 ${RING_CENTER + pr} ${RING_CENTER}`;
-                        return <Path key={i} id={`ring-arc-${i}`} d={d} />;
-                      })}
-                    </Defs>
+                    {/* Progress fill — terracotta trapezoid from the left cap
+                        up to the ball's centre. Drawn first so the outlines
+                        and the ball sit on top. */}
+                    <AnimatedPath
+                      animatedProps={fillPathProps}
+                      fill={palette.terracotta}
+                    />
 
-                    <AnimatedCircle
-                      cx={RING_CENTER}
-                      cy={RING_CENTER}
-                      animatedProps={filledCircleProps}
+                    {/* Cone walls — converge to a sharp point on the left,
+                        open into the right cap on the right */}
+                    <Line
+                      x1={CONE_LEFT}
+                      y1={CONE_MID_Y}
+                      x2={CONE_RIGHT}
+                      y2={CONE_MID_Y - CIRCLE_MAX_SIZE / 2}
+                      stroke={textColor}
+                      strokeWidth={1.75}
+                      strokeLinecap="round"
+                    />
+                    <Line
+                      x1={CONE_LEFT}
+                      y1={CONE_MID_Y}
+                      x2={CONE_RIGHT}
+                      y2={CONE_MID_Y + CIRCLE_MAX_SIZE / 2}
+                      stroke={textColor}
+                      strokeWidth={1.75}
+                      strokeLinecap="round"
+                    />
+
+                    {/* The moving ball — drawn before the right cap so the
+                        cap outline sits on top of it when they overlap */}
+                    <AnimatedEllipse
+                      animatedProps={moodEllipseProps}
                       fill={palette.terracotta}
                       stroke={textColor}
                       strokeWidth={1.5}
                     />
 
-                    {Array.from({ length: RING_COUNT }).map((_, i) => (
-                      <Circle
-                        key={i}
-                        cx={RING_CENTER}
-                        cy={RING_CENTER}
-                        r={RING_STEP * (i + 1)}
-                        stroke={tertiaryText}
-                        strokeWidth={1}
-                        fill="none"
-                      />
-                    ))}
-
-                    {MOODS.map((mood, i) => (
-                      <SvgText
-                        key={mood}
-                        fill={textColor}
-                        fontSize={16}
-                        fontFamily="Georgia"
-                        textAnchor="middle"
-                        letterSpacing={4}
-                      >
-                        <TextPath href={`#ring-arc-${i}`} startOffset="65%">
-                          {mood}
-                        </TextPath>
-                      </SvgText>
-                    ))}
+                    {/* Right cap — drawn last so it sits on top of the ball
+                        when the ball reaches the wide end */}
+                    <Ellipse
+                      cx={CONE_RIGHT}
+                      cy={CONE_MID_Y}
+                      rx={RIGHT_RX}
+                      ry={RIGHT_RY}
+                      stroke={textColor}
+                      strokeWidth={1.5}
+                      fill="none"
+                    />
                   </Svg>
                 </View>
               </GestureDetector>
@@ -382,7 +415,7 @@ function SessionCompleteScreen({
   );
 }
 
-export default memo(SessionCompleteScreen);
+export default memo(SessionCompleteScreenCone);
 
 const styles = StyleSheet.create({
   root: {
@@ -448,9 +481,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 26,
   },
-  circleTrack: {
-    width: RING_BOX_SIZE,
-    height: RING_BOX_SIZE,
+  coneTrack: {
+    width: CONE_BOX_WIDTH,
+    height: CONE_BOX_HEIGHT,
     position: 'relative',
   },
   doneBtn: {
