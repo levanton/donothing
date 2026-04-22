@@ -40,7 +40,9 @@ const LABEL_OUTSIDE = 4;
 const RING_BOX_SIZE = (RING_MAX + RING_BOX_PAD) * 2;
 const RING_CENTER = RING_BOX_SIZE / 2;
 const FILL_MIN = 3;
-const FILL_MAX = RING_MAX;
+// Extend past the outermost ring so the fill at max progress swallows the
+// grateful label, which sits on an arc just outside ring 4.
+const FILL_MAX = RING_MAX + 20;
 const DRAG_TRAVEL = RING_MAX * 2;
 
 // Mood colours at low alpha — tint the "carry on" button with the current hue.
