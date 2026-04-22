@@ -123,6 +123,11 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, 
   const opacityProps = useAnimatedProps(() => ({ opacity: reveal.value }));
   return (
     <AnimatedSvgText
+      // Static 0 so the very first paint is already invisible — without
+      // this the animatedProps sometimes flushes one frame late and the
+      // label flashes at full opacity before the reveal animation takes
+      // over.
+      opacity={0}
       animatedProps={opacityProps}
       fontSize={size}
       fill={color}
@@ -154,12 +159,15 @@ const AnimatedRing = memo(function AnimatedRing({
 }: AnimatedRingProps) {
   const targetR = RING_STEP * (index + 1);
   const animatedProps = useAnimatedProps(() => {
-    const r = targetR * reveal.value;
+    // Pure opacity fade — the text labels sit on a fixed-radius SVG path
+    // in Defs and can't follow a scaling ring, so any radius animation on
+    // the ring would visibly lag the text. Fading both in at their final
+    // positions keeps them glued together.
     const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
     const tol = 4;
     const t = Math.max(0, Math.min(1, (fillR - targetR + tol) / (tol * 2)));
     const stroke = interpolateColor(t, [0, 1], [mutedColor, darkColor]);
-    return { r, stroke };
+    return { r: targetR, stroke, opacity: reveal.value };
   });
   return (
     <AnimatedCircle
@@ -293,8 +301,8 @@ function SessionCompleteScreen({
       // reveal also drives its label's opacity so the label fades in just
       // as its ring finishes settling.
       const ringRevealBase = base + 1200;
-      const ringStride = 130;
-      const ringDuration = 520;
+      const ringStride = 150;
+      const ringDuration = 720;
       ringReveals.forEach((sv, i) => {
         sv.value = withDelay(
           ringRevealBase + i * ringStride,
