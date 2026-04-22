@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText, TextPath } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
@@ -89,19 +88,22 @@ interface MoodLabelProps {
   active: boolean;
   passed: boolean;
   color: string;
-  reveal: SharedValue<number>;
+  revealed: boolean;
 }
 
-// Per-label font-size animation via requestAnimationFrame. react-native-svg's
-// Text does not honour reanimated animatedProps for fontSize, so we drive the
-// size through React state and ease it ourselves. The ref captures the live
-// size so a new transition can start smoothly mid-animation. Opacity, on the
-// other hand, is handled by reanimated so the reveal stagger matches the
-// ring growth frame-for-frame.
-const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, reveal }: MoodLabelProps) {
+// Everything here goes through React state + rAF because react-native-svg
+// does not reliably apply opacity / fillOpacity / fontSize on the first
+// paint when driven by reanimated's animatedProps — it kept rendering the
+// label at full opacity for a frame before the animation caught up.
+// Returning null while hidden keeps the element out of the tree entirely,
+// so there is nothing to flash in the first place.
+const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, revealed }: MoodLabelProps) {
   const baseSize = 13 + index;
   const [size, setSize] = useState(baseSize);
   const sizeRef = useRef(baseSize);
+  const [opacity, setOpacity] = useState(0);
+  const opacityRef = useRef(0);
+
   useEffect(() => {
     const from = sizeRef.current;
     const delta = active ? 4 : passed ? -1 : 0;
@@ -120,15 +122,32 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [active, passed, baseSize]);
-  const opacityProps = useAnimatedProps(() => ({ opacity: reveal.value }));
+
+  useEffect(() => {
+    const from = opacityRef.current;
+    const to = revealed ? 1 : 0;
+    if (from === to) return;
+    const duration = 460;
+    const start = Date.now();
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      // ease-in-out cubic — gentler start and end than ease-out alone
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const next = from + (to - from) * eased;
+      opacityRef.current = next;
+      setOpacity(next);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [revealed]);
+
+  if (!revealed && opacity < 0.01) return null;
+
   return (
-    <AnimatedSvgText
-      // Static 0 so the very first paint is already invisible — without
-      // this the animatedProps sometimes flushes one frame late and the
-      // label flashes at full opacity before the reveal animation takes
-      // over.
-      opacity={0}
-      animatedProps={opacityProps}
+    <SvgText
+      fillOpacity={opacity}
       fontSize={size}
       fill={color}
       fontFamily="Georgia"
@@ -138,7 +157,7 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, 
       <TextPath href={`#ring-arc-${index}`} startOffset="65%">
         {mood}
       </TextPath>
-    </AnimatedSvgText>
+    </SvgText>
   );
 });
 
@@ -149,31 +168,38 @@ interface AnimatedRingProps {
   index: number;
   center: number;
   progress: SharedValue<number>;
-  reveal: SharedValue<number>;
+  wave: number;
   mutedColor: string;
   darkColor: string;
 }
 
+// One wavefront expands from the centre; every ring renders at
+// `min(wave, targetR)` so smaller rings "drop off" and lock in place as
+// the wave passes them, while larger rings keep riding it outward. This
+// matches the user's intent: a single breath of motion that deposits
+// each ring at its radius.
 const AnimatedRing = memo(function AnimatedRing({
-  index, center, progress, reveal, mutedColor, darkColor,
+  index, center, progress, wave, mutedColor, darkColor,
 }: AnimatedRingProps) {
   const targetR = RING_STEP * (index + 1);
-  const animatedProps = useAnimatedProps(() => {
-    // Pure opacity fade — the text labels sit on a fixed-radius SVG path
-    // in Defs and can't follow a scaling ring, so any radius animation on
-    // the ring would visibly lag the text. Fading both in at their final
-    // positions keeps them glued together.
+  const r = Math.min(wave, targetR);
+
+  // Stroke colour stays on the UI thread because it has to react to the
+  // user's drag progress in real time.
+  const strokeProps = useAnimatedProps(() => {
     const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
     const tol = 4;
     const t = Math.max(0, Math.min(1, (fillR - targetR + tol) / (tol * 2)));
     const stroke = interpolateColor(t, [0, 1], [mutedColor, darkColor]);
-    return { r: targetR, stroke, opacity: reveal.value };
+    return { stroke };
   });
+
   return (
     <AnimatedCircle
       cx={center}
       cy={center}
-      animatedProps={animatedProps}
+      r={r}
+      animatedProps={strokeProps}
       strokeWidth={1}
       fill="none"
     />
@@ -228,12 +254,6 @@ function SessionCompleteScreen({
   const splashSize = useSharedValue(0);
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
   const splashCy = useSharedValue(SCREEN_H);
-  const ringReveal0 = useSharedValue(0);
-  const ringReveal1 = useSharedValue(0);
-  const ringReveal2 = useSharedValue(0);
-  const ringReveal3 = useSharedValue(0);
-  const ringReveal4 = useSharedValue(0);
-  const ringReveals = [ringReveal0, ringReveal1, ringReveal2, ringReveal3, ringReveal4];
 
   // Continuous 0..1 value — 0 starts with the smallest position (still),
   // 1 ends at the biggest (full). Stored mood is still bucketed to the
@@ -243,6 +263,10 @@ function SessionCompleteScreen({
 
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [wave, setWave] = useState(0);
+  const [revealedLabels, setRevealedLabels] = useState(-1);
+  const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const waveRafRef = useRef(0);
   const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
 
   const lastHapticStep = useSharedValue(-1);
@@ -266,7 +290,14 @@ function SessionCompleteScreen({
       splashSize.value = 0;
       splashCx.value = SPLASH_ORIGIN_X;
       splashCy.value = SCREEN_H - insets.bottom - 68;
-      ringReveals.forEach((sv) => { sv.value = 0; });
+      revealTimersRef.current.forEach(clearTimeout);
+      revealTimersRef.current = [];
+      if (waveRafRef.current) {
+        cancelAnimationFrame(waveRafRef.current);
+        waveRafRef.current = 0;
+      }
+      setWave(0);
+      setRevealedLabels(-1);
 
       // When the screen opens right after a timer ends, the JS thread is
       // briefly busy with DB writes, notification cleanup and week-stats
@@ -283,7 +314,7 @@ function SessionCompleteScreen({
         withTiming(1, { duration: CONTENT_FADE_MS + 120, easing: EASE_OUT }),
       );
 
-      const base = INTRO_DELAY + 600;
+      const base = INTRO_DELAY + 440;
       glowOpacity.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
       glowScale.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
 
@@ -297,21 +328,41 @@ function SessionCompleteScreen({
       circleBlockOpacity.value = withDelay(base + 900, withTiming(1, { duration: 750, easing: EASE_OUT }));
       circleBlockY.value = withDelay(base + 900, withTiming(0, { duration: 750, easing: EASE_OUT }));
 
-      // Rings grow from the middle outwards, smallest first. Each ring's
-      // reveal also drives its label's opacity so the label fades in just
-      // as its ring finishes settling.
-      const ringRevealBase = base + 1200;
-      const ringStride = 150;
-      const ringDuration = 720;
-      ringReveals.forEach((sv, i) => {
-        sv.value = withDelay(
-          ringRevealBase + i * ringStride,
-          withTiming(1, { duration: ringDuration, easing: EASE_OUT }),
-        );
-      });
+      // One expanding wavefront: all rings render at min(wave, targetR),
+      // so they appear to grow together until each reaches its own
+      // radius and "locks in". Labels fade in the moment their ring
+      // locks, keeping word + ring synchronised.
+      const ringRevealBase = base + 1000;
+      const WAVE_DURATION = 1600;
+      const LABEL_DUR = 460;
 
-      // Hint waits until every ring is visible before inviting the drag.
-      const hintDelay = ringRevealBase + (ringReveals.length - 1) * ringStride + ringDuration - 100;
+      // Schedule label reveals at the exact moments the wave would pass
+      // each ring (linear wave → evenly spaced ticks, one per ring).
+      for (let i = 0; i < RING_COUNT; i++) {
+        const labelAt = ringRevealBase + ((i + 1) / RING_COUNT) * WAVE_DURATION;
+        revealTimersRef.current.push(
+          setTimeout(() => {
+            setRevealedLabels((prev) => (i > prev ? i : prev));
+          }, labelAt),
+        );
+      }
+
+      // Drive the wave via rAF (React state + linear tween to RING_MAX).
+      revealTimersRef.current.push(
+        setTimeout(() => {
+          const startAt = Date.now();
+          const tick = () => {
+            const t = Math.min(1, (Date.now() - startAt) / WAVE_DURATION);
+            setWave(t * RING_MAX);
+            if (t < 1) waveRafRef.current = requestAnimationFrame(tick);
+            else waveRafRef.current = 0;
+          };
+          waveRafRef.current = requestAnimationFrame(tick);
+        }, ringRevealBase),
+      );
+
+      // Hint waits until every label is settled.
+      const hintDelay = ringRevealBase + WAVE_DURATION + LABEL_DUR;
       hintOpacity.value = withDelay(hintDelay, withTiming(1, { duration: 600, easing: EASE_OUT }));
       hintY.value = withDelay(hintDelay, withTiming(0, { duration: 600, easing: EASE_OUT }));
     } else {
@@ -330,7 +381,14 @@ function SessionCompleteScreen({
       hintOpacity.value = 0;
       hintY.value = 8;
       splashSize.value = 0;
-      ringReveals.forEach((sv) => { sv.value = 0; });
+      revealTimersRef.current.forEach(clearTimeout);
+      revealTimersRef.current = [];
+      if (waveRafRef.current) {
+        cancelAnimationFrame(waveRafRef.current);
+        waveRafRef.current = 0;
+      }
+      setWave(0);
+      setRevealedLabels(-1);
       setHasInteracted(false);
     }
   }, [visible]);
@@ -578,13 +636,13 @@ function SessionCompleteScreen({
                       fill={palette.cream}
                     />
 
-                    {ringReveals.map((reveal, i) => (
+                    {Array.from({ length: RING_COUNT }).map((_, i) => (
                       <AnimatedRing
                         key={i}
                         index={i}
                         center={RING_CENTER}
                         progress={progress}
-                        reveal={reveal}
+                        wave={wave}
                         mutedColor={tertiaryText}
                         darkColor={palette.brown}
                       />
@@ -600,7 +658,7 @@ function SessionCompleteScreen({
                           active={i === activeIndex}
                           passed={activeIndex > i}
                           color={textColor}
-                          reveal={ringReveals[i]}
+                          revealed={i <= revealedLabels}
                         />
                       );
                     })}
@@ -619,7 +677,7 @@ function SessionCompleteScreen({
                             active={i === activeIndex}
                             passed={activeIndex > i}
                             color={clippedLabelColor}
-                            reveal={ringReveals[i]}
+                            revealed={i <= revealedLabels}
                           />
                         );
                       })}
