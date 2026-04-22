@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Path, Text as SvgText, TextPath } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText, TextPath } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -42,7 +42,7 @@ const RING_CENTER = RING_BOX_SIZE / 2;
 const FILL_MIN = 12;
 // Extend past the outermost ring so the fill at max progress swallows the
 // outermost label, which sits on an arc just outside ring 4.
-const FILL_MAX = RING_MAX + 20;
+const FILL_MAX = RING_MAX + 22;
 const DRAG_TRAVEL = RING_MAX * 2;
 
 // Mood colours at low alpha — tint the "carry on" button with the current hue.
@@ -390,6 +390,16 @@ function SessionCompleteScreen({
                         const d = `M ${RING_CENTER - pr} ${RING_CENTER} A ${pr} ${pr} 0 0 1 ${RING_CENTER + pr} ${RING_CENTER}`;
                         return <Path key={i} id={`ring-arc-${i}`} d={d} />;
                       })}
+                      {/* Clip matches the growing mood fill — used to reveal
+                          the cream-coloured copy of the labels only over the
+                          terracotta area, so letters fade half by half. */}
+                      <ClipPath id="mood-fill-clip">
+                        <AnimatedCircle
+                          cx={RING_CENTER}
+                          cy={RING_CENTER}
+                          animatedProps={filledCircleProps}
+                        />
+                      </ClipPath>
                     </Defs>
 
                     <AnimatedCircle
@@ -422,6 +432,21 @@ function SessionCompleteScreen({
                         color={textColor}
                       />
                     ))}
+
+                    {/* Cream copy, revealed only where the terracotta fill
+                        currently covers — gives the half-dark / half-cream
+                        transition as the circle sweeps across each letter. */}
+                    <G clipPath="url(#mood-fill-clip)">
+                      {MOODS.map((mood, i) => (
+                        <MoodLabel
+                          key={`${mood}-cream`}
+                          mood={mood}
+                          index={i}
+                          active={activeMood === mood}
+                          color={palette.cream}
+                        />
+                      ))}
+                    </G>
                   </Svg>
                 </View>
               </GestureDetector>
