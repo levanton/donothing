@@ -75,6 +75,7 @@ interface MoodLabelProps {
   mood: string;
   index: number;
   active: boolean;
+  passed: boolean;
   color: string;
 }
 
@@ -82,13 +83,14 @@ interface MoodLabelProps {
 // Text does not honour reanimated animatedProps for fontSize, so we drive the
 // size through React state and ease it ourselves. The ref captures the live
 // size so a new transition can start smoothly mid-animation.
-const MoodLabel = memo(function MoodLabel({ mood, index, active, color }: MoodLabelProps) {
+const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color }: MoodLabelProps) {
   const baseSize = 13 + index;
   const [size, setSize] = useState(baseSize);
   const sizeRef = useRef(baseSize);
   useEffect(() => {
     const from = sizeRef.current;
-    const to = baseSize + (active ? 3 : 0);
+    const delta = active ? 3 : passed ? -1 : 0;
+    const to = baseSize + delta;
     const duration = 260;
     const start = Date.now();
     let raf = 0;
@@ -102,7 +104,7 @@ const MoodLabel = memo(function MoodLabel({ mood, index, active, color }: MoodLa
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, baseSize]);
+  }, [active, passed, baseSize]);
   return (
     <SvgText
       fontSize={size}
@@ -423,29 +425,37 @@ function SessionCompleteScreen({
                       />
                     ))}
 
-                    {MOODS.map((mood, i) => (
-                      <MoodLabel
-                        key={mood}
-                        mood={mood}
-                        index={i}
-                        active={activeMood === mood}
-                        color={textColor}
-                      />
-                    ))}
+                    {MOODS.map((mood, i) => {
+                      const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
+                      return (
+                        <MoodLabel
+                          key={mood}
+                          mood={mood}
+                          index={i}
+                          active={i === activeIndex}
+                          passed={activeIndex > i}
+                          color={textColor}
+                        />
+                      );
+                    })}
 
                     {/* Cream copy, revealed only where the terracotta fill
                         currently covers — gives the half-dark / half-cream
                         transition as the circle sweeps across each letter. */}
                     <G clipPath="url(#mood-fill-clip)">
-                      {MOODS.map((mood, i) => (
-                        <MoodLabel
-                          key={`${mood}-cream`}
-                          mood={mood}
-                          index={i}
-                          active={activeMood === mood}
-                          color={palette.cream}
-                        />
-                      ))}
+                      {MOODS.map((mood, i) => {
+                        const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
+                        return (
+                          <MoodLabel
+                            key={`${mood}-cream`}
+                            mood={mood}
+                            index={i}
+                            active={i === activeIndex}
+                            passed={activeIndex > i}
+                            color={palette.cream}
+                          />
+                        );
+                      })}
                     </G>
                   </Svg>
                 </View>
