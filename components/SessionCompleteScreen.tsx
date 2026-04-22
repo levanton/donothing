@@ -2,62 +2,24 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
-  interpolateColor,
-  runOnJS,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText, TextPath } from 'react-native-svg';
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
-import { updateSessionMood } from '@/lib/db/sessions';
+import MoodDial, { MOOD_DIAL_DISC_DURATION } from '@/components/MoodDial';
 
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const CONTENT_FADE_MS = 500;
 
-const MOODS = ['still', 'calm', 'lighter', 'refreshed', 'full'] as const;
-
-// Concentric mood rings — 5 guide circles sharing a centre, one per mood
-// step. A terracotta circle in the middle grows from a tiny seed to reach
-// the outermost ring as the user drags horizontally. Wider fill = fuller
-// feeling.
-const RING_COUNT = MOODS.length;
-const RING_STEP = 22;
-const RING_MAX = RING_STEP * RING_COUNT;
-const RING_BOX_PAD = 28;
-const LABEL_OUTSIDE = 4;
-const RING_BOX_SIZE = (RING_MAX + RING_BOX_PAD) * 2;
-const RING_CENTER = RING_BOX_SIZE / 2;
-const FILL_MIN = 12;
-// Extend past the outermost ring so the fill at max progress swallows the
-// outermost label, which sits on an arc just outside ring 4.
-const FILL_MAX = RING_MAX + 22;
-const DRAG_TRAVEL = RING_MAX * 2;
-
-// Mood colours at low alpha — tint the "carry on" button with the current hue.
-const MOOD_SOFT = [
-  'rgba(199, 91, 58, 0.32)',
-  'rgba(78, 109, 128, 0.32)',
-  'rgba(224, 166, 83, 0.32)',
-  'rgba(93, 143, 91, 0.32)',
-  'rgba(223, 92, 68, 0.32)',
-] as const;
-
-const MOOD_STOPS = MOODS.map((_, i) => i / (MOODS.length - 1));
-
-const grassImage = require('@/assets/images/grass.png');
+const grassImage = require('@/assets/images/sun.png');
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.28), 260);
@@ -81,130 +43,6 @@ interface Props {
 }
 
 type Locale = 'en' | 'uk';
-
-interface MoodLabelProps {
-  mood: string;
-  index: number;
-  active: boolean;
-  passed: boolean;
-  color: string;
-  revealed: boolean;
-}
-
-// Everything here goes through React state + rAF because react-native-svg
-// does not reliably apply opacity / fillOpacity / fontSize on the first
-// paint when driven by reanimated's animatedProps — it kept rendering the
-// label at full opacity for a frame before the animation caught up.
-// Returning null while hidden keeps the element out of the tree entirely,
-// so there is nothing to flash in the first place.
-const MoodLabel = memo(function MoodLabel({ mood, index, active, passed, color, revealed }: MoodLabelProps) {
-  const baseSize = 13 + index;
-  const [size, setSize] = useState(baseSize);
-  const sizeRef = useRef(baseSize);
-  const [opacity, setOpacity] = useState(0);
-  const opacityRef = useRef(0);
-
-  useEffect(() => {
-    const from = sizeRef.current;
-    const delta = active ? 4 : passed ? -1 : 0;
-    const to = baseSize + delta;
-    const duration = 260;
-    const start = Date.now();
-    let raf = 0;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = from + (to - from) * eased;
-      sizeRef.current = next;
-      setSize(next);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active, passed, baseSize]);
-
-  useEffect(() => {
-    const from = opacityRef.current;
-    const to = revealed ? 1 : 0;
-    if (from === to) return;
-    const duration = 460;
-    const start = Date.now();
-    let raf = 0;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      // ease-in-out cubic — gentler start and end than ease-out alone
-      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      const next = from + (to - from) * eased;
-      opacityRef.current = next;
-      setOpacity(next);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [revealed]);
-
-  if (!revealed && opacity < 0.01) return null;
-
-  return (
-    <SvgText
-      fillOpacity={opacity}
-      fontSize={size}
-      fill={color}
-      fontFamily="Georgia"
-      textAnchor="middle"
-      letterSpacing={2 + index * 0.5}
-    >
-      <TextPath href={`#ring-arc-${index}`} startOffset="65%">
-        {mood}
-      </TextPath>
-    </SvgText>
-  );
-});
-
-// Concentric ring whose radius grows in from zero on mount, and whose stroke
-// darkens as the mood fill crosses its line — giving a visible "reached"
-// state that reads from the ring colour alone.
-interface AnimatedRingProps {
-  index: number;
-  center: number;
-  progress: SharedValue<number>;
-  wave: number;
-  mutedColor: string;
-  darkColor: string;
-}
-
-// One wavefront expands from the centre; every ring renders at
-// `min(wave, targetR)` so smaller rings "drop off" and lock in place as
-// the wave passes them, while larger rings keep riding it outward. This
-// matches the user's intent: a single breath of motion that deposits
-// each ring at its radius.
-const AnimatedRing = memo(function AnimatedRing({
-  index, center, progress, wave, mutedColor, darkColor,
-}: AnimatedRingProps) {
-  const targetR = RING_STEP * (index + 1);
-  const r = Math.min(wave, targetR);
-
-  // Stroke colour stays on the UI thread because it has to react to the
-  // user's drag progress in real time.
-  const strokeProps = useAnimatedProps(() => {
-    const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    const tol = 4;
-    const t = Math.max(0, Math.min(1, (fillR - targetR + tol) / (tol * 2)));
-    const stroke = interpolateColor(t, [0, 1], [mutedColor, darkColor]);
-    return { stroke };
-  });
-
-  return (
-    <AnimatedCircle
-      cx={center}
-      cy={center}
-      r={r}
-      animatedProps={strokeProps}
-      strokeWidth={1}
-      fill="none"
-    />
-  );
-});
 
 function pluralizeMinutes(n: number, locale: Locale): string {
   if (locale === 'uk') {
@@ -255,30 +93,32 @@ function SessionCompleteScreen({
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
   const splashCy = useSharedValue(SCREEN_H);
 
-  // Continuous 0..1 value — 0 starts with the smallest position (still),
-  // 1 ends at the biggest (full). Stored mood is still bucketed to the
-  // 5 steps on commit.
-  const progress = useSharedValue(0);
-  const dragStart = useSharedValue(0);
-
-  const [activeMood, setActiveMood] = useState<string | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [wave, setWave] = useState(0);
-  const [revealedLabels, setRevealedLabels] = useState(-1);
+  const [revealDial, setRevealDial] = useState(false);
   const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  const waveRafRef = useRef(0);
   const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
 
-  const lastHapticStep = useSharedValue(-1);
   const dismissingRef = useRef(false);
+  const prevVisibleRef = useRef(false);
+
+  // Reset React state SYNCHRONOUSLY during render the moment visible
+  // flips — otherwise the first paint after re-entry uses the previous
+  // session's state and the re-open animations never show.
+  if (visible && !prevVisibleRef.current) {
+    prevVisibleRef.current = true;
+    setHasInteracted(false);
+    setRevealDial(false);
+  } else if (!visible && prevVisibleRef.current) {
+    prevVisibleRef.current = false;
+    setHasInteracted(false);
+    setRevealDial(false);
+  }
 
   useEffect(() => {
     if (visible) {
       dismissingRef.current = false;
-      setActiveMood(null);
       setHasInteracted(false);
-      lastHapticStep.value = -1;
-      progress.value = 0;
+      setRevealDial(false);
 
       // Hard-reset every piece first so nothing lingers from a previous
       // session — especially the done button, which must always start
@@ -292,12 +132,6 @@ function SessionCompleteScreen({
       splashCy.value = SCREEN_H - insets.bottom - 68;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
-      if (waveRafRef.current) {
-        cancelAnimationFrame(waveRafRef.current);
-        waveRafRef.current = 0;
-      }
-      setWave(0);
-      setRevealedLabels(-1);
 
       // When the screen opens right after a timer ends, the JS thread is
       // briefly busy with DB writes, notification cleanup and week-stats
@@ -307,13 +141,16 @@ function SessionCompleteScreen({
       const INTRO_DELAY = 240;
       splashSize.value = withDelay(
         INTRO_DELAY,
-        withTiming(SPLASH_MAX_SIZE, { duration: 980, easing: EASE_OUT }),
+        withTiming(SPLASH_MAX_SIZE, { duration: 820, easing: EASE_OUT }),
       );
       contentOpacity.value = withDelay(
         INTRO_DELAY,
         withTiming(1, { duration: CONTENT_FADE_MS + 120, easing: EASE_OUT }),
       );
 
+      // Content first, dial last: title / subtitle / prompt / circle
+      // block all cascade in from `base`. The mood dial (disc + rings +
+      // labels) animates at the very end as a single breath.
       const base = INTRO_DELAY + 440;
       glowOpacity.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
       glowScale.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
@@ -328,41 +165,14 @@ function SessionCompleteScreen({
       circleBlockOpacity.value = withDelay(base + 900, withTiming(1, { duration: 750, easing: EASE_OUT }));
       circleBlockY.value = withDelay(base + 900, withTiming(0, { duration: 750, easing: EASE_OUT }));
 
-      // One expanding wavefront: all rings render at min(wave, targetR),
-      // so they appear to grow together until each reaches its own
-      // radius and "locks in". Labels fade in the moment their ring
-      // locks, keeping word + ring synchronised.
-      const ringRevealBase = base + 1000;
-      const WAVE_DURATION = 1600;
-      const LABEL_DUR = 460;
-
-      // Schedule label reveals at the exact moments the wave would pass
-      // each ring (linear wave → evenly spaced ticks, one per ring).
-      for (let i = 0; i < RING_COUNT; i++) {
-        const labelAt = ringRevealBase + ((i + 1) / RING_COUNT) * WAVE_DURATION;
-        revealTimersRef.current.push(
-          setTimeout(() => {
-            setRevealedLabels((prev) => (i > prev ? i : prev));
-          }, labelAt),
-        );
-      }
-
-      // Drive the wave via rAF (React state + linear tween to RING_MAX).
+      // Mood dial reveals after everything else is on screen.
+      const DIAL_START = base + 1300;
       revealTimersRef.current.push(
-        setTimeout(() => {
-          const startAt = Date.now();
-          const tick = () => {
-            const t = Math.min(1, (Date.now() - startAt) / WAVE_DURATION);
-            setWave(t * RING_MAX);
-            if (t < 1) waveRafRef.current = requestAnimationFrame(tick);
-            else waveRafRef.current = 0;
-          };
-          waveRafRef.current = requestAnimationFrame(tick);
-        }, ringRevealBase),
+        setTimeout(() => setRevealDial(true), DIAL_START),
       );
 
-      // Hint waits until every label is settled.
-      const hintDelay = ringRevealBase + WAVE_DURATION + LABEL_DUR;
+      // Hint waits until the dial has finished its sweep.
+      const hintDelay = DIAL_START + MOOD_DIAL_DISC_DURATION + 120;
       hintOpacity.value = withDelay(hintDelay, withTiming(1, { duration: 600, easing: EASE_OUT }));
       hintY.value = withDelay(hintDelay, withTiming(0, { duration: 600, easing: EASE_OUT }));
     } else {
@@ -383,19 +193,13 @@ function SessionCompleteScreen({
       splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
-      if (waveRafRef.current) {
-        cancelAnimationFrame(waveRafRef.current);
-        waveRafRef.current = 0;
-      }
-      setWave(0);
-      setRevealedLabels(-1);
       setHasInteracted(false);
+      setRevealDial(false);
     }
   }, [visible]);
 
-  const setPreviewMood = useCallback((mood: string | null) => {
-    setActiveMood(mood);
-    if (mood !== null) setHasInteracted(true);
+  const handleDialInteract = useCallback(() => {
+    setHasInteracted(true);
   }, []);
 
   // Once the user touches the first ring, swap the hint for the done
@@ -407,13 +211,6 @@ function SessionCompleteScreen({
     closeOpacity.value = withTiming(1, { duration: 520, easing: EASE_OUT });
     closeY.value = withTiming(0, { duration: 520, easing: EASE_OUT });
   }, [hasInteracted]);
-
-  const commitMood = useCallback(
-    (mood: string) => {
-      if (sessionId) updateSessionMood(sessionId, mood);
-    },
-    [sessionId],
-  );
 
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
@@ -436,48 +233,6 @@ function SessionCompleteScreen({
     contentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
     setTimeout(onClose, duration + 20);
   }, [onClose, yesBtnRect]);
-
-  // Horizontal drag grows the centre circle outward toward the largest
-  // ring; dragging back shrinks it. DRAG_TRAVEL worth of movement covers
-  // the full 0..1 mood range.
-  const circleGesture = Gesture.Pan()
-    .onStart(() => {
-      'worklet';
-      dragStart.value = progress.value;
-    })
-    .onUpdate((e) => {
-      'worklet';
-      const next = Math.max(0, Math.min(1, dragStart.value + e.translationX / DRAG_TRAVEL));
-      progress.value = next;
-      // Step is the largest ring the fill has fully reached — so the
-      // mood only activates when the circle physically touches its ring,
-      // not as soon as the user starts dragging.
-      const fillR = FILL_MIN + next * (FILL_MAX - FILL_MIN);
-      let step = -1;
-      for (let j = 0; j < MOODS.length; j++) {
-        if (fillR >= RING_STEP * (j + 1)) step = j;
-      }
-      if (step !== lastHapticStep.value) {
-        lastHapticStep.value = step;
-        if (step >= 0) {
-          runOnJS(Haptics.selectionAsync)();
-          runOnJS(setPreviewMood)(MOODS[step]);
-        } else {
-          runOnJS(setPreviewMood)(null);
-        }
-      }
-    })
-    .onEnd(() => {
-      'worklet';
-      const fillR = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-      let step = -1;
-      for (let j = 0; j < MOODS.length; j++) {
-        if (fillR >= RING_STEP * (j + 1)) step = j;
-      }
-      if (step >= 0) {
-        runOnJS(commitMood)(MOODS[step]);
-      }
-    });
 
   const contentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
@@ -516,31 +271,23 @@ function SessionCompleteScreen({
     transform: [{ translateY: hintY.value }],
   }));
 
-  // Mood-tinted button bg — carries the current hue without shouting.
-  const doneBgStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, MOOD_STOPS, MOOD_SOFT as unknown as string[]),
-  }));
-
   const glowWrapStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
     transform: [{ scale: glowScale.value }],
   }));
 
-  const filledCircleProps = useAnimatedProps(() => {
-    const r = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    return { r };
-  });
-
 
   if (!visible) return null;
 
-  // Inverse palette — the reveal disc fills the screen with terracotta, so
-  // every label on top of it is cream, and the mood circle in the middle
-  // becomes cream-filled with dark text inside.
+  // Screen bg is terracotta, so title / prompt / subtitle / hint (all
+  // drawn on that bg) stay cream. The mood circle has flipped: the canvas
+  // disc is cream and the user-driven fill is terracotta, so the ring
+  // Screen bg is terracotta, so title / prompt / subtitle / hint stay
+  // cream. Ring strokes and ring labels stay dark on the cream disc — no
+  // colour switch when the fill crosses them.
   const textColor = palette.cream;
   const softText = 'rgba(249, 242, 224, 0.85)';
   const tertiaryText = 'rgba(249, 242, 224, 0.5)';
-  const clippedLabelColor = palette.brown;
 
   const duration = formatMinutes(durationSeconds);
   const today = formatMinutes(todaySeconds);
@@ -589,102 +336,23 @@ function SessionCompleteScreen({
               )}
             </View>
 
-            <Animated.View style={[styles.interaction, circleBlockStyle]}>
-              <Text
+            <View style={styles.interaction}>
+              <Animated.Text
                 style={[
                   styles.prompt,
                   { color: textColor, fontFamily: Fonts.serif },
+                  circleBlockStyle,
                 ]}
               >
                 how full do you feel?
-              </Text>
+              </Animated.Text>
 
-              <GestureDetector gesture={circleGesture}>
-                <View style={styles.circleTrack}>
-                  <Svg
-                    width={RING_BOX_SIZE}
-                    height={RING_BOX_SIZE}
-                    style={StyleSheet.absoluteFill}
-                    pointerEvents="none"
-                  >
-                    <Defs>
-                      {Array.from({ length: RING_COUNT }).map((_, i) => {
-                        const pr = RING_STEP * (i + 1) + LABEL_OUTSIDE;
-                        // CW top arc (via 12 o'clock) on a radius OUTSIDE
-                        // the ring itself. startOffset 65% lands the label
-                        // in the upper-right quadrant. Text reads along the
-                        // tangent from upper-left to lower-right.
-                        const d = `M ${RING_CENTER - pr} ${RING_CENTER} A ${pr} ${pr} 0 0 1 ${RING_CENTER + pr} ${RING_CENTER}`;
-                        return <Path key={i} id={`ring-arc-${i}`} d={d} />;
-                      })}
-                      {/* Clip matches the growing mood fill — used to reveal
-                          the cream-coloured copy of the labels only over the
-                          terracotta area, so letters fade half by half. */}
-                      <ClipPath id="mood-fill-clip">
-                        <AnimatedCircle
-                          cx={RING_CENTER}
-                          cy={RING_CENTER}
-                          animatedProps={filledCircleProps}
-                        />
-                      </ClipPath>
-                    </Defs>
-
-                    <AnimatedCircle
-                      cx={RING_CENTER}
-                      cy={RING_CENTER}
-                      animatedProps={filledCircleProps}
-                      fill={palette.cream}
-                    />
-
-                    {Array.from({ length: RING_COUNT }).map((_, i) => (
-                      <AnimatedRing
-                        key={i}
-                        index={i}
-                        center={RING_CENTER}
-                        progress={progress}
-                        wave={wave}
-                        mutedColor={tertiaryText}
-                        darkColor={palette.brown}
-                      />
-                    ))}
-
-                    {MOODS.map((mood, i) => {
-                      const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
-                      return (
-                        <MoodLabel
-                          key={mood}
-                          mood={mood}
-                          index={i}
-                          active={i === activeIndex}
-                          passed={activeIndex > i}
-                          color={textColor}
-                          revealed={i <= revealedLabels}
-                        />
-                      );
-                    })}
-
-                    {/* Cream copy, revealed only where the terracotta fill
-                        currently covers — gives the half-dark / half-cream
-                        transition as the circle sweeps across each letter. */}
-                    <G clipPath="url(#mood-fill-clip)">
-                      {MOODS.map((mood, i) => {
-                        const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
-                        return (
-                          <MoodLabel
-                            key={`${mood}-cream`}
-                            mood={mood}
-                            index={i}
-                            active={i === activeIndex}
-                            passed={activeIndex > i}
-                            color={clippedLabelColor}
-                            revealed={i <= revealedLabels}
-                          />
-                        );
-                      })}
-                    </G>
-                  </Svg>
-                </View>
-              </GestureDetector>
+              <MoodDial
+                visible={visible}
+                reveal={revealDial}
+                sessionId={sessionId}
+                onInteract={handleDialInteract}
+              />
 
               <Animated.Text
                 style={[
@@ -695,7 +363,7 @@ function SessionCompleteScreen({
               >
                 drag outward
               </Animated.Text>
-            </Animated.View>
+            </View>
           </View>
 
           <Animated.View style={closeStyleAnim}>
@@ -746,7 +414,10 @@ const styles = StyleSheet.create({
   },
   grassImage: {
     width: GRASS_SIZE,
-    height: GRASS_SIZE,
+    // sun.png is 780×450, so use its native aspect ratio instead of a
+    // square — otherwise contain leaves blank vertical space that reads
+    // as an awkward gap between the image and the title below.
+    height: GRASS_SIZE * (450 / 780),
     resizeMode: 'contain',
   },
   titleBlock: {
@@ -794,11 +465,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center',
     marginTop: 18,
-  },
-  circleTrack: {
-    width: RING_BOX_SIZE,
-    height: RING_BOX_SIZE,
-    position: 'relative',
   },
   doneBtn: {
     borderRadius: 100,
