@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
@@ -31,6 +33,124 @@ const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.24), 220);
 const SPLASH_ORIGIN_X = SCREEN_W / 2;
 const SPLASH_MAX_SIZE = Math.hypot(SCREEN_W, SCREEN_H) * 2;
 const YES_SIZE = 140;
+
+// Body responds in stages. We tier the messaging so a 1-minute pause
+// doesn't claim the same benefits as a 30-minute sit. Tiers are ordered
+// longest-first; pickBenefits() walks the list and returns the first
+// tier the duration crosses.
+type Benefit = { icon: string; title: string; sub: string };
+
+// Tiers ordered longest-first; pickBenefits walks the list and returns
+// the first set the duration crosses. Minimum session is 1 minute, so
+// the 60-second floor is the smallest tier we ever surface.
+const BENEFIT_TIERS: Array<{ minSeconds: number; items: Benefit[] }> = [
+  {
+    minSeconds: 30 * 60,
+    items: [
+      { icon: 'sleep',                   title: 'deep rest achieved',  sub: 'your brain fully recovered' },
+      { icon: 'heart-pulse',             title: 'cortisol reset',      sub: 'stress hormones back to baseline' },
+      { icon: 'emoticon-happy-outline',  title: 'emotional reset',     sub: 'amygdala calmed down' },
+      { icon: 'lightbulb',               title: 'creativity unlocked', sub: 'new neural connections forming' },
+      { icon: 'bookmark-outline',        title: 'memory consolidated', sub: "today's experiences organized" },
+      { icon: 'eye-outline',             title: 'clarity restored',    sub: "you're thinking at full capacity" },
+    ],
+  },
+  {
+    minSeconds: 20 * 60,
+    items: [
+      { icon: 'sleep',                  title: 'deep rest achieved',  sub: 'equivalent to a power nap' },
+      { icon: 'heart-pulse',            title: 'cortisol reset',      sub: 'stress hormones back to baseline' },
+      { icon: 'emoticon-happy-outline', title: 'emotional reset',     sub: 'amygdala activity reduced' },
+      { icon: 'lightning-bolt',         title: 'focus sharpened',     sub: 'deep attention restored' },
+      { icon: 'lightbulb',              title: 'creativity unlocked', sub: 'new neural connections forming' },
+    ],
+  },
+  {
+    minSeconds: 15 * 60,
+    items: [
+      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones significantly down' },
+      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention restored' },
+      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory restored' },
+      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
+      { icon: 'lightbulb',      title: 'creativity unlocked',  sub: 'new neural connections forming' },
+    ],
+  },
+  {
+    minSeconds: 10 * 60,
+    items: [
+      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones easing' },
+      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention coming back' },
+      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory restored' },
+      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
+    ],
+  },
+  {
+    minSeconds: 5 * 60,
+    items: [
+      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones easing' },
+      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention coming back' },
+      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
+    ],
+  },
+  {
+    minSeconds: 3 * 60,
+    items: [
+      { icon: 'weather-windy', title: 'your breath slowed',     sub: 'nervous system calming down' },
+      { icon: 'heart',         title: 'cortisol started dropping', sub: 'stress hormones easing' },
+      { icon: 'eye-outline',   title: 'attention returning',    sub: 'your brain got a moment to reset' },
+    ],
+  },
+  {
+    minSeconds: 60,
+    items: [
+      { icon: 'weather-windy', title: 'your breath slowed',     sub: 'nervous system starting to calm' },
+      { icon: 'restart',       title: 'a micro-reset happened', sub: 'the stress loop was interrupted' },
+    ],
+  },
+];
+
+function pickBenefits(seconds: number): Benefit[] {
+  for (const tier of BENEFIT_TIERS) {
+    if (seconds >= tier.minSeconds) return tier.items;
+  }
+  return BENEFIT_TIERS[BENEFIT_TIERS.length - 1].items;
+}
+
+const BENEFIT_STAGGER_MS = 220;
+const BENEFIT_FADE_MS = 500;
+// Mount-relative time when the first benefit row begins fading in.
+// Must match BENEFITS_START inside the parent useEffect.
+const BENEFITS_FIRST_DELAY_MS = 1380;
+
+function BenefitRow({ item, delay, isLast }: { item: Benefit; delay: number; isLast: boolean }) {
+  const opacity = useSharedValue(0);
+  const y = useSharedValue(8);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: BENEFIT_FADE_MS, easing: EASE_OUT }));
+    y.value = withDelay(delay, withTiming(0, { duration: BENEFIT_FADE_MS, easing: EASE_OUT }));
+  }, [delay]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: y.value }],
+  }));
+
+  return (
+    <Animated.View style={style}>
+      <View style={styles.benefitRow}>
+        <View style={styles.benefitBadge}>
+          <MaterialCommunityIcons name={item.icon as any} size={18} color={palette.cream} />
+        </View>
+        <View style={styles.benefitTextCol}>
+          <Text style={[styles.benefitTitle, { fontFamily: Fonts.serif }]}>{item.title}</Text>
+          <Text style={[styles.benefitSub, { fontFamily: Fonts.serif }]}>{item.sub}</Text>
+        </View>
+      </View>
+      {!isLast && <View style={styles.benefitDivider} />}
+    </Animated.View>
+  );
+}
 
 interface Props {
   visible: boolean;
@@ -87,12 +207,16 @@ function SessionCompleteScreen({
   const circleBlockY = useSharedValue(12);
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
+  const benefitsOpacity = useSharedValue(0);
   const splashSize = useSharedValue(0);
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
   const splashCy = useSharedValue(SCREEN_H);
 
   const [hasInteracted, setHasInteracted] = useState(false);
   const [revealDial, setRevealDial] = useState(false);
+  const [phase, setPhase] = useState<'benefits' | 'mood'>('benefits');
+
+  const benefits = useMemo(() => pickBenefits(durationSeconds), [durationSeconds]);
   const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
 
@@ -106,10 +230,12 @@ function SessionCompleteScreen({
     prevVisibleRef.current = true;
     setHasInteracted(false);
     setRevealDial(false);
+    setPhase('benefits');
   } else if (!visible && prevVisibleRef.current) {
     prevVisibleRef.current = false;
     setHasInteracted(false);
     setRevealDial(false);
+    setPhase('benefits');
   }
 
   useEffect(() => {
@@ -117,12 +243,14 @@ function SessionCompleteScreen({
       dismissingRef.current = false;
       setHasInteracted(false);
       setRevealDial(false);
+      setPhase('benefits');
 
       // Hard-reset every piece first so nothing lingers from a previous
       // session — especially the done button, which must always start
       // hidden when the user lands on this screen.
       closeOpacity.value = 0;
       closeY.value = 14;
+      benefitsOpacity.value = 0;
       splashSize.value = 0;
       splashCx.value = SPLASH_ORIGIN_X;
       splashCy.value = SCREEN_H - insets.bottom - 68;
@@ -144,9 +272,9 @@ function SessionCompleteScreen({
         withTiming(1, { duration: CONTENT_FADE_MS + 120, easing: EASE_OUT }),
       );
 
-      // Content first, dial last: title / subtitle / prompt / circle
-      // block all cascade in from `base`. The mood dial (disc + rings +
-      // labels) animates at the very end as a single breath.
+      // Beat 1 only here: title + benefits cascade in, then a "next" pill
+      // fades in at the bottom. Beat 2 (prompt + dial) is gated on the user
+      // tapping next — handleNext drives that transition.
       const base = INTRO_DELAY + 440;
       glowOpacity.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
       glowScale.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
@@ -158,14 +286,19 @@ function SessionCompleteScreen({
       subtitleOpacity.value = withDelay(base + 500, withTiming(1, { duration: 850, easing: EASE_OUT }));
       subtitleY.value = withDelay(base + 500, withTiming(0, { duration: 850, easing: EASE_OUT }));
 
-      circleBlockOpacity.value = withDelay(base + 900, withTiming(1, { duration: 750, easing: EASE_OUT }));
-      circleBlockY.value = withDelay(base + 900, withTiming(0, { duration: 750, easing: EASE_OUT }));
+      // Benefits wrap fades in after subtitle. The per-row cascade is
+      // owned by BenefitRow children — they self-schedule based on the
+      // delay prop we pass below.
+      const BENEFITS_START = base + 700;
+      benefitsOpacity.value = withDelay(BENEFITS_START, withTiming(1, { duration: 400, easing: EASE_OUT }));
 
-      // Mood dial reveals after everything else is on screen.
-      const DIAL_START = base + 1300;
-      revealTimersRef.current.push(
-        setTimeout(() => setRevealDial(true), DIAL_START),
-      );
+      // "next" pill (driven by closeOpacity — same slot will later host
+      // the "done" pill after the user interacts with the dial). Fades in
+      // shortly after the last benefit lands. Length depends on tier.
+      const LAST_BENEFIT_LANDED = BENEFITS_START + (benefits.length - 1) * BENEFIT_STAGGER_MS + BENEFIT_FADE_MS;
+      const NEXT_SHOW = LAST_BENEFIT_LANDED + 200;
+      closeOpacity.value = withDelay(NEXT_SHOW, withTiming(1, { duration: 500, easing: EASE_OUT }));
+      closeY.value = withDelay(NEXT_SHOW, withTiming(0, { duration: 500, easing: EASE_OUT }));
 
     } else {
       contentOpacity.value = 0;
@@ -180,6 +313,7 @@ function SessionCompleteScreen({
       circleBlockY.value = 12;
       closeOpacity.value = 0;
       closeY.value = 14;
+      benefitsOpacity.value = 0;
       splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
@@ -192,14 +326,32 @@ function SessionCompleteScreen({
     setHasInteracted(true);
   }, []);
 
-  // Once the user touches the first ring, swap the hint for the done
-  // button. Depends ONLY on hasInteracted so a stale `true` can't survive
-  // a re-entry — visible=true always resets the flag to false first.
+  // Once the user touches the first ring, fade in the done pill. Only
+  // fires in the mood phase — during the benefits phase the bottom slot
+  // hosts the "next" pill instead.
   useEffect(() => {
-    if (!hasInteracted) return;
+    if (!hasInteracted || phase !== 'mood') return;
     closeOpacity.value = withTiming(1, { duration: 520, easing: EASE_OUT });
     closeY.value = withTiming(0, { duration: 520, easing: EASE_OUT });
-  }, [hasInteracted]);
+  }, [hasInteracted, phase]);
+
+  const handleNext = useCallback(() => {
+    Haptics.selectionAsync();
+    // Beat 1 → Beat 2 transition. Fade out benefits and the next pill,
+    // then swap the slot's content to "done" (still invisible) and fade
+    // in prompt + dial.
+    benefitsOpacity.value = withTiming(0, { duration: 450, easing: EASE_OUT });
+    closeOpacity.value = withTiming(0, { duration: 350, easing: EASE_OUT });
+    closeY.value = withTiming(14, { duration: 350, easing: EASE_OUT });
+
+    const t1 = setTimeout(() => {
+      setPhase('mood');
+      circleBlockOpacity.value = withTiming(1, { duration: 700, easing: EASE_OUT });
+      circleBlockY.value = withTiming(0, { duration: 700, easing: EASE_OUT });
+    }, 380);
+    const t2 = setTimeout(() => setRevealDial(true), 380 + 400);
+    revealTimersRef.current.push(t1, t2);
+  }, []);
 
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
@@ -255,6 +407,9 @@ function SessionCompleteScreen({
     transform: [{ translateY: closeY.value }],
     pointerEvents: closeOpacity.value > 0.5 ? 'auto' : 'none',
   }));
+  const benefitsWrapStyle = useAnimatedStyle(() => ({
+    opacity: benefitsOpacity.value,
+  }));
   const glowWrapStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
     transform: [{ scale: glowScale.value }],
@@ -299,7 +454,9 @@ function SessionCompleteScreen({
 
               <Animated.View style={[styles.titleBlock, titleStyle]}>
                 <Text style={[styles.titleMain, { color: textColor, fontFamily: Fonts.serif }]}>
-                  {duration.value} {duration.unit}
+                  <Text style={styles.titleNumeral}>{duration.value}</Text>
+                  {' '}
+                  {duration.unit}
                 </Text>
                 <Text style={[styles.titleSub, { color: textColor, fontFamily: Fonts.serif }]}>
                   with yourself
@@ -314,21 +471,19 @@ function SessionCompleteScreen({
                     subtitleStyle,
                   ]}
                 >
-                  {`today, that's ${today.value} ${today.unit}`}
+                  {`today, that's `}
+                  <Text style={styles.subtitleNumeral}>{today.value}</Text>
+                  {` ${today.unit}`}
                 </Animated.Text>
               )}
             </View>
 
             <View style={styles.interaction}>
+              {/* Beat 2: prompt + dial. Sits in normal flow; benefits
+                  layer below overlays this space until it fades out. */}
               <Animated.View style={[styles.promptBlock, circleBlockStyle]}>
-                <View style={styles.promptDivider} />
-                <Text
-                  style={[
-                    styles.prompt,
-                    { color: textColor, fontFamily: Fonts.serif },
-                  ]}
-                >
-                  how full do you feel?
+                <Text style={[styles.headerChip, { fontFamily: Fonts.serif }]}>
+                  how full do you feel
                 </Text>
               </Animated.View>
 
@@ -338,14 +493,36 @@ function SessionCompleteScreen({
                 sessionId={sessionId}
                 onInteract={handleDialInteract}
               />
+
+              {/* Beat 1: benefits overlay — absolute so it sits on top of
+                  the dial space without pushing layout around. Fades out
+                  as Beat 2 fades in. */}
+              <Animated.View
+                style={[styles.benefitsLayer, benefitsWrapStyle]}
+                pointerEvents="none"
+              >
+                <Text style={[styles.headerChip, { fontFamily: Fonts.serif }]}>
+                  what changed
+                </Text>
+                <View style={styles.benefitsCard}>
+                  {benefits.map((b, i) => (
+                    <BenefitRow
+                      key={b.title}
+                      item={b}
+                      delay={BENEFITS_FIRST_DELAY_MS + i * BENEFIT_STAGGER_MS}
+                      isLast={i === benefits.length - 1}
+                    />
+                  ))}
+                </View>
+              </Animated.View>
             </View>
           </View>
 
           <Animated.View style={closeStyleAnim}>
-            <Pressable onPress={handleClose}>
+            <Pressable onPress={phase === 'benefits' ? handleNext : handleClose}>
               <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
                 <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                  done
+                  {phase === 'benefits' ? 'next' : 'done'}
                 </Text>
               </View>
             </Pressable>
@@ -404,6 +581,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     textAlign: 'center',
   },
+  titleNumeral: {
+    fontFamily: Fonts.mono,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  subtitleNumeral: {
+    fontFamily: Fonts.mono,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
   titleSub: {
     fontSize: 18,
     fontWeight: '300',
@@ -422,8 +611,80 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   interaction: {
+    width: '100%',
     alignItems: 'center',
     marginTop: 36,
+    position: 'relative',
+  },
+  benefitsLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 8,
+  },
+  benefitsCard: {
+    backgroundColor: palette.cream,
+    borderRadius: 22,
+    paddingTop: 22,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    alignSelf: 'stretch',
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  headerChip: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: palette.brown,
+    backgroundColor: palette.cream,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 100,
+    overflow: 'hidden',
+    marginBottom: 16,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    marginBottom: 14,
+  },
+  benefitBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: palette.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitTextCol: {
+    flex: 1,
+    paddingTop: 5,
+  },
+  benefitDivider: {
+    width: 40,
+    height: 1,
+    backgroundColor: 'rgba(51, 52, 49, 0.18)',
+    alignSelf: 'center',
+    marginVertical: 4,
+  },
+  benefitTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    color: palette.brown,
+  },
+  benefitSub: {
+    fontSize: 13,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    marginTop: 2,
+    color: palette.brown,
   },
   promptBlock: {
     alignItems: 'center',
@@ -454,8 +715,7 @@ const styles = StyleSheet.create({
   },
   doneLabel: {
     fontSize: 18,
-    fontWeight: '400',
-    fontStyle: 'italic',
+    fontWeight: '500',
     letterSpacing: 0.6,
   },
 });

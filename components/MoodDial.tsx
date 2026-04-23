@@ -20,6 +20,7 @@ import { updateSessionMood } from '@/lib/db/sessions';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const MOODS = ['still', 'lighter', 'refreshed', 'full'] as const;
+export type MoodKey = (typeof MOODS)[number];
 
 const RING_COUNT = MOODS.length;
 const RING_STEP = 28;
@@ -332,7 +333,7 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
   }, []);
 
   const commitMood = useCallback(
-    (mood: string) => {
+    (mood: MoodKey) => {
       if (sessionId) updateSessionMood(sessionId, mood);
     },
     [sessionId],
