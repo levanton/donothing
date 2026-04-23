@@ -173,7 +173,7 @@ function pluralizeMinutes(n: number, locale: Locale): string {
     if (mod10 >= 2 && mod10 <= 4) return 'хвилини';
     return 'хвилин';
   }
-  return n === 1 ? 'minute' : 'minutes';
+  return 'min';
 }
 
 function formatMinutes(seconds: number, locale: Locale = 'en'): { value: string; unit: string } {
@@ -453,9 +453,10 @@ function SessionCompleteScreen({
               </Animated.View>
 
               <Animated.View style={[styles.titleBlock, titleStyle]}>
-                <Text style={[styles.titleMain, { color: textColor, fontFamily: Fonts.serif }]}>
-                  <Text style={styles.titleNumeral}>{duration.value}</Text>
-                  {' '}
+                <Text style={[styles.titleNumeral, { color: textColor }]}>
+                  {duration.value}
+                </Text>
+                <Text style={[styles.titleUnit, { color: textColor, fontFamily: Fonts.serif }]}>
                   {duration.unit}
                 </Text>
                 <Text style={[styles.titleSub, { color: textColor, fontFamily: Fonts.serif }]}>
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
   grassWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 40,
   },
   grassImage: {
     width: GRASS_SIZE,
@@ -575,17 +576,21 @@ const styles = StyleSheet.create({
   titleBlock: {
     alignItems: 'center',
   },
-  titleMain: {
-    fontSize: 40,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
   titleNumeral: {
+    fontSize: 100,
     fontFamily: Fonts.mono,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: 1,
+    textAlign: 'center',
+    lineHeight: 104,
+  },
+  titleUnit: {
+    fontSize: 26,
+    fontWeight: '400',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: -10,
   },
   subtitleNumeral: {
     fontFamily: Fonts.mono,
