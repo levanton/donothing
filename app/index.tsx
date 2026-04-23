@@ -56,24 +56,32 @@ import { useRouter } from 'expo-router';
 
 const RING_R = 64;
 
+// Find the block that most recently fired today. We can't rely on the
+// block's `durationMinutes` window — that's a 15-min trigger interval,
+// not how long the shield actually stays up — so a strict in-window
+// check would lose the block within minutes and fall back to a default.
+// Instead pick the latest enabled block for today whose start time is
+// ≤ now. That reliably surfaces the unlock goal the user actually set.
 function findActiveBlock(
   blocks: ScheduledBlock[],
   now: Date,
 ): ScheduledBlock | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const today = now.getDay();
+
+  let best: ScheduledBlock | null = null;
+  let bestStart = -1;
   for (const b of blocks) {
     if (!b.enabled) continue;
     if (b.weekdays.length > 0 && !b.weekdays.includes(today)) continue;
     const start = b.hour * 60 + b.minute;
-    const end = start + b.durationMinutes;
-    if (end <= 24 * 60) {
-      if (nowMinutes >= start && nowMinutes < end) return b;
-    } else {
-      if (nowMinutes >= start || nowMinutes < end - 24 * 60) return b;
+    if (start > nowMinutes) continue;
+    if (start > bestStart) {
+      best = b;
+      bestStart = start;
     }
   }
-  return null;
+  return best;
 }
 
 // ===========================================================================
@@ -779,6 +787,25 @@ export default function DoNothingScreen() {
               >
                 <Feather
                   name='flag'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  useAppStore.setState({
+                    sessionEndedVisible: true,
+                    cancelReason: 'backgrounded',
+                  })
+                }
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='alert-octagon'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}
