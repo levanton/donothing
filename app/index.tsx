@@ -467,10 +467,14 @@ export default function DoNothingScreen() {
         console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
         return;
       }
-      const durationSec = (data.durationMinutes as number) * 60;
       blockAppsById('donothing-scheduled-block').catch(() => {});
       activateKeepAwakeAsync('scheduled-block');
-      useAppStore.getState().startFocus(durationSec);
+      // Drop straight into the "do nothing to unlock" screen — same state
+      // we land on when the app re-enters foreground while a block is
+      // already active. Previously we ran startFocus(durationMinutes),
+      // which spun a 15-min countdown before revealing the unlock view,
+      // so a foreground notification effectively did nothing visible.
+      useAppStore.getState().showUnlock();
     };
 
     // When notification received while app is in foreground
