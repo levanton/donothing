@@ -54,10 +54,13 @@ const ARC_OFFSET_FRACTION = 0.65;
 // Angle from +x axis: top semicircle goes from 180° clockwise to 0°, so
 // 65% along lands at (1 - 0.65) * 180° = 63°.
 const ARC_ANGLE_RAD = (1 - ARC_OFFSET_FRACTION) * Math.PI;
-// Modest growth as the word flies in — the motion and straightening
-// carry most of the emphasis; a large size jump made the smaller moods
-// (e.g. "still") balloon unnaturally.
-const CENTER_SIZE_BONUS = 5;
+// Growth as the word flies in. The base bump is modest (motion and
+// straightening already carry most of the emphasis), but each mood
+// gains an extra step per index so "full" arrives visibly larger than
+// "still" at centre — otherwise all four moods read as roughly the
+// same size once they're horizontal.
+const CENTER_SIZE_BASE = 5;
+const CENTER_SIZE_INDEX_STEP = 3;
 
 // Approximate lowercase glyph widths for Georgia, expressed in ems.
 // Per-character advance is needed because a uniform spacing either
@@ -87,7 +90,7 @@ const MorphingLabel = memo(function MorphingLabel({
   const arcR = RING_STEP * (index + 1) + LABEL_OUTSIDE;
   const chars = mood.split('');
   const arcSize = 16 + index * 1.5;
-  const centerSize = arcSize + CENTER_SIZE_BONUS;
+  const centerSize = arcSize + CENTER_SIZE_BASE + index * CENTER_SIZE_INDEX_STEP;
 
   const [t, setT] = useState(0);
   const [opacity, setOpacity] = useState(0);
