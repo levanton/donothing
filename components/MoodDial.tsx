@@ -295,6 +295,9 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
   const progress = useSharedValue(0);
   const dragStart = useSharedValue(0);
   const lastHapticStep = useSharedValue(-1);
+  // Rides from 0 to 1 alongside the cream-disc intro reveal so the sage
+  // dot grows from nothing instead of popping in at FILL_MIN.
+  const introFill = useSharedValue(0);
 
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [discR, setDiscR] = useState(0);
@@ -355,8 +358,8 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
     });
 
   const filledCircleProps = useAnimatedProps(() => {
-    const r = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    return { r };
+    const base = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
+    return { r: base * introFill.value };
   });
 
   // Reset everything when the parent closes the screen.
@@ -371,6 +374,7 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
     hasInteractedRef.current = false;
     progress.value = 0;
     lastHapticStep.value = -1;
+    introFill.value = 0;
   }, [visible]);
 
   // Start the disc-grow animation when reveal flips true.
@@ -382,6 +386,7 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
       const t = Math.min(1, (Date.now() - startAt) / MOOD_DIAL_DISC_DURATION);
       const eased = 1 - Math.pow(1 - t, 3);
       setDiscR(eased * DISC_MAX_R);
+      introFill.value = eased;
       if (t < 1) discRafRef.current = requestAnimationFrame(tick);
       else discRafRef.current = 0;
     };
