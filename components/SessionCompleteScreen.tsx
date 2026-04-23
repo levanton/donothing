@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
@@ -203,6 +203,10 @@ function SessionCompleteScreen({
   const circleBlockY = useSharedValue(12);
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
+  const closeBtnScale = useSharedValue(1);
+  const farewellOpacity = useSharedValue(0);
+  const farewellY = useSharedValue(12);
+  const mainContentOpacity = useSharedValue(1);
   const benefitsOpacity = useSharedValue(0);
   const splashSize = useSharedValue(0);
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
@@ -210,7 +214,7 @@ function SessionCompleteScreen({
 
   const [hasInteracted, setHasInteracted] = useState(false);
   const [revealDial, setRevealDial] = useState(false);
-  const [phase, setPhase] = useState<'benefits' | 'mood'>('benefits');
+  const [phase, setPhase] = useState<'benefits' | 'mood' | 'farewell'>('benefits');
 
   const benefits = useMemo(() => pickBenefits(durationSeconds), [durationSeconds]);
   const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
@@ -218,6 +222,7 @@ function SessionCompleteScreen({
 
   const dismissingRef = useRef(false);
   const prevVisibleRef = useRef(false);
+  const handleCloseRef = useRef<() => void>(() => {});
 
   // Reset React state SYNCHRONOUSLY during render the moment visible
   // flips — otherwise the first paint after re-entry uses the previous
@@ -246,6 +251,10 @@ function SessionCompleteScreen({
       // hidden when the user lands on this screen.
       closeOpacity.value = 0;
       closeY.value = 14;
+      closeBtnScale.value = 1;
+      farewellOpacity.value = 0;
+      farewellY.value = 12;
+      mainContentOpacity.value = 1;
       benefitsOpacity.value = 0;
       splashSize.value = 0;
       splashCx.value = SPLASH_ORIGIN_X;
@@ -308,6 +317,9 @@ function SessionCompleteScreen({
       circleBlockY.value = 12;
       closeOpacity.value = 0;
       closeY.value = 14;
+      closeBtnScale.value = 1;
+      farewellOpacity.value = 0;
+      farewellY.value = 12;
       benefitsOpacity.value = 0;
       splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
@@ -348,6 +360,29 @@ function SessionCompleteScreen({
     revealTimersRef.current.push(t1, t2);
   }, []);
 
+  const handleUnlock = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Mood → Farewell. Fade EVERYTHING out (sun, title, dial, button) so
+    // the farewell beat owns the screen alone, then swap to phase
+    // 'farewell' and reveal "well done" centered. Auto-dismisses after a
+    // dwell — no continue button.
+    mainContentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
+
+    const FADE_OUT_MS = 460;
+
+    const t1 = setTimeout(() => {
+      setPhase('farewell');
+      farewellOpacity.value = withTiming(1, { duration: 700, easing: EASE_OUT });
+      farewellY.value = withTiming(0, { duration: 700, easing: EASE_OUT });
+    }, FADE_OUT_MS);
+
+    revealTimersRef.current.push(t1);
+  }, []);
+
+  // Keep handleCloseRef in sync so handleUnlock (memoized with [])
+  // always invokes the LATEST handleClose — otherwise it'd capture the
+  // first render's version, when yesBtnRect was still null, and the
+  // splash would shrink to 0 instead of collapsing onto the yes button.
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
     dismissingRef.current = true;
@@ -369,6 +404,8 @@ function SessionCompleteScreen({
     contentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
     setTimeout(onClose, duration + 20);
   }, [onClose, yesBtnRect]);
+
+  handleCloseRef.current = handleClose;
 
   const contentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
@@ -399,8 +436,15 @@ function SessionCompleteScreen({
   }));
   const closeStyleAnim = useAnimatedStyle(() => ({
     opacity: closeOpacity.value,
-    transform: [{ translateY: closeY.value }],
+    transform: [{ translateY: closeY.value }, { scale: closeBtnScale.value }],
     pointerEvents: closeOpacity.value > 0.5 ? 'auto' : 'none',
+  }));
+  const farewellStyle = useAnimatedStyle(() => ({
+    opacity: farewellOpacity.value,
+    transform: [{ translateY: farewellY.value }],
+  }));
+  const mainContentStyle = useAnimatedStyle(() => ({
+    opacity: mainContentOpacity.value,
   }));
   const benefitsWrapStyle = useAnimatedStyle(() => ({
     opacity: benefitsOpacity.value,
@@ -435,10 +479,12 @@ function SessionCompleteScreen({
 
       {/* Content layer — transparent, lives on top of the terracotta disc */}
       <Animated.View style={[StyleSheet.absoluteFillObject, contentStyle]}>
-        <View
+        <Animated.View
+          pointerEvents={phase === 'farewell' ? 'none' : 'auto'}
           style={[
             styles.layout,
             { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 },
+            mainContentStyle,
           ]}
         >
           <View style={styles.centerGroup}>
@@ -515,19 +561,76 @@ function SessionCompleteScreen({
                   </ScrollView>
                 </View>
               </Animated.View>
+
             </View>
           </View>
 
           <Animated.View style={closeStyleAnim}>
-            <Pressable onPress={phase === 'benefits' ? handleNext : handleClose}>
+            <Pressable
+              onPress={phase === 'benefits' ? handleNext : handleUnlock}
+              onPressIn={() => {
+                closeBtnScale.value = withTiming(0.94, { duration: 90, easing: EASE_OUT });
+              }}
+              onPressOut={() => {
+                closeBtnScale.value = withTiming(1, { duration: 160, easing: EASE_OUT });
+              }}
+            >
               <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+                {phase === 'mood' && (
+                  <Feather name="unlock" size={18} color={palette.terracotta} style={styles.doneIcon} />
+                )}
                 <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                  {phase === 'benefits' ? 'next' : 'done'}
+                  {phase === 'benefits' ? 'next' : 'unlock apps'}
                 </Text>
               </View>
             </Pressable>
           </Animated.View>
-        </View>
+        </Animated.View>
+
+        {/* Farewell beat — sole content during the farewell phase, lives
+            above the faded-out main layer so nothing else is visible. */}
+        <Animated.View
+          style={[styles.farewellLayer, farewellStyle]}
+          pointerEvents={phase === 'farewell' ? 'auto' : 'none'}
+        >
+          <View style={styles.farewellCenter}>
+            <Image source={grassImage} style={styles.farewellSun} fadeDuration={0} />
+
+            <Text style={[styles.farewellEyebrow, { color: textColor, fontFamily: Fonts.serif }]}>
+              see you tomorrow
+            </Text>
+
+            <Text style={[styles.farewellTitle, { color: textColor, fontFamily: Fonts.serif }]}>
+              well done
+            </Text>
+
+            <View style={styles.farewellDivider} />
+
+            <Text style={[styles.farewellSub, { color: textColor, fontFamily: Fonts.serif }]}>
+              your apps are open again
+            </Text>
+
+            <View style={styles.farewellChip}>
+              <Text style={[styles.farewellChipText, { fontFamily: Fonts.serif }]}>
+                {duration.value} {duration.unit} • complete
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            onPress={() => handleCloseRef.current()}
+            style={({ pressed }) => [
+              styles.farewellContinue,
+              { bottom: insets.bottom + 40, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+              <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
+                continue
+              </Text>
+            </View>
+          </Pressable>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -705,19 +808,87 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   doneBtn: {
+    flexDirection: 'row',
     borderRadius: 100,
     paddingVertical: 18,
-    paddingHorizontal: 60,
+    paddingHorizontal: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
   },
+  doneIcon: {
+    marginTop: 1,
+  },
   doneLabel: {
     fontSize: 18,
     fontWeight: '500',
     letterSpacing: 0.6,
+  },
+  farewellLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  farewellCenter: {
+    alignItems: 'center',
+  },
+  farewellContinue: {
+    position: 'absolute',
+    alignSelf: 'center',
+  },
+  farewellSun: {
+    width: GRASS_SIZE * 1.1,
+    height: GRASS_SIZE * 1.1 * (450 / 780),
+    resizeMode: 'contain',
+    marginBottom: 22,
+  },
+  farewellEyebrow: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 2.4,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  farewellTitle: {
+    fontSize: 56,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    lineHeight: 60,
+    marginBottom: 20,
+  },
+  farewellDivider: {
+    width: 44,
+    height: 1.5,
+    backgroundColor: palette.cream,
+    marginBottom: 20,
+    borderRadius: 1,
+  },
+  farewellSub: {
+    fontSize: 18,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    marginBottom: 28,
+  },
+  farewellChip: {
+    backgroundColor: palette.cream,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  farewellChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: palette.brown,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
   },
 });
