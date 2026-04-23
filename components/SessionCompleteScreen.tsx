@@ -438,7 +438,7 @@ function SessionCompleteScreen({
         <View
           style={[
             styles.layout,
-            { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 40 },
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 },
           ]}
         >
           <View style={styles.centerGroup}>
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 100,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 27,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
