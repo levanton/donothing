@@ -22,7 +22,7 @@ const CONTENT_FADE_MS = 500;
 const grassImage = require('@/assets/images/sun.png');
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
-const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.28), 260);
+const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.24), 220);
 
 // Terracotta reveal disc — starts small at the done-button position and
 // grows out to engulf the whole screen, inverting the palette. On close it
@@ -320,15 +320,17 @@ function SessionCompleteScreen({
             </View>
 
             <View style={styles.interaction}>
-              <Animated.Text
-                style={[
-                  styles.prompt,
-                  { color: textColor, fontFamily: Fonts.serif },
-                  circleBlockStyle,
-                ]}
-              >
-                how full do you feel?
-              </Animated.Text>
+              <Animated.View style={[styles.promptBlock, circleBlockStyle]}>
+                <View style={styles.promptDivider} />
+                <Text
+                  style={[
+                    styles.prompt,
+                    { color: textColor, fontFamily: Fonts.serif },
+                  ]}
+                >
+                  how full do you feel?
+                </Text>
+              </Animated.View>
 
               <MoodDial
                 visible={visible}
@@ -397,13 +399,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   titleMain: {
-    fontSize: 44,
+    fontSize: 40,
     fontWeight: '500',
     letterSpacing: 0.2,
     textAlign: 'center',
   },
   titleSub: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '300',
     fontStyle: 'italic',
     letterSpacing: 0.4,
@@ -421,15 +423,23 @@ const styles = StyleSheet.create({
   },
   interaction: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 36,
+  },
+  promptBlock: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  promptDivider: {
+    width: 36,
+    height: 1,
+    backgroundColor: 'rgba(249, 242, 224, 0.35)',
+    marginBottom: 14,
   },
   prompt: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '400',
-    fontStyle: 'italic',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
     textAlign: 'center',
-    marginBottom: 18,
   },
   doneBtn: {
     borderRadius: 100,
