@@ -770,7 +770,7 @@ export default function DoNothingScreen() {
                   useAppStore.setState({
                     completionVisible: true,
                     lastSessionId: 'dev-preview',
-                    lastSessionDuration: 60,
+                    lastSessionDuration: 50 * 60,
                   })
                 }
                 disabled={started}

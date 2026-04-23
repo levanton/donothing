@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -47,32 +47,32 @@ const BENEFIT_TIERS: Array<{ minSeconds: number; items: Benefit[] }> = [
   {
     minSeconds: 30 * 60,
     items: [
-      { icon: 'sleep',                   title: 'deep rest achieved',  sub: 'your brain fully recovered' },
-      { icon: 'heart-pulse',             title: 'cortisol reset',      sub: 'stress hormones back to baseline' },
-      { icon: 'emoticon-happy-outline',  title: 'emotional reset',     sub: 'amygdala calmed down' },
-      { icon: 'lightbulb',               title: 'creativity unlocked', sub: 'new neural connections forming' },
-      { icon: 'bookmark-outline',        title: 'memory consolidated', sub: "today's experiences organized" },
-      { icon: 'eye-outline',             title: 'clarity restored',    sub: "you're thinking at full capacity" },
+      { icon: 'sleep',           title: 'deep rest achieved',  sub: 'your brain fully recovered' },
+      { icon: 'heart-pulse',     title: 'stress dissolved',    sub: 'cortisol back to baseline' },
+      { icon: 'spa-outline',     title: 'emotions settled',    sub: 'amygdala calmed down' },
+      { icon: 'lightbulb-on',    title: 'creativity unlocked', sub: 'new neural connections forming' },
+      { icon: 'archive-outline', title: 'memory consolidated', sub: "today's experiences organized" },
+      { icon: 'eye-outline',     title: 'mind cleared',        sub: 'thinking at full capacity' },
     ],
   },
   {
     minSeconds: 20 * 60,
     items: [
-      { icon: 'sleep',                  title: 'deep rest achieved',  sub: 'equivalent to a power nap' },
-      { icon: 'heart-pulse',            title: 'cortisol reset',      sub: 'stress hormones back to baseline' },
-      { icon: 'emoticon-happy-outline', title: 'emotional reset',     sub: 'amygdala activity reduced' },
-      { icon: 'lightning-bolt',         title: 'focus sharpened',     sub: 'deep attention restored' },
-      { icon: 'lightbulb',              title: 'creativity unlocked', sub: 'new neural connections forming' },
+      { icon: 'sleep',          title: 'deep rest achieved',  sub: 'equivalent to a power nap' },
+      { icon: 'heart-pulse',    title: 'stress dissolved',    sub: 'cortisol back to baseline' },
+      { icon: 'spa-outline',    title: 'emotions settled',    sub: 'amygdala activity reduced' },
+      { icon: 'lightning-bolt', title: 'focus sharpened',     sub: 'deep attention back online' },
+      { icon: 'lightbulb-on',   title: 'creativity unlocked', sub: 'new neural connections forming' },
     ],
   },
   {
     minSeconds: 15 * 60,
     items: [
       { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones significantly down' },
-      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention restored' },
-      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory restored' },
+      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention back online' },
+      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory clear' },
       { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
-      { icon: 'lightbulb',      title: 'creativity unlocked',  sub: 'new neural connections forming' },
+      { icon: 'lightbulb-on',   title: 'creativity unlocked',  sub: 'new neural connections forming' },
     ],
   },
   {
@@ -80,7 +80,7 @@ const BENEFIT_TIERS: Array<{ minSeconds: number; items: Benefit[] }> = [
     items: [
       { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones easing' },
       { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention coming back' },
-      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory restored' },
+      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory clear' },
       { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
     ],
   },
@@ -95,16 +95,16 @@ const BENEFIT_TIERS: Array<{ minSeconds: number; items: Benefit[] }> = [
   {
     minSeconds: 3 * 60,
     items: [
-      { icon: 'weather-windy', title: 'your breath slowed',     sub: 'nervous system calming down' },
+      { icon: 'weather-windy', title: 'your breath slowed',        sub: 'nervous system calming down' },
       { icon: 'heart',         title: 'cortisol started dropping', sub: 'stress hormones easing' },
-      { icon: 'eye-outline',   title: 'attention returning',    sub: 'your brain got a moment to reset' },
+      { icon: 'eye-outline',   title: 'attention returning',       sub: 'your brain got a breath' },
     ],
   },
   {
     minSeconds: 60,
     items: [
-      { icon: 'weather-windy', title: 'your breath slowed',     sub: 'nervous system starting to calm' },
-      { icon: 'restart',       title: 'a micro-reset happened', sub: 'the stress loop was interrupted' },
+      { icon: 'weather-windy', title: 'your breath slowed', sub: 'nervous system starting to calm' },
+      { icon: 'pause-circle',  title: 'the rush stopped',   sub: 'stress loop interrupted' },
     ],
   },
 ];
@@ -116,39 +116,35 @@ function pickBenefits(seconds: number): Benefit[] {
   return BENEFIT_TIERS[BENEFIT_TIERS.length - 1].items;
 }
 
-const BENEFIT_STAGGER_MS = 220;
-const BENEFIT_FADE_MS = 500;
-// Mount-relative time when the first benefit row begins fading in.
-// Must match BENEFITS_START inside the parent useEffect.
-const BENEFITS_FIRST_DELAY_MS = 1380;
+// Same proportions as the Paywall FeatureCarousel — small narrow
+// cards with alternating colored backgrounds.
+const BENEFIT_CARD_W = 150;
+const BENEFIT_CARD_H = 240;
+const BENEFIT_CARD_GAP = 12;
 
-function BenefitRow({ item, delay, isLast }: { item: Benefit; delay: number; isLast: boolean }) {
-  const opacity = useSharedValue(0);
-  const y = useSharedValue(8);
+// 6-tone warm-earth palette — refined Mediterranean ceramic feel.
+// Order alternates light and dark so neighbouring cards contrast.
+const BENEFIT_VARIANTS: Array<{ bg: string; fg: string }> = [
+  { bg: '#F0E0BD', fg: palette.brown }, // 0: warm cream (light)
+  { bg: '#5C2F2F', fg: palette.cream }, // 1: deep wine (dark)
+  { bg: '#C5A572', fg: palette.brown }, // 2: antique gold (light pop)
+  { bg: '#7E3A24', fg: palette.cream }, // 3: rich auburn (mid)
+  { bg: '#E8B89A', fg: palette.brown }, // 4: peach blush (light)
+  { bg: '#3D2516', fg: palette.cream }, // 5: dark cocoa (darkest)
+];
 
-  useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: BENEFIT_FADE_MS, easing: EASE_OUT }));
-    y.value = withDelay(delay, withTiming(0, { duration: BENEFIT_FADE_MS, easing: EASE_OUT }));
-  }, [delay]);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: y.value }],
-  }));
-
+function BenefitCard({ item, index }: { item: Benefit; index: number }) {
+  const variant = BENEFIT_VARIANTS[index % BENEFIT_VARIANTS.length];
   return (
-    <Animated.View style={style}>
-      <View style={styles.benefitRow}>
-        <View style={styles.benefitBadge}>
-          <MaterialCommunityIcons name={item.icon as any} size={18} color={palette.cream} />
-        </View>
-        <View style={styles.benefitTextCol}>
-          <Text style={[styles.benefitTitle, { fontFamily: Fonts.serif }]}>{item.title}</Text>
-          <Text style={[styles.benefitSub, { fontFamily: Fonts.serif }]}>{item.sub}</Text>
-        </View>
+    <View style={[styles.benefitCardSlide, { backgroundColor: variant.bg }]}>
+      <View style={styles.benefitIconWrap}>
+        <View style={[styles.benefitIconHalo, { backgroundColor: `${variant.fg}22` }]} />
+        <MaterialCommunityIcons name={item.icon as any} size={48} color={variant.fg} />
       </View>
-      {!isLast && <View style={styles.benefitDivider} />}
-    </Animated.View>
+      <Text style={[styles.benefitLabel, { color: variant.fg }]}>
+        {item.title}
+      </Text>
+    </View>
   );
 }
 
@@ -244,7 +240,7 @@ function SessionCompleteScreen({
       setHasInteracted(false);
       setRevealDial(false);
       setPhase('benefits');
-
+  
       // Hard-reset every piece first so nothing lingers from a previous
       // session — especially the done button, which must always start
       // hidden when the user lands on this screen.
@@ -286,17 +282,16 @@ function SessionCompleteScreen({
       subtitleOpacity.value = withDelay(base + 500, withTiming(1, { duration: 850, easing: EASE_OUT }));
       subtitleY.value = withDelay(base + 500, withTiming(0, { duration: 850, easing: EASE_OUT }));
 
-      // Benefits wrap fades in after subtitle. The per-row cascade is
-      // owned by BenefitRow children — they self-schedule based on the
-      // delay prop we pass below.
+      // Benefits slider fades in as a single unit — no per-card cascade
+      // needed since cards live side-by-side and only one is visible at
+      // a time.
       const BENEFITS_START = base + 700;
-      benefitsOpacity.value = withDelay(BENEFITS_START, withTiming(1, { duration: 400, easing: EASE_OUT }));
+      benefitsOpacity.value = withDelay(BENEFITS_START, withTiming(1, { duration: 500, easing: EASE_OUT }));
 
       // "next" pill (driven by closeOpacity — same slot will later host
-      // the "done" pill after the user interacts with the dial). Fades in
-      // shortly after the last benefit lands. Length depends on tier.
-      const LAST_BENEFIT_LANDED = BENEFITS_START + (benefits.length - 1) * BENEFIT_STAGGER_MS + BENEFIT_FADE_MS;
-      const NEXT_SHOW = LAST_BENEFIT_LANDED + 200;
+      // the "done" pill after the user interacts with the dial). Lands a
+      // moment after the slider settles so the user sees a card first.
+      const NEXT_SHOW = BENEFITS_START + 1100;
       closeOpacity.value = withDelay(NEXT_SHOW, withTiming(1, { duration: 500, easing: EASE_OUT }));
       closeY.value = withDelay(NEXT_SHOW, withTiming(0, { duration: 500, easing: EASE_OUT }));
 
@@ -500,20 +495,24 @@ function SessionCompleteScreen({
                   as Beat 2 fades in. */}
               <Animated.View
                 style={[styles.benefitsLayer, benefitsWrapStyle]}
-                pointerEvents="none"
+                pointerEvents={phase === 'benefits' ? 'auto' : 'none'}
               >
                 <Text style={[styles.headerChip, { fontFamily: Fonts.serif }]}>
                   what changed
                 </Text>
-                <View style={styles.benefitsCard}>
-                  {benefits.map((b, i) => (
-                    <BenefitRow
-                      key={b.title}
-                      item={b}
-                      delay={BENEFITS_FIRST_DELAY_MS + i * BENEFIT_STAGGER_MS}
-                      isLast={i === benefits.length - 1}
-                    />
-                  ))}
+                <View style={{ height: BENEFIT_CARD_H }}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    bounces={false}
+                    decelerationRate="fast"
+                    snapToInterval={BENEFIT_CARD_W + BENEFIT_CARD_GAP}
+                    contentContainerStyle={styles.benefitsSliderContent}
+                  >
+                    {benefits.map((b, i) => (
+                      <BenefitCard key={b.title} item={b} index={i} />
+                    ))}
+                  </ScrollView>
                 </View>
               </Animated.View>
             </View>
@@ -563,7 +562,7 @@ const styles = StyleSheet.create({
   grassWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 16,
   },
   grassImage: {
     width: GRASS_SIZE,
@@ -622,23 +621,45 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   benefitsLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: -32,
+    right: -32,
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingTop: 8,
   },
-  benefitsCard: {
-    backgroundColor: palette.cream,
-    borderRadius: 22,
-    paddingTop: 22,
-    paddingBottom: 16,
-    paddingHorizontal: 24,
-    alignSelf: 'stretch',
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
+  benefitsSliderContent: {
+    paddingHorizontal: 32,
+    gap: BENEFIT_CARD_GAP,
+    alignItems: 'center',
+  },
+  benefitCardSlide: {
+    width: BENEFIT_CARD_W,
+    height: BENEFIT_CARD_H,
+    borderRadius: 20,
+    padding: 16,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  benefitIconWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitIconHalo: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+  },
+  benefitLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 19,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   headerChip: {
     fontSize: 12,
@@ -653,43 +674,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    marginBottom: 14,
-  },
-  benefitBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: palette.terracotta,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  benefitTextCol: {
-    flex: 1,
-    paddingTop: 5,
-  },
-  benefitDivider: {
-    width: 40,
-    height: 1,
-    backgroundColor: 'rgba(51, 52, 49, 0.18)',
-    alignSelf: 'center',
-    marginVertical: 4,
-  },
   benefitTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 0.1,
     color: palette.brown,
+    lineHeight: 32,
   },
   benefitSub: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '400',
     letterSpacing: 0.2,
-    marginTop: 2,
     color: palette.brown,
+    lineHeight: 22,
   },
   promptBlock: {
     alignItems: 'center',
