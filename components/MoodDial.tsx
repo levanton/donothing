@@ -1,11 +1,16 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   runOnJS,
   useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 
@@ -301,6 +306,12 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
   // Rides from 0 to 1 alongside the cream-disc intro reveal so the sage
   // dot grows from nothing instead of popping in at FILL_MIN.
   const introFill = useSharedValue(0);
+  // Direction hint ("← drag →") that sits on the dial. Drives both the
+  // hint's own opacity AND a cream wash covering the dial — so rings
+  // below the hint soften while the hint itself reads crisp. Both fade
+  // out together on first interaction.
+  const hintOpacity = useSharedValue(0);
+  const hintPulse = useSharedValue(0);
 
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [discR, setDiscR] = useState(0);
@@ -314,6 +325,9 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
     if (mood !== null && !hasInteractedRef.current) {
       hasInteractedRef.current = true;
       onInteractRef.current();
+      hintOpacity.value = withTiming(0, { duration: 280 });
+      cancelAnimation(hintPulse);
+      hintPulse.value = withTiming(0, { duration: 220 });
     }
   }, []);
 
@@ -378,6 +392,9 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
     progress.value = 0;
     lastHapticStep.value = -1;
     introFill.value = 0;
+    hintOpacity.value = 0;
+    cancelAnimation(hintPulse);
+    hintPulse.value = 0;
   }, [visible]);
 
   // Start the disc-grow animation when reveal flips true.
@@ -394,15 +411,47 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
       else discRafRef.current = 0;
     };
     discRafRef.current = requestAnimationFrame(tick);
+
+    // After the disc settles, fade in the "← drag →" hint + cream wash
+    // and start the arrow pulse. Both fall away on the first drag.
+    const hintTimer = setTimeout(() => {
+      if (hasInteractedRef.current) return;
+      hintOpacity.value = withTiming(1, { duration: 520 });
+      hintPulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 820 }),
+          withTiming(0, { duration: 820 }),
+        ),
+        -1,
+      );
+    }, MOOD_DIAL_DISC_DURATION + 260);
+
     return () => {
       if (discRafRef.current) {
         cancelAnimationFrame(discRafRef.current);
         discRafRef.current = 0;
       }
+      clearTimeout(hintTimer);
     };
   }, [reveal]);
 
   const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
+
+  // Cream wash over the whole disc. Capped at ~0.42 so rings read as
+  // softened rather than hidden — the hint on top stands clear, but the
+  // dial doesn't disappear.
+  const dimProps = useAnimatedProps(() => ({
+    opacity: hintOpacity.value * 0.42,
+  }));
+  const hintRowStyle = useAnimatedStyle(() => ({
+    opacity: hintOpacity.value,
+  }));
+  const hintLeftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -hintPulse.value * 6 }],
+  }));
+  const hintRightStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: hintPulse.value * 6 }],
+  }));
 
   return (
     <GestureDetector gesture={circleGesture}>
@@ -460,7 +509,31 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
             );
           })}
 
+          {/* Cream wash over the dial during the hint phase — washes out
+              the ring strokes and mood labels just enough that the
+              "← drag →" hint above reads clearly. Fades with the hint. */}
+          <AnimatedCircle
+            cx={RING_CENTER}
+            cy={RING_CENTER}
+            r={DISC_MAX_R}
+            fill={palette.cream}
+            animatedProps={dimProps}
+          />
+
         </Svg>
+
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.hintRow, hintRowStyle]}
+        >
+          <Animated.View style={hintLeftStyle}>
+            <Text style={styles.hintArrow}>←</Text>
+          </Animated.View>
+          <Text style={styles.hintText}>drag</Text>
+          <Animated.View style={hintRightStyle}>
+            <Text style={styles.hintArrow}>→</Text>
+          </Animated.View>
+        </Animated.View>
       </View>
     </GestureDetector>
   );
@@ -471,5 +544,32 @@ const styles = StyleSheet.create({
     width: RING_BOX_SIZE,
     height: RING_BOX_SIZE,
     position: 'relative',
+  },
+  // "← drag →" centered just below the sage dot. The cream wash behind
+  // softens the ring strokes at this y, so the text reads even though a
+  // ring passes through the same band.
+  hintRow: {
+    position: 'absolute',
+    top: RING_CENTER + 26,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  hintArrow: {
+    color: palette.brown,
+    fontSize: 26,
+    fontFamily: 'Georgia',
+    fontWeight: '500',
+  },
+  hintText: {
+    color: palette.brown,
+    fontSize: 16,
+    fontFamily: 'Georgia',
+    fontStyle: 'italic',
+    fontWeight: '500',
+    letterSpacing: 1,
   },
 });

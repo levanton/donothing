@@ -87,8 +87,6 @@ function SessionCompleteScreen({
   const circleBlockY = useSharedValue(12);
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
-  const hintOpacity = useSharedValue(0);
-  const hintY = useSharedValue(8);
   const splashSize = useSharedValue(0);
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
   const splashCy = useSharedValue(SCREEN_H);
@@ -125,8 +123,6 @@ function SessionCompleteScreen({
       // hidden when the user lands on this screen.
       closeOpacity.value = 0;
       closeY.value = 14;
-      hintOpacity.value = 0;
-      hintY.value = 8;
       splashSize.value = 0;
       splashCx.value = SPLASH_ORIGIN_X;
       splashCy.value = SCREEN_H - insets.bottom - 68;
@@ -171,10 +167,6 @@ function SessionCompleteScreen({
         setTimeout(() => setRevealDial(true), DIAL_START),
       );
 
-      // Hint waits until the dial has finished its sweep.
-      const hintDelay = DIAL_START + MOOD_DIAL_DISC_DURATION + 120;
-      hintOpacity.value = withDelay(hintDelay, withTiming(1, { duration: 600, easing: EASE_OUT }));
-      hintY.value = withDelay(hintDelay, withTiming(0, { duration: 600, easing: EASE_OUT }));
     } else {
       contentOpacity.value = 0;
       glowOpacity.value = 0;
@@ -188,8 +180,6 @@ function SessionCompleteScreen({
       circleBlockY.value = 12;
       closeOpacity.value = 0;
       closeY.value = 14;
-      hintOpacity.value = 0;
-      hintY.value = 8;
       splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
@@ -207,7 +197,6 @@ function SessionCompleteScreen({
   // a re-entry — visible=true always resets the flag to false first.
   useEffect(() => {
     if (!hasInteracted) return;
-    hintOpacity.value = withTiming(0, { duration: 320, easing: EASE_OUT });
     closeOpacity.value = withTiming(1, { duration: 520, easing: EASE_OUT });
     closeY.value = withTiming(0, { duration: 520, easing: EASE_OUT });
   }, [hasInteracted]);
@@ -266,11 +255,6 @@ function SessionCompleteScreen({
     transform: [{ translateY: closeY.value }],
     pointerEvents: closeOpacity.value > 0.5 ? 'auto' : 'none',
   }));
-  const hintStyle = useAnimatedStyle(() => ({
-    opacity: hintOpacity.value,
-    transform: [{ translateY: hintY.value }],
-  }));
-
   const glowWrapStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
     transform: [{ scale: glowScale.value }],
@@ -287,7 +271,6 @@ function SessionCompleteScreen({
   // colour switch when the fill crosses them.
   const textColor = palette.cream;
   const softText = 'rgba(249, 242, 224, 0.85)';
-  const tertiaryText = 'rgba(249, 242, 224, 0.5)';
 
   const duration = formatMinutes(durationSeconds);
   const today = formatMinutes(todaySeconds);
@@ -353,16 +336,6 @@ function SessionCompleteScreen({
                 sessionId={sessionId}
                 onInteract={handleDialInteract}
               />
-
-              <Animated.Text
-                style={[
-                  styles.hint,
-                  { color: tertiaryText, fontFamily: Fonts.serif },
-                  hintStyle,
-                ]}
-              >
-                drag outward
-              </Animated.Text>
             </View>
           </View>
 
@@ -457,14 +430,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textAlign: 'center',
     marginBottom: 18,
-  },
-  hint: {
-    fontSize: 14,
-    fontWeight: '400',
-    fontStyle: 'italic',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    marginTop: 18,
   },
   doneBtn: {
     borderRadius: 100,
