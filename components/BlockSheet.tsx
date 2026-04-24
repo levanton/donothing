@@ -265,8 +265,8 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
 
           {/* Benefits pills */}
           <View style={styles.benefitsRow}>
-            <View style={[styles.benefitChip, { backgroundColor: WARM_CREAM }]}>
-              <Feather name='moon' size={13} color={BROWN} />
+            <View style={[styles.benefitChip, { backgroundColor: CHIP_LIGHT }]}>
+              <Feather name='cloud' size={13} color={BROWN} />
               <Text
                 style={[
                   styles.benefitText,
@@ -276,18 +276,18 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
                 rest
               </Text>
             </View>
-            <View style={[styles.benefitChip, { backgroundColor: GOLD }]}>
-              <Feather name='heart' size={13} color={WINE} />
+            <View style={[styles.benefitChip, { backgroundColor: CHIP_MID }]}>
+              <Feather name='heart' size={13} color={BROWN} />
               <Text
                 style={[
                   styles.benefitText,
-                  { color: WINE, fontFamily: Fonts!.serif },
+                  { color: BROWN, fontFamily: Fonts!.serif },
                 ]}
               >
                 calm
               </Text>
             </View>
-            <View style={[styles.benefitChip, { backgroundColor: WINE }]}>
+            <View style={[styles.benefitChip, { backgroundColor: CHIP_DEEP }]}>
               <Feather name='zap' size={13} color={CREAM} />
               <Text
                 style={[
@@ -356,10 +356,10 @@ export default BlockSheet;
 const CREAM = palette.cream;
 const BROWN = palette.brown;
 const TERRACOTTA = palette.terracotta;
-// Warm-earth palette borrowed from SessionCompleteScreen benefits
-const WARM_CREAM = '#F0E0BD';
-const GOLD = '#C5A572';
-const WINE = '#5C2F2F';
+// Warm-earth ladder tied to the app palette — sand → salmon → espresso.
+const CHIP_LIGHT = '#EBDAB2'; // warm sand (REST)
+const CHIP_MID = palette.salmon; // dusty salmon (CALM)
+const CHIP_DEEP = '#3F2C22'; // deep espresso (FOCUS)
 
 const styles = StyleSheet.create({
   backdropImageWrap: {
