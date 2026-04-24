@@ -58,7 +58,7 @@ const MOOD_SOFT = [
   'rgba(78, 109, 128, 0.32)',
   'rgba(224, 166, 83, 0.32)',
   'rgba(93, 143, 91, 0.32)',
-  'rgba(223, 92, 68, 0.32)',
+  'rgba(194, 103, 73, 0.32)',
 ] as const;
 
 const MOOD_STOPS = MOODS.map((_, i) => i / (MOODS.length - 1));

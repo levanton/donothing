@@ -253,6 +253,14 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             >
               of doing nothing
             </Text>
+            <Text
+              style={[
+                styles.heroSub,
+                { color: theme.textTertiary, fontFamily: Fonts!.serif },
+              ]}
+            >
+              to unlock your apps
+            </Text>
           </View>
 
           {/* Benefits pills */}
@@ -391,9 +399,9 @@ const styles = StyleSheet.create({
   starscape: {
     alignSelf: 'stretch',
     alignItems: 'center',
-    paddingVertical: 28,
+    paddingVertical: 24,
     paddingHorizontal: 8,
-    marginBottom: 28,
+    marginBottom: 14,
     position: 'relative',
   },
   star: {
@@ -414,6 +422,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.4,
     marginTop: 12,
+  },
+  heroSub: {
+    fontSize: 13,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+    marginTop: 4,
   },
   benefitsRow: {
     flexDirection: 'row',
@@ -443,10 +457,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
-    shadowColor: TERRACOTTA,
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
   },
   primaryBtnPressed: {
     opacity: 0.92,
