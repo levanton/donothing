@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
+import { useAppStore } from '@/lib/store';
 import PillButton from '@/components/PillButton';
 import PlanCard from '@/components/paywall/PlanCardGeneral';
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
@@ -63,6 +64,9 @@ export default function PaywallRoute() {
 
   const handleSkip = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Win-back: surface the half-off promo on home before the user gets back
+    // to the gate, giving them one more chance to convert.
+    useAppStore.getState().showPromoOffer();
     router.replace('/');
   }, [router]);
 

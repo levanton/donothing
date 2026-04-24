@@ -13,6 +13,7 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
+import { useAppStore } from '@/lib/store';
 import PlanCard from '@/components/paywall/PlanCard';
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
 
@@ -93,6 +94,9 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
 
   const handleSkip = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Win-back: surface the half-off promo on home once onboarding finishes,
+    // mirroring the behaviour when the standalone /paywall is dismissed.
+    useAppStore.getState().showPromoOffer();
     onFinish();
   }, [onFinish]);
 

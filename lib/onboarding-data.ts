@@ -74,17 +74,6 @@ export const SCREENS: OnboardingScreen[] = [
     options: ['1m', '5m', '10m', '15m', '30m'],
   },
   {
-    id: 'schedule',
-    type: 'setup',
-    heading: 'When do you want to do nothing?',
-    body: 'A gentle nudge. No spam. Ever.',
-    options: [
-      'Morning — start your day calm',
-      'Afternoon — reset your brain',
-      'Evening — wind down before sleep',
-    ],
-  },
-  {
     id: 'personalResult',
     type: 'info',
     heading: 'Your plan is ready.',
@@ -114,7 +103,7 @@ export type PageId =
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
-  | 'testimonials' | 'howItWorks' | 'setGoal' | 'schedule' | 'personalResult'
+  | 'testimonials' | 'howItWorks' | 'setGoal' | 'personalResult'
   | 'paywall';
 
 export interface OnboardingPage {
@@ -140,7 +129,6 @@ export const PAGES: OnboardingPage[] = [
   { id: 'testimonials',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
-  { id: 'schedule',        bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'paywall',          bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];

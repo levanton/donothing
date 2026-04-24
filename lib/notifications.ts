@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import type { Reminder, ScheduledBlock } from './db/types';
+import type { ScheduledBlock } from './db/types';
 import {
   getNotificationIds,
   setNotificationIds,
@@ -46,6 +46,24 @@ export async function cancelNotification(notificationId: string): Promise<void> 
   await Notifications.cancelScheduledNotificationAsync(notificationId);
 }
 
+export async function scheduleSessionCompleteNotification(
+  secondsFromNow: number,
+  durationMinutes: number,
+): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Do Nothing',
+      body: `You were in silence for ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.`,
+      sound: 'default',
+      data: { type: 'sessionComplete' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.floor(secondsFromNow)),
+    },
+  });
+}
+
 const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export async function scheduleWeeklyNotification(
@@ -65,33 +83,6 @@ export async function scheduleWeeklyNotification(
       weekday,
     },
   });
-}
-
-export async function syncReminders(reminders: Reminder[]): Promise<void> {
-  for (const r of reminders) {
-    // Cancel all existing notifications for this reminder
-    const existingIds = getNotificationIds('reminder', r.id);
-    for (const nid of existingIds) {
-      try { await cancelNotification(nid); } catch {}
-    }
-
-    if (r.enabled) {
-      const days = r.weekdays?.length ? r.weekdays : ALL_WEEKDAYS;
-      const notificationIds: string[] = [];
-      for (const day of days) {
-        const nid = await scheduleWeeklyNotification(
-          r.hour, r.minute, day,
-          'Do Nothing',
-          'Time to do nothing.',
-          { type: 'reminder', id: r.id },
-        );
-        notificationIds.push(nid);
-      }
-      setNotificationIds('reminder', r.id, notificationIds);
-    } else {
-      clearNotificationIds('reminder', r.id);
-    }
-  }
 }
 
 export async function syncScheduledBlockNotifications(blocks: ScheduledBlock[]): Promise<void> {

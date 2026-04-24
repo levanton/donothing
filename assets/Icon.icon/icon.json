@@ -16,32 +16,12 @@
     {
       "layers" : [
         {
-          "glass" : false,
-          "hidden" : true,
-          "image-name" : "enso_terracotta_transparent.png",
-          "name" : "enso_terracotta_transparent",
-          "position" : {
-            "scale" : 0.5,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
           "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:0.87451,0.36078,0.26667,1.00000"
+              }
+            },
             {
               "appearance" : "tinted",
               "value" : {
@@ -57,7 +37,7 @@
             "scale" : 0.5,
             "translation-in-points" : [
               0,
-              0
+              -9.5625
             ]
           }
         }

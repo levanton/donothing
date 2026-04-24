@@ -14,7 +14,6 @@ const FEATURES = [
   { id: 'lock', label: 'Focus\nLock', bg: palette.terracotta, fg: palette.cream },
   { id: 'stats', label: 'Track\nProgress', bg: palette.charcoal, fg: palette.cream },
   { id: 'goals', label: 'Custom\nGoals', bg: palette.salmon, fg: palette.charcoal },
-  { id: 'reminders', label: 'Unlimited\nReminders', bg: '#8B6B5B', fg: palette.cream },
   { id: 'calendar', label: 'Activity\nCalendar', bg: palette.brown, fg: palette.cream },
 ] as const;
 
@@ -73,26 +72,6 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
           <Circle cx={120} cy={22} r={4} fill={o4} />
           <Circle cx={18} cy={78} r={3} fill={o2} />
           <Circle cx={126} cy={88} r={5} fill={o2} />
-        </Svg>
-      );
-    case 'reminders':
-      return (
-        <Svg width={w} height={h} viewBox="0 0 140 110">
-          <Rect x={18} y={8} width={104} height={36} rx={12} fill={o2} />
-          <Circle cx={38} cy={26} r={8} fill={o4} />
-          <Rect x={52} y={20} width={50} height={5} rx={2.5} fill={o4} />
-          <Rect x={52} y={29} width={30} height={4} rx={2} fill={o2} />
-          <Rect x={12} y={34} width={116} height={36} rx={12} fill={o4} />
-          <Circle cx={34} cy={52} r={8} fill={o6} />
-          <Rect x={48} y={46} width={56} height={5} rx={2.5} fill={o6} />
-          <Rect x={48} y={55} width={34} height={4} rx={2} fill={o4} />
-          <Rect x={6} y={60} width={128} height={40} rx={12} fill={color} />
-          <Circle cx={30} cy={80} r={10} fill={o4} />
-          <Path d="M30 74 a5 5 0 0 1 5 5v2l1.5 1.5H23.5L25 81v-2a5 5 0 0 1 5-5Z" fill={o2} />
-          <Rect x={46} y={74} width={68} height={5} rx={2.5} fill={o4} />
-          <Rect x={46} y={83} width={42} height={4} rx={2} fill={o2} />
-          <Circle cx={126} cy={64} r={10} fill={`${palette.salmon}CC`} />
-          <Rect x={121} y={61} width={10} height={6} rx={1} fill={color} />
         </Svg>
       );
     case 'calendar':
@@ -160,9 +139,10 @@ export default function FeatureCarousel() {
     listRef.current?.scrollToOffset({ offset: MIDDLE_OFFSET, animated: false });
   }, []);
 
-  const renderItem = useCallback(({ item }: { item: typeof LOOP_DATA[number] }) => (
-    <FeatureCard {...item} />
-  ), []);
+  const renderItem = useCallback(({ item }: { item: typeof LOOP_DATA[number] }) => {
+    const { key: _key, ...props } = item;
+    return <FeatureCard {...props} />;
+  }, []);
 
   return (
     <Animated.View entering={FadeIn.delay(400).duration(500)}>

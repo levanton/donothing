@@ -9,8 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 
-export const RING_SIZE = 96;
-const RING_R = 42;
+export const RING_SIZE = 140;
+const RING_R = 64;
 const RING_STROKE = 3;
 const RING_CIRC = 2 * Math.PI * RING_R;
 const RING_PERIOD = 15;

@@ -1,205 +1,215 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
+import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
-import { activitySelectionMetadata } from 'react-native-device-activity';
+import {
+  activitySelectionMetadata,
+} from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { DeviceActivitySelectionSheetViewPersisted } from 'react-native-device-activity';
+import * as Notifications from 'expo-notifications';
+import AppLabelsView from 'app-labels';
+import AppPickerSheet from '@/components/AppPickerSheet';
 
 import { Fonts } from '@/constants/theme';
-import { AppTheme, themes, palette } from '@/lib/theme';
-import GoalSliderBar from './GoalSliderBar';
+import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
-import type { Reminder, ScheduledBlock } from '@/lib/db/types';
-import { requestAuth } from '@/lib/screen-time';
+import type { ScheduledBlock } from '@/lib/db/types';
+import { getAuth, requestAuth, type AuthStatus } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
-import ReminderCard from '@/components/ReminderCard';
-import TimePickerContent, { formatTime12, WEEKDAY_LABELS, WEEKDAY_VALUES, WEEKDAY_SHORT, ALL_DAYS } from '@/components/TimePicker';
+import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import BlockPickerContent from '@/components/BlockPicker';
+import AlertModal from '@/components/AlertModal';
 
-const BLOCK_SELECTION_ID = 'donothing-scheduled-block';
+interface PendingBlockParams {
+  hour: number;
+  minute: number;
+  duration: number;
+  weekdays: number[];
+  groupId: string | null;
+  unlockGoalMinutes: number;
+  conflictTime?: string | null;
+}
+
+const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
+
+function countFromMeta(meta: {
+  applicationCount?: number;
+  categoryCount?: number;
+  webDomainCount?: number;
+} | null | undefined): number {
+  return (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0) + (meta?.webDomainCount ?? 0);
+}
 
 interface SettingsContentProps {
   onClose: () => void;
   insets: { top: number; bottom: number };
+  onOpenAccount: () => void;
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0');
-}
-
-// Duration block picker content for bottom sheet
-function BlockPickerContent({ onConfirm, onCancel, theme, title, initialHour, initialMinute, initialDuration, initialDays }: {
-  onConfirm: (hour: number, minute: number, duration: number, weekdays: number[]) => void;
-  onCancel: () => void;
-  theme: AppTheme;
-  title?: string;
-  initialHour?: number;
-  initialMinute?: number;
-  initialDuration?: number;
-  initialDays?: number[];
-}) {
-  const [hour, setHour] = useState(initialHour ?? 14);
-  const [minute, setMinute] = useState(initialMinute ?? 0);
-  const [duration, setDuration] = useState(initialDuration ?? 15);
-  const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
-  const MIN_DURATION = 15;
-
-  const toggleDay = (day: number) => {
-    Haptics.selectionAsync();
-    setSelectedDays((prev) => {
-      if (prev.includes(day)) {
-        if (prev.length <= 1) return prev;
-        return prev.filter((d) => d !== day);
-      }
-      return [...prev, day];
-    });
-  };
-
-  const incHour = () => { Haptics.selectionAsync(); setHour((h) => (h + 1) % 24); };
-  const decHour = () => { Haptics.selectionAsync(); setHour((h) => (h - 1 + 24) % 24); };
-  const incMin = () => { Haptics.selectionAsync(); setMinute((m) => (m + 5) % 60); };
-  const decMin = () => { Haptics.selectionAsync(); setMinute((m) => (m - 5 + 60) % 60); };
-  const incDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.min(120, d + 5)); };
-  const decDur = () => { Haptics.selectionAsync(); setDuration((d) => Math.max(MIN_DURATION, d - 5)); };
-
-  return (
-    <View style={styles.sheetContent}>
-      <Text style={[styles.sheetTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-        {title ?? 'Add screen block'}
-      </Text>
-      <View style={styles.sheetPickerRow}>
-        <View style={styles.sheetPickerCol}>
-          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>hour</Text>
-          <Pressable onPress={incHour} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
-          </Pressable>
-          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad(hour)}
-          </Text>
-          <Pressable onPress={decHour} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
-          </Pressable>
-        </View>
-        <Text style={[styles.sheetColon, { color: theme.textTertiary }]}>:</Text>
-        <View style={styles.sheetPickerCol}>
-          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>min</Text>
-          <Pressable onPress={incMin} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
-          </Pressable>
-          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad(minute)}
-          </Text>
-          <Pressable onPress={decMin} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
-          </Pressable>
-        </View>
-        <View style={{ width: 20 }} />
-        <View style={styles.sheetPickerCol}>
-          <Text style={[styles.sheetLabel, { color: theme.textTertiary }]}>do nothing</Text>
-          <Pressable onPress={incDur} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-up" size={24} color={theme.textSecondary} />
-          </Pressable>
-          <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {duration}m
-          </Text>
-          <Pressable onPress={decDur} hitSlop={12} style={styles.sheetArrow}>
-            <Feather name="chevron-down" size={24} color={theme.textSecondary} />
-          </Pressable>
-        </View>
-      </View>
-      <View style={styles.dayRow}>
-        {WEEKDAY_LABELS.map((label, i) => {
-          const day = WEEKDAY_VALUES[i];
-          const active = selectedDays.includes(day);
-          return (
-            <Pressable key={day} onPress={() => toggleDay(day)} hitSlop={4}>
-              <View style={[
-                styles.dayCircle,
-                active
-                  ? { backgroundColor: theme.text, borderColor: theme.text }
-                  : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
-              ]}>
-                <Text style={[
-                  styles.dayLabel,
-                  { color: active ? theme.bg : theme.textSecondary },
-                ]}>
-                  {label}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={{ height: 24 }} />
-      <View style={styles.sheetButtons}>
-        <PillButton label="cancel" onPress={onCancel} color={theme.textSecondary} outline flex />
-        <PillButton label="add" onPress={() => onConfirm(hour, minute, duration, selectedDays)} color={theme.accent} filled flex />
-      </View>
-    </View>
-  );
-}
-
-export default function SettingsContent({ onClose, insets }: SettingsContentProps) {
+export default function SettingsContent({ onClose, insets, onOpenAccount }: SettingsContentProps) {
   const themeMode = useAppStore((s) => s.themeMode);
-  const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
-  const reminders = useAppStore((s) => s.reminders);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
   const theme = themes[themeMode];
+  const isDark = themeMode === 'dark';
 
-  const [showReminderPicker, setShowReminderPicker] = useState(false);
-  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
-  const [showAppPicker, setShowAppPicker] = useState(false);
-  const [appCount, setAppCount] = useState(() => {
+  const [showNeverBlockPicker, setShowNeverBlockPicker] = useState(false);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('notDetermined');
+
+  // iOS notification permission — banner appears when not granted
+  type NotifStatus = 'granted' | 'denied' | 'undetermined';
+  const [notifStatus, setNotifStatus] = useState<NotifStatus | null>(null);
+  const notifBannerOpacity = useSharedValue(0);
+  const notifBannerY = useSharedValue(10);
+  const stBannerOpacity = useSharedValue(0);
+  const stBannerY = useSharedValue(10);
+
+  const checkNotifStatus = useCallback(async () => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status === 'granted') setNotifStatus('granted');
+      else if (status === 'denied') setNotifStatus('denied');
+      else setNotifStatus('undetermined');
+    } catch {}
+  }, []);
+
+  const checkAuthStatus = useCallback(async () => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      const s = await getAuth();
+      setAuthStatus(s);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    checkAuthStatus();
+    checkNotifStatus();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        checkNotifStatus();
+        checkAuthStatus();
+      }
+    });
+    return () => sub.remove();
+  }, [checkNotifStatus, checkAuthStatus]);
+
+  // Fade each banner in once we know the user hasn't granted that permission
+  useEffect(() => {
+    if (notifStatus === 'denied' || notifStatus === 'undetermined') {
+      notifBannerOpacity.value = withDelay(120, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
+      notifBannerY.value = withDelay(120, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
+    } else {
+      notifBannerOpacity.value = 0;
+      notifBannerY.value = 10;
+    }
+  }, [notifStatus]);
+
+  useEffect(() => {
+    if (authStatus === 'denied' || authStatus === 'notDetermined') {
+      stBannerOpacity.value = withDelay(180, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
+      stBannerY.value = withDelay(180, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
+    } else {
+      stBannerOpacity.value = 0;
+      stBannerY.value = 10;
+    }
+  }, [authStatus]);
+
+  const notifBannerStyle = useAnimatedStyle(() => ({
+    opacity: notifBannerOpacity.value,
+    transform: [{ translateY: notifBannerY.value }],
+  }));
+  const stBannerStyle = useAnimatedStyle(() => ({
+    opacity: stBannerOpacity.value,
+    transform: [{ translateY: stBannerY.value }],
+  }));
+
+  const handleNotifTap = useCallback(async () => {
+    Haptics.selectionAsync();
+    if (notifStatus === 'undetermined') {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        setNotifStatus(status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined');
+      } catch {}
+    } else if (notifStatus === 'denied') {
+      try { await Linking.openSettings(); } catch {}
+    }
+  }, [notifStatus]);
+
+  const handleScreenTimeBannerTap = useCallback(async () => {
+    Haptics.selectionAsync();
+    if (authStatus === 'denied') {
+      try { await Linking.openSettings(); } catch {}
+    } else {
+      const status = await requestAuth();
+      setAuthStatus(status);
+    }
+  }, [authStatus]);
+
+  const readCount = (id: string) => {
     if (Platform.OS !== 'ios') return 0;
     try {
-      const meta = activitySelectionMetadata({ activitySelectionId: BLOCK_SELECTION_ID });
-      return (meta?.applicationCount ?? 0) + (meta?.categoryCount ?? 0);
+      const meta = activitySelectionMetadata({ activitySelectionId: id });
+      return countFromMeta(meta);
     } catch { return 0; }
-  });
+  };
 
-  const reminderSheetRef = useRef<BottomSheet>(null);
+  const [neverBlockCount, setNeverBlockCount] = useState(() => readCount(NEVER_BLOCK_SELECTION_ID));
+
   const blockSheetRef = useRef<BottomSheet>(null);
 
+  const handleOpenAccount = () => {
+    Haptics.selectionAsync();
+    onOpenAccount();
+  };
 
   const store = useAppStore.getState;
 
-  // Block button animation
-  const lockScale = useSharedValue(1);
-  const lockRotate = useSharedValue(0);
-  const lockCircleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: lockScale.value }],
-  }));
+  const [pendingBlock, setPendingBlock] = useState<PendingBlockParams | null>(null);
 
-  const lockIconStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${lockRotate.value}deg` }],
-  }));
-
-  const handleGoalChange = (minutes: number) => {
-    store().setDailyGoal(minutes);
-  };
-
-  const handleConfirmReminder = (hour: number, minute: number, weekdays: number[]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (editingReminder) {
-      store().editReminder(editingReminder.id, hour, minute, weekdays);
-    } else {
-      store().addReminder(hour, minute, weekdays);
-    }
-    reminderSheetRef.current?.close();
-  };
-
-  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[]) => {
+  const commitBlock = (p: PendingBlockParams) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (editingBlock) {
-      store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays);
+      store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
     } else {
-      store().addScheduledBlock(hour, minute, duration, weekdays);
+      store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
     }
     blockSheetRef.current?.close();
+  };
+
+  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
+    const params: PendingBlockParams = { hour, minute, duration, weekdays, groupId, unlockGoalMinutes };
+    const startMin = hour * 60 + minute;
+
+    // Reject blocks sitting within an hour of an existing one (wall-clock,
+    // circular over 24h). Catches duplicates and near-duplicates.
+    let conflictTime: string | null = null;
+    for (const b of scheduledBlocks) {
+      if (editingBlock && editingBlock.id === b.id) continue;
+      const otherMin = b.hour * 60 + b.minute;
+      const d = Math.abs(startMin - otherMin);
+      const circular = Math.min(d, 24 * 60 - d);
+      if (circular < 60) {
+        conflictTime = formatTime12(b.hour, b.minute);
+        break;
+      }
+    }
+
+    if (conflictTime) {
+      setPendingBlock({ ...params, conflictTime });
+      return;
+    }
+    commitBlock(params);
   };
 
   return (
@@ -215,178 +225,136 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
     >
       {/* Header */}
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          Settings
-        </Text>
+        <PillButton
+          label="My account"
+          onPress={handleOpenAccount}
+          color={theme.text}
+          variant="outline"
+          size="small"
+          style={{
+            alignSelf: 'flex-start',
+            borderWidth: 1.2,
+            paddingVertical: 6,
+            paddingHorizontal: 14,
+          }}
+        />
         <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
       </View>
 
-      {/* Daily Goal */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DAILY GOAL</Text>
-      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
-        {dailyGoalMinutes > 0
-          ? `Do nothing for ${dailyGoalMinutes} min every day`
-          : 'Set a daily goal to track your progress'}
-      </Text>
-      <GoalSliderBar
-        value={dailyGoalMinutes}
-        onChange={handleGoalChange}
-        theme={theme}
-        maxMinutes={90}
-        ticks={[5, 10, 15, 30, 45, 60]}
-        scaleLabels={['0', '5', '10', '15', '30', '45', '60', '90']}
-        accentColor={theme.accent}
-      />
-
-      {/* Reminders */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
-        REMINDERS
-      </Text>
-      {reminders.length === 0 && (
-        <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
-          <Feather name="bell-off" size={22} color={theme.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
-            No reminders yet
-          </Text>
-          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
-            Add one to remember to pause
-          </Text>
-        </View>
-      )}
-      {reminders.map((r) => (
-        <ReminderCard
-          key={r.id}
-          hour={r.hour}
-          minute={r.minute}
-          weekdays={r.weekdays}
-          enabled={r.enabled}
-          theme={theme}
-          onPress={() => {
-            Haptics.selectionAsync();
-            setEditingReminder(r);
-            reminderSheetRef.current?.expand();
-          }}
-          onToggle={() => {
-            Haptics.selectionAsync();
-            store().toggleReminder(r.id);
-          }}
-          onRemove={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            store().removeReminder(r.id);
-          }}
-        />
-      ))}
-      <PillButton
-        label="+ add reminder"
-        color={theme.text}
-        variant="outline"
-        size="small"
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setEditingReminder(null);
-          setShowReminderPicker(true);
-          reminderSheetRef.current?.expand();
-        }}
-      />
-
-      {/* App selection for blocking */}
-      {Platform.OS === 'ios' && (
-        <>
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            APPS TO BLOCK
-          </Text>
-          <View style={styles.blockRow}>
-            <View style={styles.blockTextCol}>
-              <Text style={[styles.blockTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                {appCount > 0 ? `${appCount} apps blocked` : 'No apps blocked'}
+      {/* Notification permission banner — shown first so it's impossible to miss.
+          Banner is its own warm chip regardless of theme: saturated peach/amber
+          background with dark text so it stays readable on cream AND charcoal. */}
+      {Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
+        <Animated.View style={notifBannerStyle}>
+          <Pressable
+            onPress={handleNotifTap}
+            style={[
+              styles.notifBanner,
+              {
+                backgroundColor: isDark ? 'rgba(232, 169, 154, 0.95)' : 'rgba(232, 169, 154, 0.6)',
+                marginBottom: (authStatus === 'denied' || authStatus === 'notDetermined') ? 12 : 28,
+              },
+            ]}
+          >
+            <View style={[styles.notifIconWrap, { backgroundColor: palette.white }]}>
+              <Feather name="bell-off" size={18} color={palette.brown} />
+            </View>
+            <View style={styles.notifText}>
+              <Text style={[styles.notifTitle, { color: palette.brown, fontFamily: Fonts!.serif }]}>
+                {notifStatus === 'denied' ? 'Notifications are off' : 'Enable notifications'}
               </Text>
-              <Text style={[styles.blockSub, { color: theme.textTertiary }]}>
-                {appCount > 0 ? 'tap lock to change' : 'tap lock to select'}
+              <Text style={[styles.notifSub, { color: 'rgba(51, 52, 49, 0.75)', fontFamily: Fonts!.serif }]}>
+                {notifStatus === 'denied'
+                  ? "We can't remind you about blocks or session ends. Tap to turn them on."
+                  : "So we can gently remind you about scheduled blocks and session ends."}
               </Text>
             </View>
-            <Pressable
-              onPressIn={() => {
-                lockScale.value = withTiming(0.9, { duration: 100 });
-              }}
-              onPressOut={() => {
-                lockScale.value = withTiming(1, { duration: 200 });
-              }}
-              onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                lockRotate.value = withSequence(
-                  withTiming(-20, { duration: 100 }),
-                  withTiming(15, { duration: 100 }),
-                  withTiming(0, { duration: 150 }),
-                );
-                const status = await requestAuth();
-                if (status === 'approved') setShowAppPicker(true);
-              }}
-            >
-              <Animated.View
-                style={[styles.lockCircle, lockCircleStyle, appCount > 0
-                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                  : { backgroundColor: 'transparent', borderColor: theme.text },
-                ]}
-              >
-                <Animated.View style={lockIconStyle}>
-                  <Feather
-                    name={appCount > 0 ? 'lock' : 'unlock'}
-                    size={20}
-                    color={appCount > 0 ? theme.accentText : theme.text}
-                  />
-                </Animated.View>
-              </Animated.View>
-            </Pressable>
-          </View>
-          {showAppPicker && (
-            <DeviceActivitySelectionSheetViewPersisted
-              familyActivitySelectionId={BLOCK_SELECTION_ID}
-              headerText="Choose apps to block"
-              footerText=""
-              onSelectionChange={(e) => {
-                const meta = e.nativeEvent;
-                setAppCount((meta.applicationCount ?? 0) + (meta.categoryCount ?? 0));
-              }}
-              onDismissRequest={() => setShowAppPicker(false)}
-              style={{ height: 1, width: 1, position: 'absolute', top: -9999 }}
-            />
-          )}
-        </>
+            <Feather name="chevron-right" size={18} color="rgba(51, 52, 49, 0.55)" />
+          </Pressable>
+        </Animated.View>
       )}
 
-      {/* Scheduled Blocking */}
-      <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginTop: 32 }]}>
-        SCREEN BLOCK
-      </Text>
+      {/* Screen Time permission banner — amber-tinted to differ from notif salmon */}
+      {Platform.OS === 'ios' && (authStatus === 'denied' || authStatus === 'notDetermined') && (
+        <Animated.View style={stBannerStyle}>
+          <Pressable
+            onPress={handleScreenTimeBannerTap}
+            style={[
+              styles.notifBanner,
+              { backgroundColor: isDark ? 'rgba(224, 166, 83, 0.95)' : 'rgba(224, 166, 83, 0.55)' },
+            ]}
+          >
+            <View style={[styles.notifIconWrap, { backgroundColor: palette.white }]}>
+              <Feather name="smartphone" size={18} color={palette.brown} />
+            </View>
+            <View style={styles.notifText}>
+              <Text style={[styles.notifTitle, { color: palette.brown, fontFamily: Fonts!.serif }]}>
+                {authStatus === 'denied' ? 'Screen Time access is off' : 'Enable Screen Time access'}
+              </Text>
+              <Text style={[styles.notifSub, { color: 'rgba(51, 52, 49, 0.75)', fontFamily: Fonts!.serif }]}>
+                {authStatus === 'denied'
+                  ? "Without it we can't block or unblock apps for you. Tap to turn it on."
+                  : "We need it to schedule app blocks. Tap to grant access."}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="rgba(51, 52, 49, 0.55)" />
+          </Pressable>
+        </Animated.View>
+      )}
+
+      {/* Screen block + Always allowed — gated behind iOS Screen Time and
+          Notifications permissions. When either is missing the whole block
+          reads as inactive and rejects touches until the banners above are
+          dismissed by granting access. */}
+      <View
+        pointerEvents={
+          Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
+            ? 'none'
+            : 'auto'
+        }
+        style={{
+          opacity:
+            Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
+              ? 0.4
+              : 1,
+        }}
+      >
+      {/* Screen block */}
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderText}>
+          <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+            Screen block
+          </Text>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+            Block all apps at a set time, unlock by doing nothing
+          </Text>
+        </View>
+      </View>
       {scheduledBlocks.length === 0 && (
         <View style={[styles.emptyCard, { borderColor: theme.textTertiary }]}>
           <Feather name="smartphone" size={22} color={theme.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+          <Text style={[styles.emptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
             No scheduled blocks yet
           </Text>
-          <Text style={[styles.emptySub, { color: theme.textTertiary }]}>
+          <Text style={[styles.emptySub, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
             Schedule time to block distractions
           </Text>
         </View>
       )}
       {scheduledBlocks.map((b) => {
-        const disabled = appCount === 0;
-        const active = b.enabled && !disabled;
+        const active = b.enabled;
         return (
           <Pressable
             key={b.id}
             onPress={() => {
-              if (disabled) return;
               Haptics.selectionAsync();
               setEditingBlock(b);
               blockSheetRef.current?.expand();
             }}
             style={[styles.card, {
-              borderColor: active ? theme.accent : theme.border,
-              opacity: disabled ? 0.4 : 1,
+              borderColor: active ? theme.accent : theme.text,
             }]}
           >
             <View style={styles.cardContent}>
@@ -394,7 +362,10 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
                 {formatTime12(b.hour, b.minute)}
               </Text>
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-                do nothing for {b.durationMinutes} min
+                <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
+                  {b.unlockGoalMinutes} min
+                </Text>
+                {' nothing to unlock'}
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
@@ -416,7 +387,6 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
             <View style={styles.cardActions}>
               <Switch
                 value={active}
-                disabled={disabled}
                 onValueChange={() => {
                   Haptics.selectionAsync();
                   store().toggleScheduledBlock(b.id);
@@ -445,32 +415,86 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         variant="outline"
         size="small"
         onPress={() => {
-          if (appCount === 0) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setEditingBlock(null);
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
       />
-    </ScrollView>
 
-    {/* Bottom sheet for reminder picker */}
-    <PickerSheet
-      ref={reminderSheetRef}
-      theme={theme}
-      onDismiss={() => { setShowReminderPicker(false); setEditingReminder(null); }}
-    >
-      <TimePickerContent
-        key={editingReminder?.id ?? 'new'}
-        theme={theme}
-        title={editingReminder ? 'Edit reminder' : 'Add reminder'}
-        initialHour={editingReminder?.hour}
-        initialMinute={editingReminder?.minute}
-        initialDays={editingReminder?.weekdays}
-        onConfirm={handleConfirmReminder}
-        onCancel={() => reminderSheetRef.current?.close()}
-      />
-    </PickerSheet>
+      {/* Always allowed */}
+      {Platform.OS === 'ios' && (
+        <>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                Always allowed
+              </Text>
+              <Text style={[styles.sectionHint, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
+                These stay unlocked during any block
+              </Text>
+            </View>
+            {neverBlockCount > 0 && (
+              <Pressable
+                onPress={async () => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const status = await requestAuth();
+                  if (status === 'approved') setShowNeverBlockPicker(true);
+                }}
+                hitSlop={10}
+                style={[styles.changeChip, { borderColor: theme.text }]}
+              >
+                <Feather name="edit-2" size={12} color={theme.text} />
+                <Text style={[styles.changeChipLabel, { color: theme.text }]}>edit</Text>
+              </Pressable>
+            )}
+          </View>
+          {neverBlockCount > 0 ? (
+            <View
+              style={{
+                height: 240,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 16,
+                overflow: 'hidden',
+              }}
+            >
+              <AppLabelsView
+                activitySelectionId={NEVER_BLOCK_SELECTION_ID}
+                iconSize={44}
+                layout="list"
+                tintColor={theme.text}
+                ringColor={theme.bg}
+                style={{ flex: 1 }}
+              />
+            </View>
+          ) : (
+            <Pressable
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const status = await requestAuth();
+                if (status === 'approved') setShowNeverBlockPicker(true);
+              }}
+              style={[styles.allowEmpty, { borderColor: theme.textTertiary }]}
+            >
+              <View style={[styles.allowEmptyIcon, { backgroundColor: theme.border }]}>
+                <Feather name="plus" size={20} color={theme.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.allowEmptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                  Allow some apps
+                </Text>
+                <Text style={[styles.allowEmptySub, { color: theme.textTertiary }]}>
+                  Pick apps that stay usable while blocking
+                </Text>
+              </View>
+            </Pressable>
+          )}
+        </>
+      )}
+      </View>
+    </ScrollView>
 
     {/* Bottom sheet for block picker */}
     <PickerSheet
@@ -484,12 +508,41 @@ export default function SettingsContent({ onClose, insets }: SettingsContentProp
         title={editingBlock ? 'Edit screen block' : 'Add screen block'}
         initialHour={editingBlock?.hour}
         initialMinute={editingBlock?.minute}
-        initialDuration={editingBlock?.durationMinutes}
         initialDays={editingBlock?.weekdays}
+        initialUnlockGoal={editingBlock?.unlockGoalMinutes}
         onConfirm={handleConfirmBlock}
         onCancel={() => blockSheetRef.current?.close()}
       />
     </PickerSheet>
+
+    {/* Inter-block spacing warning — blocking (no override) */}
+    <AlertModal
+      visible={pendingBlock !== null}
+      theme={theme}
+      icon="clock"
+      title="Too close to another block"
+      message={
+        pendingBlock?.conflictTime
+          ? `You already have a block at ${pendingBlock.conflictTime}. Blocks must be at least an hour apart.`
+          : ''
+      }
+      closeLabel="got it"
+      onClose={() => setPendingBlock(null)}
+    />
+
+    {/* App picker: never-block */}
+    <AppPickerSheet
+      theme={theme}
+      selectionId={showNeverBlockPicker ? NEVER_BLOCK_SELECTION_ID : null}
+      title="Never block"
+      onClose={() => {
+        try {
+          const meta = activitySelectionMetadata({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
+          setNeverBlockCount(countFromMeta(meta));
+        } catch {}
+        setShowNeverBlockPicker(false);
+      }}
+    />
     </>
   );
 }
@@ -499,24 +552,45 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: '500', marginBottom: 12 },
-  sectionHint: { fontSize: 13, fontWeight: '300', fontStyle: 'italic', marginBottom: 4 },
-  goalRow: {
+
+  notifBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 24,
-    paddingVertical: 16,
-    borderWidth: 1.2,
     borderRadius: 16,
-    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 28,
+    gap: 14,
   },
-  stepperBtn: { padding: 8 },
-  goalValue: { fontSize: 22, fontWeight: '300', minWidth: 80, textAlign: 'center' },
+  notifIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifText: { flex: 1 },
+  notifTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginBottom: 3,
+  },
+  notifSub: {
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0.15,
+  },
+
+  sectionTitle: { fontSize: 24, fontWeight: '400' },
+  sectionHint: { fontSize: 14, fontWeight: '300', fontStyle: 'italic' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  sectionHeaderText: { flex: 1, gap: 4 },
 
   // Card style for reminders & blocks
   card: {
-    borderWidth: 1.2,
+    borderWidth: CARD_BORDER_WIDTH,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -526,8 +600,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
-  cardTime: { fontSize: 28, fontWeight: '300' },
-  cardLabel: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
+  cardTime: { fontSize: 28, fontWeight: '500' },
+  cardLabel: { fontSize: 14, fontWeight: '300' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
 
@@ -537,13 +611,72 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 4,
   },
-  lockCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
+  groupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: CARD_BORDER_WIDTH,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  labelGrid: {
+    width: '100%',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  allowEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: CARD_BORDER_WIDTH,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  allowEmptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  allowEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  allowEmptySub: {
+    fontSize: 12,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  changeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1.5,
+    borderRadius: 100,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  changeChipLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  groupName: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  groupSub: {
+    fontSize: 12,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   blockTextCol: {
     flex: 1,
@@ -559,7 +692,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: 28 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 36 },
   emptyCard: {
     borderWidth: 1,
     borderStyle: 'dashed',
@@ -574,90 +707,23 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: '400' },
   emptySub: { fontSize: 12, fontWeight: '300', fontStyle: 'italic' },
 
-  // Bottom sheet content
-  sheetContent: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '400',
-    marginBottom: 24,
-  },
-  sheetPickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 32,
-  },
-  sheetPickerCol: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  sheetArrow: {
-    padding: 4,
-  },
-  sheetPickerValue: {
-    fontSize: 36,
-    fontWeight: '200',
-  },
-  sheetColon: {
-    fontSize: 36,
-    fontWeight: '200',
-  },
-  sheetLabel: {
-    fontSize: 10,
-    fontWeight: '400',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  sheetButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  dayRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
-  },
-  dayCircle: {
-    width: 40,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1.2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
   cardDays: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
+    gap: 9,
+    marginTop: 8,
   },
   cardDayCol: {
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   cardDot: {
-    width: 5.5,
-    height: 5.5,
-    borderRadius: 2.75,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 1,
   },
   cardDayText: {
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '400',
-  },
-  dayHint: {
-    fontSize: 12,
-    fontWeight: '300',
-    fontStyle: 'italic',
-    marginBottom: 24,
   },
 });

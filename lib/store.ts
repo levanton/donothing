@@ -1,18 +1,12 @@
 import { create } from 'zustand';
-import { Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { initDatabase } from './db';
 import {
   addSession as dbAddSession,
+  deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
+  cleanupInvalidSessions,
 } from './db/sessions';
-import {
-  getAllReminders,
-  insertReminder,
-  updateReminder as dbUpdateReminder,
-  deleteReminder as dbDeleteReminder,
-  toggleReminder as dbToggleReminder,
-} from './db/reminders';
 import {
   getAllScheduledBlocks,
   insertScheduledBlock,
@@ -20,17 +14,22 @@ import {
   deleteScheduledBlock as dbDeleteScheduledBlock,
   toggleScheduledBlock as dbToggleScheduledBlock,
 } from './db/scheduled-blocks';
-import { getSetting, setSetting, getDeviceState, setDeviceState } from './db/settings';
 import {
-  getNotificationIds,
+  getAllBlockGroups,
+} from './db/block-groups';
+import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
+import {
   clearNotificationIds,
 } from './db/notification-state';
-import type { Reminder, ScheduledBlock } from './db/types';
+import type { ScheduledBlock } from './db/types';
 import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
+import { getAchievedMilestones } from './db/milestones-db';
+import { evaluateAndSaveNewMilestones } from './milestones';
 import {
-  configureNotifications, requestPermission,
-  syncReminders, cancelNotification,
+  configureNotifications,
+  scheduleSessionCompleteNotification,
+  cancelNotification,
 } from './notifications';
 
 // Module-level refs (not state, not serializable)
@@ -38,6 +37,31 @@ let timerInterval: ReturnType<typeof setInterval> | null = null;
 let focusInterval: ReturnType<typeof setInterval> | null = null;
 let sessionStartTime = 0;
 let focusEndTime = 0;
+let sessionNotificationId: string | null = null;
+
+const PENDING_SESSION_KEY = 'session_pending';
+const SESSION_CANCELLED_KEY = 'session_cancelled';
+
+interface PendingSession {
+  startedAt: number;
+  goalSeconds: number;
+  notificationId: string | null;
+}
+
+function writePendingSession(p: PendingSession): void {
+  try { setDeviceState(PENDING_SESSION_KEY, JSON.stringify(p)); } catch {}
+}
+
+function readPendingSession(): PendingSession | null {
+  try {
+    const raw = getDeviceState(PENDING_SESSION_KEY);
+    return raw ? (JSON.parse(raw) as PendingSession) : null;
+  } catch { return null; }
+}
+
+function clearPendingSession(): void {
+  try { deleteDeviceState(PENDING_SESSION_KEY); } catch {}
+}
 
 export interface AppState {
   // Timer / Session
@@ -49,9 +73,17 @@ export interface AppState {
   // Theme
   themeMode: ThemeMode;
 
+  // Subscription — gates premium features (Settings, Journey, etc.)
+  // Default false; flip to true once RevenueCat entitlement is active.
+  isSubscribed: boolean;
+
+  // Win-back promo offer shown after the user closes the main paywall
+  promoOfferVisible: boolean;
+  showPromoOffer: () => void;
+  hidePromoOffer: () => void;
+
   // Goal
   goalSeconds: number;
-  showGoalSlider: boolean;
   sliderMinutes: number;
 
   // Focus lock
@@ -62,12 +94,36 @@ export interface AppState {
   // Settings
   settingsOpen: boolean;
   dailyGoalMinutes: number;
-  reminders: Reminder[];
   scheduledBlocks: ScheduledBlock[];
+
+  // Last session metadata (used by SessionCompleteScreen)
+  lastSessionId: string;
+  lastSessionDuration: number;
+
+  // Session completion (countdown reached 00:00)
+  completionVisible: boolean;
+
+  // Milestones (data only — no overlay UI)
+  achievedMilestones: Map<string, number>;
+
+  // Session interruption
+  sessionEndedVisible: boolean;
+  cancelReason: 'backgrounded' | null;
 
   // Onboarding
   onboardingComplete: boolean;
   setOnboardingComplete: () => void;
+
+  // Completion actions
+  completeSession: () => Promise<void>;
+  dismissCompletion: () => void;
+
+  // Milestone actions
+  checkMilestones: () => void;
+
+  // Interruption actions
+  cancelSession: (reason: 'backgrounded') => Promise<void>;
+  dismissSessionEnded: () => void;
 
   // Actions
   init: () => Promise<void>;
@@ -75,10 +131,9 @@ export interface AppState {
   stopSession: () => Promise<void>;
   resetElapsed: () => void;
   toggleTheme: () => void;
+  setSubscription: (isSubscribed: boolean) => void;
 
   // Goal actions
-  openGoalSlider: () => void;
-  cancelGoal: () => void;
   setSliderMinutes: (m: number) => void;
   setGoalFromSlider: (m: number) => void;
 
@@ -93,16 +148,13 @@ export interface AppState {
   openSettings: () => void;
   closeSettings: () => void;
   setDailyGoal: (minutes: number) => Promise<void>;
-  addReminder: (hour: number, minute: number, weekdays: number[]) => Promise<void>;
-  editReminder: (id: string, hour: number, minute: number, weekdays: number[]) => Promise<void>;
-  removeReminder: (id: string) => Promise<void>;
-  toggleReminder: (id: string) => Promise<void>;
-  addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
-  editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[]) => Promise<void>;
+  addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => Promise<void>;
+  editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => Promise<void>;
   removeScheduledBlock: (id: string) => Promise<void>;
   toggleScheduledBlock: (id: string) => Promise<void>;
 
   // Session actions
+  deleteSession: (id: string) => Promise<void>;
   deleteSessionsByDate: (dateKey: string) => Promise<void>;
 
   // AppState
@@ -117,17 +169,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   weekStats: [],
   ready: false,
   themeMode: 'dark',
-  goalSeconds: 0,
-  showGoalSlider: false,
-  sliderMinutes: 5,
+  isSubscribed: true,
+  goalSeconds: 10 * 60,
+  sliderMinutes: 10,
   focusStep: 'hidden',
   focusRemaining: 0,
   focusTotal: 0,
 
+  // Last session metadata
+  lastSessionId: '',
+  lastSessionDuration: 0,
+
+  // Session completion
+  completionVisible: false,
+
+  // Milestones (data only — no overlay UI)
+  achievedMilestones: new Map(),
+
+  // Session interruption
+  sessionEndedVisible: false,
+  cancelReason: null,
+
   // Settings
   settingsOpen: false,
   dailyGoalMinutes: 0,
-  reminders: [],
   scheduledBlocks: [],
 
   // Onboarding
@@ -140,6 +205,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Init ---
   init: async () => {
     await initDatabase();
+    // Drop any sessions with bogus duration (timestamp-sized, negative, etc.)
+    try { cleanupInvalidSessions(); } catch {}
     configureNotifications();
     // Copy shield icon to app group (fire and forget)
     import('./screen-time').then(({ copyShieldIcon }) => copyShieldIcon()).catch(() => {});
@@ -148,29 +215,48 @@ export const useAppStore = create<AppState>((set, get) => ({
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
     const onboardingComplete = getSetting('onboardingComplete') === '1';
     const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
-    const reminders = getAllReminders();
     const scheduledBlocks = getAllScheduledBlocks();
 
-    // Sync notifications (async)
-    await syncReminders(reminders);
-
-    // Re-register native scheduled blocks
+    // Reconcile native monitors with DB state, then re-register what's valid.
     try {
-      const { scheduleBlock } = await import('./screen-time');
+      const { reconcileBlocks, scheduleBlock } = await import('./screen-time');
+      const validIds = new Set(scheduledBlocks.filter((b) => b.enabled).map((b) => b.id));
+      const groupIds = getAllBlockGroups().map((g) => g.id);
+      await reconcileBlocks(validIds, groupIds);
       for (const b of scheduledBlocks) {
         if (b.enabled) {
-          await scheduleBlock(b.id, 'donothing-scheduled-block', b.hour, b.minute, b.durationMinutes);
+          await scheduleBlock(b.id, b.groupId, b.hour, b.minute, b.durationMinutes, b.unlockGoalMinutes);
         }
       }
     } catch {}
+
+    // Load milestones
+    const achievedMilestones = getAchievedMilestones();
+
+    // Cold-start recovery: if a session was pending when the app was killed,
+    // treat it as cancelled (we can't verify the user wasn't on another app).
+    const pending = readPendingSession();
+    let sessionEndedVisible = getDeviceState(SESSION_CANCELLED_KEY) === '1';
+    let cancelReason: 'backgrounded' | null = sessionEndedVisible ? 'backgrounded' : null;
+    if (pending) {
+      if (pending.notificationId) {
+        try { await cancelNotification(pending.notificationId); } catch {}
+      }
+      clearPendingSession();
+      setDeviceState(SESSION_CANCELLED_KEY, '1');
+      sessionEndedVisible = true;
+      cancelReason = 'backgrounded';
+    }
 
     set({
       themeMode,
       dailyGoalMinutes,
       onboardingComplete,
-      reminders,
       scheduledBlocks,
+      achievedMilestones,
       weekStats: getWeekStats(),
+      sessionEndedVisible,
+      cancelReason,
       ready: true,
     });
   },
@@ -178,11 +264,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Timer ---
   startSession: () => {
     sessionStartTime = Date.now();
-    set({ started: true, elapsed: 0, showGoalSlider: false });
+    const goalSeconds = get().goalSeconds;
+    set({ started: true, elapsed: 0 });
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
+    // Schedule completion notification only for countdown sessions.
+    sessionNotificationId = null;
+    if (goalSeconds > 0) {
+      scheduleSessionCompleteNotification(goalSeconds, Math.round(goalSeconds / 60))
+        .then((id) => {
+          sessionNotificationId = id;
+          writePendingSession({
+            startedAt: sessionStartTime,
+            goalSeconds,
+            notificationId: id,
+          });
+        })
+        .catch(() => {
+          writePendingSession({ startedAt: sessionStartTime, goalSeconds, notificationId: null });
+        });
+    } else {
+      writePendingSession({ startedAt: sessionStartTime, goalSeconds: 0, notificationId: null });
+    }
   },
 
   stopSession: async () => {
@@ -190,13 +295,74 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-    set({ started: false });
-    dbAddSession(duration);
-    set({ weekStats: getWeekStats() });
+    const session = dbAddSession(duration);
+    set({
+      started: false,
+      weekStats: getWeekStats(),
+      lastSessionId: session?.id ?? '',
+      lastSessionDuration: duration,
+      // Same reason as completeSession — make the next tap start from the
+      // slider's visible value, not whatever the last block session set.
+      goalSeconds: get().sliderMinutes * 60,
+    });
+    get().checkMilestones();
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
+
+  // --- Completion (countdown reached 00:00) ---
+  completeSession: async () => {
+    if (!get().started) return;
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
+    const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const session = dbAddSession(duration);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    set({
+      started: false,
+      elapsed: 0,
+      weekStats: getWeekStats(),
+      lastSessionId: session?.id ?? '',
+      lastSessionDuration: duration,
+      completionVisible: true,
+      // Sync goal back to the slider display — block sessions override
+      // goalSeconds to unlockMin*60, and without this reset a subsequent
+      // normal tap would start a session at the stale block duration
+      // while the UI still shows the slider's value.
+      goalSeconds: get().sliderMinutes * 60,
+    });
+  },
+
+  dismissCompletion: () => {
+    set({ completionVisible: false });
+    get().checkMilestones();
+  },
+
+  // --- Milestones ---
+  checkMilestones: () => {
+    const newIds = evaluateAndSaveNewMilestones();
+    if (newIds.length > 0) {
+      set({ achievedMilestones: getAchievedMilestones() });
+    }
+  },
+
+  deleteSession: async (id: string) => {
+    dbDeleteSession(id);
+    set({ weekStats: getWeekStats() });
+  },
 
   deleteSessionsByDate: async (dateKey: string) => {
     deleteSessionsByDateKey(dateKey);
@@ -210,15 +376,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     setDeviceState('theme', next);
   },
 
+  setSubscription: (isSubscribed: boolean) => {
+    set({ isSubscribed });
+  },
+
+  promoOfferVisible: false,
+  showPromoOffer: () => set({ promoOfferVisible: true }),
+  hidePromoOffer: () => set({ promoOfferVisible: false }),
+
   // --- Goal ---
-  openGoalSlider: () => {
-    set({ showGoalSlider: true, sliderMinutes: 5, goalSeconds: 5 * 60 });
-  },
-
-  cancelGoal: () => {
-    set({ goalSeconds: 0, showGoalSlider: false });
-  },
-
   setSliderMinutes: (m) => set({ sliderMinutes: m }),
 
   setGoalFromSlider: (m) => set({ goalSeconds: m * 60 }),
@@ -266,71 +432,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     setSetting('dailyGoal', String(minutes));
   },
 
-  addReminder: async (hour, minute, weekdays) => {
-    const status = await requestPermission();
-    if (status === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'Enable notifications in Settings to receive reminders.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ],
-      );
-      return;
-    }
-    if (status !== 'granted') return;
-    const reminder = insertReminder(hour, minute, weekdays);
-    const reminders = getAllReminders();
-    await syncReminders(reminders);
-    set({ reminders });
-  },
-
-  editReminder: async (id, hour, minute, weekdays) => {
-    dbUpdateReminder(id, hour, minute, weekdays);
-    const reminders = getAllReminders();
-    await syncReminders(reminders);
-    set({ reminders });
-  },
-
-  removeReminder: async (id) => {
-    // Cancel notifications before deleting
-    const notifIds = getNotificationIds('reminder', id);
-    for (const nid of notifIds) {
-      try { await cancelNotification(nid); } catch {}
-    }
-    clearNotificationIds('reminder', id);
-    dbDeleteReminder(id);
-    set({ reminders: getAllReminders() });
-  },
-
-  toggleReminder: async (id) => {
-    dbToggleReminder(id);
-    const reminders = getAllReminders();
-    // Optimistically update UI
-    set({ reminders });
-    await syncReminders(reminders);
-    set({ reminders: getAllReminders() });
-  },
-
-  addScheduledBlock: async (hour, minute, durationMinutes, weekdays) => {
-    const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays);
+  addScheduledBlock: async (hour, minute, durationMinutes, weekdays, groupId, unlockGoalMinutes) => {
+    const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays, groupId, unlockGoalMinutes);
     try {
       const { scheduleBlock } = await import('./screen-time');
-      await scheduleBlock(block.id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+      await scheduleBlock(block.id, groupId, hour, minute, durationMinutes, unlockGoalMinutes);
     } catch (e) {
       console.warn('Failed to schedule native block:', e);
     }
     set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
-  editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays) => {
+  editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays, groupId, unlockGoalMinutes) => {
     try {
       const { unscheduleBlock, scheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
-      await scheduleBlock(id, 'donothing-scheduled-block', hour, minute, durationMinutes);
+      await scheduleBlock(id, groupId, hour, minute, durationMinutes, unlockGoalMinutes);
     } catch {}
-    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays);
+    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays, groupId, unlockGoalMinutes);
     set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
@@ -353,7 +472,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         if (nowEnabled) {
           const { scheduleBlock } = await import('./screen-time');
-          await scheduleBlock(id, 'donothing-scheduled-block', block.hour, block.minute, block.durationMinutes);
+          await scheduleBlock(id, block.groupId, block.hour, block.minute, block.durationMinutes, block.unlockGoalMinutes);
         } else {
           const { unscheduleBlock } = await import('./screen-time');
           unscheduleBlock(id);
@@ -362,18 +481,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // --- Interruption handling ---
+  cancelSession: async (reason) => {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+    clearPendingSession();
+    setDeviceState(SESSION_CANCELLED_KEY, '1');
+    set({
+      started: false,
+      elapsed: 0,
+      sessionEndedVisible: true,
+      cancelReason: reason,
+    });
+  },
+
+  dismissSessionEnded: () => {
+    try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
+    set({ sessionEndedVisible: false, cancelReason: null });
+  },
+
   // --- AppState ---
   handleBackground: async () => {
     const { started } = get();
-    if (started) {
-      const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-      }
-      set({ started: false });
-      dbAddSession(duration);
-    }
+    if (!started) return;
+    await get().cancelSession('backgrounded');
   },
 
   handleForeground: () => {

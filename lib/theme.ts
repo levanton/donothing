@@ -7,11 +7,13 @@ export const palette = {
   white:      '#FFFFFF',
   charcoal:   '#444444',
   brown:      '#333431',
-  terracotta: '#CF644D',
+  terracotta: '#C26749',
   salmon:     '#E8A99A',
   umber:      '#5C4033',
   danger:     '#D94040',
 } as const;
+
+export const CARD_BORDER_WIDTH = 1.5;
 
 // ── Opacity helpers ──────────────────────────────────────────────────────
 const alpha = (hex: string, opacity: number): string => {
@@ -39,7 +41,7 @@ export const themes: Record<ThemeMode, AppTheme> = {
   dark: {
     bg:            palette.charcoal,
     text:          palette.cream,
-    textSecondary: alpha(palette.cream, 0.85),
+    textSecondary: alpha(palette.cream, 0.92),
     textTertiary:  alpha(palette.cream, 0.75),
     dot:           palette.terracotta,
     border:        alpha(palette.cream, 0.18),
@@ -51,7 +53,7 @@ export const themes: Record<ThemeMode, AppTheme> = {
   light: {
     bg:            palette.cream,
     text:          palette.brown,
-    textSecondary: alpha(palette.brown, 0.75),
+    textSecondary: alpha(palette.brown, 0.9),
     textTertiary:  alpha(palette.brown, 0.7),
     dot:           palette.terracotta,
     border:        alpha(palette.brown, 0.2),

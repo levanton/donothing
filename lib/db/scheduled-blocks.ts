@@ -9,6 +9,8 @@ interface BlockRow {
   duration_minutes: number;
   weekdays: string;
   enabled: number;
+  group_id: string | null;
+  unlock_goal_minutes: number;
 }
 
 function rowToBlock(row: BlockRow): ScheduledBlock {
@@ -19,13 +21,18 @@ function rowToBlock(row: BlockRow): ScheduledBlock {
     durationMinutes: row.duration_minutes,
     weekdays: JSON.parse(row.weekdays),
     enabled: row.enabled === 1,
+    groupId: row.group_id,
+    unlockGoalMinutes: row.unlock_goal_minutes,
   };
 }
+
+const SELECT_COLS =
+  'id, hour, minute, duration_minutes, weekdays, enabled, group_id, unlock_goal_minutes';
 
 export function getAllScheduledBlocks(): ScheduledBlock[] {
   const db = getDb();
   const rows = db.getAllSync<BlockRow>(
-    'SELECT id, hour, minute, duration_minutes, weekdays, enabled FROM scheduled_blocks ORDER BY hour, minute',
+    `SELECT ${SELECT_COLS} FROM scheduled_blocks ORDER BY hour, minute`,
   );
   return rows.map(rowToBlock);
 }
@@ -33,31 +40,56 @@ export function getAllScheduledBlocks(): ScheduledBlock[] {
 export function getScheduledBlockById(id: string): ScheduledBlock | null {
   const db = getDb();
   const row = db.getFirstSync<BlockRow>(
-    'SELECT id, hour, minute, duration_minutes, weekdays, enabled FROM scheduled_blocks WHERE id = ?',
+    `SELECT ${SELECT_COLS} FROM scheduled_blocks WHERE id = ?`,
     id,
   );
   return row ? rowToBlock(row) : null;
 }
 
 export function insertScheduledBlock(
-  hour: number, minute: number, durationMinutes: number, weekdays: number[],
+  hour: number,
+  minute: number,
+  durationMinutes: number,
+  weekdays: number[],
+  groupId: string | null,
+  unlockGoalMinutes: number,
 ): ScheduledBlock {
   const db = getDb();
   const id = randomUUID();
+  const goal = unlockGoalMinutes ?? 5;
   db.runSync(
-    'INSERT INTO scheduled_blocks (id, hour, minute, duration_minutes, weekdays, enabled) VALUES (?, ?, ?, ?, ?, 1)',
-    id, hour, minute, durationMinutes, JSON.stringify(weekdays),
+    'INSERT INTO scheduled_blocks (id, hour, minute, duration_minutes, weekdays, enabled, group_id, unlock_goal_minutes) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+    id,
+    hour,
+    minute,
+    durationMinutes,
+    JSON.stringify(weekdays),
+    groupId,
+    goal,
   );
-  return { id, hour, minute, durationMinutes, weekdays, enabled: true };
+  return { id, hour, minute, durationMinutes, weekdays, enabled: true, groupId, unlockGoalMinutes: goal };
 }
 
 export function updateScheduledBlock(
-  id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[],
+  id: string,
+  hour: number,
+  minute: number,
+  durationMinutes: number,
+  weekdays: number[],
+  groupId: string | null,
+  unlockGoalMinutes: number,
 ): void {
   const db = getDb();
+  const goal = unlockGoalMinutes ?? 5;
   db.runSync(
-    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, updated_at = datetime('now') WHERE id = ?`,
-    hour, minute, durationMinutes, JSON.stringify(weekdays), id,
+    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, group_id = ?, unlock_goal_minutes = ?, updated_at = datetime('now') WHERE id = ?`,
+    hour,
+    minute,
+    durationMinutes,
+    JSON.stringify(weekdays),
+    groupId,
+    goal,
+    id,
   );
 }
 
@@ -73,7 +105,8 @@ export function toggleScheduledBlock(id: string): boolean {
     id,
   );
   const row = db.getFirstSync<{ enabled: number }>(
-    'SELECT enabled FROM scheduled_blocks WHERE id = ?', id,
+    'SELECT enabled FROM scheduled_blocks WHERE id = ?',
+    id,
   );
   return row?.enabled === 1;
 }

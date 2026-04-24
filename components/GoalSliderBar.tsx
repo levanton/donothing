@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, TextStyle, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -24,12 +24,17 @@ const SNAP_POINTS = [
   65, 70, 75, 80, 85, 90,
 ];
 
-// Piecewise linear: 0–15 → 0–0.375, 15–60 → 0.375–0.8, 60–90 → 0.8–1.0
+// Piecewise linear anchors — value → position mapping is split into segments
+// between neighbouring breakpoints plus the implicit endpoints (0, 0) and
+// (max, 1). Passing an optional third breakpoint gives four segments, which
+// is what lets tick marks like 30/45/60/90 be equally spaced even though
+// their value gaps aren't equal.
 const DEFAULT_BP = { b1Val: 15, b1Pos: 0.375, b2Val: 60, b2Pos: 0.8 };
 
 export interface PiecewiseBreakpoints {
   b1Val: number; b1Pos: number;
   b2Val: number; b2Pos: number;
+  b3Val?: number; b3Pos?: number;
 }
 
 /** value → visual position (0–1) */
@@ -37,6 +42,10 @@ function valueToPos(v: number, max: number, bp: PiecewiseBreakpoints = DEFAULT_B
   'worklet';
   if (v <= bp.b1Val) return (v / bp.b1Val) * bp.b1Pos;
   if (v <= bp.b2Val) return bp.b1Pos + ((v - bp.b1Val) / (bp.b2Val - bp.b1Val)) * (bp.b2Pos - bp.b1Pos);
+  if (bp.b3Val !== undefined && bp.b3Pos !== undefined) {
+    if (v <= bp.b3Val) return bp.b2Pos + ((v - bp.b2Val) / (bp.b3Val - bp.b2Val)) * (bp.b3Pos - bp.b2Pos);
+    return bp.b3Pos + ((v - bp.b3Val) / (max - bp.b3Val)) * (1 - bp.b3Pos);
+  }
   return bp.b2Pos + ((v - bp.b2Val) / (max - bp.b2Val)) * (1 - bp.b2Pos);
 }
 
@@ -45,6 +54,10 @@ function posToValue(p: number, max: number, bp: PiecewiseBreakpoints = DEFAULT_B
   'worklet';
   if (p <= bp.b1Pos) return (p / bp.b1Pos) * bp.b1Val;
   if (p <= bp.b2Pos) return bp.b1Val + ((p - bp.b1Pos) / (bp.b2Pos - bp.b1Pos)) * (bp.b2Val - bp.b1Val);
+  if (bp.b3Val !== undefined && bp.b3Pos !== undefined) {
+    if (p <= bp.b3Pos) return bp.b2Val + ((p - bp.b2Pos) / (bp.b3Pos - bp.b2Pos)) * (bp.b3Val - bp.b2Val);
+    return bp.b3Val + ((p - bp.b3Pos) / (1 - bp.b3Pos)) * (max - bp.b3Val);
+  }
   return bp.b2Val + ((p - bp.b2Pos) / (1 - bp.b2Pos)) * (max - bp.b2Val);
 }
 
@@ -81,6 +94,11 @@ interface GoalSliderBarProps {
   thumbRadius?: number;
   /** Override track stroke width (default 2.5 fill / 2 bg) */
   trackStrokeWidth?: number;
+  /** Override background (unfilled) track color — defaults to theme.textTertiary */
+  trackBgColor?: string;
+
+  /** Override scale label text style */
+  scaleLabelStyle?: TextStyle;
 
   // --- Controlled mode (main screen): pass progress + width, gesture is external ---
   progress?: Animated.SharedValue<number>;
@@ -89,6 +107,8 @@ interface GoalSliderBarProps {
   // --- Interactive mode (settings): pass value + onChange, gesture is built-in ---
   value?: number;
   onChange?: (minutes: number) => void;
+  /** Lower bound for interactive snapping (default 0) */
+  minMinutes?: number;
 }
 
 export default function GoalSliderBar({
@@ -103,10 +123,13 @@ export default function GoalSliderBar({
   sliderHeight,
   thumbRadius: thumbR,
   trackStrokeWidth,
+  trackBgColor,
+  scaleLabelStyle,
   progress: externalProgress,
   width: fixedWidth,
   value,
   onChange,
+  minMinutes = 0,
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
   const color = accentColor ?? theme.textSecondary;
@@ -146,7 +169,8 @@ export default function GoalSliderBar({
       if (twVal === 0) return;
       const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
       const raw = posToValue(x, maxMinutes, bp);
-      const snapped = snapToNearest(raw);
+      let snapped = snapToNearest(raw);
+      if (snapped < minMinutes) snapped = minMinutes;
       internalProgress.value = valueToPos(snapped, maxMinutes, bp);
       runOnJS(handleDisplayUpdate)(snapped);
     });
@@ -217,7 +241,7 @@ export default function GoalSliderBar({
         {/* Track */}
         <SvgLine
           x1={pad} y1={cy} x2={width - pad} y2={cy}
-          stroke={theme.textTertiary}
+          stroke={trackBgColor ?? theme.textTertiary}
           strokeWidth={bgSW}
           strokeLinecap="round"
         />
@@ -229,8 +253,8 @@ export default function GoalSliderBar({
             <SvgLine
               key={m}
               x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
-              stroke={filled ? color : theme.textTertiary}
-              strokeWidth={1}
+              stroke={filled ? color : (trackBgColor ?? theme.textTertiary)}
+              strokeWidth={1.5}
             />
           );
         })}
@@ -272,7 +296,7 @@ export default function GoalSliderBar({
                   width: 40,
                 }}
               >
-                <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>
+                <Text style={[styles.scaleLabel, { color: theme.textTertiary }, scaleLabelStyle]}>
                   {label}
                 </Text>
               </View>
@@ -282,7 +306,7 @@ export default function GoalSliderBar({
       ) : (
         <View style={[styles.scaleRow, { width, paddingHorizontal: pad - 4 }]}>
           {scaleLabels.map((label, i) => (
-            <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }]}>{label}</Text>
+            <Text key={i} style={[styles.scaleLabel, { color: theme.textTertiary }, scaleLabelStyle]}>{label}</Text>
           ))}
         </View>
       )}

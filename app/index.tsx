@@ -1,3 +1,5 @@
+import { Entypo, Feather } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
@@ -8,65 +10,80 @@ import {
   Text,
   View,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import Animated, {
+  Easing,
+  interpolate,
   interpolateColor,
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AccountSheet from '@/components/AccountSheet';
+import GoalSliderBar from '@/components/GoalSliderBar';
+import BlockSheet from '@/components/BlockSheet';
+import HistoryContent from '@/components/HistoryContent';
+import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
+import PaywallGate from '@/components/PaywallGate';
+import PromoOffer from '@/components/promo/PromoOffer';
+import SessionCompleteScreen from '@/components/SessionCompleteScreen';
+import SessionEndedView from '@/components/SessionEndedView';
+import SettingsContent from '@/components/SettingsContent';
+import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
-import { useRouter } from 'expo-router';
-import { themes, palette } from '@/lib/theme';
-import { timerDisplay, formatTimeStat } from '@/lib/format';
+import type { ScheduledBlock } from '@/lib/db/types';
+import { formatTimeStat } from '@/lib/format';
+import {
+  blockAppsById,
+  forceUnblockAll,
+  getAuth,
+  isBlockActive,
+  unblockAppsById,
+} from '@/lib/screen-time';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
-import { blockAppsById, unblockAppsById, isBlockActive } from '@/lib/screen-time';
-import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
-import GoalSliderBar, { SLIDER_PAD } from '@/components/GoalSliderBar';
-import HistoryContent from '@/components/HistoryContent';
-import SettingsContent from '@/components/SettingsContent';
-import PillButton from '@/components/PillButton';
-import TimerDisplay from '@/components/TimerDisplay';
+import { palette, themes } from '@/lib/theme';
+import type BottomSheet from '@gorhom/bottom-sheet';
+import { useRouter } from 'expo-router';
 
-const FOCUS_OPTIONS = [
-  { label: '15 min', seconds: 15 * 60 },
-  { label: '30 min', seconds: 30 * 60 },
-  { label: '1 hour', seconds: 60 * 60 },
-  { label: '2 hours', seconds: 2 * 60 * 60 },
-];
+const RING_R = 64;
 
-function getMessage(seconds: number): string {
-  if (seconds < 10) return '';
-  if (seconds < 30) return 'breathe.';
-  if (seconds < 60) return 'good. keep going.';
-  if (seconds < 180) return "you're doing nothing great.";
-  if (seconds < 300) return 'the world can wait.';
-  return 'just be.';
+// Find the block that most recently fired today. We can't rely on the
+// block's `durationMinutes` window — that's a 15-min trigger interval,
+// not how long the shield actually stays up — so a strict in-window
+// check would lose the block within minutes and fall back to a default.
+// Instead pick the latest enabled block for today whose start time is
+// ≤ now. That reliably surfaces the unlock goal the user actually set.
+function findActiveBlock(
+  blocks: ScheduledBlock[],
+  now: Date,
+): ScheduledBlock | null {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const today = now.getDay();
+
+  let best: ScheduledBlock | null = null;
+  let bestStart = -1;
+  for (const b of blocks) {
+    if (!b.enabled) continue;
+    if (b.weekdays.length > 0 && !b.weekdays.includes(today)) continue;
+    const start = b.hour * 60 + b.minute;
+    if (start > nowMinutes) continue;
+    if (start > bestStart) {
+      best = b;
+      bestStart = start;
+    }
+  }
+  return best;
 }
-
-function getFocusMessage(remaining: number, total: number): string {
-  const progress = 1 - remaining / total;
-  if (progress < 0.1) return 'settle in.';
-  if (progress < 0.25) return 'let go of the urge.';
-  if (progress < 0.5) return 'you don\u2019t need your phone.';
-  if (progress < 0.75) return 'halfway there.';
-  if (progress < 0.9) return 'almost free.';
-  return 'just a little more.';
-}
-
-const RING_R = 42;
 
 // ===========================================================================
 // Main Screen
@@ -81,19 +98,60 @@ export default function DoNothingScreen() {
   const ready = useAppStore((s) => s.ready);
   const started = useAppStore((s) => s.started);
   const goalSeconds = useAppStore((s) => s.goalSeconds);
-  const showGoalSlider = useAppStore((s) => s.showGoalSlider);
   const sliderMinutes = useAppStore((s) => s.sliderMinutes);
   const focusStep = useAppStore((s) => s.focusStep);
-  const focusRemaining = useAppStore((s) => s.focusRemaining);
-  const focusTotal = useAppStore((s) => s.focusTotal);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
-  const dailyGoalMinutes = useAppStore((s) => s.dailyGoalMinutes);
+  const isSubscribed = useAppStore((s) => s.isSubscribed);
+
+  const accountSheetRef = useRef<BottomSheet>(null);
+  const blockSheetRef = useRef<BottomSheet>(null);
+  const handleOpenAccount = useCallback(() => {
+    accountSheetRef.current?.expand();
+  }, []);
+  const handleDeleteAccount = useCallback(async () => {
+    // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
+    console.warn('[Account] delete tapped — stub; no-op until wired');
+  }, []);
+
+  // Shared element: Journey pill on home ↔ Journey heading in history.
+  // We measure both on-screen rects and float a proxy Text that smoothly
+  // travels + scales between them, driven by historySlide.
+  type Rect = { x: number; y: number; w: number; h: number };
+  const journeyBtnRef = useRef<View>(null);
+  const [btnRect, setBtnRect] = useState<Rect | null>(null);
+  const [headingRect, setHeadingRect] = useState<Rect | null>(null);
+
+  const measureJourneyBtn = useCallback(() => {
+    // Home container has translateY = 0 whenever the pill is visible (slide = 0),
+    // so measureInWindow gives us the at-rest screen coords directly.
+    requestAnimationFrame(() => {
+      journeyBtnRef.current?.measureInWindow((x, y, w, h) => {
+        if (w > 0 && h > 0) setBtnRect({ x, y, w, h });
+      });
+    });
+  }, []);
+
+  const handleHeadingLayout = useCallback((rect: Rect) => {
+    setHeadingRect(rect);
+  }, []);
+  const lastSessionId = useAppStore((s) => s.lastSessionId);
+  const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
+  const completionVisible = useAppStore((s) => s.completionVisible);
+  const sessionEndedVisible = useAppStore((s) => s.sessionEndedVisible);
+  const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
+
+  // Block-waiting state: a scheduled block fired and apps are locked until the
+  // user either does nothing for the required time, or force-unlocks.
+  const blockWaiting = focusStep === 'done';
+  const activeBlock = blockWaiting
+    ? findActiveBlock(scheduledBlocks, new Date())
+    : null;
+  const unlockMin = activeBlock?.unlockGoalMinutes ?? 15;
 
   const isActiveRef = useRef(true);
 
   const theme = themes[themeMode];
   const stats = getStats();
-  const message = getMessage(elapsed);
 
   // --- Theme animation ---
   const themeProgress = useSharedValue(0);
@@ -113,10 +171,10 @@ export default function DoNothingScreen() {
   }));
 
   // --- Entry animations ---
-  const timerOpacity = useSharedValue(0.15);
+  const timerOpacity = useSharedValue(0.9);
   const dotProgress = useSharedValue(0);
-  const orbitAmount = useSharedValue(0);     // 0 = centered (button), 1 = orbiting (dot)
-  const buttonSize = useSharedValue(100);     // 100 = button, 12 = dot
+  const orbitAmount = useSharedValue(0); // 0 = centered (button), 1 = orbiting (dot)
+  const buttonSize = useSharedValue(140); // 140 = button, 12 = dot
   const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
@@ -139,6 +197,48 @@ export default function DoNothingScreen() {
     showWidth.value = withTiming(1, { duration: 690 });
     showOpacity.value = withTiming(1, { duration: 1125 });
   }, [started]);
+
+  // --- Countdown complete: auto-end session when timer reaches 00:00 ---
+  useEffect(() => {
+    if (started && goalSeconds > 0 && elapsed >= goalSeconds) {
+      deactivateKeepAwake('session');
+      setDistractionFree(false);
+      // If a scheduled block is still enforcing a shield, the user has earned
+      // their unlock by completing the countdown.
+      if (isBlockActive()) {
+        forceUnblockAll([]).catch(() => {});
+        unblockAppsById('donothing-scheduled-block').catch(() => {});
+      }
+      useAppStore.getState().completeSession();
+    }
+  }, [elapsed, started, goalSeconds]);
+
+  // --- Reset main screen visuals while completion overlay is showing ---
+  useEffect(() => {
+    if (!completionVisible) return;
+    orbitAmount.value = withTiming(0, { duration: 600 });
+    buttonSize.value = withTiming(140, { duration: 600 });
+    playIconOpacity.value = withTiming(1, { duration: 900 });
+    timerOpacity.value = withTiming(0.9, { duration: 700 });
+    showOpacity.value = withTiming(0, { duration: 400 });
+    showWidth.value = withTiming(0, { duration: 860 });
+    hideWidth.value = withTiming(1, { duration: 690 });
+    hideOpacity.value = withTiming(1, { duration: 1125 });
+  }, [completionVisible]);
+
+  // --- Reset main screen visuals when a session was cancelled ---
+  useEffect(() => {
+    if (!sessionEndedVisible) return;
+    setDistractionFree(false);
+    orbitAmount.value = 0;
+    buttonSize.value = 140;
+    playIconOpacity.value = 1;
+    timerOpacity.value = 0.9;
+    showOpacity.value = 0;
+    showWidth.value = 0;
+    hideWidth.value = 1;
+    hideOpacity.value = 1;
+  }, [sessionEndedVisible]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
@@ -178,35 +278,20 @@ export default function DoNothingScreen() {
 
   // --- Goal slider ---
   const SLIDER_W = 300;
-  const goalSliderX = useSharedValue(0);
+  const handleSliderChange = useCallback((mins: number) => {
+    const s = useAppStore.getState();
+    s.setSliderMinutes(mins);
+    s.setGoalFromSlider(mins);
+  }, []);
 
-  const lastHapticMin = useRef(0);
-  const onSliderUpdate = useCallback((mins: number) => {
-    if (mins !== lastHapticMin.current) {
-      lastHapticMin.current = mins;
-      Haptics.selectionAsync();
+  // Drive the block-state bottom sheet from focusStep === 'done'.
+  useEffect(() => {
+    if (blockWaiting) {
+      blockSheetRef.current?.expand();
+    } else {
+      blockSheetRef.current?.close();
     }
-    useAppStore.getState().setSliderMinutes(mins);
-  }, []);
-
-  const onSliderEnd = useCallback((mins: number) => {
-    useAppStore.getState().setGoalFromSlider(mins);
-  }, []);
-
-  const goalSliderGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      'worklet';
-      const x = Math.max(0, Math.min(1, (e.x - SLIDER_PAD) / (SLIDER_W - SLIDER_PAD * 2)));
-      goalSliderX.value = x;
-      const mins = Math.round(x * 60);
-      runOnJS(onSliderUpdate)(mins);
-    })
-    .onEnd(() => {
-      'worklet';
-      const mins = Math.round(goalSliderX.value * 60);
-      runOnJS(onSliderEnd)(mins);
-    });
-
+  }, [blockWaiting]);
 
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
@@ -231,8 +316,49 @@ export default function DoNothingScreen() {
     transform: [{ translateY: (1 - historySlide.value) * SCREEN_H }],
   }));
 
+  // Pill border fades out in the first half of the swipe — the word has already
+  // started travelling via the proxy, leaving the empty border hanging there
+  // would look strange.
+  const journeyPillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(historySlide.value, [0, 0.5, 1], [1, 0, 0]),
+  }));
+
+  // Chevron disappears instantly at the first sign of a swipe — the shared-
+  // element morph is enough of a signal; the chevron only hinted at rest.
+  const journeyChevronStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(historySlide.value, [0, 0.05], [1, 0]),
+  }));
+
+  // Shared element — floating Journey label that travels between pill and heading.
+  // Both endpoints' centres drive a single translate + scale; the pill/heading
+  // texts stay invisible so the proxy is the only glyph the user sees.
+  const journeyProxyStyle = useAnimatedStyle(() => {
+    if (!btnRect || !headingRect) return { opacity: 0 };
+    const p = historySlide.value;
+    const s = settingsSlide.value;
+    const startCX = btnRect.x + btnRect.w / 2;
+    const startCY = btnRect.y + btnRect.h / 2;
+    const endCX = headingRect.x + headingRect.w / 2;
+    const endCY = headingRect.y + headingRect.h / 2;
+    const cx = interpolate(p, [0, 1], [startCX, endCX]);
+    const cy = interpolate(p, [0, 1], [startCY, endCY]);
+    const scale = interpolate(p, [0, 1], [19 / 32, 1]);
+    return {
+      opacity: 1,
+      // Base position (home ↔ history morph) + sideways offset that follows
+      // the home container when Settings slides in from the right. The proxy
+      // should feel like it lives on the home screen.
+      transform: [
+        { translateX: cx - headingRect.w / 2 + s * SCREEN_W },
+        { translateY: cy - headingRect.h / 2 },
+        { scale },
+      ],
+    };
+  });
+
   // Swipe up on main → open history
   const mainVerticalPan = Gesture.Pan()
+    .enabled(!started)
     .activeOffsetY(-20)
     .failOffsetX([-15, 15])
     .onUpdate((e) => {
@@ -251,6 +377,7 @@ export default function DoNothingScreen() {
     useAppStore.getState().openSettings();
   }, []);
   const mainHorizontalPan = Gesture.Pan()
+    .enabled(!started)
     .activeOffsetX(20)
     .failOffsetY([-15, 15])
     .onUpdate((e) => {
@@ -315,56 +442,6 @@ export default function DoNothingScreen() {
     },
   });
 
-  const handleGoalToggle = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const s = useAppStore.getState();
-    if (s.showGoalSlider || s.goalSeconds > 0) {
-      s.cancelGoal();
-      timerOpacity.value = withTiming(0.15, { duration: 300 });
-    } else {
-      goalSliderX.value = 5 / 60;
-      s.openGoalSlider();
-      timerOpacity.value = withTiming(0.75, { duration: 300 });
-    }
-  }, []);
-
-  // --- Message fade ---
-  const messageOpacity = useSharedValue(0);
-  const prevMessageRef = useRef('');
-
-  // --- Unlock slider ---
-  const UNLOCK_TRACK_W = SCREEN_W * 0.75;
-  const UNLOCK_THUMB = 56;
-  const UNLOCK_MAX = UNLOCK_TRACK_W - UNLOCK_THUMB - 8;
-  const unlockX = useSharedValue(0);
-  const unlockStartX = useSharedValue(0);
-
-  const unlockThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: unlockX.value }],
-  }));
-
-  const unlockTextStyle = useAnimatedStyle(() => ({
-    opacity: 1 - unlockX.value / UNLOCK_MAX,
-  }));
-
-  useEffect(() => {
-    if (message !== prevMessageRef.current) {
-      if (prevMessageRef.current === '') {
-        messageOpacity.value = withTiming(1, { duration: 400 });
-      } else {
-        messageOpacity.value = withSequence(
-          withTiming(0, { duration: 200 }),
-          withTiming(1, { duration: 200 }),
-        );
-      }
-      prevMessageRef.current = message;
-    }
-  }, [message]);
-
-  const messageFadeStyle = useAnimatedStyle(() => ({
-    opacity: messageOpacity.value,
-  }));
-
   // Deactivate keep awake when focus ends (unblock only happens on explicit unlock)
   useEffect(() => {
     if (focusStep === 'hidden') {
@@ -375,48 +452,75 @@ export default function DoNothingScreen() {
 
   // --- Init ---
   useEffect(() => {
-    useAppStore.getState().init().then(() => {
-      // Check if a block is currently active (app was closed during block)
-      if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
-        useAppStore.getState().showUnlock();
-      }
-    });
+    useAppStore
+      .getState()
+      .init()
+      .then(() => {
+        // Check if a block is currently active (app was closed during block)
+        if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
+          useAppStore.getState().showUnlock();
+        }
+      });
   }, []);
 
   // --- Notification listener for scheduled blocks ---
   useEffect(() => {
-    const handleScheduledBlock = (data: Record<string, unknown>) => {
-      if (data?.type === 'scheduledBlock' && data?.durationMinutes) {
-        const durationSec = (data.durationMinutes as number) * 60;
-        blockAppsById('donothing-scheduled-block').catch(() => {});
-        activateKeepAwakeAsync('scheduled-block');
-        useAppStore.getState().startFocus(durationSec);
+    const handleScheduledBlock = async (data: Record<string, unknown>) => {
+      if (!(data?.type === 'scheduledBlock' && data?.durationMinutes)) return;
+      // Block can only act if Screen Time access is approved AND notifications
+      // are granted. If either was revoked after the block was scheduled,
+      // skip silently — the gated Settings UI will surface the missing perm.
+      const [auth, notif] = await Promise.all([
+        getAuth(),
+        Notifications.getPermissionsAsync(),
+      ]);
+      if (auth !== 'approved' || notif.status !== 'granted') {
+        console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
+        return;
       }
+      blockAppsById('donothing-scheduled-block').catch(() => {});
+      activateKeepAwakeAsync('scheduled-block');
+      // Drop straight into the "do nothing to unlock" screen — same state
+      // we land on when the app re-enters foreground while a block is
+      // already active. Previously we ran startFocus(durationMinutes),
+      // which spun a 15-min countdown before revealing the unlock view,
+      // so a foreground notification effectively did nothing visible.
+      useAppStore.getState().showUnlock();
     };
 
     // When notification received while app is in foreground
-    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
-      handleScheduledBlock(notification.request.content.data ?? {});
-    });
+    const sub1 = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        handleScheduledBlock(notification.request.content.data ?? {});
+      },
+    );
 
     // When user taps notification (app was in background)
-    const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
-      handleScheduledBlock(response.notification.request.content.data ?? {});
-    });
+    const sub2 = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        handleScheduledBlock(response.notification.request.content.data ?? {});
+      },
+    );
 
-    return () => { sub1.remove(); sub2.remove(); };
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
   }, []);
 
   // --- AppState ---
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState) => {
-      if ((nextState === 'background' || nextState === 'inactive') && isActiveRef.current) {
+      // Only 'background' ends a session flow. 'inactive' covers Control
+      // Center / notification drawer / incoming-call preview — those don't
+      // count as leaving the app.
+      if (nextState === 'background' && isActiveRef.current) {
         isActiveRef.current = false;
         deactivateKeepAwake('session');
         await useAppStore.getState().handleBackground();
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
-        await useAppStore.getState().handleForeground();
+        useAppStore.getState().handleForeground();
         // Check if block is active when returning to foreground
         if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
           useAppStore.getState().showUnlock();
@@ -445,39 +549,129 @@ export default function DoNothingScreen() {
     useAppStore.getState().closeSettings();
   }, []);
 
-  // --- Focus lock ---
-  const handleStartFocus = useCallback((seconds: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    activateKeepAwakeAsync('focus');
-    useAppStore.getState().startFocus(seconds);
-  }, []);
-
-  const cancelFocus = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    deactivateKeepAwake('focus');
-    useAppStore.getState().cancelFocus();
-  }, []);
-
-  const handleUnlock = useCallback(() => {
+  // Emergency unlock: bypasses the do-nothing gate. Shown on the block-waiting
+  // main screen so the user always has an out.
+  const handleForceUnlock = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
+    forceUnblockAll([]).catch(() => {});
     unblockAppsById('donothing-scheduled-block').catch(() => {});
     useAppStore.getState().unlockFocus();
   }, []);
 
-  // --- Debug: manual block toggle ---
-  const [debugBlocked, setDebugBlocked] = useState(false);
-  const handleDebugBlock = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (debugBlocked) {
-      await unblockAppsById('donothing-scheduled-block').catch(() => {});
-      setDebugBlocked(false);
-    } else {
-      await blockAppsById('donothing-scheduled-block').catch(() => {});
-      setDebugBlocked(true);
-    }
-  }, [debugBlocked]);
+  const handleStartBlockSession = useCallback(
+    (minutes: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      activateKeepAwakeAsync('session');
+      // Jump the header morph to the "Doing nothing" state so the user doesn't
+      // see a flash of "Ready to Do nothing?" when leaving the block-waiting UI.
+      hideOpacity.value = 0;
+      hideWidth.value = 0;
+      showOpacity.value = 1;
+      showWidth.value = 1;
+      useAppStore.setState({
+        focusStep: 'hidden',
+        goalSeconds: minutes * 60,
+      });
+      useAppStore.getState().startSession();
+    },
+    [hideOpacity, hideWidth, showOpacity, showWidth],
+  );
+
+  // --- Launch splash — terracotta fills the screen, then shrinks in place
+  // onto the yes button. Animates real width/height (not scale) so the
+  // edge stays crisp, and lands exactly on the measured yes-button position
+  // so the splash literally becomes the button with no visible handoff.
+  const [splashDone, setSplashDone] = useState(false);
+  const yesButtonRef = useRef<View>(null);
+  const [yesBtnRect, setYesBtnRect] = useState<Rect | null>(null);
+  const measureYesButton = useCallback(() => {
+    requestAnimationFrame(() => {
+      yesButtonRef.current?.measureInWindow((x, y, w, h) => {
+        if (w > 0 && h > 0) setYesBtnRect({ x, y, w, h });
+      });
+    });
+  }, []);
+
+  const { width: SCREEN_W_INIT, height: SCREEN_H_INIT } = Dimensions.get('window');
+  const YES_SIZE = 140;
+  // Shared values drive the animated style — seeded with safe "cover the
+  // screen" defaults so the splash is opaque from the very first frame
+  // even before the yes button is measured.
+  const splashProgress = useSharedValue(0);
+  const splashCenterX = useSharedValue(SCREEN_W_INIT / 2);
+  const splashCenterY = useSharedValue(SCREEN_H_INIT / 2);
+  const splashInitialSize = useSharedValue(Math.max(SCREEN_W_INIT, SCREEN_H_INIT) * 2.5);
+
+  // Recompute the splash's anchor + cover size once the yes button has been
+  // measured. For a circle centred at (cx, cy) to cover the screen we need
+  // the radius to reach the farthest corner — so use corner distances, not
+  // Manhattan half-extents.
+  useEffect(() => {
+    if (!yesBtnRect) return;
+    const cx = yesBtnRect.x + yesBtnRect.w / 2;
+    const cy = yesBtnRect.y + yesBtnRect.h / 2;
+    const maxDist = Math.max(
+      Math.hypot(cx, cy),
+      Math.hypot(SCREEN_W_INIT - cx, cy),
+      Math.hypot(cx, SCREEN_H_INIT - cy),
+      Math.hypot(SCREEN_W_INIT - cx, SCREEN_H_INIT - cy),
+    );
+    splashCenterX.value = cx;
+    splashCenterY.value = cy;
+    splashInitialSize.value = maxDist * 2 + 80;
+  }, [yesBtnRect]);
+
+  useEffect(() => {
+    if (!ready || splashDone || !yesBtnRect) return;
+    splashProgress.value = withDelay(
+      200,
+      withTiming(
+        1,
+        { duration: 1200, easing: Easing.bezier(0.16, 1, 0.3, 1) },
+        (finished) => {
+          if (finished) runOnJS(setSplashDone)(true);
+        },
+      ),
+    );
+  }, [ready, splashDone, yesBtnRect]);
+
+  const splashStyle = useAnimatedStyle(() => {
+    const size =
+      splashInitialSize.value + splashProgress.value * (YES_SIZE - splashInitialSize.value);
+    return {
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      left: splashCenterX.value - size / 2,
+      top: splashCenterY.value - size / 2,
+    };
+  });
+  // The inline yes label stays visible only when the splash is small enough
+  // to actually read as the button — fades in over the tail of the anim.
+  const splashLabelStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, Math.min(1, (splashProgress.value - 0.6) / 0.3)),
+  }));
+
+  // --- Distraction-free mode: hide timer & button while running ---
+  const [distractionFree, setDistractionFree] = useState(false);
+
+  // --- Promo offer modal (for users without subscription) ---
+  // Lives in the store so the standalone paywall route can trigger it
+  // when the user dismisses without buying.
+  const promoVisible = useAppStore((s) => s.promoOfferVisible);
+  const handleOpenPromo = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    useAppStore.getState().showPromoOffer();
+  }, []);
+  const handleClosePromo = useCallback(() => {
+    useAppStore.getState().hidePromoOffer();
+  }, []);
+  const toggleDistractionFree = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDistractionFree((v) => !v);
+  }, []);
 
   const handleStart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -488,12 +682,13 @@ export default function DoNothingScreen() {
   const handleStop = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     deactivateKeepAwake('session');
+    setDistractionFree(false);
     await useAppStore.getState().stopSession();
     // Dot grows back to button
     orbitAmount.value = withTiming(0, { duration: 600 });
-    buttonSize.value = withTiming(100, { duration: 600 });
+    buttonSize.value = withTiming(140, { duration: 600 });
     playIconOpacity.value = withTiming(1, { duration: 900 });
-    timerOpacity.value = withTiming(0.15, { duration: 700 });
+    timerOpacity.value = withTiming(0.9, { duration: 700 });
     // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
@@ -502,6 +697,10 @@ export default function DoNothingScreen() {
     hideOpacity.value = withTiming(1, { duration: 1125 });
     // Reset elapsed after animations finish
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
+  }, []);
+
+  const handleCompletionClose = useCallback(() => {
+    useAppStore.getState().dismissCompletion();
   }, []);
 
   const handleHistory = useCallback(() => {
@@ -515,217 +714,22 @@ export default function DoNothingScreen() {
   }, []);
 
   if (!ready) {
+    // Match the launch splash colour so there is no dark flash between the
+    // native splash hiding and the JS splash overlay mounting.
     return (
-      <View style={[styles.container, { backgroundColor: themes.dark.bg }]} />
+      <View style={[styles.container, { backgroundColor: palette.terracotta }]} />
     );
   }
 
   // =========================================================================
-  // Focus done — unlock screen
+  // Session ended — shown when the previous session was cancelled (backgrounded)
   // =========================================================================
-  if (focusStep === 'done') {
-    const doNothingMins = focusTotal > 0 ? Math.round(focusTotal / 60) : 15;
-
+  if (sessionEndedVisible) {
     return (
-      <Animated.View style={[styles.container, animatedContainerStyle, { justifyContent: 'space-between', paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <View />
-
-        <View style={{ alignItems: 'center' }}>
-          <Feather name="lock" size={40} color={theme.textTertiary} style={{ marginBottom: 32 }} />
-
-          <Text
-            style={[
-              styles.focusMessage,
-              { color: theme.text, fontFamily: Fonts!.serif, fontSize: 22, marginBottom: 12 },
-            ]}
-          >
-            your apps are blocked.
-          </Text>
-
-          <Text
-            style={[
-              styles.focusMessage,
-              { color: theme.textTertiary, fontFamily: Fonts!.serif, marginBottom: 48 },
-            ]}
-          >
-            do nothing to unlock them.
-          </Text>
-
-          <Pressable
-            style={[styles.doNothingBtn, { backgroundColor: theme.accent }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              useAppStore.getState().startFocus(doNothingMins * 60);
-              activateKeepAwakeAsync('focus');
-            }}
-          >
-            <Text style={{ color: palette.white, fontFamily: Fonts!.serif, fontSize: 17, fontWeight: '400' }}>
-              do nothing for {doNothingMins} min
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={handleUnlock}
-          hitSlop={16}
-        >
-          <Text style={{ color: theme.textTertiary, fontFamily: Fonts!.serif, fontSize: 14, fontWeight: '300' }}>
-            unlock now
-          </Text>
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  // =========================================================================
-  // Focus lock overlay — active session
-  // =========================================================================
-  if (focusStep === 'active') {
-    const progress = focusTotal > 0 ? 1 - focusRemaining / focusTotal : 0;
-    const focusMsg = getFocusMessage(focusRemaining, focusTotal);
-    const ringSize = 200;
-    const strokeWidth = 3;
-
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <Text style={[styles.focusLabel, { color: theme.accent }]}>
-          FOCUS MODE
-        </Text>
-
-        {/* Circular progress */}
-        <View style={{ width: ringSize, height: ringSize, marginTop: 24 }}>
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { alignItems: 'center', justifyContent: 'center' },
-            ]}
-          >
-            <View
-              style={{
-                width: ringSize,
-                height: ringSize,
-                borderRadius: ringSize / 2,
-                borderWidth: strokeWidth,
-                borderColor: theme.cardBorder,
-                position: 'absolute',
-              }}
-            />
-          </View>
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { alignItems: 'center', justifyContent: 'center' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.focusTimer,
-                { color: theme.text, fontFamily: Fonts!.mono },
-              ]}
-            >
-              {timerDisplay(focusRemaining)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Focus message */}
-        <Text
-          style={[
-            styles.focusMessage,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          {focusMsg}
-        </Text>
-
-        {/* Progress bar */}
-        <View
-          style={[styles.progressTrack, { backgroundColor: theme.subtle }]}
-        >
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: theme.dot,
-                width: `${Math.min(progress * 100, 100)}%`,
-              },
-            ]}
-          />
-        </View>
-
-        {/* Quit button */}
-        <Pressable
-          onPress={cancelFocus}
-          style={[
-            styles.quitButton,
-            { backgroundColor: theme.accent, borderColor: theme.accent },
-          ]}
-        >
-          <Text style={[styles.quitText, { color: theme.accentText }]}>
-            give up
-          </Text>
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  // =========================================================================
-  // Focus — pick duration
-  // =========================================================================
-  if (focusStep === 'pickTime') {
-    return (
-      <Animated.View style={[styles.container, animatedContainerStyle]}>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-        <Text
-          style={[
-            styles.pickerTitle,
-            { color: theme.text, fontFamily: Fonts!.serif },
-          ]}
-        >
-          Lock yourself in
-        </Text>
-        <Text
-          style={[
-            styles.pickerSubtitle,
-            { color: theme.textSecondary, fontFamily: Fonts!.serif },
-          ]}
-        >
-          Choose how long to do nothing
-        </Text>
-
-        <View style={styles.pickerOptions}>
-          {FOCUS_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.seconds}
-              onPress={() => handleStartFocus(opt.seconds)}
-              style={[styles.pickerOption, { borderColor: theme.cardBorder }]}
-            >
-              <Text style={[styles.pickerOptionText, { color: theme.text }]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            useAppStore.getState().cancelFocus();
-          }}
-          style={styles.pickerCancel}
-        >
-          <Text
-            style={[styles.pickerCancelText, { color: theme.textSecondary }]}
-          >
-            cancel
-          </Text>
-        </Pressable>
-      </Animated.View>
+      <SessionEndedView
+        themeMode={themeMode}
+        onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
+      />
     );
   }
 
@@ -734,313 +738,664 @@ export default function DoNothingScreen() {
   // =========================================================================
   return (
     <View style={[styles.screenStack, { backgroundColor: theme.bg }]}>
-    <GestureDetector gesture={mainPanGesture}>
-    <Animated.View style={[styles.container, animatedContainerStyle, mainSlideStyle]}>
-      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-
-      {/* Settings button — top left */}
-      <Pressable
-        onPress={handleSettingsPress}
-        style={[styles.lockButton, { top: insets.top + 12 }]}
-        hitSlop={16}
-      >
-        <Feather name="sliders" size={24} color={theme.text} style={{ opacity: 0.9 }} />
-      </Pressable>
-
-      {/* Onboarding test button — top right */}
-      <Pressable
-        onPress={() => router.push('/onboarding')}
-        style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 96 }]}
-        hitSlop={16}
-      >
-        <Feather name="play" size={20} color={theme.text} style={{ opacity: 0.9 }} />
-      </Pressable>
-
-      {/* Debug block button — top right (iOS only) */}
-      {Platform.OS === 'ios' && (
-        <Pressable
-          onPress={handleDebugBlock}
-          style={[styles.lockButton, { top: insets.top + 12, left: undefined, right: 60 }]}
-          hitSlop={16}
+      <GestureDetector gesture={mainPanGesture}>
+        <Animated.View
+          style={[styles.container, animatedContainerStyle, mainSlideStyle]}
         >
-          <Feather
-            name={debugBlocked ? 'unlock' : 'lock'}
-            size={20}
-            color={debugBlocked ? theme.accent : theme.text}
-            style={{ opacity: 0.9 }}
-          />
-        </Pressable>
-      )}
+          <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
 
-      {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
-      <View style={styles.headerRow}>
-        <Animated.View style={hideStyle}>
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            Ready to{' '}
-          </Text>
-        </Animated.View>
-        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          Do
-        </Text>
-        <Animated.View style={showStyle}>
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            ing
-          </Text>
-        </Animated.View>
-        <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-          {' '}nothing
-        </Text>
-        <Animated.View style={hideStyle}>
-          <Text style={[styles.header, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            ?
-          </Text>
-        </Animated.View>
-      </View>
-
-      {/* Theme toggle — top right */}
-      <Pressable
-        onPress={toggleTheme}
-        style={[styles.themeToggle, { top: insets.top + 12 }]}
-        hitSlop={16}
-      >
-        <View
-          style={[
-            styles.themeCircle,
-            { backgroundColor: theme.accent, opacity: 0.7 },
-          ]}
-        />
-      </Pressable>
-
-      {/* Timer */}
-      <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-        {showGoalSlider && !started ? (
-          <Animated.Text
-            style={[
-              styles.timer,
-              { color: theme.text, fontFamily: Fonts!.mono, textAlign: 'center' },
-            ]}
-          >
-            {`${String(sliderMinutes).padStart(2, '0')}:00`}
-          </Animated.Text>
-        ) : (
-          <TimerDisplay
-            seconds={goalSeconds > 0 ? Math.max(0, goalSeconds - elapsed) : elapsed}
-            color={theme.text}
-          />
-        )}
-      </Animated.View>
-
-      {/* Orbit ring + unified button/dot */}
-      <View style={styles.orbitWrap}>
-      <View style={styles.orbitArea}>
-        <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
-          <OrbitRing
-            color={theme.accent}
-            faintColor={themeMode === 'dark' ? palette.cream : palette.charcoal}
-            elapsed={elapsed}
-            onStop={handleStop}
-            dotProgress={dotProgress}
-          />
-        </Animated.View>
-        {/* Unified element: play button ↔ orbit dot */}
-        <Pressable
-          onPress={started ? handleStop : handleStart}
-          style={styles.orbitCenter}
-        >
-          <Animated.View
-            style={[
-              { backgroundColor: theme.accent, justifyContent: 'center', alignItems: 'center' },
-              unifiedDotStyle,
-            ]}
-          >
-            <Animated.View style={{ opacity: playIconOpacity }}>
-              <Feather name="play" size={36} color={theme.accentText} style={{ marginLeft: 4 }} />
-            </Animated.View>
-          </Animated.View>
-        </Pressable>
-
-      </View>
-
-        {/* Goal button — to the right of play */}
-        {!started && (
+          {/* Settings button — top left */}
           <Pressable
-            onPress={handleGoalToggle}
+            onPress={handleSettingsPress}
+            disabled={started}
             style={[
-              styles.goalButton,
+              styles.lockButton,
               {
-                borderColor: theme.border,
-                backgroundColor: (showGoalSlider || goalSeconds > 0) ? theme.border : 'transparent',
+                top: insets.top + 12,
+                opacity: started ? 0 : 1,
               },
             ]}
-            hitSlop={20}
+            hitSlop={16}
           >
-            <Text style={[styles.goalButtonText, {
-              color: theme.text,
-              fontFamily: Fonts!.serif,
-            }]}>
-              {(showGoalSlider || goalSeconds > 0) ? 'cancel' : 'goal'}
-            </Text>
+            <Feather
+              name='sliders'
+              size={24}
+              color={theme.text}
+              style={{ opacity: 0.9 }}
+            />
           </Pressable>
-        )}
-      </View>
 
-      {/* Message + goal slider overlay */}
-      <View style={styles.messageSliderArea}>
-        <Animated.View style={[timerEntryStyle, styles.messageContainer, messageFadeStyle]}>
-          <Text
-            style={[
-              styles.message,
-              { color: theme.textSecondary, fontFamily: Fonts!.serif },
-            ]}
+          {/* Dev tools cluster — only in dev builds, hidden while session is active */}
+          {__DEV__ && (
+            <View
+              style={[
+                styles.devCluster,
+                {
+                  top: insets.top + 12,
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              pointerEvents={started ? 'none' : 'auto'}
+            >
+              <Pressable
+                onPress={() => router.push('/onboarding')}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='play'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  useAppStore.setState({
+                    completionVisible: true,
+                    lastSessionId: 'dev-preview',
+                    lastSessionDuration: 50 * 60,
+                  })
+                }
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='flag'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  useAppStore.setState({
+                    sessionEndedVisible: true,
+                    cancelReason: 'backgrounded',
+                  })
+                }
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='alert-octagon'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={handleOpenPromo}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='gift'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  const past = new Date(Date.now() - 60 * 1000);
+                  const fakeBlock: ScheduledBlock = {
+                    id: 'dev-mock-1min',
+                    hour: past.getHours(),
+                    minute: past.getMinutes(),
+                    durationMinutes: 15,
+                    weekdays: [past.getDay()],
+                    enabled: true,
+                    groupId: null,
+                    unlockGoalMinutes: 1,
+                  };
+                  const existing = useAppStore.getState().scheduledBlocks;
+                  useAppStore.setState({
+                    scheduledBlocks: [
+                      ...existing.filter((b) => b.id !== 'dev-mock-1min'),
+                      fakeBlock,
+                    ],
+                  });
+                  useAppStore.getState().showUnlock();
+                }}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='lock'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
+          <View
+            style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
           >
-            {message}
-          </Text>
-        </Animated.View>
-        {showGoalSlider && !started && (
-          <GestureDetector gesture={goalSliderGesture}>
-            <View style={styles.goalSliderWrap}>
-              <GoalSliderBar
-                progress={goalSliderX}
-                theme={theme}
-                width={SLIDER_W}
-              />
-            </View>
-          </GestureDetector>
-        )}
-      </View>
-
-      {/* Stats — with goal slider overlaid */}
-      <Pressable onPress={handleHistory}>
-        <View style={styles.statsColumn}>
-          <View style={styles.statRow}>
-            <Text
-              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
-            >
-              today:
-            </Text>
-            <View style={styles.statRowValueRow}>
+            <Animated.View style={hideStyle}>
               <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
+                style={[
+                  styles.header,
+                  { color: theme.text, fontFamily: Fonts!.serif },
+                ]}
               >
-                {formatTimeStat(stats.today + elapsed).value}
+                Ready to{' '}
               </Text>
-              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                {formatTimeStat(stats.today + elapsed).unit}
+            </Animated.View>
+            <Text
+              style={[
+                styles.header,
+                { color: theme.text, fontFamily: Fonts!.serif },
+              ]}
+            >
+              Do
+            </Text>
+            <Animated.View style={showStyle}>
+              <Text
+                style={[
+                  styles.header,
+                  { color: theme.text, fontFamily: Fonts!.serif },
+                ]}
+              >
+                ing
               </Text>
-              {dailyGoalMinutes > 0 && (
-                <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                  {' / '}{dailyGoalMinutes}m
-                </Text>
+            </Animated.View>
+            <Text
+              style={[
+                styles.header,
+                { color: theme.text, fontFamily: Fonts!.serif },
+              ]}
+            >
+              {' '}
+              nothing
+            </Text>
+            <Animated.View style={hideStyle}>
+              <Text
+                style={[
+                  styles.header,
+                  { color: theme.text, fontFamily: Fonts!.serif },
+                ]}
+              >
+                ?
+              </Text>
+            </Animated.View>
+          </View>
+
+          {/* Theme toggle — top right */}
+          <Pressable
+            onPress={toggleTheme}
+            disabled={started}
+            style={[
+              styles.themeToggle,
+              {
+                top: insets.top + 12,
+                opacity: started ? 0 : 1,
+              },
+            ]}
+            hitSlop={16}
+          >
+            <View
+              style={[
+                styles.themeCircle,
+                { backgroundColor: theme.accent, opacity: 0.7 },
+              ]}
+            />
+          </Pressable>
+
+          {/* Timer */}
+          <View
+            style={{ opacity: distractionFree ? 0 : 1 }}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+              {!started ? (
+                <Animated.Text
+                  style={[
+                    styles.timer,
+                    {
+                      color: theme.text,
+                      fontFamily: Fonts!.mono,
+                      textAlign: 'center',
+                    },
+                  ]}
+                >
+                  {`${String(sliderMinutes).padStart(2, '0')}:00`}
+                </Animated.Text>
+              ) : (
+                <TimerDisplay
+                  seconds={
+                    goalSeconds > 0
+                      ? Math.max(0, goalSeconds - elapsed)
+                      : elapsed
+                  }
+                  color={theme.text}
+                  fontSize={64}
+                  style={{ letterSpacing: 4 }}
+                />
               )}
-            </View>
+            </Animated.View>
           </View>
-          <Text style={[styles.statDot, { color: theme.textTertiary }]}>·</Text>
-          <View style={styles.statRow}>
-            <Text
-              style={[styles.statRowLabel, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}
-            >
-              week:
-            </Text>
-            <View style={styles.statRowValueRow}>
-              <Text
-                style={[styles.statRowValue, { color: theme.text, fontFamily: Fonts!.serif }]}
-              >
-                {formatTimeStat(stats.week + elapsed).value}
-              </Text>
-              <Text style={[styles.statRowUnit, { color: theme.textTertiary }]}>
-                {formatTimeStat(stats.week + elapsed).unit}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Pressable>
 
-      {/* Week dots */}
-      {weekStats.length > 0 && (
-        <View style={styles.weekSection}>
-          <View style={styles.weekGrid}>
-            {weekStats.map((day) => {
-              const maxDur = Math.max(
-                ...weekStats.map((d) => d.duration),
-                1,
-              );
-              const size =
-                day.duration > 0
-                  ? 10 + (day.duration / maxDur) * 20
-                  : 4;
-              return (
-                <View key={day.date} style={styles.weekDayCol}>
-                  <View
-                    style={{
-                      width: size,
-                      height: size,
-                      borderRadius: size / 2,
-                      backgroundColor:
-                        day.duration > 0 ? theme.accent : theme.border,
-                    }}
-                  />
+          {/* Orbit ring + unified button/dot */}
+          <View
+            style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            <View style={styles.orbitArea}>
+              <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
+                <OrbitRing
+                  color={theme.accent}
+                  faintColor={
+                    themeMode === 'dark' ? palette.cream : palette.charcoal
+                  }
+                  elapsed={elapsed}
+                  onStop={handleStop}
+                  dotProgress={dotProgress}
+                />
+              </Animated.View>
+              {/* Unified element: play button ↔ orbit dot */}
+              <Pressable
+                ref={yesButtonRef}
+                onLayout={measureYesButton}
+                onPress={started ? handleStop : handleStart}
+                style={styles.orbitCenter}
+              >
+                <Animated.View
+                  style={[
+                    {
+                      backgroundColor: theme.accent,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      overflow: 'hidden',
+                    },
+                    unifiedDotStyle,
+                  ]}
+                >
+                  <Animated.View style={{ opacity: playIconOpacity }}>
+                    <Text
+                      style={[
+                        styles.nothingLabel,
+                        { color: theme.accentText, fontFamily: Fonts!.serif },
+                      ]}
+                    >
+                      yes
+                    </Text>
+                  </Animated.View>
+                </Animated.View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Goal slider */}
+          <View
+            style={[
+              styles.messageSliderArea,
+              { opacity: started ? 0 : 1 },
+            ]}
+            pointerEvents={started ? 'none' : 'auto'}
+          >
+            {!started && (
+              <View style={styles.goalSliderWrap}>
+                <GoalSliderBar
+                  theme={theme}
+                  value={sliderMinutes}
+                  onChange={handleSliderChange}
+                  width={SLIDER_W}
+                  maxMinutes={60}
+                  minMinutes={0}
+                  ticks={[5, 10, 20, 30, 45]}
+                  scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
+                  breakpoints={{
+                    b1Val: 15,
+                    b1Pos: 0.25,
+                    b2Val: 30,
+                    b2Pos: 0.5,
+                  }}
+                  accentColor={theme.accent}
+                  trackBgColor={theme.text}
+                  trackStrokeWidth={3.5}
+                  scaleLabelStyle={{
+                    color: theme.text,
+                    fontWeight: '500',
+                    fontSize: 12,
+                  }}
+                  hideLabel
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Stats — with goal slider overlaid */}
+          <Pressable
+            onPress={handleHistory}
+            disabled={started}
+            style={{ opacity: started ? 0 : 1 }}
+          >
+            <View style={styles.statsColumn}>
+              <View style={styles.statRow}>
+                <Text
+                  style={[
+                    styles.statRowLabel,
+                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  today:
+                </Text>
+                <View style={styles.statRowValueRow}>
                   <Text
                     style={[
-                      styles.weekDayLabel,
+                      styles.statRowValue,
+                      { color: theme.text, fontFamily: Fonts!.mono },
+                    ]}
+                  >
+                    {formatTimeStat(stats.today + elapsed).value}
+                  </Text>
+                  <Text
+                    style={[styles.statRowUnit, { color: theme.textTertiary }]}
+                  >
+                    {formatTimeStat(stats.today + elapsed).unit}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.statDot, { color: theme.textTertiary }]}>
+                ·
+              </Text>
+              <View style={styles.statRow}>
+                <Text
+                  style={[
+                    styles.statRowLabel,
+                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  week:
+                </Text>
+                <View style={styles.statRowValueRow}>
+                  <Text
+                    style={[
+                      styles.statRowValue,
+                      { color: theme.text, fontFamily: Fonts!.mono },
+                    ]}
+                  >
+                    {formatTimeStat(stats.week + elapsed).value}
+                  </Text>
+                  <Text
+                    style={[styles.statRowUnit, { color: theme.textTertiary }]}
+                  >
+                    {formatTimeStat(stats.week + elapsed).unit}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Week dots */}
+          {weekStats.length > 0 && (
+            <View
+              style={[
+                styles.weekSection,
+                { opacity: started ? 0 : 1 },
+              ]}
+              pointerEvents={started ? 'none' : 'auto'}
+            >
+              <View style={styles.weekGrid}>
+                {weekStats.map((day) => {
+                  const maxDur = Math.max(
+                    ...weekStats.map((d) => d.duration),
+                    1,
+                  );
+                  const size =
+                    day.duration > 0 ? 10 + (day.duration / maxDur) * 20 : 4;
+                  return (
+                    <View key={day.date} style={styles.weekDayCol}>
+                      <View
+                        style={{
+                          width: size,
+                          height: size,
+                          borderRadius: size / 2,
+                          backgroundColor:
+                            day.duration > 0 ? theme.accent : theme.border,
+                        }}
+                      />
+                      <Text
+                        style={[
+                          styles.weekDayLabel,
+                          {
+                            color: day.isToday
+                              ? theme.text
+                              : theme.textTertiary,
+                          },
+                        ]}
+                      >
+                        {day.dayName}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Bottom buttons */}
+          <View
+            style={[
+              styles.bottomButtons,
+              { bottom: 12, opacity: started ? 0 : 1 },
+            ]}
+            pointerEvents={started ? 'none' : 'auto'}
+          >
+            <Animated.View style={journeyPillStyle}>
+              <Pressable
+                onPress={handleHistory}
+                hitSlop={16}
+                style={styles.journeyBtn}
+              >
+                <View
+                  ref={journeyBtnRef}
+                  onLayout={measureJourneyBtn}
+                  collapsable={false}
+                >
+                  <Text
+                    style={[
+                      styles.journeyPillText,
                       {
-                        color: day.isToday
-                          ? theme.text
-                          : theme.textTertiary,
+                        color:
+                          themeMode === 'dark' ? palette.cream : palette.brown,
+                        fontFamily: Fonts!.serif,
+                        opacity: 0,
                       },
                     ]}
                   >
-                    {day.dayName}
+                    My Journey
                   </Text>
                 </View>
-              );
-            })}
+                <Animated.View
+                  style={[styles.journeyArrow, journeyChevronStyle]}
+                  pointerEvents='none'
+                >
+                  <Entypo
+                    name='chevron-thin-down'
+                    size={20}
+                    color={
+                      themeMode === 'dark' ? palette.cream : palette.brown
+                    }
+                  />
+                </Animated.View>
+              </Pressable>
+            </Animated.View>
           </View>
-        </View>
+
+          {/* Distraction-free toggle — visible only while timer is running */}
+          {started && (
+            <Pressable
+              onPress={toggleDistractionFree}
+              style={[
+                styles.distractionFreeButton,
+                { bottom: insets.bottom + 24, borderColor: theme.border },
+              ]}
+              hitSlop={16}
+            >
+              <Feather
+                name={distractionFree ? 'eye' : 'eye-off'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </Pressable>
+          )}
+        </Animated.View>
+      </GestureDetector>
+
+      {/* History screen — always rendered, positioned off-screen when hidden */}
+      <GestureDetector gesture={historyPanGesture}>
+        <Animated.View
+          style={[
+            styles.historyContainer,
+            animatedContainerStyle,
+            historySlideStyle,
+          ]}
+        >
+          <HistoryContent
+            onClose={handleHistoryClose}
+            insets={insets}
+            onScroll={historyScrollHandler}
+            nativeScrollGesture={historyScrollNativeGesture}
+            onHeadingLayout={handleHeadingLayout}
+            historySlide={historySlide}
+          />
+          <PaywallGate
+            visible={!isSubscribed}
+            themeMode={themeMode}
+            insets={insets}
+            onClose={handleHistoryClose}
+            title='unlock your journey'
+            body="Every minute you've reclaimed, at a glance. Join to open Journey and keep the thread of your practice."
+          />
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Settings screen */}
+      <GestureDetector gesture={settingsSwipeBack}>
+        <Animated.View
+          style={[
+            styles.historyContainer,
+            animatedContainerStyle,
+            settingsSlideStyle,
+          ]}
+        >
+          <SettingsContent
+            onClose={handleSettingsClose}
+            insets={insets}
+            onOpenAccount={handleOpenAccount}
+          />
+          <PaywallGate
+            visible={!isSubscribed}
+            themeMode={themeMode}
+            insets={insets}
+            onClose={handleSettingsClose}
+            onOpenAccount={handleOpenAccount}
+            title='unlock donothing'
+            body='Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way.'
+          />
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Shared account sheet — available from Settings header and from both gates */}
+      <AccountSheet
+        ref={accountSheetRef}
+        theme={theme}
+        onDeleteAccount={handleDeleteAccount}
+      />
+
+      {/* Block-state sheet — appears when a scheduled block has fired */}
+      <BlockSheet
+        ref={blockSheetRef}
+        theme={theme}
+        unlockMin={unlockMin}
+        onStart={handleStartBlockSession}
+        onUnlock={handleForceUnlock}
+      />
+
+      {/* Floating Journey label — the one shared element that morphs between the
+        home pill and the Journey heading as the panel slides up. Hidden while
+        a session is running or a scheduled block is waiting so the timer UI
+        gets the spotlight. */}
+      {btnRect && headingRect && !started && !blockWaiting && (
+        <Animated.Text
+          pointerEvents='none'
+          style={[
+            styles.journeyProxy,
+            {
+              color: theme.text,
+              fontFamily: Fonts!.serif,
+              width: headingRect.w,
+              height: headingRect.h,
+            },
+            journeyProxyStyle,
+          ]}
+        >
+          My Journey
+        </Animated.Text>
       )}
 
-      {/* Bottom buttons */}
-      <View
-        style={[
-          styles.bottomButtons,
-          { bottom: insets.bottom + 16 },
-        ]}
-      >
-        <PillButton
-          label="History"
-          onPress={handleHistory}
-          color={themeMode === 'dark' ? palette.cream : palette.brown}
-          outline
-        />
-      </View>
-
-    </Animated.View>
-    </GestureDetector>
-
-    {/* History screen — always rendered, positioned off-screen when hidden */}
-    <GestureDetector gesture={historyPanGesture}>
-    <Animated.View style={[styles.historyContainer, animatedContainerStyle, historySlideStyle]}>
-      <HistoryContent
-        onClose={handleHistoryClose}
-        insets={insets}
-        onScroll={historyScrollHandler}
-        nativeScrollGesture={historyScrollNativeGesture}
+      {/* Promo offer — shown to users without an active subscription */}
+      <PromoOffer
+        visible={promoVisible}
+        onClose={handleClosePromo}
+        onPurchase={() => {
+          // TODO: hook into RevenueCat purchase flow
+          handleClosePromo();
+        }}
       />
-    </Animated.View>
-    </GestureDetector>
 
-    {/* Settings screen */}
-    <GestureDetector gesture={settingsSwipeBack}>
-    <Animated.View style={[styles.historyContainer, animatedContainerStyle, settingsSlideStyle]}>
-      <SettingsContent
-        onClose={handleSettingsClose}
-        insets={insets}
+      {/* Countdown completion screen */}
+      <SessionCompleteScreen
+        visible={completionVisible}
+        sessionId={lastSessionId}
+        durationSeconds={lastSessionDuration}
+        todaySeconds={stats.today}
+        themeMode={themeMode}
+        yesBtnRect={yesBtnRect}
+        onClose={handleCompletionClose}
       />
-    </Animated.View>
-    </GestureDetector>
+
+      {/* Launch splash — terracotta sheet that covers the screen and
+          shrinks in place onto the measured yes button */}
+      {!splashDone && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.splashCircle,
+            { backgroundColor: theme.accent },
+            splashStyle,
+          ]}
+        >
+          <Animated.View style={[splashLabelStyle, styles.splashLabelWrap]}>
+            <Text
+              style={[
+                styles.splashLabel,
+                { color: theme.accentText, fontFamily: Fonts!.serif },
+              ]}
+            >
+              yes
+            </Text>
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   screenStack: {
@@ -1068,10 +1423,12 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'center',
     width: '100%',
+    height: 30,
     marginBottom: 24,
   },
   header: {
     fontSize: 22,
+    lineHeight: 28,
     letterSpacing: 1,
     opacity: 0.85,
     fontWeight: '400',
@@ -1079,10 +1436,6 @@ const styles = StyleSheet.create({
   lockButton: {
     position: 'absolute',
     left: 24,
-  },
-  lockIcon: {
-    fontSize: 20,
-    opacity: 0.25,
   },
   themeToggle: {
     position: 'absolute',
@@ -1097,16 +1450,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontWeight: '200',
     letterSpacing: 4,
-  },
-  messageContainer: {
-    height: 24,
-    justifyContent: 'center',
-  },
-  message: {
-    fontSize: 17,
-    fontWeight: '400',
-    fontStyle: 'italic',
-    textAlign: 'center',
   },
   orbitCenter: {
     position: 'absolute',
@@ -1128,7 +1471,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statsColumn: {
-    marginTop: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 19,
@@ -1186,130 +1528,78 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'absolute',
   },
-  pillText: {
-    fontSize: 15,
-    letterSpacing: 0.5,
-    fontWeight: '500',
-  },
-  // --- Focus picker ---
-  pickerTitle: {
-    fontSize: 28,
-    fontWeight: '400',
-    letterSpacing: 0.5,
-  },
-  pickerSubtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    fontStyle: 'italic',
-    marginTop: 8,
-    marginBottom: 40,
-  },
-  pickerOptions: {
-    gap: 12,
-    width: '100%',
-    maxWidth: 260,
-  },
-  pickerOption: {
-    borderWidth: 1.2,
-    borderRadius: 24,
-    paddingVertical: 16,
+  journeyBtn: {
     alignItems: 'center',
-  },
-  pickerOptionText: {
-    fontSize: 17,
-    fontWeight: '300',
-    letterSpacing: 1,
-  },
-  pickerCancel: {
-    marginTop: 32,
-    padding: 12,
-  },
-  pickerCancelText: {
-    fontSize: 14,
-    fontWeight: '300',
-  },
-  // --- Focus active ---
-  focusLabel: {
-    fontSize: 11,
-    letterSpacing: 4,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-  },
-  focusTimer: {
-    fontSize: 48,
-    fontWeight: '200',
-    letterSpacing: 2,
-  },
-  focusMessage: {
-    fontSize: 16,
-    fontWeight: '300',
-    marginTop: 24,
-    textAlign: 'center',
-  },
-  progressTrack: {
-    width: '60%',
-    height: 3,
-    borderRadius: 1.5,
-    marginTop: 40,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 3,
-    borderRadius: 1.5,
-  },
-  quitButton: {
-    marginTop: 48,
-    borderWidth: 1.2,
-    borderRadius: 24,
-    paddingVertical: 12,
+    gap: 10,
+    paddingVertical: 10,
     paddingHorizontal: 28,
   },
-  quitText: {
-    fontSize: 14,
+  journeyArrow: {
+    alignItems: 'center',
+  },
+  journeyPillText: {
+    fontSize: 19,
     fontWeight: '400',
-    fontStyle: 'italic',
+    lineHeight: 22,
+    letterSpacing: 0.3,
   },
-  doNothingBtn: {
-    borderWidth: 1.2,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-  },
-  unlockTrack: {
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  unlockLabel: {
-    fontSize: 16,
-    fontWeight: '300',
-    letterSpacing: 1,
+  journeyProxy: {
     position: 'absolute',
+    left: 0,
+    top: 0,
+    fontSize: 32,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+    textAlign: 'left',
+    zIndex: 110,
   },
-  unlockThumb: {
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+  distractionFreeButton: {
     position: 'absolute',
-    left: 4,
-  },
-  goalButton: {
-    position: 'absolute',
-    right: 15,
+    alignSelf: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  goalButtonText: {
-    fontSize: 13,
+  devCluster: {
+    position: 'absolute',
+    right: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  devIconBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nothingLabel: {
+    fontSize: 22,
     fontWeight: '400',
+    letterSpacing: 0.5,
+  },
+  splashCircle: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 500,
+    overflow: 'hidden',
+  },
+  splashLabelWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLabel: {
+    fontSize: 22,
+    fontWeight: '400',
+    letterSpacing: 0.5,
   },
   messageSliderArea: {
     width: 300,
-    height: 40,
-    marginTop: 12,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
