@@ -34,7 +34,6 @@ import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
-const SCREEN_H = Dimensions.get('window').height;
 const MOUNTAIN_SIZE = Math.min(Math.round(SCREEN_W * 0.62), 280);
 
 const mountainImage = require('@/assets/images/mountain.png');
@@ -47,8 +46,10 @@ interface Props {
   onClose?: () => void;
 }
 
-function TerracottaBackdrop({ animatedIndex }: BottomSheetBackdropProps) {
-  const insets = useSafeAreaInsets();
+function TerracottaBackdrop({
+  animatedIndex,
+  animatedPosition,
+}: BottomSheetBackdropProps) {
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       animatedIndex.value,
@@ -56,6 +57,11 @@ function TerracottaBackdrop({ animatedIndex }: BottomSheetBackdropProps) {
       [0, 1],
       Extrapolation.CLAMP,
     ),
+  }));
+  // Sit the mountain slightly below the midpoint between the screen top
+  // and the sheet top so it feels grounded against the sheet edge.
+  const mountainStyle = useAnimatedStyle(() => ({
+    top: Math.max(0, animatedPosition.value * 0.58 - MOUNTAIN_SIZE / 2),
   }));
   return (
     <Animated.View
@@ -66,11 +72,8 @@ function TerracottaBackdrop({ animatedIndex }: BottomSheetBackdropProps) {
         animatedStyle,
       ]}
     >
-      <View
-        style={[
-          styles.backdropImageWrap,
-          { top: insets.top + SCREEN_H * 0.1 },
-        ]}
+      <Animated.View
+        style={[styles.backdropImageWrap, mountainStyle]}
         pointerEvents='none'
       >
         <Image
@@ -78,7 +81,7 @@ function TerracottaBackdrop({ animatedIndex }: BottomSheetBackdropProps) {
           style={styles.backdropImage}
           fadeDuration={0}
         />
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 }
