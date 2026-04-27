@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     fontSize: 84,
     fontFamily: Fonts!.mono,
     fontVariant: ['tabular-nums'],
-    fontWeight: '300',
+    fontWeight: '400',
     letterSpacing: 2,
     lineHeight: 90,
     includeFontPadding: false,
