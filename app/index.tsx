@@ -1,6 +1,6 @@
 import { Entypo, Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   Dimensions,
@@ -51,7 +51,7 @@ import {
 } from '@/lib/screen-time';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
-import { palette, themes } from '@/lib/theme';
+import { palette, themes, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 
@@ -103,7 +103,10 @@ export default function DoNothingScreen() {
   const ready = useAppStore((s) => s.ready);
   const started = useAppStore((s) => s.started);
   const goalSeconds = useAppStore((s) => s.goalSeconds);
-  const sliderMinutes = useAppStore((s) => s.sliderMinutes);
+  // sliderMinutes is intentionally NOT subscribed here — every snap
+  // would re-render this 1700-line component. The resting timer text
+  // and the slider value prop both consume it via small self-
+  // subscribing components below, so JS work stays local.
   const focusStep = useAppStore((s) => s.focusStep);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const isSubscribed = useAppStore((s) => s.isSubscribed);
@@ -1047,18 +1050,7 @@ export default function DoNothingScreen() {
           >
             <Animated.View style={[timerEntryStyle, styles.centerContent]}>
               {!started ? (
-                <Animated.Text
-                  style={[
-                    styles.timer,
-                    {
-                      color: theme.text,
-                      fontFamily: Fonts!.mono,
-                      textAlign: 'center',
-                    },
-                  ]}
-                >
-                  {`${String(sliderMinutes).padStart(2, '0')}:00`}
-                </Animated.Text>
+                <RestingTimerText color={theme.text} />
               ) : (
                 <TimerDisplay
                   seconds={
@@ -1119,30 +1111,10 @@ export default function DoNothingScreen() {
           >
             {!started && (
               <View style={styles.goalSliderWrap}>
-                <GoalSliderBar
+                <RestingSliderWrap
                   theme={theme}
-                  value={sliderMinutes}
-                  onChange={handleSliderChange}
                   width={SLIDER_W}
-                  maxMinutes={60}
-                  minMinutes={0}
-                  ticks={[5, 10, 20, 30, 45]}
-                  scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
-                  breakpoints={{
-                    b1Val: 15,
-                    b1Pos: 0.25,
-                    b2Val: 30,
-                    b2Pos: 0.5,
-                  }}
-                  accentColor={theme.accent}
-                  trackBgColor={theme.text}
-                  trackStrokeWidth={3.5}
-                  scaleLabelStyle={{
-                    color: theme.text,
-                    fontWeight: '500',
-                    fontSize: 12,
-                  }}
-                  hideLabel
+                  onChange={handleSliderChange}
                 />
               </View>
             )}
@@ -1882,4 +1854,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+});
+
+// ── Self-subscribing slider helpers ─────────────────────────────────────
+// Both consume `sliderMinutes` directly from the store so the parent
+// MainScreen never needs to subscribe — every slider snap re-renders
+// only these tiny components, not the whole 1700-line tree.
+
+const RestingTimerText = memo(function RestingTimerText({
+  color,
+}: {
+  color: string;
+}) {
+  const sliderMinutes = useAppStore((s) => s.sliderMinutes);
+  return (
+    <Animated.Text
+      style={[
+        styles.timer,
+        { color, fontFamily: Fonts!.mono, textAlign: 'center' },
+      ]}
+    >
+      {`${String(sliderMinutes).padStart(2, '0')}:00`}
+    </Animated.Text>
+  );
+});
+
+interface RestingSliderWrapProps {
+  theme: AppTheme;
+  width: number;
+  onChange: (minutes: number) => void;
+}
+
+const RestingSliderWrap = memo(function RestingSliderWrap({
+  theme,
+  width,
+  onChange,
+}: RestingSliderWrapProps) {
+  const sliderMinutes = useAppStore((s) => s.sliderMinutes);
+  return (
+    <GoalSliderBar
+      theme={theme}
+      value={sliderMinutes}
+      onChange={onChange}
+      width={width}
+      maxMinutes={60}
+      minMinutes={0}
+      ticks={[5, 10, 20, 30, 45]}
+      scaleLabels={['0', '5', '10', '20', '30', '45', '60']}
+      breakpoints={{ b1Val: 15, b1Pos: 0.25, b2Val: 30, b2Pos: 0.5 }}
+      accentColor={theme.accent}
+      trackBgColor={theme.text}
+      trackStrokeWidth={3.5}
+      scaleLabelStyle={{
+        color: theme.text,
+        fontWeight: '500',
+        fontSize: 12,
+      }}
+      hideLabel
+    />
+  );
 });

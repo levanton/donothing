@@ -38,24 +38,29 @@ interface DotConfig {
   color: string;
 }
 
-// 14 dots, staggered ~1.1s apart so the layer is always populated.
-// Sizes 3–5px, mixed colours, varied sway so neighbouring dots don't
-// look like a synchronized pattern.
+// 18 dots, staggered ~890ms apart so the layer always has a few in
+// frame. Sizes 4–7px (slightly bigger than the first pass), mixed
+// colours, varied sway so neighbouring dots don't look like a
+// synchronized pattern.
 const DOTS: DotConfig[] = [
-  { startX: -SCREEN_W * 0.36, swayAmplitude: 22, swayPhase: 0.0, delay: 0,     peakOpacity: 0.34, size: 4, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.18, swayAmplitude: 30, swayPhase: 0.3, delay: 1100,  peakOpacity: 0.42, size: 3, color: COLOR_SALMON },
-  { startX:  SCREEN_W * 0.04, swayAmplitude: 18, swayPhase: 0.6, delay: 2200,  peakOpacity: 0.36, size: 5, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.22, swayAmplitude: 26, swayPhase: 0.1, delay: 3300,  peakOpacity: 0.30, size: 3, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.30, swayAmplitude: 28, swayPhase: 0.4, delay: 4400,  peakOpacity: 0.44, size: 4, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.34, swayAmplitude: 20, swayPhase: 0.7, delay: 5500,  peakOpacity: 0.32, size: 3, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.06, swayAmplitude: 24, swayPhase: 0.2, delay: 6600,  peakOpacity: 0.40, size: 5, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.40, swayAmplitude: 16, swayPhase: 0.5, delay: 7700,  peakOpacity: 0.28, size: 4, color: COLOR_SALMON },
-  { startX:  SCREEN_W * 0.12, swayAmplitude: 32, swayPhase: 0.8, delay: 8800,  peakOpacity: 0.38, size: 3, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.40, swayAmplitude: 22, swayPhase: 0.0, delay: 9900,  peakOpacity: 0.34, size: 4, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.10, swayAmplitude: 28, swayPhase: 0.55,delay: 11000, peakOpacity: 0.42, size: 5, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.26, swayAmplitude: 18, swayPhase: 0.25,delay: 12100, peakOpacity: 0.30, size: 3, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.30, swayAmplitude: 26, swayPhase: 0.75,delay: 13200, peakOpacity: 0.36, size: 4, color: COLOR_CREAM },
-  { startX:  SCREEN_W * 0.00, swayAmplitude: 14, swayPhase: 0.45,delay: 14300, peakOpacity: 0.38, size: 4, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.38, swayAmplitude: 22, swayPhase: 0.0, delay: 0,     peakOpacity: 0.36, size: 5, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.20, swayAmplitude: 30, swayPhase: 0.3, delay: 890,   peakOpacity: 0.44, size: 4, color: COLOR_SALMON },
+  { startX:  SCREEN_W * 0.04, swayAmplitude: 18, swayPhase: 0.6, delay: 1780,  peakOpacity: 0.40, size: 7, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.22, swayAmplitude: 26, swayPhase: 0.1, delay: 2670,  peakOpacity: 0.32, size: 5, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.30, swayAmplitude: 28, swayPhase: 0.4, delay: 3560,  peakOpacity: 0.46, size: 6, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.36, swayAmplitude: 20, swayPhase: 0.7, delay: 4450,  peakOpacity: 0.34, size: 4, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.08, swayAmplitude: 24, swayPhase: 0.2, delay: 5340,  peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.42, swayAmplitude: 16, swayPhase: 0.5, delay: 6230,  peakOpacity: 0.30, size: 5, color: COLOR_SALMON },
+  { startX:  SCREEN_W * 0.12, swayAmplitude: 32, swayPhase: 0.8, delay: 7120,  peakOpacity: 0.40, size: 4, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.42, swayAmplitude: 22, swayPhase: 0.0, delay: 8010,  peakOpacity: 0.36, size: 6, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.12, swayAmplitude: 28, swayPhase: 0.55,delay: 8900,  peakOpacity: 0.44, size: 7, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.26, swayAmplitude: 18, swayPhase: 0.25,delay: 9790,  peakOpacity: 0.32, size: 4, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.30, swayAmplitude: 26, swayPhase: 0.75,delay: 10680, peakOpacity: 0.38, size: 5, color: COLOR_CREAM },
+  { startX:  SCREEN_W * 0.00, swayAmplitude: 14, swayPhase: 0.45,delay: 11570, peakOpacity: 0.40, size: 6, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.34, swayAmplitude: 24, swayPhase: 0.65,delay: 12460, peakOpacity: 0.34, size: 5, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.18, swayAmplitude: 20, swayPhase: 0.15,delay: 13350, peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
+  { startX:  SCREEN_W * 0.06, swayAmplitude: 30, swayPhase: 0.85,delay: 14240, peakOpacity: 0.36, size: 4, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.04, swayAmplitude: 26, swayPhase: 0.35,delay: 15130, peakOpacity: 0.38, size: 6, color: COLOR_SAND },
 ];
 
 interface DriftingDotProps {
