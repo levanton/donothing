@@ -153,11 +153,11 @@ export default function GoalSliderBar({
   const tw = width - pad * 2;
 
   // --- Interactive gesture ---
+  // Called only when the snapped minute value actually changes — the
+  // worklet dedupes via `lastSnap` so JS work happens once per
+  // integer step, not 60× per second.
   const handleDisplayUpdate = useCallback((mins: number) => {
-    if (mins !== lastSnap.value) {
-      lastSnap.value = mins;
-      Haptics.selectionAsync();
-    }
+    Haptics.selectionAsync();
     setDisplayMins(mins);
     onChange?.(mins);
   }, [onChange]);
@@ -172,7 +172,14 @@ export default function GoalSliderBar({
       let snapped = snapToNearest(raw);
       if (snapped < minMinutes) snapped = minMinutes;
       internalProgress.value = valueToPos(snapped, maxMinutes, bp);
-      runOnJS(handleDisplayUpdate)(snapped);
+      // Cross to JS only on a real value change — the gesture fires
+      // ~60×/sec but the snapped minute changes far less often.
+      // Without this gate, every frame queues a setState + store
+      // write which lags the timer numerals behind the thumb.
+      if (snapped !== lastSnap.value) {
+        lastSnap.value = snapped;
+        runOnJS(handleDisplayUpdate)(snapped);
+      }
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {

@@ -32,11 +32,12 @@ import AccountSheet from '@/components/AccountSheet';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import BlockSheet from '@/components/BlockSheet';
 import HistoryContent from '@/components/HistoryContent';
-import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
+import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
+import DriftingDots from '@/components/DriftingDots';
 import PaywallGate from '@/components/PaywallGate';
 import PromoOffer from '@/components/promo/PromoOffer';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
-import SessionEndedView from '@/components/SessionEndedView';
+import SessionEndedSheet from '@/components/SessionEndedSheet';
 import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
@@ -54,7 +55,11 @@ import { palette, themes } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 
-const RING_R = 64;
+// Yes-button + orbit slot — kept at 140px so the launch-splash math
+// (which lands the splash circle exactly on the measured yes button)
+// stays consistent. The orbit ring itself was removed; this is just
+// the diameter of the static cream→terracotta yes pill at rest.
+const YES_BUTTON_SIZE = 140;
 
 // Pick the block that most recently fired today so the unlock view
 // surfaces the unlockGoalMinutes the user configured for it. The shield
@@ -105,6 +110,7 @@ export default function DoNothingScreen() {
 
   const accountSheetRef = useRef<BottomSheet>(null);
   const blockSheetRef = useRef<BottomSheet>(null);
+  const sessionEndedSheetRef = useRef<BottomSheet>(null);
   const handleOpenAccount = useCallback(() => {
     accountSheetRef.current?.expand();
   }, []);
@@ -172,10 +178,6 @@ export default function DoNothingScreen() {
 
   // --- Entry animations ---
   const timerOpacity = useSharedValue(0.9);
-  const dotProgress = useSharedValue(0);
-  const orbitAmount = useSharedValue(0); // 0 = centered (button), 1 = orbiting (dot)
-  const buttonSize = useSharedValue(140); // 140 = button, 12 = dot
-  const playIconOpacity = useSharedValue(1);
 
   // Header morph: "Ready to Do|ing| nothing|?|"
   const hideOpacity = useSharedValue(1);
@@ -185,13 +187,11 @@ export default function DoNothingScreen() {
 
   useEffect(() => {
     if (!started) return;
-    // Button shrinks to dot and starts orbiting
-    buttonSize.value = withTiming(12, { duration: 600 });
-    playIconOpacity.value = withTiming(0, { duration: 300 });
-    orbitAmount.value = withTiming(1, { duration: 600 });
-    // Timer and ring appear
+    // Timer fade — kept so the resting timer's slight 0.9 opacity
+    // jumps to 1 in the brief moment before the camera covers it.
     timerOpacity.value = withTiming(1, { duration: 1125 });
-    // Header text morph
+    // Header text morph (still cosmetically nice even though the
+    // camera covers it during the run; matters on close).
     hideOpacity.value = withTiming(0, { duration: 400 });
     hideWidth.value = withTiming(0, { duration: 860 });
     showWidth.value = withTiming(1, { duration: 690 });
@@ -215,9 +215,6 @@ export default function DoNothingScreen() {
   // --- Reset main screen visuals while completion overlay is showing ---
   useEffect(() => {
     if (!completionVisible) return;
-    orbitAmount.value = withTiming(0, { duration: 600 });
-    buttonSize.value = withTiming(140, { duration: 600 });
-    playIconOpacity.value = withTiming(1, { duration: 900 });
     timerOpacity.value = withTiming(0.9, { duration: 700 });
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
@@ -229,9 +226,6 @@ export default function DoNothingScreen() {
   useEffect(() => {
     if (!sessionEndedVisible) return;
     setDistractionFree(false);
-    orbitAmount.value = 0;
-    buttonSize.value = 140;
-    playIconOpacity.value = 1;
     timerOpacity.value = 0.9;
     showOpacity.value = 0;
     showWidth.value = 0;
@@ -242,22 +236,6 @@ export default function DoNothingScreen() {
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
   }));
-
-  const unifiedDotStyle = useAnimatedStyle(() => {
-    const rad = dotProgress.value * 2 * Math.PI;
-    const orbitX = Math.sin(rad) * RING_R;
-    const orbitY = -Math.cos(rad) * RING_R;
-    const s = buttonSize.value;
-    return {
-      width: s,
-      height: s,
-      borderRadius: s / 2,
-      transform: [
-        { translateX: orbitAmount.value * orbitX },
-        { translateY: orbitAmount.value * orbitY },
-      ],
-    };
-  });
 
   // "Ready to " and "?" — fade then collapse
   const hideStyle = useAnimatedStyle(() => ({
@@ -291,6 +269,17 @@ export default function DoNothingScreen() {
       blockSheetRef.current?.close();
     }
   }, [blockWaiting]);
+
+  // Drive the session-ended sheet — replaces the old full-screen
+  // SessionEndedView with a bottom-sheet that matches BlockSheet's
+  // design language.
+  useEffect(() => {
+    if (sessionEndedVisible) {
+      sessionEndedSheetRef.current?.expand();
+    } else {
+      sessionEndedSheetRef.current?.close();
+    }
+  }, [sessionEndedVisible]);
 
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
@@ -690,8 +679,82 @@ export default function DoNothingScreen() {
     opacity: Math.max(0, Math.min(1, (splashProgress.value - 0.6) / 0.3)),
   }));
 
+  // --- Terracotta camera --------------------------------------------------
+  // When the user taps yes, the terracotta yes button doesn't shrink to a
+  // dot anymore — it expands into a full-screen sheet. The whole running
+  // experience lives inside that sheet: cream timer, breath orb, phrase.
+  // Reuses the splash centre/cover-size math so the geometry is consistent
+  // (a circle whose radius reaches the farthest corner from the yes
+  // button's measured centre).
+  const runExpand = useSharedValue(0);
+  // Mount the running UI immediately on start; keep it mounted long
+  // enough on stop for the fade-out to play alongside the camera
+  // shrinking.
+  const [runUiMounted, setRunUiMounted] = useState(false);
+
+  useEffect(() => {
+    runExpand.value = withTiming(started ? 1 : 0, {
+      // Open slow enough for the terracotta sweep to actually land,
+      // close a touch faster — by then the user has already chosen
+      // to leave so dawdling reads as "not letting go".
+      duration: started ? 1100 : 620,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+    });
+    if (started) {
+      setRunUiMounted(true);
+      return;
+    }
+    const t = setTimeout(() => setRunUiMounted(false), 640);
+    return () => clearTimeout(t);
+  }, [started]);
+
+  const terraCameraStyle = useAnimatedStyle(() => {
+    // Scale-based animation runs purely on the GPU — no per-frame
+    // layout work. The view stays a fixed YES_SIZE circle anchored
+    // at the yes button centre; only `transform: scale` changes.
+    // Far smoother than animating width/height/borderRadius.
+    const maxScale = splashInitialSize.value / YES_SIZE;
+    const scale = 1 + runExpand.value * (maxScale - 1);
+    return {
+      width: YES_SIZE,
+      height: YES_SIZE,
+      borderRadius: YES_SIZE / 2,
+      left: splashCenterX.value - YES_SIZE / 2,
+      top: splashCenterY.value - YES_SIZE / 2,
+      transform: [{ scale }],
+      // Hide the camera entirely at rest so it doesn't sit on top of
+      // the yes button at the same 140px size and steal the label.
+      opacity: runExpand.value < 0.001 ? 0 : 1,
+    };
+  });
+
+  // Running UI fades in during the last third of the expansion so the
+  // terracotta lands first, then the cream content arrives — feels like
+  // the camera "settles" before showing its inside.
+  const runUiStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, Math.min(1, (runExpand.value - 0.6) / 0.35)),
+  }));
+
+  // Distraction-free fade — declared early so its shared value is
+  // ready before any animated style closes over it. The actual
+  // useEffect that drives it lives below the distractionFree state.
+  const distractionFade = useSharedValue(1);
+  const distractionStyle = useAnimatedStyle(() => ({
+    opacity: distractionFade.value,
+  }));
+
   // --- Distraction-free mode: hide timer & button while running ---
   const [distractionFree, setDistractionFree] = useState(false);
+
+  // Drive the distraction-fade shared value declared above, now that
+  // distractionFree is in scope. Smooth tween instead of an instant
+  // opacity flip.
+  useEffect(() => {
+    distractionFade.value = withTiming(distractionFree ? 0 : 1, {
+      duration: 720,
+      easing: Easing.inOut(Easing.cubic),
+    });
+  }, [distractionFree]);
 
   // --- Promo offer modal (for users without subscription) ---
   // Lives in the store so the standalone paywall route can trigger it
@@ -720,10 +783,8 @@ export default function DoNothingScreen() {
     deactivateKeepAwake('session');
     setDistractionFree(false);
     await useAppStore.getState().stopSession();
-    // Dot grows back to button
-    orbitAmount.value = withTiming(0, { duration: 600 });
-    buttonSize.value = withTiming(140, { duration: 600 });
-    playIconOpacity.value = withTiming(1, { duration: 900 });
+    // Camera shrinks back via the runExpand effect; here we just
+    // reverse the resting-state visuals: timer fade, header morph.
     timerOpacity.value = withTiming(0.9, { duration: 700 });
     // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
@@ -758,19 +819,8 @@ export default function DoNothingScreen() {
   }
 
   // =========================================================================
-  // Session ended — shown when the previous session was cancelled (backgrounded)
-  // =========================================================================
-  if (sessionEndedVisible) {
-    return (
-      <SessionEndedView
-        themeMode={themeMode}
-        onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
-      />
-    );
-  }
-
-  // =========================================================================
-  // Main screen
+  // Main screen — session-ended state shows as a bottom sheet over
+  // the resting main UI, not as a full-screen replacement.
   // =========================================================================
   return (
     <View style={[styles.screenStack, { backgroundColor: theme.bg }]}>
@@ -1024,52 +1074,37 @@ export default function DoNothingScreen() {
             </Animated.View>
           </View>
 
-          {/* Orbit ring + unified button/dot */}
+          {/* Yes button — static terracotta pill at rest. The old
+              orbit-ring + shrink-to-dot animation was removed; the
+              terracotta camera now carries the running state, and
+              the yes button just sits behind it. */}
           <View
             style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
             pointerEvents={distractionFree ? 'none' : 'auto'}
           >
             <View style={styles.orbitArea}>
-              <Animated.View style={[styles.orbitCenter, timerEntryStyle]}>
-                <OrbitRing
-                  color={theme.accent}
-                  faintColor={
-                    themeMode === 'dark' ? palette.cream : palette.charcoal
-                  }
-                  elapsed={elapsed}
-                  onStop={handleStop}
-                  dotProgress={dotProgress}
-                />
-              </Animated.View>
-              {/* Unified element: play button ↔ orbit dot */}
               <Pressable
                 ref={yesButtonRef}
                 onLayout={measureYesButton}
-                onPress={started ? handleStop : handleStart}
+                onPress={handleStart}
+                disabled={started}
                 style={styles.orbitCenter}
               >
-                <Animated.View
+                <View
                   style={[
-                    {
-                      backgroundColor: theme.accent,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      overflow: 'hidden',
-                    },
-                    unifiedDotStyle,
+                    styles.yesButton,
+                    { backgroundColor: theme.accent },
                   ]}
                 >
-                  <Animated.View style={{ opacity: playIconOpacity }}>
-                    <Text
-                      style={[
-                        styles.nothingLabel,
-                        { color: theme.accentText, fontFamily: Fonts!.serif },
-                      ]}
-                    >
-                      yes
-                    </Text>
-                  </Animated.View>
-                </Animated.View>
+                  <Text
+                    style={[
+                      styles.nothingLabel,
+                      { color: theme.accentText, fontFamily: Fonts!.serif },
+                    ]}
+                  >
+                    yes
+                  </Text>
+                </View>
               </Pressable>
             </View>
           </View>
@@ -1272,23 +1307,9 @@ export default function DoNothingScreen() {
             </Animated.View>
           </View>
 
-          {/* Distraction-free toggle — visible only while timer is running */}
-          {started && (
-            <Pressable
-              onPress={toggleDistractionFree}
-              style={[
-                styles.distractionFreeButton,
-                { bottom: insets.bottom + 24, borderColor: theme.border },
-              ]}
-              hitSlop={16}
-            >
-              <Feather
-                name={distractionFree ? 'eye' : 'eye-off'}
-                size={20}
-                color={theme.textSecondary}
-              />
-            </Pressable>
-          )}
+          {/* (Running-mode UI — phrase, stop, eye-toggle — now lives in
+              the terracotta camera overlay rendered above this stack.
+              Nothing renders here while `started` is true.) */}
         </Animated.View>
       </GestureDetector>
 
@@ -1362,6 +1383,16 @@ export default function DoNothingScreen() {
         onUnlock={handleForceUnlock}
       />
 
+      {/* Session-ended sheet — appears when a session was cut short
+          (e.g. the app got backgrounded). Replaces the old full-
+          screen view with a bottom-sheet so the experience feels
+          consistent with BlockSheet. */}
+      <SessionEndedSheet
+        ref={sessionEndedSheetRef}
+        theme={theme}
+        onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
+      />
+
       {/* Floating Journey label — the one shared element that morphs between the
         home pill and the Journey heading as the panel slides up. Hidden while
         a session is running or a scheduled block is waiting so the timer UI
@@ -1404,6 +1435,129 @@ export default function DoNothingScreen() {
         yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
       />
+
+      {/* Terracotta camera — yes button expanded into a full-screen
+          sheet on session start. Crisp width/height animation (not
+          scale) so the edges stay sharp during the grow. Always
+          mounted; the animated style gates visibility via opacity. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.runCamera,
+          { backgroundColor: theme.accent },
+          terraCameraStyle,
+        ]}
+      />
+
+      {/* Running UI — cream-on-terracotta. Stays mounted briefly after
+          a session ends so the fade-out reads alongside the camera
+          shrinking, then unmounts cleanly. */}
+      {runUiMounted && (
+        <Animated.View
+          style={[styles.runLayer, runUiStyle]}
+          pointerEvents="box-none"
+        >
+          {/* Drifting cream dots — atmospheric layer that floats up
+              through the screen, like dust motes in golden-hour
+              light. Behind the timer in z-order. Wrapped so the
+              hide-toggle fades the whole layer alongside everything
+              else, instead of cutting it off mid-motion. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, distractionStyle]}
+            pointerEvents="none"
+          >
+            <DriftingDots active={runUiMounted} color={palette.cream} />
+          </Animated.View>
+
+          {/* Big cream timer at vertical centre. Each digit slides
+              and fades as it ticks; the whole block fades smoothly
+              with the hide-toggle. */}
+          <Animated.View
+            style={[styles.runCenter, distractionStyle]}
+            pointerEvents="none"
+          >
+            <AnimatedTimerDisplay
+              seconds={
+                goalSeconds > 0
+                  ? Math.max(0, goalSeconds - elapsed)
+                  : elapsed
+              }
+              color={palette.cream}
+              fontSize={96}
+            />
+          </Animated.View>
+
+          {/* Interrupt is the primary action — substantial cream-
+              outline pill at the very bottom, reachable thumb. */}
+          <Animated.View
+            style={[
+              styles.runStopWrap,
+              { bottom: insets.bottom + 30 },
+              distractionStyle,
+            ]}
+            pointerEvents={distractionFree ? 'none' : 'auto'}
+          >
+            <Pressable
+              onPress={handleStop}
+              style={styles.runStopPill}
+              hitSlop={12}
+            >
+              <Text
+                style={[
+                  styles.runStopLabel,
+                  { fontFamily: Fonts!.serif },
+                ]}
+              >
+                interrupt
+              </Text>
+            </Pressable>
+          </Animated.View>
+
+          {/* Hide is secondary — small eye-off icon above the
+              interrupt pill, with its hint underneath. Lighter
+              border, smaller tap area so it reads as auxiliary. */}
+          <Animated.View
+            style={[
+              styles.runHideStack,
+              { bottom: insets.bottom + 110 },
+              distractionStyle,
+            ]}
+            pointerEvents={distractionFree ? 'none' : 'box-none'}
+          >
+            <Pressable
+              onPress={toggleDistractionFree}
+              style={styles.runHideIconBtn}
+              hitSlop={16}
+            >
+              <Feather
+                name="eye-off"
+                size={18}
+                color={palette.cream}
+                style={{ opacity: 0.78 }}
+              />
+            </Pressable>
+            <Text
+              style={[
+                styles.runHideHint,
+                { fontFamily: Fonts!.serif },
+              ]}
+            >
+              tap so nothing distracts
+            </Text>
+          </Animated.View>
+
+          {/* Tap-anywhere overlay — only catches taps in distraction-
+              free mode, where it toggles distraction-free off. The
+              session itself is still controlled by the explicit stop
+              link, so no risk of accidental cancellation. */}
+          {distractionFree && (
+            <Pressable
+              onPress={toggleDistractionFree}
+              style={StyleSheet.absoluteFillObject}
+            />
+          )}
+        </Animated.View>
+      )}
 
       {/* Launch splash — terracotta sheet that covers the screen and
           shrinks in place onto the measured yes button */}
@@ -1491,16 +1645,26 @@ const styles = StyleSheet.create({
   },
   orbitWrap: {
     width: 280,
-    height: RING_SIZE,
+    height: YES_BUTTON_SIZE,
     marginTop: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   orbitArea: {
-    width: RING_SIZE,
-    height: RING_SIZE,
+    width: YES_BUTTON_SIZE,
+    height: YES_BUTTON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Static terracotta pill — the start screen's primary action.
+  // Replaces the old shrink-to-orbit-dot Animated.View.
+  yesButton: {
+    width: YES_BUTTON_SIZE,
+    height: YES_BUTTON_SIZE,
+    borderRadius: YES_BUTTON_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   centerContent: {
     alignItems: 'center',
@@ -1598,6 +1762,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  idlePhraseLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
   devCluster: {
     position: 'absolute',
     right: 68,
@@ -1622,6 +1792,75 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 500,
     overflow: 'hidden',
+  },
+  // Terracotta camera — yes button expanded to fill the screen during
+  // a session. Shares the splash's positioning math.
+  runCamera: {
+    position: 'absolute',
+    zIndex: 400,
+  },
+  runLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 410,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Interrupt is the primary action — substantial cream-outline
+  // pill at the bottom, reachable thumb position. Wrapper carries
+  // the absolute positioning so the inner Pressable can be wrapped
+  // in an Animated.View without losing alignment.
+  runStopWrap: {
+    position: 'absolute',
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  runStopPill: {
+    minWidth: 152,
+    height: 52,
+    paddingHorizontal: 28,
+    borderRadius: 100,
+    borderWidth: 1.4,
+    borderColor: 'rgba(249, 242, 224, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runStopLabel: {
+    color: palette.cream,
+    fontSize: 18,
+    letterSpacing: 0.6,
+  },
+  // Hide is secondary — small icon button above the stop pill, with
+  // its hint beneath. Lighter border + half the visual weight.
+  runHideStack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  runHideIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 242, 224, 0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runHideHint: {
+    color: palette.cream,
+    fontSize: 11,
+    letterSpacing: 0.3,
+    opacity: 0.55,
+    marginTop: 8,
+    textAlign: 'center',
   },
   splashLabelWrap: {
     alignItems: 'center',
