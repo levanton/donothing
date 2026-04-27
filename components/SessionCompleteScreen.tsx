@@ -34,87 +34,11 @@ const SPLASH_ORIGIN_X = SCREEN_W / 2;
 const SPLASH_MAX_SIZE = Math.hypot(SCREEN_W, SCREEN_H) * 2;
 const YES_SIZE = 140;
 
-// Body responds in stages. We tier the messaging so a 1-minute pause
-// doesn't claim the same benefits as a 30-minute sit. Tiers are ordered
-// longest-first; pickBenefits() walks the list and returns the first
-// tier the duration crosses.
-type Benefit = { icon: string; title: string; sub: string };
-
-// Tiers ordered longest-first; pickBenefits walks the list and returns
-// the first set the duration crosses. Minimum session is 1 minute, so
-// the 60-second floor is the smallest tier we ever surface.
-const BENEFIT_TIERS: Array<{ minSeconds: number; items: Benefit[] }> = [
-  {
-    minSeconds: 30 * 60,
-    items: [
-      { icon: 'sleep',           title: 'deep rest achieved',  sub: 'your brain fully recovered' },
-      { icon: 'heart-pulse',     title: 'stress dissolved',    sub: 'cortisol back to baseline' },
-      { icon: 'spa-outline',     title: 'emotions settled',    sub: 'amygdala calmed down' },
-      { icon: 'lightbulb-on',    title: 'creativity unlocked', sub: 'new neural connections forming' },
-      { icon: 'archive-outline', title: 'memory consolidated', sub: "today's experiences organized" },
-      { icon: 'eye-outline',     title: 'mind cleared',        sub: 'thinking at full capacity' },
-    ],
-  },
-  {
-    minSeconds: 20 * 60,
-    items: [
-      { icon: 'sleep',          title: 'deep rest achieved',  sub: 'equivalent to a power nap' },
-      { icon: 'heart-pulse',    title: 'stress dissolved',    sub: 'cortisol back to baseline' },
-      { icon: 'spa-outline',    title: 'emotions settled',    sub: 'amygdala activity reduced' },
-      { icon: 'lightning-bolt', title: 'focus sharpened',     sub: 'deep attention back online' },
-      { icon: 'lightbulb-on',   title: 'creativity unlocked', sub: 'new neural connections forming' },
-    ],
-  },
-  {
-    minSeconds: 15 * 60,
-    items: [
-      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones significantly down' },
-      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention back online' },
-      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory clear' },
-      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
-      { icon: 'lightbulb-on',   title: 'creativity unlocked',  sub: 'new neural connections forming' },
-    ],
-  },
-  {
-    minSeconds: 10 * 60,
-    items: [
-      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones easing' },
-      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention coming back' },
-      { icon: 'compass',        title: 'clearer decisions',    sub: 'working memory clear' },
-      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
-    ],
-  },
-  {
-    minSeconds: 5 * 60,
-    items: [
-      { icon: 'heart',          title: 'cortisol dropped',     sub: 'stress hormones easing' },
-      { icon: 'lightning-bolt', title: 'focus sharpened',      sub: 'attention coming back' },
-      { icon: 'brain',          title: 'your brain recharged', sub: 'default mode network online' },
-    ],
-  },
-  {
-    minSeconds: 3 * 60,
-    items: [
-      { icon: 'weather-windy', title: 'your breath slowed',        sub: 'nervous system calming down' },
-      { icon: 'heart',         title: 'cortisol started dropping', sub: 'stress hormones easing' },
-      { icon: 'eye-outline',   title: 'attention returning',       sub: 'your brain got a breath' },
-    ],
-  },
-  {
-    minSeconds: 60,
-    items: [
-      { icon: 'weather-windy', title: 'your breath slowed', sub: 'nervous system starting to calm' },
-      { icon: 'pause-circle',  title: 'the rush stopped',   sub: 'stress loop interrupted' },
-    ],
-  },
-];
-
-function pickBenefits(seconds: number): Benefit[] {
-  for (const tier of BENEFIT_TIERS) {
-    if (seconds >= tier.minSeconds) return tier.items;
-  }
-  return BENEFIT_TIERS[BENEFIT_TIERS.length - 1].items;
-}
+// Benefit tier copy + icons live in lib/benefits — the post-session
+// screen pulls from there so any other surface (paywall, onboarding,
+// reminder card, etc.) can render the same list without duplicating
+// the data.
+import { type Benefit, pickBenefits } from '@/lib/benefits';
 
 // Same proportions as the Paywall FeatureCarousel — small narrow
 // cards with alternating colored backgrounds.
@@ -133,10 +57,43 @@ const BENEFIT_VARIANTS: Array<{ bg: string; fg: string }> = [
   { bg: '#3D2516', fg: palette.cream }, // 5: dark cocoa (darkest)
 ];
 
-function BenefitCard({ item, index }: { item: Benefit; index: number }) {
+function BenefitCard({
+  item,
+  index,
+  revealed,
+}: {
+  item: Benefit;
+  index: number;
+  revealed: boolean;
+}) {
   const variant = BENEFIT_VARIANTS[index % BENEFIT_VARIANTS.length];
+  // Each card rises, scales and fades on its own delay so the slider
+  // composes itself left-to-right rather than dropping in as a block.
+  // Scale gives the cards a sense of "stepping forward" — without it
+  // the cascade reads as a flat fade.
+  const op = useSharedValue(0);
+  const y = useSharedValue(18);
+  const scale = useSharedValue(0.94);
+  useEffect(() => {
+    if (!revealed) {
+      op.value = 0;
+      y.value = 18;
+      scale.value = 0.94;
+      return;
+    }
+    const delay = index * 130;
+    op.value = withDelay(delay, withTiming(1, { duration: 560, easing: EASE_OUT }));
+    y.value = withDelay(delay, withTiming(0, { duration: 560, easing: EASE_OUT }));
+    scale.value = withDelay(delay, withTiming(1, { duration: 620, easing: EASE_OUT }));
+  }, [revealed, index]);
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: op.value,
+    transform: [{ translateY: y.value }, { scale: scale.value }],
+  }));
   return (
-    <View style={[styles.benefitCardSlide, { backgroundColor: variant.bg }]}>
+    <Animated.View
+      style={[styles.benefitCardSlide, { backgroundColor: variant.bg }, cardStyle]}
+    >
       <View style={styles.benefitIconWrap}>
         <View style={[styles.benefitIconHalo, { backgroundColor: `${variant.fg}22` }]} />
         <MaterialCommunityIcons name={item.icon as any} size={48} color={variant.fg} />
@@ -144,7 +101,7 @@ function BenefitCard({ item, index }: { item: Benefit; index: number }) {
       <Text style={[styles.benefitLabel, { color: variant.fg }]}>
         {item.title}
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -206,6 +163,39 @@ function SessionCompleteScreen({
   const closeBtnScale = useSharedValue(1);
   const farewellOpacity = useSharedValue(0);
   const farewellY = useSharedValue(12);
+  // Title pieces stagger so the numeral lands first, the unit a beat
+  // later, then `with yourself` settles in. Without this they all
+  // share titleStyle and read as a single opaque block plopping in.
+  const titleUnitOp = useSharedValue(0);
+  const titleUnitY = useSharedValue(8);
+  const titleSubOp = useSharedValue(0);
+  const titleSubY = useSharedValue(10);
+  // Benefits-phase header `what changed` rises just before the cards
+  // cascade in, so the eye lands on the heading first.
+  const benefitsHeaderOp = useSharedValue(0);
+  const benefitsHeaderY = useSharedValue(8);
+  // Mood-phase header `how full do you feel` gets its own gentle rise
+  // so it doesn't blink on with the dial — the heading lands first,
+  // the dial reveals a beat later.
+  const moodHeaderOp = useSharedValue(0);
+  const moodHeaderY = useSharedValue(8);
+  // Per-element farewell stagger — eyebrow, title, divider, sub, chip
+  // and the continue pill each rise + fade in on their own delay so
+  // the screen reads as it composes itself piece by piece, not as
+  // one block dropping in.
+  const fwEyebrowOp = useSharedValue(0);
+  const fwEyebrowY = useSharedValue(10);
+  const fwTitleOp = useSharedValue(0);
+  const fwTitleY = useSharedValue(14);
+  const fwTitleScale = useSharedValue(0.94);
+  const fwDividerOp = useSharedValue(0);
+  const fwDividerW = useSharedValue(0);
+  const fwSubOp = useSharedValue(0);
+  const fwSubY = useSharedValue(10);
+  const fwChipOp = useSharedValue(0);
+  const fwChipY = useSharedValue(10);
+  const fwContinueOp = useSharedValue(0);
+  const fwContinueY = useSharedValue(12);
   const mainContentOpacity = useSharedValue(1);
   const benefitsOpacity = useSharedValue(0);
   const splashSize = useSharedValue(0);
@@ -220,6 +210,9 @@ function SessionCompleteScreen({
   const [revealDial, setRevealDial] = useState(false);
   const [phase, setPhase] = useState<'benefits' | 'mood' | 'farewell'>('benefits');
   const [dialCollapsing, setDialCollapsing] = useState(false);
+  // Drives BenefitCard cascade — flipped true once the benefits layer
+  // has started fading in, so cards rise just behind it.
+  const [benefitsRevealed, setBenefitsRevealed] = useState(false);
 
   // Refs on the two sun renders so we can measure the live delta for
   // the sun's mood→farewell glide. Farewell sun is rendered always but
@@ -268,6 +261,28 @@ function SessionCompleteScreen({
       closeBtnScale.value = 1;
       farewellOpacity.value = 0;
       farewellY.value = 12;
+      fwEyebrowOp.value = 0;
+      fwEyebrowY.value = 10;
+      fwTitleOp.value = 0;
+      fwTitleY.value = 14;
+      fwTitleScale.value = 0.94;
+      fwDividerOp.value = 0;
+      fwDividerW.value = 0;
+      fwSubOp.value = 0;
+      fwSubY.value = 10;
+      fwChipOp.value = 0;
+      fwChipY.value = 10;
+      fwContinueOp.value = 0;
+      fwContinueY.value = 12;
+      titleUnitOp.value = 0;
+      titleUnitY.value = 8;
+      titleSubOp.value = 0;
+      titleSubY.value = 10;
+      benefitsHeaderOp.value = 0;
+      benefitsHeaderY.value = 8;
+      moodHeaderOp.value = 0;
+      moodHeaderY.value = 8;
+      setBenefitsRevealed(false);
       mainContentOpacity.value = 1;
       benefitsOpacity.value = 0;
       sunTranslateY.value = 0;
@@ -299,18 +314,39 @@ function SessionCompleteScreen({
       glowOpacity.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
       glowScale.value = withDelay(base, withTiming(1, { duration: 1400, easing: EASE_OUT }));
 
+      // Numeral leads (it's the line that does the most work). Unit
+      // follows ~200ms behind so it reads as `50 …` then `min`, not as
+      // `50 min` plopping in whole. `with yourself` settles last.
       titleOpacity.value = withDelay(base, withTiming(1, { duration: 1100, easing: EASE_OUT }));
       titleY.value = withDelay(base, withTiming(0, { duration: 1100, easing: EASE_OUT }));
       titleScale.value = withDelay(base, withTiming(1, { duration: 1200, easing: EASE_OUT }));
+      titleUnitOp.value = withDelay(base + 220, withTiming(1, { duration: 700, easing: EASE_OUT }));
+      titleUnitY.value = withDelay(base + 220, withTiming(0, { duration: 700, easing: EASE_OUT }));
+      titleSubOp.value = withDelay(base + 420, withTiming(1, { duration: 700, easing: EASE_OUT }));
+      titleSubY.value = withDelay(base + 420, withTiming(0, { duration: 700, easing: EASE_OUT }));
 
-      subtitleOpacity.value = withDelay(base + 500, withTiming(1, { duration: 850, easing: EASE_OUT }));
-      subtitleY.value = withDelay(base + 500, withTiming(0, { duration: 850, easing: EASE_OUT }));
+      subtitleOpacity.value = withDelay(base + 700, withTiming(1, { duration: 700, easing: EASE_OUT }));
+      subtitleY.value = withDelay(base + 700, withTiming(0, { duration: 700, easing: EASE_OUT }));
 
-      // Benefits slider fades in as a single unit — no per-card cascade
-      // needed since cards live side-by-side and only one is visible at
-      // a time.
+      // Benefits layer fades the whole block in; the header rises in
+      // lockstep so the chip doesn't lag behind the wash. Cards wait
+      // until the header has fully landed before cascading in — keeps
+      // the order header → cards clean instead of overlapping.
       const BENEFITS_START = base + 700;
       benefitsOpacity.value = withDelay(BENEFITS_START, withTiming(1, { duration: 500, easing: EASE_OUT }));
+      benefitsHeaderOp.value = withDelay(
+        BENEFITS_START,
+        withTiming(1, { duration: 480, easing: EASE_OUT }),
+      );
+      benefitsHeaderY.value = withDelay(
+        BENEFITS_START,
+        withTiming(0, { duration: 480, easing: EASE_OUT }),
+      );
+      const cardsTrigger = setTimeout(
+        () => setBenefitsRevealed(true),
+        BENEFITS_START + 380,
+      );
+      revealTimersRef.current.push(cardsTrigger);
 
       // "next" pill (driven by closeOpacity — same slot will later host
       // the "done" pill after the user interacts with the dial). Lands a
@@ -335,6 +371,27 @@ function SessionCompleteScreen({
       closeBtnScale.value = 1;
       farewellOpacity.value = 0;
       farewellY.value = 12;
+      fwEyebrowOp.value = 0;
+      fwEyebrowY.value = 10;
+      fwTitleOp.value = 0;
+      fwTitleY.value = 14;
+      fwTitleScale.value = 0.94;
+      fwDividerOp.value = 0;
+      fwDividerW.value = 0;
+      fwSubOp.value = 0;
+      fwSubY.value = 10;
+      fwChipOp.value = 0;
+      fwChipY.value = 10;
+      fwContinueOp.value = 0;
+      fwContinueY.value = 12;
+      titleUnitOp.value = 0;
+      titleUnitY.value = 8;
+      titleSubOp.value = 0;
+      titleSubY.value = 10;
+      benefitsHeaderOp.value = 0;
+      benefitsHeaderY.value = 8;
+      moodHeaderOp.value = 0;
+      moodHeaderY.value = 8;
       benefitsOpacity.value = 0;
       sunTranslateY.value = 0;
       splashSize.value = 0;
@@ -343,6 +400,7 @@ function SessionCompleteScreen({
       setHasInteracted(false);
       setRevealDial(false);
       setDialCollapsing(false);
+      setBenefitsRevealed(false);
     }
   }, [visible]);
 
@@ -372,6 +430,11 @@ function SessionCompleteScreen({
       setPhase('mood');
       circleBlockOpacity.value = withTiming(1, { duration: 700, easing: EASE_OUT });
       circleBlockY.value = withTiming(0, { duration: 700, easing: EASE_OUT });
+      // The mood-phase heading rises a touch before the dial reveals,
+      // so the eye lands on `how full do you feel` first instead of
+      // catching the disc grow.
+      moodHeaderOp.value = withTiming(1, { duration: 620, easing: EASE_OUT });
+      moodHeaderY.value = withTiming(0, { duration: 620, easing: EASE_OUT });
     }, 380);
     const t2 = setTimeout(() => setRevealDial(true), 380 + 400);
     revealTimersRef.current.push(t1, t2);
@@ -412,6 +475,32 @@ function SessionCompleteScreen({
         sunTranslateY.value = withTiming(deltaY, { duration: SETTLE_MS, easing: EASE_OUT });
         farewellY.value = withTiming(0, { duration: SETTLE_MS, easing: EASE_OUT });
         farewellOpacity.value = withTiming(1, { duration: SETTLE_MS, easing: EASE_OUT });
+
+        // Per-element cascade — each line of the farewell rises and
+        // fades on its own delay so the screen reads as it composes
+        // itself, not as one block dropping in. Times are relative to
+        // the moment the sun starts gliding so the texts settle around
+        // the sun as it lands.
+        const RISE = 700;
+        const ease = { easing: EASE_OUT };
+        fwEyebrowOp.value = withDelay(120, withTiming(1, { duration: RISE, ...ease }));
+        fwEyebrowY.value = withDelay(120, withTiming(0, { duration: RISE, ...ease }));
+
+        fwTitleOp.value = withDelay(260, withTiming(1, { duration: RISE + 80, ...ease }));
+        fwTitleY.value = withDelay(260, withTiming(0, { duration: RISE + 80, ...ease }));
+        fwTitleScale.value = withDelay(260, withTiming(1, { duration: RISE + 200, ...ease }));
+
+        fwDividerOp.value = withDelay(440, withTiming(1, { duration: 540, ...ease }));
+        fwDividerW.value = withDelay(440, withTiming(1, { duration: 700, ...ease }));
+
+        fwSubOp.value = withDelay(560, withTiming(1, { duration: RISE, ...ease }));
+        fwSubY.value = withDelay(560, withTiming(0, { duration: RISE, ...ease }));
+
+        fwChipOp.value = withDelay(740, withTiming(1, { duration: RISE, ...ease }));
+        fwChipY.value = withDelay(740, withTiming(0, { duration: RISE, ...ease }));
+
+        fwContinueOp.value = withDelay(960, withTiming(1, { duration: RISE, ...ease }));
+        fwContinueY.value = withDelay(960, withTiming(0, { duration: RISE, ...ease }));
       };
 
       const fallback = SCREEN_H * 0.2;
@@ -501,6 +590,49 @@ function SessionCompleteScreen({
     opacity: farewellOpacity.value,
     transform: [{ translateY: farewellY.value }],
   }));
+  const fwEyebrowStyle = useAnimatedStyle(() => ({
+    opacity: fwEyebrowOp.value,
+    transform: [{ translateY: fwEyebrowY.value }],
+  }));
+  const fwTitleStyle = useAnimatedStyle(() => ({
+    opacity: fwTitleOp.value,
+    transform: [
+      { translateY: fwTitleY.value },
+      { scale: fwTitleScale.value },
+    ],
+  }));
+  const fwDividerStyle = useAnimatedStyle(() => ({
+    opacity: fwDividerOp.value,
+    transform: [{ scaleX: fwDividerW.value }],
+  }));
+  const fwSubStyle = useAnimatedStyle(() => ({
+    opacity: fwSubOp.value,
+    transform: [{ translateY: fwSubY.value }],
+  }));
+  const fwChipStyle = useAnimatedStyle(() => ({
+    opacity: fwChipOp.value,
+    transform: [{ translateY: fwChipY.value }],
+  }));
+  const fwContinueStyle = useAnimatedStyle(() => ({
+    opacity: fwContinueOp.value,
+    transform: [{ translateY: fwContinueY.value }],
+  }));
+  const benefitsHeaderStyle = useAnimatedStyle(() => ({
+    opacity: benefitsHeaderOp.value,
+    transform: [{ translateY: benefitsHeaderY.value }],
+  }));
+  const moodHeaderStyle = useAnimatedStyle(() => ({
+    opacity: moodHeaderOp.value,
+    transform: [{ translateY: moodHeaderY.value }],
+  }));
+  const titleUnitStyle = useAnimatedStyle(() => ({
+    opacity: titleUnitOp.value,
+    transform: [{ translateY: titleUnitY.value }],
+  }));
+  const titleSubStyle = useAnimatedStyle(() => ({
+    opacity: titleSubOp.value,
+    transform: [{ translateY: titleSubY.value }],
+  }));
   const mainContentStyle = useAnimatedStyle(() => ({
     opacity: mainContentOpacity.value,
   }));
@@ -562,12 +694,24 @@ function SessionCompleteScreen({
                 <Text style={[styles.titleNumeral, { color: textColor }]}>
                   {duration.value}
                 </Text>
-                <Text style={[styles.titleUnit, { color: textColor, fontFamily: Fonts.serif }]}>
+                <Animated.Text
+                  style={[
+                    styles.titleUnit,
+                    { color: textColor, fontFamily: Fonts.serif },
+                    titleUnitStyle,
+                  ]}
+                >
                   {duration.unit}
-                </Text>
-                <Text style={[styles.titleSub, { color: textColor, fontFamily: Fonts.serif }]}>
+                </Animated.Text>
+                <Animated.Text
+                  style={[
+                    styles.titleSub,
+                    { color: textColor, fontFamily: Fonts.serif },
+                    titleSubStyle,
+                  ]}
+                >
                   with yourself
-                </Text>
+                </Animated.Text>
               </Animated.View>
 
               {todaySeconds > durationSeconds && (
@@ -589,9 +733,15 @@ function SessionCompleteScreen({
               {/* Beat 2: prompt + dial. Sits in normal flow; benefits
                   layer below overlays this space until it fades out. */}
               <Animated.View style={[styles.promptBlock, circleBlockStyle]}>
-                <Text style={[styles.headerChip, { fontFamily: Fonts.serif }]}>
+                <Animated.Text
+                  style={[
+                    styles.headerChip,
+                    { fontFamily: Fonts.serif },
+                    moodHeaderStyle,
+                  ]}
+                >
                   how full do you feel
-                </Text>
+                </Animated.Text>
               </Animated.View>
 
               <MoodDial
@@ -609,9 +759,15 @@ function SessionCompleteScreen({
                 style={[styles.benefitsLayer, benefitsWrapStyle]}
                 pointerEvents={phase === 'benefits' ? 'auto' : 'none'}
               >
-                <Text style={[styles.headerChip, { fontFamily: Fonts.serif }]}>
+                <Animated.Text
+                  style={[
+                    styles.headerChip,
+                    { fontFamily: Fonts.serif },
+                    benefitsHeaderStyle,
+                  ]}
+                >
                   what changed
-                </Text>
+                </Animated.Text>
                 <View style={{ height: BENEFIT_CARD_H }}>
                   <ScrollView
                     horizontal
@@ -622,7 +778,12 @@ function SessionCompleteScreen({
                     contentContainerStyle={styles.benefitsSliderContent}
                   >
                     {benefits.map((b, i) => (
-                      <BenefitCard key={b.title} item={b} index={i} />
+                      <BenefitCard
+                        key={b.title}
+                        item={b}
+                        index={i}
+                        revealed={benefitsRevealed}
+                      />
                     ))}
                   </ScrollView>
                 </View>
@@ -666,40 +827,63 @@ function SessionCompleteScreen({
                 continuous element rather than a cross-fade. */}
             <View ref={farewellSunRef as any} style={styles.farewellSunAnchor} />
 
-            <Text style={[styles.farewellEyebrow, { color: textColor, fontFamily: Fonts.serif }]}>
+            <Animated.Text
+              style={[
+                styles.farewellEyebrow,
+                { color: textColor, fontFamily: Fonts.serif },
+                fwEyebrowStyle,
+              ]}
+            >
               see you tomorrow
-            </Text>
+            </Animated.Text>
 
-            <Text style={[styles.farewellTitle, { color: textColor, fontFamily: Fonts.serif }]}>
+            <Animated.Text
+              style={[
+                styles.farewellTitle,
+                { color: textColor, fontFamily: Fonts.serif },
+                fwTitleStyle,
+              ]}
+            >
               well done
-            </Text>
+            </Animated.Text>
 
-            <View style={styles.farewellDivider} />
+            <Animated.View style={[styles.farewellDivider, fwDividerStyle]} />
 
-            <Text style={[styles.farewellSub, { color: textColor, fontFamily: Fonts.serif }]}>
+            <Animated.Text
+              style={[
+                styles.farewellSub,
+                { color: textColor, fontFamily: Fonts.serif },
+                fwSubStyle,
+              ]}
+            >
               your apps are open again
-            </Text>
+            </Animated.Text>
 
-            <View style={styles.farewellChip}>
+            <Animated.View style={[styles.farewellChip, fwChipStyle]}>
               <Text style={[styles.farewellChipText, { fontFamily: Fonts.serif }]}>
                 {duration.value} {duration.unit} • complete
               </Text>
-            </View>
+            </Animated.View>
           </View>
 
-          <Pressable
-            onPress={() => handleCloseRef.current()}
-            style={({ pressed }) => [
+          <Animated.View
+            style={[
               styles.farewellContinue,
-              { bottom: insets.bottom + 40, opacity: pressed ? 0.85 : 1 },
+              { bottom: insets.bottom + 40 },
+              fwContinueStyle,
             ]}
           >
-            <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-              <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                continue
-              </Text>
-            </View>
-          </Pressable>
+            <Pressable
+              onPress={() => handleCloseRef.current()}
+              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+            >
+              <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+                <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
+                  continue
+                </Text>
+              </View>
+            </Pressable>
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </View>
