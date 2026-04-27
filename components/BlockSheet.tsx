@@ -263,7 +263,7 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
                 { color: theme.textTertiary, fontFamily: Fonts!.serif },
               ]}
             >
-              to unlock your apps
+              to unlock your apps and
             </Text>
           </View>
 
