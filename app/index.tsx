@@ -43,11 +43,10 @@ import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat } from '@/lib/format';
 import {
-  blockAppsById,
   forceUnblockAll,
   getAuth,
   isBlockActive,
-  unblockAppsById,
+  onBlockShieldRaised,
 } from '@/lib/screen-time';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
@@ -57,18 +56,19 @@ import { useRouter } from 'expo-router';
 
 const RING_R = 64;
 
-// Find the block that most recently fired today. We can't rely on the
-// block's `durationMinutes` window — that's a 15-min trigger interval,
-// not how long the shield actually stays up — so a strict in-window
-// check would lose the block within minutes and fall back to a default.
-// Instead pick the latest enabled block for today whose start time is
-// ≤ now. That reliably surfaces the unlock goal the user actually set.
+// Pick the block that most recently fired today so the unlock view
+// surfaces the unlockGoalMinutes the user configured for it. The shield
+// persists until the user unlocks, so "most recent start ≤ now today"
+// is the right heuristic — durationMinutes is only an iOS API window,
+// not an actual block length.
 function findActiveBlock(
   blocks: ScheduledBlock[],
   now: Date,
 ): ScheduledBlock | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const today = now.getDay();
+  // iOS/Expo weekday convention: 1=Sun … 7=Sat. JS Date.getDay() is 0=Sun,
+  // so we offset by 1 to match what block.weekdays stores.
+  const today = now.getDay() + 1;
 
   let best: ScheduledBlock | null = null;
   let bestStart = -1;
@@ -206,8 +206,7 @@ export default function DoNothingScreen() {
       // If a scheduled block is still enforcing a shield, the user has earned
       // their unlock by completing the countdown.
       if (isBlockActive()) {
-        forceUnblockAll([]).catch(() => {});
-        unblockAppsById('donothing-scheduled-block').catch(() => {});
+        forceUnblockAll().catch(() => {});
       }
       useAppStore.getState().completeSession();
     }
@@ -442,10 +441,26 @@ export default function DoNothingScreen() {
     },
   });
 
-  // Deactivate keep awake when focus ends (unblock only happens on explicit unlock)
+  // Deactivate keep awake when focus ends (unblock only happens on explicit unlock).
+  // If a scheduled block fired during an active focus session, the shield is up
+  // but we never flipped to the unlock view (onBlockShieldRaised checks
+  // focusStep === 'hidden' and bails during sessions). Now that the session has
+  // ended, surface the unlock view so the user sees why their apps are locked.
+  // Only trigger when arriving from 'active' — arriving from 'done' means the
+  // user just completed the unlock ritual, and isBlockActive may still report
+  // true for a tick while the native unblock propagates.
+  const prevFocusStepRef = useRef<typeof focusStep>(focusStep);
   useEffect(() => {
-    if (focusStep === 'hidden') {
-      deactivateKeepAwake('focus');
+    const prev = prevFocusStepRef.current;
+    prevFocusStepRef.current = focusStep;
+    if (focusStep !== 'hidden') return;
+    deactivateKeepAwake('focus');
+    if (prev === 'active' && isBlockActive()) {
+      // Keep the screen awake while the unlock view is open, matching the
+      // other entry paths (onBlockShieldRaised, notification handler).
+      activateKeepAwakeAsync('scheduled-block');
+      useAppStore.getState().showUnlock();
+    } else {
       deactivateKeepAwake('scheduled-block');
     }
   }, [focusStep]);
@@ -478,13 +493,10 @@ export default function DoNothingScreen() {
         console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
         return;
       }
-      blockAppsById('donothing-scheduled-block').catch(() => {});
       activateKeepAwakeAsync('scheduled-block');
-      // Drop straight into the "do nothing to unlock" screen — same state
-      // we land on when the app re-enters foreground while a block is
-      // already active. Previously we ran startFocus(durationMinutes),
-      // which spun a 15-min countdown before revealing the unlock view,
-      // so a foreground notification effectively did nothing visible.
+      // Native DeviceActivity raises the shield at intervalDidStart; we
+      // only need to mirror the UI. If the user taps the banner from
+      // outside the app, this opens the unlock view as they come back in.
       useAppStore.getState().showUnlock();
     };
 
@@ -506,6 +518,25 @@ export default function DoNothingScreen() {
       sub1.remove();
       sub2.remove();
     };
+  }, []);
+
+  // --- Native shield-raised listener ---
+  // The DeviceActivity extension raises the shield natively at the scheduled
+  // time and then posts a Darwin notification; we forward that here as
+  // `onBlockShieldRaised`. Darwin notifications are delivered synchronously
+  // even to foregrounded apps, so this fires reliably in cases where the
+  // expo-notifications foreground listener silently drops. The native
+  // shield is the source of truth: we just mirror it to the UI, which
+  // eliminates polling, timers, debounce bookkeeping, and race windows.
+  useEffect(() => {
+    const sub = onBlockShieldRaised(() => {
+      const state = useAppStore.getState();
+      if (state.focusStep !== 'hidden') return;
+      if (!isBlockActive()) return;
+      activateKeepAwakeAsync('scheduled-block');
+      state.showUnlock();
+    });
+    return () => sub.remove();
   }, []);
 
   // --- AppState ---
@@ -555,8 +586,7 @@ export default function DoNothingScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
-    forceUnblockAll([]).catch(() => {});
-    unblockAppsById('donothing-scheduled-block').catch(() => {});
+    forceUnblockAll().catch(() => {});
     useAppStore.getState().unlockFocus();
   }, []);
 
@@ -852,9 +882,8 @@ export default function DoNothingScreen() {
                     hour: past.getHours(),
                     minute: past.getMinutes(),
                     durationMinutes: 15,
-                    weekdays: [past.getDay()],
+                    weekdays: [past.getDay() + 1],
                     enabled: true,
-                    groupId: null,
                     unlockGoalMinutes: 1,
                   };
                   const existing = useAppStore.getState().scheduledBlocks;

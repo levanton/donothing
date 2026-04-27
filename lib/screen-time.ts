@@ -14,8 +14,19 @@ import {
   copyFile,
   disableBlockAllMode,
   resetBlocks,
+  onDeviceActivityMonitorEvent,
 } from 'react-native-device-activity';
 import { Asset } from 'expo-asset';
+
+// Fires whenever the native DeviceActivity extension starts a scheduled
+// interval — i.e. the moment the shield goes up. Delivered via a Darwin
+// notification, so it's reliable in foreground where
+// Notifications.addNotificationReceivedListener can be silently dropped.
+export function onBlockShieldRaised(listener: () => void) {
+  return onDeviceActivityMonitorEvent((event) => {
+    if (event.callbackName === 'intervalDidStart') listener();
+  });
+}
 
 export type AuthStatus = 'notDetermined' | 'denied' | 'approved';
 
@@ -124,28 +135,21 @@ const SHIELD_ACTIONS = {
 
 export const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
 
-export function groupSelectionId(groupId: string): string {
-  return `donothing-group-${groupId}`;
+const ALL_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+
+function blockActivityName(blockId: string, weekday: number): string {
+  return `block-${blockId}-${weekday}`;
 }
 
 export async function scheduleBlock(
   blockId: string,
-  groupId: string | null,
   hour: number,
   minute: number,
   durationMinutes: number,
+  weekdays: number[],
   // Reserved for future native shield-side enforcement; today only JS gates on it.
   _unlockGoalMinutes?: number,
 ): Promise<void> {
-  const activityName = `block-${blockId}`;
-
-  // Calculate end time
-  let endHour = hour;
-  let endMinute = minute + durationMinutes;
-  endHour += Math.floor(endMinute / 60);
-  endMinute = endMinute % 60;
-  endHour = endHour % 24;
-
   // Ensure authorization — but never trigger the system prompt here. Init
   // and re-scheduling can call this for many blocks at once, and surprising
   // the user with a prompt outside of an explicit tap is bad UX. The caller
@@ -156,77 +160,107 @@ export async function scheduleBlock(
     return;
   }
 
+  // Calculate end time; durations may cross midnight, in which case the
+  // intervalEnd weekday needs to roll forward by one.
+  let endHour = hour;
+  let endMinute = minute + durationMinutes;
+  endHour += Math.floor(endMinute / 60);
+  endMinute = endMinute % 60;
+  const endsNextDay = endHour >= 24;
+  endHour = endHour % 24;
+
+  // All blocks follow the same model: enable block-all mode and whitelist
+  // only the user-defined "never block" selection. The shield raises for
+  // every app outside that whitelist.
   const startActions: any[] = [
     { type: 'clearWhitelist' },
-  ];
-
-  if (groupId === null) {
-    // "All apps" sentinel
-    startActions.push({ type: 'enableBlockAllMode' });
-  } else {
-    startActions.push({
-      type: 'blockSelection',
-      familyActivitySelectionId: groupSelectionId(groupId),
-    });
-  }
-
-  startActions.push({
-    type: 'addSelectionToWhitelist',
-    familyActivitySelection: { activitySelectionId: NEVER_BLOCK_SELECTION_ID },
-  });
-
-  startActions.push({
-    type: 'sendNotification',
-    payload: {
-      title: 'Do Nothing',
-      body: `Time to do nothing for ${durationMinutes} minutes.`,
+    { type: 'enableBlockAllMode' },
+    {
+      type: 'addSelectionToWhitelist',
+      familyActivitySelection: { activitySelectionId: NEVER_BLOCK_SELECTION_ID },
     },
-  });
-
-  configureActions({
-    activityName,
-    callbackName: 'intervalDidStart',
-    actions: startActions,
-  });
-
-  // No action on intervalDidEnd — user must unlock manually via the app
+    {
+      type: 'sendNotification',
+      payload: {
+        title: 'Do Nothing',
+        body: 'Time to do nothing.',
+      },
+    },
+  ];
 
   // Update shield appearance
   await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
 
-  // iOS DeviceActivityMonitor fires intervalDidStart immediately if the current
-  // time is inside the [start, end] window. That would block apps right as the
-  // user adds the block. Skip registration this cycle if we're inside — it will
-  // fire normally on the next occurrence (tomorrow).
+  // Whether the block fires every day — in that case we can register a
+  // single daily monitor (no weekday constraint), saving 6 slots against
+  // iOS's ~20-monitor limit. Otherwise we need a separate monitor per
+  // selected weekday so iOS enforces the filter natively.
+  const daysSet = new Set(weekdays);
+  const isEveryDay = weekdays.length === 0 || daysSet.size === 7;
+
+  // The 15-minute [start, end] window is an iOS API requirement
+  // (DeviceActivitySchedule needs an intervalEnd), not user-facing —
+  // the user only chose a start time. If we register a monitor while
+  // the current time is inside that window on the same weekday, iOS
+  // fires intervalDidStart immediately. Skip just that occurrence so a
+  // user configuring a block at 14:05 for a 14:00 schedule doesn't get
+  // blocked as they finish tapping. Other weekdays register normally;
+  // the skipped occurrence gets registered the next time init() runs.
   const now = new Date();
+  const todayWeekday = now.getDay() + 1; // iOS convention: 1=Sun..7=Sat
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const startMin = hour * 60 + minute;
   const endMin = startMin + durationMinutes;
-  const insideWindow =
+  const nowInsideTodayWindow =
     endMin <= 24 * 60
       ? nowMin >= startMin && nowMin < endMin
       : nowMin >= startMin || nowMin < endMin - 24 * 60;
 
-  if (insideWindow) {
-    console.log('[ScreenTime] Current time inside window — deferring registration to next cycle');
-    return;
+  type Schedule = { name: string; weekday: number | null };
+  const schedules: Schedule[] = isEveryDay
+    ? [{ name: `block-${blockId}`, weekday: null }]
+    : weekdays.map((w) => ({ name: blockActivityName(blockId, w), weekday: w }));
+
+  for (const { name, weekday } of schedules) {
+    // Actions are read from UserDefaults by the extension at fire time.
+    // Always configure them — even if we skip startMonitoring for today's
+    // insideWindow case, the next registration (on app relaunch) already
+    // has them keyed by this activityName.
+    configureActions({
+      activityName: name,
+      callbackName: 'intervalDidStart',
+      actions: startActions,
+    });
+
+    // "Today's occurrence" is either the every-day schedule (always today)
+    // or the weekday-specific monitor whose weekday matches today.
+    const isTodayOccurrence = weekday === null || weekday === todayWeekday;
+    if (isTodayOccurrence && nowInsideTodayWindow) {
+      console.log(
+        `[ScreenTime] Skip ${name} today — inside active window; will register on next app launch`,
+      );
+      continue;
+    }
+
+    const intervalStart: Record<string, number> = { hour, minute, second: 0 };
+    const intervalEnd: Record<string, number> = {
+      hour: endHour,
+      minute: endMinute,
+      second: 0,
+    };
+    if (weekday !== null) {
+      intervalStart.weekday = weekday;
+      intervalEnd.weekday = endsNextDay ? (weekday % 7) + 1 : weekday;
+    }
+
+    await startMonitoring(name, { intervalStart, intervalEnd, repeats: true }, []);
   }
 
-  // Start monitoring with the schedule
-  await startMonitoring(
-    activityName,
-    {
-      intervalStart: { hour, minute, second: 0 },
-      intervalEnd: { hour: endHour, minute: endMinute, second: 0 },
-      repeats: true,
-    },
-    [],
-  );
-
-  // Debug: verify monitoring is active
   const active = getActivities();
   console.log('[ScreenTime] Active monitors:', active);
-  console.log(`[ScreenTime] Scheduled: ${activityName} from ${hour}:${String(minute).padStart(2, '0')} to ${endHour}:${String(endMinute).padStart(2, '0')}`);
+  console.log(
+    `[ScreenTime] Scheduled block ${blockId} at ${hour}:${String(minute).padStart(2, '0')} (${isEveryDay ? 'daily' : `weekdays [${weekdays.join(',')}]`})`,
+  );
 }
 
 export function getActiveMonitors(): string[] {
@@ -242,26 +276,25 @@ export function isBlockActive(): boolean {
 }
 
 export function unscheduleBlock(blockId: string): void {
-  stopMonitoring([`block-${blockId}`]);
+  const names = ALL_WEEKDAYS.map((w) => blockActivityName(blockId, w));
+  // Also stop the legacy single-monitor name in case it was registered
+  // pre-upgrade and the old monitor is still active.
+  names.push(`block-${blockId}`);
+  stopMonitoring(names);
 }
 
 /**
- * Full nuclear reset — stops every monitor, drops block-all mode, resets the
- * native block list, and unblocks every known group selection. Use when the
- * DB has no blocks but the native shield is still active.
+ * Full nuclear reset — stops every monitor, drops block-all mode, and
+ * resets the native block list. Use when the DB has no blocks but the
+ * native shield is still active.
  */
-export async function forceUnblockAll(knownGroupIds: string[]): Promise<void> {
+export async function forceUnblockAll(): Promise<void> {
   try { stopMonitoring(); } catch {}
   try { disableBlockAllMode(); } catch {}
   try { resetBlocks(); } catch {}
   try {
     await unblockSelection({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
   } catch {}
-  for (const gid of knownGroupIds) {
-    try {
-      await unblockSelection({ activitySelectionId: groupSelectionId(gid) });
-    } catch {}
-  }
 }
 
 /**
@@ -271,15 +304,21 @@ export async function forceUnblockAll(knownGroupIds: string[]): Promise<void> {
  */
 export async function reconcileBlocks(
   validBlockIds: Set<string>,
-  knownGroupIds: string[],
 ): Promise<void> {
   try {
     const active = getActivities();
     const prefix = 'block-';
     const ours = active.filter((n) => n.startsWith(prefix));
-    const orphans = ours.filter(
-      (n) => !validBlockIds.has(n.slice(prefix.length)),
-    );
+    // Monitor names are either `block-{id}` (legacy) or `block-{id}-{weekday}`
+    // (post-weekday-filter upgrade). IDs are UUIDs and contain hyphens, so we
+    // match by startsWith rather than splitting on '-'.
+    const orphans = ours.filter((n) => {
+      const rest = n.slice(prefix.length);
+      for (const id of validBlockIds) {
+        if (rest === id || rest.startsWith(`${id}-`)) return false;
+      }
+      return true;
+    });
 
     // If user has no enabled blocks, or the shield is stuck active with no
     // valid monitor behind it, do a full reset.
@@ -288,7 +327,7 @@ export async function reconcileBlocks(
 
     if (dbEmpty || shieldStuck) {
       console.log('[ScreenTime] Full reset (dbEmpty=%s, stuck=%s)', dbEmpty, shieldStuck);
-      await forceUnblockAll(knownGroupIds);
+      await forceUnblockAll();
       return;
     }
 
@@ -296,11 +335,6 @@ export async function reconcileBlocks(
       console.log('[ScreenTime] Stopping orphan monitors:', orphans);
       stopMonitoring(orphans);
       try { disableBlockAllMode(); } catch {}
-      for (const gid of knownGroupIds) {
-        try {
-          await unblockSelection({ activitySelectionId: groupSelectionId(gid) });
-        } catch {}
-      }
     }
   } catch (e) {
     console.warn('[ScreenTime] reconcile failed:', e);

@@ -33,7 +33,6 @@ interface PendingBlockParams {
   minute: number;
   duration: number;
   weekdays: number[];
-  groupId: string | null;
   unlockGoalMinutes: number;
   conflictTime?: string | null;
 }
@@ -180,15 +179,15 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const commitBlock = (p: PendingBlockParams) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (editingBlock) {
-      store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
+      store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
     } else {
-      store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.groupId, p.unlockGoalMinutes);
+      store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
     }
     blockSheetRef.current?.close();
   };
 
-  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], groupId: string | null, unlockGoalMinutes: number) => {
-    const params: PendingBlockParams = { hour, minute, duration, weekdays, groupId, unlockGoalMinutes };
+  const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], unlockGoalMinutes: number) => {
+    const params: PendingBlockParams = { hour, minute, duration, weekdays, unlockGoalMinutes };
     const startMin = hour * 60 + minute;
 
     // Reject blocks sitting within an hour of an existing one (wall-clock,

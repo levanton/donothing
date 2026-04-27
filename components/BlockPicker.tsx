@@ -6,7 +6,6 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 
 import { Fonts } from '@/constants/theme';
 import { type AppTheme } from '@/lib/theme';
-import type { BlockGroup } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import GoalSliderBar from '@/components/GoalSliderBar';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
@@ -24,7 +23,6 @@ interface BlockPickerProps {
     minute: number,
     duration: number,
     weekdays: number[],
-    groupId: string | null,
     unlockGoalMinutes: number,
   ) => void;
   onCancel: () => void;
@@ -34,9 +32,7 @@ interface BlockPickerProps {
   initialMinute?: number;
   initialDuration?: number;
   initialDays?: number[];
-  initialGroupId?: string | null;
   initialUnlockGoal?: number;
-  groups?: BlockGroup[];
 }
 
 function snap(v: number) {
@@ -109,7 +105,7 @@ export default function BlockPickerContent({
     const minute = startMinutes % 60;
     // Trigger fires at start; block persists until user unlocks. A short interval
     // avoids the wrap where iOS sees "now" as inside the window and fires immediately.
-    onConfirm(hour, minute, 15, selectedDays, null, unlockGoal);
+    onConfirm(hour, minute, 15, selectedDays, unlockGoal);
   };
 
   return (

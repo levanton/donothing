@@ -9,7 +9,6 @@ interface BlockRow {
   duration_minutes: number;
   weekdays: string;
   enabled: number;
-  group_id: string | null;
   unlock_goal_minutes: number;
 }
 
@@ -21,13 +20,12 @@ function rowToBlock(row: BlockRow): ScheduledBlock {
     durationMinutes: row.duration_minutes,
     weekdays: JSON.parse(row.weekdays),
     enabled: row.enabled === 1,
-    groupId: row.group_id,
     unlockGoalMinutes: row.unlock_goal_minutes,
   };
 }
 
 const SELECT_COLS =
-  'id, hour, minute, duration_minutes, weekdays, enabled, group_id, unlock_goal_minutes';
+  'id, hour, minute, duration_minutes, weekdays, enabled, unlock_goal_minutes';
 
 export function getAllScheduledBlocks(): ScheduledBlock[] {
   const db = getDb();
@@ -51,23 +49,21 @@ export function insertScheduledBlock(
   minute: number,
   durationMinutes: number,
   weekdays: number[],
-  groupId: string | null,
   unlockGoalMinutes: number,
 ): ScheduledBlock {
   const db = getDb();
   const id = randomUUID();
   const goal = unlockGoalMinutes ?? 5;
   db.runSync(
-    'INSERT INTO scheduled_blocks (id, hour, minute, duration_minutes, weekdays, enabled, group_id, unlock_goal_minutes) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+    'INSERT INTO scheduled_blocks (id, hour, minute, duration_minutes, weekdays, enabled, unlock_goal_minutes) VALUES (?, ?, ?, ?, ?, 1, ?)',
     id,
     hour,
     minute,
     durationMinutes,
     JSON.stringify(weekdays),
-    groupId,
     goal,
   );
-  return { id, hour, minute, durationMinutes, weekdays, enabled: true, groupId, unlockGoalMinutes: goal };
+  return { id, hour, minute, durationMinutes, weekdays, enabled: true, unlockGoalMinutes: goal };
 }
 
 export function updateScheduledBlock(
@@ -76,18 +72,16 @@ export function updateScheduledBlock(
   minute: number,
   durationMinutes: number,
   weekdays: number[],
-  groupId: string | null,
   unlockGoalMinutes: number,
 ): void {
   const db = getDb();
   const goal = unlockGoalMinutes ?? 5;
   db.runSync(
-    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, group_id = ?, unlock_goal_minutes = ?, updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, unlock_goal_minutes = ?, updated_at = datetime('now') WHERE id = ?`,
     hour,
     minute,
     durationMinutes,
     JSON.stringify(weekdays),
-    groupId,
     goal,
     id,
   );
