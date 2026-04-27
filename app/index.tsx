@@ -275,13 +275,19 @@ export default function DoNothingScreen() {
 
   // Drive the session-ended sheet — replaces the old full-screen
   // SessionEndedView with a bottom-sheet that matches BlockSheet's
-  // design language.
+  // design language. The expand call is deferred to the next frame
+  // so the BottomSheet has a tick to mount + measure its content
+  // (enableDynamicSizing) before we ask it to animate up — without
+  // this, a cold-start with a persisted cancelled session can race
+  // and leave the sheet half-mounted.
   useEffect(() => {
     if (sessionEndedVisible) {
-      sessionEndedSheetRef.current?.expand();
-    } else {
-      sessionEndedSheetRef.current?.close();
+      const r = requestAnimationFrame(() => {
+        sessionEndedSheetRef.current?.expand();
+      });
+      return () => cancelAnimationFrame(r);
     }
+    sessionEndedSheetRef.current?.close();
   }, [sessionEndedVisible]);
 
   // --- History slide ---
