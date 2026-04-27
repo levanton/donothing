@@ -17,10 +17,10 @@ const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 
 const DOT_DURATION = 22000;
-const DRIFT_HEIGHT = SCREEN_H * 0.78;
-// Vertical band where dots are rendered. They travel from the bottom
-// of this band up to the top, then loop.
-const BAND_BOTTOM = SCREEN_H * 0.92;
+// Dots travel the full screen — from just above the bottom edge all
+// the way past the top safe-area, fading out as they leave.
+const BAND_BOTTOM = SCREEN_H * 0.95;
+const DRIFT_HEIGHT = BAND_BOTTOM + 40;
 
 // Three warm earth-tones that read against terracotta without
 // fighting the cream timer for attention.

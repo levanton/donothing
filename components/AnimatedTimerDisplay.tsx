@@ -17,12 +17,12 @@ import { timerDisplay } from '@/lib/format';
 // visible at any moment — no crossfade, no two-glyph overlap, no
 // fade-to-transparent midpoint that reads as a blink.
 //
-// PUNCH_MIN is intentionally close to 1 (0.92) — the smaller the
-// trough, the gentler the motion reads. Earlier passes at 0.86 felt
-// snappy; 0.92 is barely a press.
-const PUNCH_IN_MS = 180;
-const PUNCH_OUT_MS = 320;
-const PUNCH_MIN = 0.92;
+// PUNCH_MIN is intentionally close to 1 — the smaller the trough,
+// the gentler the motion reads. 0.95 is whisper-soft; the eye sees a
+// gentle press rather than a punch.
+const PUNCH_IN_MS = 240;
+const PUNCH_OUT_MS = 380;
+const PUNCH_MIN = 0.95;
 
 interface DigitProps {
   char: string;
