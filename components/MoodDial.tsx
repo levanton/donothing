@@ -4,12 +4,12 @@ import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
+  Easing,
   runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
@@ -452,12 +452,17 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     const hintTimer = setTimeout(() => {
       if (hasInteractedRef.current) return;
       hintOpacity.value = withTiming(1, { duration: 520 });
+      // Continuous ping-pong with smooth in/out easing — auto-reverses
+      // around the endpoints so the arrows never "snap" back. Truly
+      // infinite (-1) and seamless: no central pause from the previous
+      // sequence-based pulse.
       hintPulse.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 820 }),
-          withTiming(0, { duration: 820 }),
-        ),
+        withTiming(1, {
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+        }),
         -1,
+        true,
       );
     }, MOOD_DIAL_DISC_DURATION + 260);
 
@@ -511,7 +516,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
   // softened rather than hidden — the hint on top stands clear, but the
   // dial doesn't disappear.
   const dimProps = useAnimatedProps(() => ({
-    opacity: hintOpacity.value * 0.42,
+    opacity: hintOpacity.value * 0.58,
   }));
   const hintRowStyle = useAnimatedStyle(() => ({
     opacity: hintOpacity.value,
@@ -600,7 +605,9 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
           <Animated.View style={hintLeftStyle}>
             <Text style={styles.hintArrow}>←</Text>
           </Animated.View>
-          <Text style={styles.hintText}>drag</Text>
+          <View style={styles.hintTextPill}>
+            <Text style={styles.hintText}>drag</Text>
+          </View>
           <Animated.View style={hintRightStyle}>
             <Text style={styles.hintArrow}>→</Text>
           </Animated.View>
@@ -621,7 +628,10 @@ const styles = StyleSheet.create({
   // ring passes through the same band.
   hintRow: {
     position: 'absolute',
-    top: RING_CENTER + 26,
+    // Centred on the disc — top is set to the optical centre minus
+    // roughly half the row height so `drag` sits dead-centre on the
+    // sage circle rather than below it.
+    top: RING_CENTER - 18,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -631,16 +641,24 @@ const styles = StyleSheet.create({
   },
   hintArrow: {
     color: palette.brown,
-    fontSize: 26,
+    fontSize: 30,
     fontFamily: 'Georgia',
     fontWeight: '500',
   },
   hintText: {
     color: palette.brown,
-    fontSize: 16,
+    fontSize: 19,
     fontFamily: 'Georgia',
-    fontStyle: 'italic',
     fontWeight: '500',
     letterSpacing: 1,
+  },
+  // Tiny chip behind the word — pulls the eye to the call to action
+  // and lifts `drag` off the cream wash without obscuring the rings
+  // on either side. Solid warm-sand keeps brown text readable.
+  hintTextPill: {
+    backgroundColor: '#EBDAB2',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 100,
   },
 });
