@@ -162,7 +162,7 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             <Text
               style={[
                 styles.eyebrowText,
-                { color: theme.textSecondary, fontFamily: Fonts!.serif },
+                { color: theme.text, fontFamily: Fonts!.serif },
               ]}
             >
               your apps are locked
@@ -395,8 +395,8 @@ const styles = StyleSheet.create({
     backgroundColor: TERRACOTTA,
   },
   eyebrowText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 2.2,
     textTransform: 'uppercase',
   },
