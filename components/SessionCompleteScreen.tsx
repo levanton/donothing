@@ -211,10 +211,21 @@ function SessionCompleteScreen({
   const splashSize = useSharedValue(0);
   const splashCx = useSharedValue(SPLASH_ORIGIN_X);
   const splashCy = useSharedValue(SCREEN_H);
+  // Slides the sun image down from its mood-screen perch to the
+  // farewell-layout anchor while the rings fold up. Title fades alone;
+  // only the sun rides this value.
+  const sunTranslateY = useSharedValue(0);
 
   const [hasInteracted, setHasInteracted] = useState(false);
   const [revealDial, setRevealDial] = useState(false);
   const [phase, setPhase] = useState<'benefits' | 'mood' | 'farewell'>('benefits');
+  const [dialCollapsing, setDialCollapsing] = useState(false);
+
+  // Refs on the two sun renders so we can measure the live delta for
+  // the sun's mood→farewell glide. Farewell sun is rendered always but
+  // hidden — it exists purely to anchor where the moving sun should land.
+  const mainSunRef = useRef<View | null>(null);
+  const farewellSunRef = useRef<View | null>(null);
 
   const benefits = useMemo(() => pickBenefits(durationSeconds), [durationSeconds]);
   const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
@@ -232,11 +243,13 @@ function SessionCompleteScreen({
     setHasInteracted(false);
     setRevealDial(false);
     setPhase('benefits');
+    setDialCollapsing(false);
   } else if (!visible && prevVisibleRef.current) {
     prevVisibleRef.current = false;
     setHasInteracted(false);
     setRevealDial(false);
     setPhase('benefits');
+    setDialCollapsing(false);
   }
 
   useEffect(() => {
@@ -245,7 +258,8 @@ function SessionCompleteScreen({
       setHasInteracted(false);
       setRevealDial(false);
       setPhase('benefits');
-  
+      setDialCollapsing(false);
+
       // Hard-reset every piece first so nothing lingers from a previous
       // session — especially the done button, which must always start
       // hidden when the user lands on this screen.
@@ -256,6 +270,7 @@ function SessionCompleteScreen({
       farewellY.value = 12;
       mainContentOpacity.value = 1;
       benefitsOpacity.value = 0;
+      sunTranslateY.value = 0;
       splashSize.value = 0;
       splashCx.value = SPLASH_ORIGIN_X;
       splashCy.value = SCREEN_H - insets.bottom - 68;
@@ -321,11 +336,13 @@ function SessionCompleteScreen({
       farewellOpacity.value = 0;
       farewellY.value = 12;
       benefitsOpacity.value = 0;
+      sunTranslateY.value = 0;
       splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
       setHasInteracted(false);
       setRevealDial(false);
+      setDialCollapsing(false);
     }
   }, [visible]);
 
@@ -362,19 +379,52 @@ function SessionCompleteScreen({
 
   const handleUnlock = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Mood → Farewell. Fade EVERYTHING out (sun, title, dial, button) so
-    // the farewell beat owns the screen alone, then swap to phase
-    // 'farewell' and reveal "well done" centered. Auto-dismisses after a
-    // dwell — no continue button.
-    mainContentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
 
-    const FADE_OUT_MS = 460;
+    // Beat 1 — fold the dial inward. MoodDial reverses its disc-grow
+    // (rings retract toward centre, sage fill collapses, hint dissolves);
+    // the prompt chip and unlock button fade in lockstep. The sun + title
+    // stay still so the user has a stable anchor while the rings fold.
+    setDialCollapsing(true);
+    circleBlockOpacity.value = withTiming(0, { duration: 480, easing: EASE_OUT });
+    closeOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
+    closeY.value = withTiming(14, { duration: 420, easing: EASE_OUT });
 
+    // Beat 2 — settle. Title + subtitle fade out, the sun glides down to
+    // the farewell layout's hidden anchor, and the farewell texts fade
+    // in around it. Sun translation and farewell rise/fade share the
+    // same duration starting from the same instant so the sun and the
+    // approaching anchor finish together — no last-frame nudge.
+    const FOLD_MS = 420;
+    const SETTLE_MS = 720;
     const t1 = setTimeout(() => {
+      titleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
+      subtitleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
+
+      const apply = (deltaY: number) => {
+        sunTranslateY.value = withTiming(deltaY, { duration: SETTLE_MS, easing: EASE_OUT });
+      };
+      const fallback = SCREEN_H * 0.2;
+      const main = mainSunRef.current;
+      const farewell = farewellSunRef.current;
+      // The farewell layer is offset by farewellY (12px down) until it
+      // lands. Subtract it so the moving sun targets the anchor's
+      // RESTING position, not its currently-translated one.
+      const farewellRestingOffset = farewellY.value;
+      if (main && farewell) {
+        main.measureInWindow((_mx, my) => {
+          farewell.measureInWindow((_fx, fy) => {
+            const d = (fy ?? 0) - (my ?? 0) - farewellRestingOffset;
+            apply(Number.isFinite(d) && d > 0 ? d : fallback);
+          });
+        });
+      } else {
+        apply(fallback);
+      }
+
       setPhase('farewell');
-      farewellOpacity.value = withTiming(1, { duration: 700, easing: EASE_OUT });
-      farewellY.value = withTiming(0, { duration: 700, easing: EASE_OUT });
-    }, FADE_OUT_MS);
+      farewellY.value = withTiming(0, { duration: SETTLE_MS, easing: EASE_OUT });
+      farewellOpacity.value = withTiming(1, { duration: SETTLE_MS, easing: EASE_OUT });
+    }, FOLD_MS);
 
     revealTimersRef.current.push(t1);
   }, []);
@@ -451,7 +501,10 @@ function SessionCompleteScreen({
   }));
   const glowWrapStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
-    transform: [{ scale: glowScale.value }],
+    transform: [
+      { translateY: sunTranslateY.value },
+      { scale: glowScale.value },
+    ],
   }));
 
 
@@ -489,7 +542,11 @@ function SessionCompleteScreen({
         >
           <View style={styles.centerGroup}>
             <View style={styles.summary}>
-              <Animated.View style={[styles.grassWrap, glowWrapStyle]} pointerEvents="none">
+              <Animated.View
+                ref={mainSunRef as any}
+                style={[styles.grassWrap, glowWrapStyle]}
+                pointerEvents="none"
+              >
                 <Image source={grassImage} style={styles.grassImage} fadeDuration={0} />
               </Animated.View>
 
@@ -532,6 +589,7 @@ function SessionCompleteScreen({
               <MoodDial
                 visible={visible}
                 reveal={revealDial}
+                collapse={dialCollapsing}
                 sessionId={sessionId}
                 onInteract={handleDialInteract}
               />
@@ -594,7 +652,11 @@ function SessionCompleteScreen({
           pointerEvents={phase === 'farewell' ? 'auto' : 'none'}
         >
           <View style={styles.farewellCenter}>
-            <Image source={grassImage} style={styles.farewellSun} fadeDuration={0} />
+            {/* Hidden anchor — reserves the spot the moving sun glides
+                into. The visible sun is the one in the main layout, kept
+                mounted and translated down so the user perceives a single
+                continuous element rather than a cross-fade. */}
+            <View ref={farewellSunRef as any} style={styles.farewellSunAnchor} />
 
             <Text style={[styles.farewellEyebrow, { color: textColor, fontFamily: Fonts.serif }]}>
               see you tomorrow
@@ -845,6 +907,14 @@ const styles = StyleSheet.create({
     width: GRASS_SIZE * 1.1,
     height: GRASS_SIZE * 1.1 * (450 / 780),
     resizeMode: 'contain',
+    marginBottom: 22,
+  },
+  // Same footprint as the moving main sun (no 1.1x scale) so when the
+  // shared sun glides in, it covers the anchor exactly. Margin matches
+  // the original farewell layout's sun→eyebrow gap.
+  farewellSunAnchor: {
+    width: GRASS_SIZE,
+    height: GRASS_SIZE * (450 / 780),
     marginBottom: 22,
   },
   farewellEyebrow: {

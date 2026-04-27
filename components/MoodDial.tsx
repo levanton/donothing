@@ -292,13 +292,15 @@ interface Props {
   visible: boolean;
   /** Flip to true to trigger the disc-and-rings intro animation. */
   reveal: boolean;
+  /** Flip to true to fold the dial back into nothing (mirror of reveal). */
+  collapse?: boolean;
   /** Session id used to persist the final mood on drag-end. */
   sessionId: string;
   /** Fires on the first drag that reaches the innermost ring. */
   onInteract: () => void;
 }
 
-export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }: Props) {
+export default memo(function MoodDial({ visible, reveal, collapse, sessionId, onInteract }: Props) {
   // Continuous 0..1 drag progress — shared value so the terracotta fill
   // can animate on the UI thread while the user drags.
   const progress = useSharedValue(0);
@@ -317,6 +319,7 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [discR, setDiscR] = useState(0);
   const discRafRef = useRef(0);
+  const discRRef = useRef(0);
   const hasInteractedRef = useRef(false);
   const onInteractRef = useRef(onInteract);
   onInteractRef.current = onInteract;
@@ -387,6 +390,7 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
       cancelAnimationFrame(discRafRef.current);
       discRafRef.current = 0;
     }
+    discRRef.current = 0;
     setDiscR(0);
     setActiveMood(null);
     hasInteractedRef.current = false;
@@ -406,7 +410,9 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
     const tick = () => {
       const t = Math.min(1, (Date.now() - startAt) / MOOD_DIAL_DISC_DURATION);
       const eased = 1 - Math.pow(1 - t, 3);
-      setDiscR(eased * DISC_MAX_R);
+      const next = eased * DISC_MAX_R;
+      discRRef.current = next;
+      setDiscR(next);
       introFill.value = eased;
       if (t < 1) discRafRef.current = requestAnimationFrame(tick);
       else discRafRef.current = 0;
@@ -435,6 +441,42 @@ export default memo(function MoodDial({ visible, reveal, sessionId, onInteract }
       clearTimeout(hintTimer);
     };
   }, [reveal]);
+
+  // Mirror of the reveal animation — when the parent flips collapse on,
+  // the disc and sage fill retract back to zero with the same easing.
+  // The hint and its cream wash drop alongside so nothing lingers as the
+  // rings disappear inward.
+  useEffect(() => {
+    if (!collapse) return;
+    if (discRafRef.current) cancelAnimationFrame(discRafRef.current);
+    const startAt = Date.now();
+    const startR = discRRef.current;
+    const startFill = introFill.value;
+    const COLLAPSE_MS = 540;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - startAt) / COLLAPSE_MS);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const factor = 1 - eased;
+      const next = startR * factor;
+      discRRef.current = next;
+      setDiscR(next);
+      introFill.value = startFill * factor;
+      if (t < 1) discRafRef.current = requestAnimationFrame(tick);
+      else discRafRef.current = 0;
+    };
+    discRafRef.current = requestAnimationFrame(tick);
+
+    cancelAnimation(hintPulse);
+    hintPulse.value = withTiming(0, { duration: 220 });
+    hintOpacity.value = withTiming(0, { duration: 280 });
+
+    return () => {
+      if (discRafRef.current) {
+        cancelAnimationFrame(discRafRef.current);
+        discRafRef.current = 0;
+      }
+    };
+  }, [collapse]);
 
   const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
 
