@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomSheet, {
   type BottomSheetBackdropProps,
   BottomSheetView,
@@ -24,16 +24,26 @@ import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Fingerprint button + the SVG arc that races around it on hold.
+// Inset the radius by half the stroke so the ring sits inside the bounds.
+const HOLD_BTN_SIZE = 60;
+const HOLD_RING_R = HOLD_BTN_SIZE / 2 - 2;
+const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_R;
 const MOUNTAIN_SIZE = Math.min(Math.round(SCREEN_W * 0.62), 280);
 
 const mountainImage = require('@/assets/images/mountain.png');
@@ -129,8 +139,8 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
       });
     }, [holdProgress]);
 
-    const holdFillStyle = useAnimatedStyle(() => ({
-      width: `${holdProgress.value * 100}%`,
+    const ringAnimProps = useAnimatedProps(() => ({
+      strokeDashoffset: HOLD_RING_CIRCUMFERENCE * (1 - holdProgress.value),
     }));
 
     return (
@@ -318,36 +328,68 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             </Text>
           </Pressable>
 
-          {/* Hold-to-unlock — outlined pill with fill progress, big tap area */}
-          <Pressable
-            onPressIn={handleHoldStart}
-            onPressOut={handleHoldEnd}
-            hitSlop={20}
-          >
-            <View
-              style={[styles.holdPill, { borderColor: theme.border }]}
-            >
-              <Animated.View
-                pointerEvents='none'
+          {/* Hold-to-unlock — hint on the left, fingerprint button on the
+              right. Press-and-hold draws a circular progress arc around
+              the button until it completes; release early reverses it. */}
+          <View style={styles.holdRow}>
+            <View style={styles.holdHintGroup}>
+              <Text
                 style={[
-                  styles.holdFill,
-                  { backgroundColor: TERRACOTTA },
-                  holdFillStyle,
+                  styles.holdHintLabel,
+                  { color: theme.text, fontFamily: Fonts!.serif },
                 ]}
-              />
-              <View style={styles.holdContent} pointerEvents='none'>
-                <Feather name='lock' size={14} color={theme.textSecondary} />
-                <Text
-                  style={[
-                    styles.holdText,
-                    { color: theme.textSecondary, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  hold to unlock
-                </Text>
-              </View>
+              >
+                hold to unlock
+              </Text>
+              <Text
+                style={[
+                  styles.holdHintCaption,
+                  { color: theme.text, fontFamily: Fonts!.serif },
+                ]}
+              >
+                keep your finger pressed
+              </Text>
             </View>
-          </Pressable>
+            <Pressable
+              onPressIn={handleHoldStart}
+              onPressOut={handleHoldEnd}
+              hitSlop={16}
+            >
+              <View style={styles.holdButton}>
+                <Svg
+                  width={HOLD_BTN_SIZE}
+                  height={HOLD_BTN_SIZE}
+                  style={StyleSheet.absoluteFill}
+                >
+                  <Circle
+                    cx={HOLD_BTN_SIZE / 2}
+                    cy={HOLD_BTN_SIZE / 2}
+                    r={HOLD_RING_R}
+                    stroke={theme.border}
+                    strokeWidth={2}
+                    fill='none'
+                  />
+                  <AnimatedCircle
+                    cx={HOLD_BTN_SIZE / 2}
+                    cy={HOLD_BTN_SIZE / 2}
+                    r={HOLD_RING_R}
+                    stroke={TERRACOTTA}
+                    strokeWidth={2.5}
+                    fill='none'
+                    strokeDasharray={HOLD_RING_CIRCUMFERENCE}
+                    strokeLinecap='round'
+                    transform={`rotate(-90 ${HOLD_BTN_SIZE / 2} ${HOLD_BTN_SIZE / 2})`}
+                    animatedProps={ringAnimProps}
+                  />
+                </Svg>
+                <MaterialCommunityIcons
+                  name='fingerprint'
+                  size={28}
+                  color={theme.text}
+                />
+              </View>
+            </Pressable>
+          </View>
         </BottomSheetView>
       </BottomSheet>
     );
@@ -475,32 +517,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.6,
   },
-  holdPill: {
-    borderWidth: 1.5,
-    borderRadius: 100,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    minWidth: 220,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  holdFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    opacity: 0.35,
-  },
-  holdContent: {
+  holdRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    paddingHorizontal: 4,
+    marginTop: 4,
   },
-  holdText: {
+  holdHintGroup: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  holdHintLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 1.5,
+    fontWeight: '700',
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
+  },
+  holdHintCaption: {
+    fontSize: 12,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+    marginTop: 2,
+  },
+  holdButton: {
+    width: HOLD_BTN_SIZE,
+    height: HOLD_BTN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
