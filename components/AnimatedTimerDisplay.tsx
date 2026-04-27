@@ -15,11 +15,14 @@ import { timerDisplay } from '@/lib/format';
 // changes, its cell briefly scales down, the value swaps at the
 // trough, then the cell springs back to full size. Only ONE glyph is
 // visible at any moment — no crossfade, no two-glyph overlap, no
-// fade-to-transparent midpoint that reads as a blink. The scale
-// motion alone communicates the change.
-const PUNCH_IN_MS = 160;
-const PUNCH_OUT_MS = 300;
-const PUNCH_MIN = 0.86;
+// fade-to-transparent midpoint that reads as a blink.
+//
+// PUNCH_MIN is intentionally close to 1 (0.92) — the smaller the
+// trough, the gentler the motion reads. Earlier passes at 0.86 felt
+// snappy; 0.92 is barely a press.
+const PUNCH_IN_MS = 180;
+const PUNCH_OUT_MS = 320;
+const PUNCH_MIN = 0.92;
 
 interface DigitProps {
   char: string;
@@ -100,9 +103,11 @@ const AnimatedTimerDisplay = memo(function AnimatedTimerDisplay({
 }: Props) {
   const text = timerDisplay(seconds);
   const chars = text.split('');
-  // Approximate widths for the mono font with tabular-nums.
-  const digitWidth = fontSize * 0.6 + 4;
-  const colonWidth = fontSize * 0.34 + 4;
+  // Uniform advance for every glyph (digits AND the colon) so the
+  // gap left of the colon matches the gap right of it. Mono fonts
+  // with tabular-nums have equal advance widths anyway; matching
+  // the colon to that advance makes the spacing visually symmetric.
+  const cellWidth = fontSize * 0.62;
 
   return (
     <View style={styles.row}>
@@ -112,7 +117,7 @@ const AnimatedTimerDisplay = memo(function AnimatedTimerDisplay({
           char={ch}
           color={color}
           fontSize={fontSize}
-          width={ch === ':' ? colonWidth : digitWidth}
+          width={cellWidth}
         />
       ))}
     </View>
