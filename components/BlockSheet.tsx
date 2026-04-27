@@ -246,7 +246,8 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             />
 
             <Text style={[styles.bigNumber, { color: theme.text }]}>
-              {`${String(unlockMin).padStart(2, '0')}:00`}
+              {unlockMin}
+              <Text style={[styles.bigUnit, { fontFamily: Fonts!.serif }]}> min</Text>
             </Text>
             <Text
               style={[
@@ -419,6 +420,11 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     lineHeight: 90,
     includeFontPadding: false,
+  },
+  bigUnit: {
+    fontSize: 30,
+    fontWeight: '400',
+    letterSpacing: 0.4,
   },
   heroCaption: {
     fontSize: 18,
