@@ -158,16 +158,16 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
         >
           {/* Eyebrow */}
           <View style={styles.eyebrowRow}>
-            <View style={styles.eyebrowDot} />
-            <Text
-              style={[
-                styles.eyebrowText,
-                { color: theme.text, fontFamily: Fonts!.serif },
-              ]}
-            >
-              your apps are locked
-            </Text>
-            <View style={styles.eyebrowDot} />
+            <View style={[styles.eyebrowPill, { backgroundColor: CHIP_LIGHT }]}>
+              <Text
+                style={[
+                  styles.eyebrowText,
+                  { color: BROWN, fontFamily: Fonts!.serif },
+                ]}
+              >
+                your apps are locked
+              </Text>
+            </View>
           </View>
 
           {/* Starscape hero — scattered dots around the number, poetic */}
@@ -384,20 +384,18 @@ const styles = StyleSheet.create({
   },
   eyebrowRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
     marginBottom: 8,
   },
-  eyebrowDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: TERRACOTTA,
+  eyebrowPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 100,
   },
   eyebrowText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2.2,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   starscape: {
