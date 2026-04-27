@@ -55,6 +55,10 @@ interface MorphingLabelProps {
   active: boolean;
   passed: boolean;
   introRevealed: boolean;
+  /** Parent collapse phase — kill the label immediately when set, so
+      the label doesn't linger over a disc that's already shrunk past
+      its ring. */
+  collapsing: boolean;
   color: string;
 }
 
@@ -95,7 +99,7 @@ const LETTER_GAP_PX = 0.5;
 // letter smoothly unbends and slides inward, which reads as the same
 // word straightening out rather than a new element appearing.
 const MorphingLabel = memo(function MorphingLabel({
-  mood, index, active, passed, introRevealed, color,
+  mood, index, active, passed, introRevealed, collapsing, color,
 }: MorphingLabelProps) {
   const arcR = RING_STEP * (index + 1) + LABEL_OUTSIDE;
   const chars = mood.split('');
@@ -136,7 +140,27 @@ const MorphingLabel = memo(function MorphingLabel({
     };
   }, [active, passed]);
 
+  // Parent collapse phase wins over every other state — kill the label
+  // and reset its glide so the user sees the rings retract clean,
+  // without text ghosting over a disc that's already shrunk past it.
   useEffect(() => {
+    if (!collapsing) return;
+    if (opRafRef.current) {
+      cancelAnimationFrame(opRafRef.current);
+      opRafRef.current = 0;
+    }
+    if (tRafRef.current) {
+      cancelAnimationFrame(tRafRef.current);
+      tRafRef.current = 0;
+    }
+    opacityRef.current = 0;
+    setOpacity(0);
+    tRef.current = 0;
+    setT(0);
+  }, [collapsing]);
+
+  useEffect(() => {
+    if (collapsing) return;
     if (opRafRef.current) cancelAnimationFrame(opRafRef.current);
     const revealed = introRevealed && !passed;
     const from = opacityRef.current;
@@ -550,6 +574,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
                 active={isActive}
                 passed={surpassed}
                 introRevealed={introRevealed}
+                collapsing={!!collapse}
                 color={palette.brown}
               />
             );
