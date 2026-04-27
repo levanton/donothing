@@ -44,6 +44,10 @@ const FILL_COLOR = '#8FA07A';
 // Exported so the parent can time the hint fade-in to land right after
 // the disc settles.
 export const MOOD_DIAL_DISC_DURATION = 1300;
+// Reverse animation when the parent flips `collapse`. Faster than the
+// reveal — the user has already seen the dial, so a quick fold reads as
+// "moving on" rather than "wait for me".
+const MOOD_DIAL_COLLAPSE_DURATION = 540;
 
 interface MorphingLabelProps {
   mood: string;
@@ -452,9 +456,8 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     const startAt = Date.now();
     const startR = discRRef.current;
     const startFill = introFill.value;
-    const COLLAPSE_MS = 540;
     const tick = () => {
-      const t = Math.min(1, (Date.now() - startAt) / COLLAPSE_MS);
+      const t = Math.min(1, (Date.now() - startAt) / MOOD_DIAL_COLLAPSE_DURATION);
       const eased = 1 - Math.pow(1 - t, 3);
       const factor = 1 - eased;
       const next = startR * factor;

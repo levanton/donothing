@@ -442,28 +442,30 @@ export default function DoNothingScreen() {
   });
 
   // Deactivate keep awake when focus ends (unblock only happens on explicit unlock).
-  // If a scheduled block fired during an active focus session, the shield is up
-  // but we never flipped to the unlock view (onBlockShieldRaised checks
-  // focusStep === 'hidden' and bails during sessions). Now that the session has
-  // ended, surface the unlock view so the user sees why their apps are locked.
-  // Only trigger when arriving from 'active' — arriving from 'done' means the
-  // user just completed the unlock ritual, and isBlockActive may still report
-  // true for a tick while the native unblock propagates.
-  const prevFocusStepRef = useRef<typeof focusStep>(focusStep);
   useEffect(() => {
-    const prev = prevFocusStepRef.current;
-    prevFocusStepRef.current = focusStep;
-    if (focusStep !== 'hidden') return;
-    deactivateKeepAwake('focus');
-    if (prev === 'active' && isBlockActive()) {
-      // Keep the screen awake while the unlock view is open, matching the
-      // other entry paths (onBlockShieldRaised, notification handler).
-      activateKeepAwakeAsync('scheduled-block');
-      useAppStore.getState().showUnlock();
-    } else {
+    if (focusStep === 'hidden') {
+      deactivateKeepAwake('focus');
       deactivateKeepAwake('scheduled-block');
     }
   }, [focusStep]);
+
+  // If a do-nothing session ends manually (stop button) while a scheduled
+  // block's shield is still up, surface the unlock view so the user sees
+  // why their apps are locked. Auto-completion already runs forceUnblockAll
+  // before flipping started=false; backgrounding sets sessionEndedVisible —
+  // both paths are skipped here.
+  const prevStartedRef = useRef(started);
+  useEffect(() => {
+    const wasStarted = prevStartedRef.current;
+    prevStartedRef.current = started;
+    if (!wasStarted || started) return;
+    const state = useAppStore.getState();
+    if (state.completionVisible || state.sessionEndedVisible) return;
+    if (state.focusStep !== 'hidden') return;
+    if (!isBlockActive()) return;
+    activateKeepAwakeAsync('scheduled-block');
+    state.showUnlock();
+  }, [started]);
 
   // --- Init ---
   useEffect(() => {
@@ -531,6 +533,10 @@ export default function DoNothingScreen() {
   useEffect(() => {
     const sub = onBlockShieldRaised(() => {
       const state = useAppStore.getState();
+      // Cold-start race: native extension can fire intervalDidStart before
+      // init() finishes loading scheduledBlocks. Skip until the store is
+      // ready — init() itself calls showUnlock() if a block is active.
+      if (!state.ready) return;
       if (state.focusStep !== 'hidden') return;
       if (!isBlockActive()) return;
       activateKeepAwakeAsync('scheduled-block');

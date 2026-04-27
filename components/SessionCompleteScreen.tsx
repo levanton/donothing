@@ -391,39 +391,47 @@ function SessionCompleteScreen({
 
     // Beat 2 — settle. Title + subtitle fade out, the sun glides down to
     // the farewell layout's hidden anchor, and the farewell texts fade
-    // in around it. Sun translation and farewell rise/fade share the
-    // same duration starting from the same instant so the sun and the
-    // approaching anchor finish together — no last-frame nudge.
+    // in around it. All three timings start from the SAME measureInWindow
+    // callback so they share a start frame — kicking them off
+    // synchronously around an async measure leaves a ~50ms gap that
+    // shows up as the sun stuttering before it moves.
     const FOLD_MS = 420;
     const SETTLE_MS = 720;
     const t1 = setTimeout(() => {
       titleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
       subtitleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
+      setPhase('farewell');
 
-      const apply = (deltaY: number) => {
+      // Snapshot farewellY's current value (still resting at +12 here)
+      // so when measureInWindow returns we can subtract the same offset
+      // we observe in `fy`. Once we kick off the withTiming below this
+      // value will start animating, but the snapshot is what we need.
+      const farewellRestingOffset = farewellY.value;
+
+      const startTimings = (deltaY: number) => {
         sunTranslateY.value = withTiming(deltaY, { duration: SETTLE_MS, easing: EASE_OUT });
+        farewellY.value = withTiming(0, { duration: SETTLE_MS, easing: EASE_OUT });
+        farewellOpacity.value = withTiming(1, { duration: SETTLE_MS, easing: EASE_OUT });
       };
+
       const fallback = SCREEN_H * 0.2;
       const main = mainSunRef.current;
       const farewell = farewellSunRef.current;
-      // The farewell layer is offset by farewellY (12px down) until it
-      // lands. Subtract it so the moving sun targets the anchor's
-      // RESTING position, not its currently-translated one.
-      const farewellRestingOffset = farewellY.value;
       if (main && farewell) {
         main.measureInWindow((_mx, my) => {
           farewell.measureInWindow((_fx, fy) => {
             const d = (fy ?? 0) - (my ?? 0) - farewellRestingOffset;
-            apply(Number.isFinite(d) && d > 0 ? d : fallback);
+            if (!Number.isFinite(d) || d <= 0) {
+              console.warn('[SessionComplete] sun glide measure invalid', { my, fy, d });
+              startTimings(fallback);
+            } else {
+              startTimings(d);
+            }
           });
         });
       } else {
-        apply(fallback);
+        startTimings(fallback);
       }
-
-      setPhase('farewell');
-      farewellY.value = withTiming(0, { duration: SETTLE_MS, easing: EASE_OUT });
-      farewellOpacity.value = withTiming(1, { duration: SETTLE_MS, easing: EASE_OUT });
     }, FOLD_MS);
 
     revealTimersRef.current.push(t1);
