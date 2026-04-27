@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -6,18 +6,22 @@ import Animated, {
   cancelAnimation,
   Easing,
   runOnJS,
+  type SharedValue,
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 
 import { palette } from '@/lib/theme';
 import { updateSessionMood } from '@/lib/db/sessions';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedG = Animated.createAnimatedComponent(G);
+const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 
 const MOODS = ['still', 'lighter', 'refreshed', 'full'] as const;
 export type MoodKey = (typeof MOODS)[number];
@@ -49,19 +53,6 @@ export const MOOD_DIAL_DISC_DURATION = 1300;
 // "moving on" rather than "wait for me".
 const MOOD_DIAL_COLLAPSE_DURATION = 540;
 
-interface MorphingLabelProps {
-  mood: string;
-  index: number;
-  active: boolean;
-  passed: boolean;
-  introRevealed: boolean;
-  /** Parent collapse phase — kill the label immediately when set, so
-      the label doesn't linger over a disc that's already shrunk past
-      its ring. */
-  collapsing: boolean;
-  color: string;
-}
-
 // 65% along the top arc — keeps the word anchored up-right of centre,
 // where it used to live as a TextPath.
 const ARC_OFFSET_FRACTION = 0.65;
@@ -92,223 +83,255 @@ const GEORGIA_WIDTH_EMS: Record<string, number> = {
 const DEFAULT_WIDTH_EM = 0.5;
 const LETTER_GAP_PX = 0.5;
 
-// Each mood is a word rendered glyph-by-glyph so we can interpolate
-// position AND rotation per character — t=0 arranges the chars along the
-// mood's arc seat (matching what TextPath produced before), t=1 lines
-// them up horizontally at the centre of the disc. Between the two, every
-// letter smoothly unbends and slides inward, which reads as the same
-// word straightening out rather than a new element appearing.
-const MorphingLabel = memo(function MorphingLabel({
-  mood, index, active, passed, introRevealed, collapsing, color,
-}: MorphingLabelProps) {
-  const arcR = RING_STEP * (index + 1) + LABEL_OUTSIDE;
-  const chars = mood.split('');
-  const arcSize = 16 + index * 1.5;
-  const centerSize = arcSize + CENTER_SIZE_BASE + index * CENTER_SIZE_INDEX_STEP;
+// Per-character static layout values: where each glyph sits at the arc
+// seat (t=0) and where it lands at the centre seat (t=1). Both arc and
+// centre offsets are precomputed once per mood so the morph itself is
+// just two lerps + a rotation lerp on the UI thread — no per-frame
+// width recomputation.
+interface CharLayout {
+  ch: string;
+  arcX: number;
+  arcY: number;
+  arcRotDeg: number;
+  centerX: number;
+}
 
-  const [t, setT] = useState(0);
-  const [opacity, setOpacity] = useState(0);
-  const tRef = useRef(0);
-  const opacityRef = useRef(0);
-  const tRafRef = useRef(0);
-  const opRafRef = useRef(0);
-
-  useEffect(() => {
-    // While passed, leave t alone — the label fades out at its current
-    // position (the "just disappears" the user asked for). Once fully
-    // invisible the opacity effect below snaps t back to 0 so a future
-    // re-activation flies in from the arc seat.
-    if (passed) return;
-    if (tRafRef.current) cancelAnimationFrame(tRafRef.current);
-    const from = tRef.current;
-    const to = active ? 1 : 0;
-    if (from === to) return;
-    const duration = active ? 520 : 380;
-    const start = Date.now();
-    const tick = () => {
-      const tt = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - tt, 3);
-      const next = from + (to - from) * eased;
-      tRef.current = next;
-      setT(next);
-      if (tt < 1) tRafRef.current = requestAnimationFrame(tick);
-      else tRafRef.current = 0;
-    };
-    tRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (tRafRef.current) cancelAnimationFrame(tRafRef.current);
-    };
-  }, [active, passed]);
-
-  // Parent collapse phase wins over every other state — kill the label
-  // and reset its glide so the user sees the rings retract clean,
-  // without text ghosting over a disc that's already shrunk past it.
-  useEffect(() => {
-    if (!collapsing) return;
-    if (opRafRef.current) {
-      cancelAnimationFrame(opRafRef.current);
-      opRafRef.current = 0;
-    }
-    if (tRafRef.current) {
-      cancelAnimationFrame(tRafRef.current);
-      tRafRef.current = 0;
-    }
-    opacityRef.current = 0;
-    setOpacity(0);
-    tRef.current = 0;
-    setT(0);
-  }, [collapsing]);
-
-  useEffect(() => {
-    if (collapsing) return;
-    if (opRafRef.current) cancelAnimationFrame(opRafRef.current);
-    const revealed = introRevealed && !passed;
-    const from = opacityRef.current;
-    const to = revealed ? 1 : 0;
-    if (from === to) return;
-    const duration = 300;
-    const start = Date.now();
-    const tick = () => {
-      const tt = Math.min(1, (Date.now() - start) / duration);
-      const eased = tt < 0.5 ? 4 * tt * tt * tt : 1 - Math.pow(-2 * tt + 2, 3) / 2;
-      const next = from + (to - from) * eased;
-      opacityRef.current = next;
-      setOpacity(next);
-      if (tt < 1) {
-        opRafRef.current = requestAnimationFrame(tick);
-      } else {
-        opRafRef.current = 0;
-        // If we just finished fading out while this mood is passed, the
-        // label is invisible — quietly snap t back to 0 so the next time
-        // this mood activates, its letters fly in from the arc seat
-        // again instead of teleporting straight in at centre.
-        if (!revealed && passed) {
-          tRef.current = 0;
-          setT(0);
-        }
-      }
-    };
-    opRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (opRafRef.current) cancelAnimationFrame(opRafRef.current);
-    };
-  }, [introRevealed, passed]);
-
-  if (opacity < 0.01 && !active) return null;
-
-  const size = arcSize + (centerSize - arcSize) * t;
-  // yCenterAdjust fixes vertical centring at the centre seat; on the arc
-  // it would push the baseline inward (toward the ring below it), so
-  // only apply it in proportion to t.
-  const yCenterAdjust = size * 0.3 * t;
-
-  // Build per-character centre offsets using real-ish glyph widths so
-  // narrow letters (i, l, t) don't drift apart and wide ones (r, h, m)
-  // don't collide. Cumulative layout: each char sits next to its
-  // neighbour with LETTER_GAP_PX between glyph edges.
+function buildOffsets(chars: string[], size: number): number[] {
   const widths = chars.map(
     (ch) => (GEORGIA_WIDTH_EMS[ch.toLowerCase()] ?? DEFAULT_WIDTH_EM) * size,
   );
-  const gapCount = chars.length - 1;
   const totalWidth =
-    widths.reduce((a, b) => a + b, 0) + gapCount * LETTER_GAP_PX;
+    widths.reduce((a, b) => a + b, 0) + (chars.length - 1) * LETTER_GAP_PX;
   const offsets: number[] = new Array(chars.length);
-  {
-    let cursor = -totalWidth / 2;
-    for (let i = 0; i < chars.length; i++) {
-      cursor += widths[i] / 2;
-      offsets[i] = cursor;
-      cursor += widths[i] / 2 + LETTER_GAP_PX;
-    }
+  let cursor = -totalWidth / 2;
+  for (let i = 0; i < chars.length; i++) {
+    cursor += widths[i] / 2;
+    offsets[i] = cursor;
+    cursor += widths[i] / 2 + LETTER_GAP_PX;
   }
+  return offsets;
+}
+
+function computeCharLayouts(
+  mood: string,
+  arcR: number,
+  arcSize: number,
+  centerSize: number,
+): CharLayout[] {
+  const chars = mood.split('');
+  const arcOffsets = buildOffsets(chars, arcSize);
+  const centerOffsets = buildOffsets(chars, centerSize);
+  return chars.map((ch, c) => {
+    const arcAngle = ARC_ANGLE_RAD - arcOffsets[c] / arcR;
+    return {
+      ch,
+      arcX: arcR * Math.cos(arcAngle),
+      arcY: -arcR * Math.sin(arcAngle),
+      arcRotDeg: 90 - (arcAngle * 180) / Math.PI,
+      centerX: centerOffsets[c],
+    };
+  });
+}
+
+// One animated G+Text per character. All four animatable values
+// (position, rotation, scale, fill opacity) are derived from the
+// parent's shared `t` and `opacity` — so the entire morph runs on the
+// UI thread with zero React reconciliation per frame.
+//
+// We render at fontSize=centerSize and shrink via `scale` instead of
+// animating fontSize itself: scale is a GPU transform, fontSize would
+// force a text re-layout each frame.
+interface MorphCharProps {
+  layout: CharLayout;
+  arcSize: number;
+  centerSize: number;
+  t: SharedValue<number>;
+  opacity: SharedValue<number>;
+  color: string;
+}
+
+const MorphChar = memo(function MorphChar({
+  layout, arcSize, centerSize, t, opacity, color,
+}: MorphCharProps) {
+  const { ch, arcX, arcY, arcRotDeg, centerX } = layout;
+
+  const gProps = useAnimatedProps(() => {
+    'worklet';
+    const tt = t.value;
+    const sz = arcSize + (centerSize - arcSize) * tt;
+    // yCenterAdjust keeps the centre seat optically centred on y=0; on
+    // the arc it would push the baseline into the ring below, so it
+    // only ramps in proportion to t.
+    const yAdj = sz * 0.3 * tt;
+    const x = RING_CENTER + arcX + (centerX - arcX) * tt;
+    const y = RING_CENTER + arcY + (0 - arcY) * tt + yAdj;
+    const rot = arcRotDeg * (1 - tt);
+    const scale = sz / centerSize;
+    // Order matters: translate → rotate around translated anchor →
+    // scale around the same anchor. That replicates the original
+    // `rotate(deg cx cy)` plus textAnchor="middle" geometry.
+    return {
+      transform: [
+        { translateX: x },
+        { translateY: y },
+        { rotate: `${rot}deg` },
+        { scale },
+      ],
+    };
+  });
+
+  const textProps = useAnimatedProps(() => {
+    'worklet';
+    return { fillOpacity: opacity.value };
+  });
+
+  return (
+    <AnimatedG animatedProps={gProps}>
+      <AnimatedSvgText
+        animatedProps={textProps}
+        x={0}
+        y={0}
+        fontSize={centerSize}
+        fill={color}
+        fontFamily="Georgia"
+        textAnchor="middle"
+      >
+        {ch}
+      </AnimatedSvgText>
+    </AnimatedG>
+  );
+});
+
+interface MorphingLabelProps {
+  mood: string;
+  index: number;
+  discR: SharedValue<number>;
+  activeStep: SharedValue<number>;
+  collapsing: SharedValue<number>;
+  color: string;
+}
+
+const MorphingLabel = memo(function MorphingLabel({
+  mood, index, discR, activeStep, collapsing, color,
+}: MorphingLabelProps) {
+  const arcR = RING_STEP * (index + 1) + LABEL_OUTSIDE;
+  const arcSize = 16 + index * 1.5;
+  const centerSize = arcSize + CENTER_SIZE_BASE + index * CENTER_SIZE_INDEX_STEP;
+
+  const layouts = useMemo(
+    () => computeCharLayouts(mood, arcR, arcSize, centerSize),
+    [mood, arcR, arcSize, centerSize],
+  );
+
+  const t = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  // Opacity: fade in once disc has reached this ring AND we haven't
+  // been surpassed yet. Special signal -1 = collapse phase, kill
+  // instantly so labels don't ghost over the retracting disc.
+  useAnimatedReaction(
+    () => {
+      const step = activeStep.value;
+      const r = discR.value;
+      if (collapsing.value) return -1;
+      const passed = step > index;
+      const introRevealed = r >= RING_STEP * (index + 1);
+      return introRevealed && !passed ? 1 : 0;
+    },
+    (curr, prev) => {
+      if (curr === prev) return;
+      if (curr === -1) {
+        cancelAnimation(opacity);
+        opacity.value = 0;
+        return;
+      }
+      opacity.value = withTiming(curr, { duration: 300 }, (finished) => {
+        // Once fully invisible while passed, snap t back to 0 so a
+        // future re-activation flies in from the arc seat instead of
+        // teleporting horizontally.
+        if (finished && curr === 0 && activeStep.value > index) {
+          t.value = 0;
+        }
+      });
+    },
+  );
+
+  // Morph t: 0 (arc seat) → 1 (centre seat) when active. While passed,
+  // freeze t at its current value — the label fades out at its last
+  // position rather than morphing back to the arc.
+  useAnimatedReaction(
+    () => {
+      const step = activeStep.value;
+      if (collapsing.value) return -2;
+      if (step > index) return -1;
+      return step === index ? 1 : 0;
+    },
+    (curr, prev) => {
+      if (curr === prev) return;
+      if (curr === -2) {
+        cancelAnimation(t);
+        t.value = 0;
+        return;
+      }
+      if (curr === -1) return;
+      cancelAnimation(t);
+      t.value = withTiming(curr, { duration: curr === 1 ? 520 : 380 });
+    },
+  );
 
   return (
     <>
-      {chars.map((ch, c) => {
-        const offsetAlong = offsets[c];
-
-        // Arc seat: each char's centre sits at its own angle along the
-        // top semicircle. Earlier chars have larger θ (further left).
-        const arcAngle = ARC_ANGLE_RAD - offsetAlong / arcR;
-        const arcX = arcR * Math.cos(arcAngle);
-        const arcY = -arcR * Math.sin(arcAngle);
-        // Rotation that aligns the baseline with the arc tangent at this
-        // point — derived from (sin θ, cos θ) being the travel direction.
-        const arcRotDeg = 90 - (arcAngle * 180) / Math.PI;
-
-        // Centre seat: straight horizontal line through the disc centre,
-        // no per-char rotation.
-        const centerX = offsetAlong;
-        const centerY = 0;
-
-        const posX = arcX + (centerX - arcX) * t;
-        const posY = arcY + (centerY - arcY) * t;
-        const rotDeg = arcRotDeg * (1 - t);
-
-        const cx = RING_CENTER + posX;
-        const cy = RING_CENTER + posY + yCenterAdjust;
-
-        return (
-          <SvgText
-            key={c}
-            x={cx}
-            y={cy}
-            transform={`rotate(${rotDeg} ${cx} ${cy})`}
-            fillOpacity={opacity}
-            fontSize={size}
-            fill={color}
-            fontFamily="Georgia"
-            textAnchor="middle"
-          >
-            {ch}
-          </SvgText>
-        );
-      })}
+      {layouts.map((layout, c) => (
+        <MorphChar
+          key={c}
+          layout={layout}
+          arcSize={arcSize}
+          centerSize={centerSize}
+          t={t}
+          opacity={opacity}
+          color={color}
+        />
+      ))}
     </>
   );
 });
 
 interface RingProps {
   index: number;
-  discR: number;
+  discR: SharedValue<number>;
+  activeStep: SharedValue<number>;
   stroke: string;
-  hidden: boolean;
 }
 
-const Ring = memo(function Ring({ index, discR, stroke, hidden }: RingProps) {
+const Ring = memo(function Ring({ index, discR, activeStep, stroke }: RingProps) {
   const targetR = RING_STEP * (index + 1);
-  const r = Math.min(discR, targetR);
-  const [opacity, setOpacity] = useState(1);
-  const opacityRef = useRef(1);
+  const opacity = useSharedValue(1);
 
-  // Fade out smoothly when the user's fill surpasses this ring (and
-  // fade back in if they drag back below it).
-  useEffect(() => {
-    const from = opacityRef.current;
-    const to = hidden ? 0 : 1;
-    if (from === to) return;
-    const duration = 320;
-    const start = Date.now();
-    let raf = 0;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = from + (to - from) * eased;
-      opacityRef.current = next;
-      setOpacity(next);
-      if (t < 1) raf = requestAnimationFrame(tick);
+  // Hide the ring once the sage fill has reached or passed it — its
+  // own outline would otherwise draw a competing dark circle inside
+  // the fill.
+  useAnimatedReaction(
+    () => (activeStep.value >= index ? 1 : 0),
+    (curr, prev) => {
+      if (curr === prev) return;
+      opacity.value = withTiming(curr === 1 ? 0 : 1, { duration: 320 });
+    },
+  );
+
+  const animatedProps = useAnimatedProps(() => {
+    'worklet';
+    return {
+      r: Math.min(discR.value, targetR),
+      strokeOpacity: opacity.value,
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [hidden]);
+  });
 
   return (
-    <Circle
+    <AnimatedCircle
       cx={RING_CENTER}
       cy={RING_CENTER}
-      r={r}
+      animatedProps={animatedProps}
       stroke={stroke}
-      strokeOpacity={opacity}
       strokeWidth={1.6}
       fill="none"
     />
@@ -329,38 +352,38 @@ interface Props {
 }
 
 export default memo(function MoodDial({ visible, reveal, collapse, sessionId, onInteract }: Props) {
-  // Continuous 0..1 drag progress — shared value so the terracotta fill
-  // can animate on the UI thread while the user drags.
+  // Drag progress drives the sage fill on the UI thread.
   const progress = useSharedValue(0);
   const dragStart = useSharedValue(0);
+  // Discrete step (-1..3) the user has currently dragged into. Read by
+  // every Ring and MorphingLabel via useAnimatedReaction, so changes
+  // never cross the JS bridge.
   const lastHapticStep = useSharedValue(-1);
-  // Rides from 0 to 1 alongside the cream-disc intro reveal so the sage
-  // dot grows from nothing instead of popping in at FILL_MIN.
+  // Rides from 0 to 1 alongside the disc reveal so the sage dot grows
+  // from nothing instead of popping in at FILL_MIN.
   const introFill = useSharedValue(0);
-  // Direction hint ("← drag →") that sits on the dial. Drives both the
-  // hint's own opacity AND a cream wash covering the dial — so rings
-  // below the hint soften while the hint itself reads crisp. Both fade
-  // out together on first interaction.
+  // Direction hint ("← drag →") sitting on the dial. Drives both the
+  // hint's own opacity AND a cream wash covering the dial.
   const hintOpacity = useSharedValue(0);
   const hintPulse = useSharedValue(0);
+  // Cream-disc radius, animated on the UI thread. Was a JS state in
+  // the previous version — every frame triggered a full SVG re-render.
+  const discR = useSharedValue(0);
+  // Boolean signal (0/1) read by labels to kill themselves instantly
+  // during the parent's collapse phase.
+  const collapsing = useSharedValue(0);
 
-  const [activeMood, setActiveMood] = useState<string | null>(null);
-  const [discR, setDiscR] = useState(0);
-  const discRafRef = useRef(0);
-  const discRRef = useRef(0);
   const hasInteractedRef = useRef(false);
   const onInteractRef = useRef(onInteract);
   onInteractRef.current = onInteract;
 
-  const setPreviewMood = useCallback((mood: string | null) => {
-    setActiveMood(mood);
-    if (mood !== null && !hasInteractedRef.current) {
-      hasInteractedRef.current = true;
-      onInteractRef.current();
-      hintOpacity.value = withTiming(0, { duration: 280 });
-      cancelAnimation(hintPulse);
-      hintPulse.value = withTiming(0, { duration: 220 });
-    }
+  const handleFirstInteract = useCallback(() => {
+    if (hasInteractedRef.current) return;
+    hasInteractedRef.current = true;
+    onInteractRef.current();
+    hintOpacity.value = withTiming(0, { duration: 280 });
+    cancelAnimation(hintPulse);
+    hintPulse.value = withTiming(0, { duration: 220 });
   }, []);
 
   const commitMood = useCallback(
@@ -390,9 +413,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
         lastHapticStep.value = step;
         if (step >= 0) {
           runOnJS(Haptics.selectionAsync)();
-          runOnJS(setPreviewMood)(MOODS[step]);
-        } else {
-          runOnJS(setPreviewMood)(null);
+          runOnJS(handleFirstInteract)();
         }
       }
     })
@@ -411,41 +432,35 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     return { r: base * introFill.value };
   });
 
+  const discCircleProps = useAnimatedProps(() => {
+    return { r: discR.value };
+  });
+
   // Reset everything when the parent closes the screen.
   useEffect(() => {
     if (visible) return;
-    if (discRafRef.current) {
-      cancelAnimationFrame(discRafRef.current);
-      discRafRef.current = 0;
-    }
-    discRRef.current = 0;
-    setDiscR(0);
-    setActiveMood(null);
-    hasInteractedRef.current = false;
-    progress.value = 0;
-    lastHapticStep.value = -1;
+    cancelAnimation(discR);
+    cancelAnimation(introFill);
+    cancelAnimation(hintOpacity);
+    cancelAnimation(hintPulse);
+    discR.value = 0;
     introFill.value = 0;
     hintOpacity.value = 0;
-    cancelAnimation(hintPulse);
     hintPulse.value = 0;
+    progress.value = 0;
+    lastHapticStep.value = -1;
+    collapsing.value = 0;
+    hasInteractedRef.current = false;
   }, [visible]);
 
-  // Start the disc-grow animation when reveal flips true.
+  // Reveal — both the disc and the sage dot scale up under withTiming
+  // with cubic-out easing, in lockstep, on the UI thread.
   useEffect(() => {
     if (!reveal) return;
-    if (discRafRef.current) cancelAnimationFrame(discRafRef.current);
-    const startAt = Date.now();
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - startAt) / MOOD_DIAL_DISC_DURATION);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = eased * DISC_MAX_R;
-      discRRef.current = next;
-      setDiscR(next);
-      introFill.value = eased;
-      if (t < 1) discRafRef.current = requestAnimationFrame(tick);
-      else discRafRef.current = 0;
-    };
-    discRafRef.current = requestAnimationFrame(tick);
+    collapsing.value = 0;
+    const easing = Easing.out(Easing.cubic);
+    discR.value = withTiming(DISC_MAX_R, { duration: MOOD_DIAL_DISC_DURATION, easing });
+    introFill.value = withTiming(1, { duration: MOOD_DIAL_DISC_DURATION, easing });
 
     // After the disc settles, fade in the "← drag →" hint + cream wash
     // and start the arrow pulse. Both fall away on the first drag.
@@ -453,9 +468,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
       if (hasInteractedRef.current) return;
       hintOpacity.value = withTiming(1, { duration: 520 });
       // Continuous ping-pong with smooth in/out easing — auto-reverses
-      // around the endpoints so the arrows never "snap" back. Truly
-      // infinite (-1) and seamless: no central pause from the previous
-      // sequence-based pulse.
+      // around the endpoints so the arrows never "snap" back.
       hintPulse.value = withRepeat(
         withTiming(1, {
           duration: 900,
@@ -466,51 +479,22 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
       );
     }, MOOD_DIAL_DISC_DURATION + 260);
 
-    return () => {
-      if (discRafRef.current) {
-        cancelAnimationFrame(discRafRef.current);
-        discRafRef.current = 0;
-      }
-      clearTimeout(hintTimer);
-    };
+    return () => clearTimeout(hintTimer);
   }, [reveal]);
 
-  // Mirror of the reveal animation — when the parent flips collapse on,
-  // the disc and sage fill retract back to zero with the same easing.
-  // The hint and its cream wash drop alongside so nothing lingers as the
-  // rings disappear inward.
+  // Mirror of reveal — disc and sage retract under cubic-out, hint
+  // drops alongside. `collapsing=1` immediately tells every label to
+  // kill its opacity/morph so nothing ghosts over the shrinking disc.
   useEffect(() => {
     if (!collapse) return;
-    if (discRafRef.current) cancelAnimationFrame(discRafRef.current);
-    const startAt = Date.now();
-    const startR = discRRef.current;
-    const startFill = introFill.value;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - startAt) / MOOD_DIAL_COLLAPSE_DURATION);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const factor = 1 - eased;
-      const next = startR * factor;
-      discRRef.current = next;
-      setDiscR(next);
-      introFill.value = startFill * factor;
-      if (t < 1) discRafRef.current = requestAnimationFrame(tick);
-      else discRafRef.current = 0;
-    };
-    discRafRef.current = requestAnimationFrame(tick);
-
+    collapsing.value = 1;
+    const easing = Easing.out(Easing.cubic);
+    discR.value = withTiming(0, { duration: MOOD_DIAL_COLLAPSE_DURATION, easing });
+    introFill.value = withTiming(0, { duration: MOOD_DIAL_COLLAPSE_DURATION, easing });
     cancelAnimation(hintPulse);
     hintPulse.value = withTiming(0, { duration: 220 });
     hintOpacity.value = withTiming(0, { duration: 280 });
-
-    return () => {
-      if (discRafRef.current) {
-        cancelAnimationFrame(discRafRef.current);
-        discRafRef.current = 0;
-      }
-    };
   }, [collapse]);
-
-  const activeIndex = activeMood ? MOODS.indexOf(activeMood as typeof MOODS[number]) : -1;
 
   // Cream wash over the whole disc. Capped at ~0.42 so rings read as
   // softened rather than hidden — the hint on top stands clear, but the
@@ -537,10 +521,10 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         >
-          <Circle
+          <AnimatedCircle
             cx={RING_CENTER}
             cy={RING_CENTER}
-            r={discR}
+            animatedProps={discCircleProps}
             fill={palette.cream}
           />
 
@@ -558,36 +542,26 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
               key={i}
               index={i}
               discR={discR}
+              activeStep={lastHapticStep}
               stroke={palette.brown}
-              // Also hide the ring at the current active level — once the
-              // sage fill has reached it, the ring stroke would just draw
-              // a competing dark circle *inside* the fill. Let the sage's
-              // own outline carry the boundary instead.
-              hidden={activeIndex >= i}
             />
           ))}
 
-          {MOODS.map((mood, i) => {
-            const introRevealed = discR >= RING_STEP * (i + 1);
-            const surpassed = activeIndex > i;
-            const isActive = i === activeIndex;
-            return (
-              <MorphingLabel
-                key={mood}
-                mood={mood}
-                index={i}
-                active={isActive}
-                passed={surpassed}
-                introRevealed={introRevealed}
-                collapsing={!!collapse}
-                color={palette.brown}
-              />
-            );
-          })}
+          {MOODS.map((mood, i) => (
+            <MorphingLabel
+              key={mood}
+              mood={mood}
+              index={i}
+              discR={discR}
+              activeStep={lastHapticStep}
+              collapsing={collapsing}
+              color={palette.brown}
+            />
+          ))}
 
-          {/* Cream wash over the dial during the hint phase — washes out
-              the ring strokes and mood labels just enough that the
-              "← drag →" hint above reads clearly. Fades with the hint. */}
+          {/* Cream wash over the dial during the hint phase — washes
+              out the ring strokes and mood labels just enough that the
+              "← drag →" hint above reads clearly. */}
           <AnimatedCircle
             cx={RING_CENTER}
             cy={RING_CENTER}
