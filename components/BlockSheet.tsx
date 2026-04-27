@@ -24,12 +24,10 @@ import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
@@ -37,13 +35,7 @@ import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// Fingerprint button + the SVG arc that races around it on hold.
-// Inset the radius by half the stroke so the ring sits inside the bounds.
 const HOLD_BTN_SIZE = 60;
-const HOLD_RING_R = HOLD_BTN_SIZE / 2 - 2;
-const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_R;
 const MOUNTAIN_SIZE = Math.min(Math.round(SCREEN_W * 0.62), 280);
 
 const mountainImage = require('@/assets/images/mountain.png');
@@ -139,8 +131,8 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
       });
     }, [holdProgress]);
 
-    const ringAnimProps = useAnimatedProps(() => ({
-      strokeDashoffset: HOLD_RING_CIRCUMFERENCE * (1 - holdProgress.value),
+    const progressFillStyle = useAnimatedStyle(() => ({
+      width: `${holdProgress.value * 100}%`,
     }));
 
     return (
@@ -329,66 +321,52 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
           </Pressable>
 
           {/* Hold-to-unlock — hint on the left, fingerprint button on the
-              right. Press-and-hold draws a circular progress arc around
-              the button until it completes; release early reverses it. */}
-          <View style={styles.holdRow}>
-            <View style={styles.holdHintGroup}>
-              <Text
-                style={[
-                  styles.holdHintLabel,
-                  { color: theme.text, fontFamily: Fonts!.serif },
-                ]}
-              >
-                hold to unlock
-              </Text>
-              <Text
-                style={[
-                  styles.holdHintCaption,
-                  { color: theme.text, fontFamily: Fonts!.serif },
-                ]}
-              >
-                keep your finger pressed
-              </Text>
-            </View>
-            <Pressable
-              onPressIn={handleHoldStart}
-              onPressOut={handleHoldEnd}
-              hitSlop={16}
-            >
-              <View style={styles.holdButton}>
-                <Svg
-                  width={HOLD_BTN_SIZE}
-                  height={HOLD_BTN_SIZE}
-                  style={StyleSheet.absoluteFill}
+              right. Progress lives on a separate horizontal track below
+              the row so the user can actually see it advance while their
+              finger covers the button. */}
+          <View style={styles.holdContainer}>
+            <View style={styles.holdRow}>
+              <View style={styles.holdHintGroup}>
+                <Text
+                  style={[
+                    styles.holdHintLabel,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
                 >
-                  <Circle
-                    cx={HOLD_BTN_SIZE / 2}
-                    cy={HOLD_BTN_SIZE / 2}
-                    r={HOLD_RING_R}
-                    stroke={theme.border}
-                    strokeWidth={2}
-                    fill='none'
-                  />
-                  <AnimatedCircle
-                    cx={HOLD_BTN_SIZE / 2}
-                    cy={HOLD_BTN_SIZE / 2}
-                    r={HOLD_RING_R}
-                    stroke={TERRACOTTA}
-                    strokeWidth={2.5}
-                    fill='none'
-                    strokeDasharray={HOLD_RING_CIRCUMFERENCE}
-                    strokeLinecap='round'
-                    transform={`rotate(-90 ${HOLD_BTN_SIZE / 2} ${HOLD_BTN_SIZE / 2})`}
-                    animatedProps={ringAnimProps}
-                  />
-                </Svg>
-                <MaterialCommunityIcons
-                  name='fingerprint'
-                  size={28}
-                  color={theme.text}
-                />
+                  hold to unlock
+                </Text>
+                <Text
+                  style={[
+                    styles.holdHintCaption,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  keep your finger pressed
+                </Text>
               </View>
-            </Pressable>
+              <Pressable
+                onPressIn={handleHoldStart}
+                onPressOut={handleHoldEnd}
+                hitSlop={16}
+              >
+                <View style={[styles.holdButton, { borderColor: theme.border }]}>
+                  <MaterialCommunityIcons
+                    name='fingerprint'
+                    size={28}
+                    color={theme.text}
+                  />
+                </View>
+              </Pressable>
+            </View>
+            <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  { backgroundColor: TERRACOTTA },
+                  progressFillStyle,
+                ]}
+              />
+            </View>
           </View>
         </BottomSheetView>
       </BottomSheet>
@@ -517,13 +495,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.6,
   },
+  holdContainer: {
+    alignSelf: 'stretch',
+    marginTop: 4,
+  },
   holdRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    alignSelf: 'stretch',
     paddingHorizontal: 4,
-    marginTop: 4,
   },
   holdHintGroup: {
     flex: 1,
@@ -544,7 +524,19 @@ const styles = StyleSheet.create({
   holdButton: {
     width: HOLD_BTN_SIZE,
     height: HOLD_BTN_SIZE,
+    borderRadius: HOLD_BTN_SIZE / 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  progressTrack: {
+    height: 3,
+    borderRadius: 100,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 100,
   },
 });
