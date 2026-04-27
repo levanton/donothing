@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import BottomSheet, {
   type BottomSheetBackdropProps,
   BottomSheetView,
@@ -35,7 +35,6 @@ import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
 
-const HOLD_BTN_SIZE = 60;
 const MOUNTAIN_SIZE = Math.min(Math.round(SCREEN_W * 0.62), 280);
 
 const mountainImage = require('@/assets/images/mountain.png');
@@ -131,7 +130,7 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
       });
     }, [holdProgress]);
 
-    const progressFillStyle = useAnimatedStyle(() => ({
+    const holdFillStyle = useAnimatedStyle(() => ({
       width: `${holdProgress.value * 100}%`,
     }));
 
@@ -265,9 +264,16 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
                 { color: theme.textTertiary, fontFamily: Fonts!.serif },
               ]}
             >
-              to unlock your apps and
+              to unlock your apps
             </Text>
           </View>
+
+          {/* Short hairline divider — silent connector between the hero
+              text and the pills. No word, no symbol, just a hint that
+              the list below continues the same thought. */}
+          <View
+            style={[styles.heroSubRule, { backgroundColor: theme.border }]}
+          />
 
           {/* Benefits pills */}
           <View style={styles.benefitsRow}>
@@ -320,54 +326,35 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             </Text>
           </Pressable>
 
-          {/* Hold-to-unlock — hint on the left, fingerprint button on the
-              right. Progress lives on a separate horizontal track below
-              the row so the user can actually see it advance while their
-              finger covers the button. */}
-          <View style={styles.holdContainer}>
-            <View style={styles.holdRow}>
-              <View style={styles.holdHintGroup}>
-                <Text
-                  style={[
-                    styles.holdHintLabel,
-                    { color: theme.text, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  hold to unlock
-                </Text>
-                <Text
-                  style={[
-                    styles.holdHintCaption,
-                    { color: theme.text, fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  keep your finger pressed
-                </Text>
-              </View>
-              <Pressable
-                onPressIn={handleHoldStart}
-                onPressOut={handleHoldEnd}
-                hitSlop={16}
-              >
-                <View style={[styles.holdButton, { borderColor: theme.border }]}>
-                  <MaterialCommunityIcons
-                    name='fingerprint'
-                    size={28}
-                    color={theme.text}
-                  />
-                </View>
-              </Pressable>
-            </View>
-            <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+          {/* Hold-to-unlock — outlined pill with a salmon fill that
+              animates left→right while held. */}
+          <Pressable
+            onPressIn={handleHoldStart}
+            onPressOut={handleHoldEnd}
+            hitSlop={20}
+          >
+            <View style={[styles.holdPill, { borderColor: theme.border }]}>
               <Animated.View
+                pointerEvents='none'
                 style={[
-                  styles.progressFill,
-                  { backgroundColor: TERRACOTTA },
-                  progressFillStyle,
+                  styles.holdFill,
+                  { backgroundColor: CHIP_LIGHT },
+                  holdFillStyle,
                 ]}
               />
+              <View style={styles.holdContent} pointerEvents='none'>
+                <Feather name='lock' size={14} color={theme.text} />
+                <Text
+                  style={[
+                    styles.holdText,
+                    { color: theme.text, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  hold to unlock now
+                </Text>
+              </View>
             </View>
-          </View>
+          </Pressable>
         </BottomSheetView>
       </BottomSheet>
     );
@@ -421,9 +408,9 @@ const styles = StyleSheet.create({
   starscape: {
     alignSelf: 'stretch',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingTop: 24,
+    paddingBottom: 0,
     paddingHorizontal: 8,
-    marginBottom: 14,
     position: 'relative',
   },
   star: {
@@ -448,13 +435,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     letterSpacing: 0.4,
-    marginTop: 12,
+    marginTop: 4,
   },
   heroSub: {
     fontSize: 13,
     fontWeight: '400',
     letterSpacing: 0.3,
     marginTop: 4,
+  },
+  heroSubRule: {
+    width: 28,
+    height: 1.5,
+    borderRadius: 1,
+    alignSelf: 'center',
+    // Symmetric breathing room — starscape's paddingBottom is 0, so the
+    // top and bottom gaps come entirely from this marginVertical.
+    marginVertical: 14,
   },
   benefitsRow: {
     flexDirection: 'row',
@@ -495,48 +491,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.6,
   },
-  holdContainer: {
-    alignSelf: 'stretch',
-    marginTop: 4,
-  },
-  holdRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  holdHintGroup: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  holdHintLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
-  holdHintCaption: {
-    fontSize: 12,
-    fontWeight: '400',
-    letterSpacing: 0.3,
-    marginTop: 2,
-  },
-  holdButton: {
-    width: HOLD_BTN_SIZE,
-    height: HOLD_BTN_SIZE,
-    borderRadius: HOLD_BTN_SIZE / 2,
+  holdPill: {
     borderWidth: 1.5,
+    borderRadius: 100,
+    paddingVertical: 14,
+    minWidth: 220,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressTrack: {
-    height: 3,
-    borderRadius: 100,
-    marginTop: 14,
-    overflow: 'hidden',
+  // Fills the full pill width — `paddingHorizontal` lives on holdContent
+  // (the inner row), so this absolute fill is bounded by the border, not
+  // by the padding area, and the progress can sweep from edge to edge.
+  holdFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 100,
+  holdContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 32,
+  },
+  holdText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });
