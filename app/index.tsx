@@ -551,8 +551,8 @@ export default function DoNothingScreen() {
     );
 
     return () => {
-      sub1.remove();
-      sub2.remove();
+      try { sub1.remove(); } catch (e) { console.error('[index] notif sub1 remove failed:', e); }
+      try { sub2.remove(); } catch (e) { console.error('[index] notif sub2 remove failed:', e); }
     };
   }, []);
 
@@ -576,12 +576,19 @@ export default function DoNothingScreen() {
       activateKeepAwakeAsync('scheduled-block');
       state.showUnlock();
     });
-    return () => sub.remove();
+    return () => {
+      try { sub.remove(); } catch (e) { console.error('[index] shield sub remove failed:', e); }
+    };
   }, []);
 
   // --- AppState ---
   useEffect(() => {
     const cancelledRef = { current: false };
+    // Serialize bg/fg transitions — handleBackground is async (it calls
+    // cancelSession which awaits a notification cancel) and a fast
+    // bg→fg toggle can have foreground run before background's set()
+    // lands, leaving stale state for pollBlockUnlock to read.
+    let bgInFlight: Promise<void> | null = null;
     const sub = AppState.addEventListener('change', async (nextState) => {
       // Only 'background' ends a session flow. 'inactive' covers Control
       // Center / notification drawer / incoming-call preview — those don't
@@ -589,9 +596,19 @@ export default function DoNothingScreen() {
       if (nextState === 'background' && isActiveRef.current) {
         isActiveRef.current = false;
         deactivateKeepAwake('session');
-        await useAppStore.getState().handleBackground();
+        bgInFlight = useAppStore.getState().handleBackground();
+        try {
+          await bgInFlight;
+        } finally {
+          bgInFlight = null;
+        }
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
+        // Wait for any in-flight background cleanup so foreground
+        // observes settled state.
+        if (bgInFlight) {
+          try { await bgInFlight; } catch {}
+        }
         useAppStore.getState().handleForeground();
         // Same retry poll as init — every foreground transition gets
         // the same defensive check, so a backgrounded app coming
@@ -601,7 +618,7 @@ export default function DoNothingScreen() {
     });
     return () => {
       cancelledRef.current = true;
-      sub.remove();
+      try { sub.remove(); } catch (e) { console.error('[index] AppState sub remove failed:', e); }
     };
   }, [pollBlockUnlock]);
 

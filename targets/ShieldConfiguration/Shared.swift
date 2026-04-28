@@ -33,6 +33,21 @@ var userDefaults = UserDefaults(suiteName: appGroup)
 let logger = Logger(
   subsystem: Bundle.main.bundleIdentifier!, category: "react-native-device-activity")
 
+// Surface App Group misconfig loudly in os_log. Without this, every
+// userDefaults?.* call silently no-ops and the extension appears to
+// "work" while reading/writing nothing — debugging is brutal.
+#if DEBUG
+private let _appGroupHealthCheck: Void = {
+  if #available(iOS 14.0, *) {
+    if appGroup == nil {
+      logger.error("REACT_NATIVE_DEVICE_ACTIVITY_APP_GROUP missing from Info.plist — extension UserDefaults will be nil")
+    } else if userDefaults == nil {
+      logger.error("UserDefaults(suiteName:) returned nil for App Group \(appGroup ?? "?", privacy: .public) — check entitlements")
+    }
+  }
+}()
+#endif
+
 var task: URLSessionDataTask?
 
 @available(iOS 15.0, *)

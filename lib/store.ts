@@ -37,6 +37,26 @@ let sessionStartTime = 0;
 let focusEndTime = 0;
 let sessionNotificationId: string | null = null;
 
+// Hot-reload safety: in dev, FastRefresh re-evaluates this module
+// and the old intervals stay alive in the global runtime, ticking
+// forever and double-firing setState. Stash live IDs on globalThis
+// so the new module instance can sweep them on init.
+if (__DEV__) {
+  const g = globalThis as { __doNothingIntervals?: ReturnType<typeof setInterval>[] };
+  if (g.__doNothingIntervals) {
+    for (const id of g.__doNothingIntervals) {
+      try { clearInterval(id); } catch { /* already cleared */ }
+    }
+  }
+  g.__doNothingIntervals = [];
+}
+function trackInterval(id: ReturnType<typeof setInterval>): void {
+  if (__DEV__) {
+    const g = globalThis as { __doNothingIntervals?: ReturnType<typeof setInterval>[] };
+    g.__doNothingIntervals?.push(id);
+  }
+}
+
 const PENDING_SESSION_KEY = 'session_pending';
 const SESSION_CANCELLED_KEY = 'session_cancelled';
 
@@ -387,6 +407,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
+    trackInterval(timerInterval);
     // Schedule completion notification only for countdown sessions.
     sessionNotificationId = null;
     if (goalSeconds > 0) {
@@ -479,6 +500,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
+    trackInterval(timerInterval);
     set({ paused: false });
     // Re-schedule the completion notification for the remaining time
     // (countdown sessions only). Without this, a paused-then-resumed
@@ -537,6 +559,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
+    trackInterval(timerInterval);
     set({
       elapsed: 0,
       paused: false,
@@ -648,6 +671,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ focusStep: 'done' });
       }
     }, 1000);
+    trackInterval(focusInterval);
   },
 
   cancelFocus: () => {
@@ -779,6 +803,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionEndedVisible: false,
       cancelReason: null,
       interruptedDuration: null,
+      // Same reason as completeSession/stopSession — block sessions
+      // override goalSeconds to unlockMin*60. Without resetting here,
+      // the next "do nothing" tap inherits a stale block duration.
+      goalSeconds: get().sliderMinutes * 60,
     });
   },
 
@@ -803,5 +831,19 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleForeground: () => {
     set({ weekStats: getWeekStats() });
+    // Re-anchor the focus timer. iOS aggressively pauses JS intervals
+    // while backgrounded, and a manual clock change (or DST flip) can
+    // leave focusRemaining stale. Recompute from focusEndTime so the
+    // visible countdown matches reality when the user comes back.
+    if (get().focusStep === 'active' && focusEndTime > 0) {
+      const left = Math.max(0, Math.ceil((focusEndTime - Date.now()) / 1000));
+      if (left <= 0) {
+        if (focusInterval) clearInterval(focusInterval);
+        focusInterval = null;
+        set({ focusRemaining: 0, focusStep: 'done' });
+      } else {
+        set({ focusRemaining: left });
+      }
+    }
   },
 }));

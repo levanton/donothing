@@ -10,6 +10,18 @@ interface SessionRow {
   id: string;
   timestamp: number;
   duration: number;
+  mood: string | null;
+}
+
+const SESSION_COLS = 'id, timestamp, duration, mood';
+
+function rowToSession(row: SessionRow): Session {
+  return {
+    id: row.id,
+    timestamp: row.timestamp,
+    duration: row.duration,
+    mood: row.mood ?? undefined,
+  };
 }
 
 // Sanity cap — no single session can plausibly last longer than 24 hours.
@@ -42,15 +54,19 @@ export function cleanupInvalidSessions(): number {
 
 export function getAllSessions(): Session[] {
   const db = getDb();
-  return db.getAllSync<SessionRow>('SELECT id, timestamp, duration FROM sessions ORDER BY timestamp DESC');
+  const rows = db.getAllSync<SessionRow>(
+    `SELECT ${SESSION_COLS} FROM sessions ORDER BY timestamp DESC`,
+  );
+  return rows.map(rowToSession);
 }
 
 export function getSessionsByDateRange(startMs: number, endMs: number): Session[] {
   const db = getDb();
-  return db.getAllSync<SessionRow>(
-    'SELECT id, timestamp, duration FROM sessions WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC',
+  const rows = db.getAllSync<SessionRow>(
+    `SELECT ${SESSION_COLS} FROM sessions WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC`,
     startMs, endMs,
   );
+  return rows.map(rowToSession);
 }
 
 export function deleteSessionById(id: string): void {
@@ -60,13 +76,12 @@ export function deleteSessionById(id: string): void {
 
 export function deleteSessionsByDateKey(dateKey: string): void {
   const db = getDb();
-  // dateKey is "YYYY-MM-DD", parse to get start/end timestamps in local time
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const startOfDay = new Date(year, month - 1, day).getTime();
-  const endOfDay = startOfDay + 86400000;
+  // Match the read-path's date_key derivation (strftime + localtime) so
+  // DST days delete the right rows. The previous JS-side
+  // `startOfDay + 86400000` math is wrong on 23/25-hour days.
   db.runSync(
-    'DELETE FROM sessions WHERE timestamp >= ? AND timestamp < ?',
-    startOfDay, endOfDay,
+    `DELETE FROM sessions WHERE strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', 'localtime') = ?`,
+    dateKey,
   );
 }
 
