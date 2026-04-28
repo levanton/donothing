@@ -178,6 +178,56 @@ function SessionCompleteScreen({
     setDialCollapsing(false);
   }
 
+  // Reset every animated value to its at-rest default — used both when
+  // the screen mounts (before kicking the entrance cascade off so a
+  // re-open from an in-flight previous session is clean) AND when it
+  // dismisses (so the next open isn't running from the previous final
+  // state).
+  const resetAllAnimations = useCallback(() => {
+    // Hero / glow
+    contentOpacity.value = 0;
+    glowOpacity.value = 0;
+    glowScale.value = 0.94;
+    // Title pieces
+    titleOpacity.value = 0;
+    titleY.value = 14;
+    titleScale.value = 0.96;
+    titleUnitOp.value = 0;
+    titleUnitY.value = 8;
+    titleSubOp.value = 0;
+    titleSubY.value = 10;
+    // Mood headers + circle block
+    circleBlockOpacity.value = 0;
+    circleBlockY.value = 12;
+    benefitsHeaderOp.value = 0;
+    benefitsHeaderY.value = 8;
+    moodHeaderOp.value = 0;
+    moodHeaderY.value = 8;
+    // Bottom pill (next/done)
+    closeOpacity.value = 0;
+    closeY.value = 14;
+    closeBtnScale.value = 1;
+    // Farewell beat
+    farewellOpacity.value = 0;
+    farewellY.value = 12;
+    fwEyebrowOp.value = 0;
+    fwEyebrowY.value = 10;
+    fwTitleOp.value = 0;
+    fwTitleY.value = 14;
+    fwTitleScale.value = 0.94;
+    fwDividerOp.value = 0;
+    fwDividerW.value = 0;
+    fwSubOp.value = 0;
+    fwSubY.value = 10;
+    fwChipOp.value = 0;
+    fwChipY.value = 10;
+    fwContinueOp.value = 0;
+    fwContinueY.value = 12;
+    // Layers + sun glide
+    benefitsOpacity.value = 0;
+    sunTranslateY.value = 0;
+  }, []);
+
   useEffect(() => {
     if (visible) {
       dismissingRef.current = false;
@@ -185,40 +235,14 @@ function SessionCompleteScreen({
       setRevealDial(false);
       setPhase('benefits');
       setDialCollapsing(false);
-
-      // Hard-reset every piece first so nothing lingers from a previous
-      // session — especially the done button, which must always start
-      // hidden when the user lands on this screen.
-      closeOpacity.value = 0;
-      closeY.value = 14;
-      closeBtnScale.value = 1;
-      farewellOpacity.value = 0;
-      farewellY.value = 12;
-      fwEyebrowOp.value = 0;
-      fwEyebrowY.value = 10;
-      fwTitleOp.value = 0;
-      fwTitleY.value = 14;
-      fwTitleScale.value = 0.94;
-      fwDividerOp.value = 0;
-      fwDividerW.value = 0;
-      fwSubOp.value = 0;
-      fwSubY.value = 10;
-      fwChipOp.value = 0;
-      fwChipY.value = 10;
-      fwContinueOp.value = 0;
-      fwContinueY.value = 12;
-      titleUnitOp.value = 0;
-      titleUnitY.value = 8;
-      titleSubOp.value = 0;
-      titleSubY.value = 10;
-      benefitsHeaderOp.value = 0;
-      benefitsHeaderY.value = 8;
-      moodHeaderOp.value = 0;
-      moodHeaderY.value = 8;
       setBenefitsRevealed(false);
+
+      // Reset to at-rest defaults first so nothing lingers from a
+      // previous run before the entrance cascade kicks off. mainContent
+      // stays at 1 — the parent is fully visible, only inner pieces
+      // animate.
+      resetAllAnimations();
       mainContentOpacity.value = 1;
-      benefitsOpacity.value = 0;
-      sunTranslateY.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
 
@@ -279,42 +303,7 @@ function SessionCompleteScreen({
       closeY.value = withDelay(NEXT_SHOW, withTiming(0, { duration: 500, easing: EASE_OUT }));
 
     } else {
-      contentOpacity.value = 0;
-      glowOpacity.value = 0;
-      glowScale.value = 0.94;
-      titleOpacity.value = 0;
-      titleY.value = 14;
-      titleScale.value = 0.96;
-      circleBlockOpacity.value = 0;
-      circleBlockY.value = 12;
-      closeOpacity.value = 0;
-      closeY.value = 14;
-      closeBtnScale.value = 1;
-      farewellOpacity.value = 0;
-      farewellY.value = 12;
-      fwEyebrowOp.value = 0;
-      fwEyebrowY.value = 10;
-      fwTitleOp.value = 0;
-      fwTitleY.value = 14;
-      fwTitleScale.value = 0.94;
-      fwDividerOp.value = 0;
-      fwDividerW.value = 0;
-      fwSubOp.value = 0;
-      fwSubY.value = 10;
-      fwChipOp.value = 0;
-      fwChipY.value = 10;
-      fwContinueOp.value = 0;
-      fwContinueY.value = 12;
-      titleUnitOp.value = 0;
-      titleUnitY.value = 8;
-      titleSubOp.value = 0;
-      titleSubY.value = 10;
-      benefitsHeaderOp.value = 0;
-      benefitsHeaderY.value = 8;
-      moodHeaderOp.value = 0;
-      moodHeaderY.value = 8;
-      benefitsOpacity.value = 0;
-      sunTranslateY.value = 0;
+      resetAllAnimations();
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
       setHasInteracted(false);
@@ -322,7 +311,7 @@ function SessionCompleteScreen({
       setDialCollapsing(false);
       setBenefitsRevealed(false);
     }
-  }, [visible]);
+  }, [visible, resetAllAnimations]);
 
   const handleDialInteract = useCallback(() => {
     setHasInteracted(true);
