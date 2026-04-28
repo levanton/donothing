@@ -467,13 +467,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 14,
   },
-  // Future grains — small, muted sand. Just visible enough to map the
-  // remaining shape of the goal.
+  // Future grains — dark dots so they stay legible on the cream sheet.
+  // Translucent brown reads as "ahead" without competing with the
+  // terracotta past on contrast.
   progressDot: {
     width: 2.5,
     height: 2.5,
     borderRadius: 100,
-    backgroundColor: CHIP_LIGHT,
+    backgroundColor: 'rgba(51, 52, 49, 0.4)',
   },
   // Past grains — terracotta, slightly bigger so the elapsed side
   // reads as solidly "done".
