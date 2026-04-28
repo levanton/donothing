@@ -12,11 +12,12 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Feather } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
 import { palette, themes, getStatusBarStyle, type ThemeMode } from '@/lib/theme';
 import MoodDial, { MOOD_DIAL_DISC_DURATION } from '@/components/MoodDial';
+import DonePill from '@/components/session-complete/DonePill';
+import FarewellPhase from '@/components/session-complete/FarewellPhase';
 
 
 const CONTENT_FADE_MS = 500;
@@ -690,113 +691,27 @@ function SessionCompleteScreen({
                 closeBtnScale.value = withTiming(1, { duration: 160, easing: EASE_OUT });
               }}
             >
-              <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-                <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                  {phase === 'benefits' ? 'next' : 'next'}
-                </Text>
-              </View>
+              <DonePill label="next" />
             </Pressable>
           </Animated.View>
         </Animated.View>
 
-        {/* Farewell beat — sole content during the farewell phase, lives
-            above the faded-out main layer so nothing else is visible. */}
-        <Animated.View
-          style={[styles.farewellLayer, farewellStyle]}
-          pointerEvents={phase === 'farewell' ? 'auto' : 'none'}
-        >
-          <View style={styles.farewellCenter}>
-            {/* Hidden anchor — reserves the spot the moving sun glides
-                into. The visible sun is the one in the main layout, kept
-                mounted and translated down so the user perceives a single
-                continuous element rather than a cross-fade. */}
-            <View ref={farewellSunRef as any} style={styles.farewellSunAnchor} />
-
-            <Animated.Text
-              style={[
-                styles.farewellEyebrow,
-                { color: textColor, fontFamily: Fonts.serif },
-                fwEyebrowStyle,
-              ]}
-            >
-              see you tomorrow
-            </Animated.Text>
-
-            <Animated.Text
-              style={[
-                styles.farewellTitle,
-                { color: textColor, fontFamily: Fonts.serif },
-                fwTitleStyle,
-              ]}
-            >
-              well done
-            </Animated.Text>
-
-            <Animated.View style={[styles.farewellDivider, fwDividerStyle]} />
-
-            <Animated.Text
-              style={[
-                styles.farewellSub,
-                { color: textColor, fontFamily: Fonts.serif },
-                fwSubStyle,
-              ]}
-            >
-              your apps are open again
-            </Animated.Text>
-
-            <Animated.View style={[styles.farewellChip, fwChipStyle]}>
-              <Text style={[styles.farewellChipText, { fontFamily: Fonts.serif }]}>
-                {duration.value} {duration.unit} • complete
-              </Text>
-            </Animated.View>
-          </View>
-
-          <Animated.View
-            style={[
-              styles.farewellContinue,
-              { bottom: insets.bottom + 40 },
-              fwContinueStyle,
-            ]}
-          >
-            {onUnlock ? (
-              <View style={styles.farewellButtonRow}>
-                <Pressable
-                  onPress={() => handleCloseRef.current()}
-                  style={({ pressed }) => [
-                    styles.farewellSecondaryBtn,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <Text style={[styles.farewellSecondaryLabel, { color: palette.cream, fontFamily: Fonts.serif }]}>
-                    just done
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleCloseAndUnlock}
-                  style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-                >
-                  <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-                    <Feather name="unlock" size={16} color={palette.terracotta} style={styles.doneIcon} />
-                    <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                      unlock your apps
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                onPress={() => handleCloseRef.current()}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-              >
-                <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-                  <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                    done
-                  </Text>
-                </View>
-              </Pressable>
-            )}
-          </Animated.View>
-        </Animated.View>
+        <FarewellPhase
+          textColor={textColor}
+          duration={duration}
+          bottomInset={insets.bottom}
+          sunAnchorRef={farewellSunRef}
+          pointerEventsActive={phase === 'farewell'}
+          layerStyle={farewellStyle}
+          eyebrowStyle={fwEyebrowStyle}
+          titleStyle={fwTitleStyle}
+          dividerStyle={fwDividerStyle}
+          subStyle={fwSubStyle}
+          chipStyle={fwChipStyle}
+          continueStyle={fwContinueStyle}
+          onClose={() => handleCloseRef.current()}
+          onUnlock={onUnlock ? handleCloseAndUnlock : undefined}
+        />
       </Animated.View>
     </View>
   );
@@ -941,108 +856,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.5,
     textAlign: 'center',
-  },
-  doneBtn: {
-    flexDirection: 'row',
-    borderRadius: 100,
-    paddingVertical: 18,
-    paddingHorizontal: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  doneIcon: {
-    marginTop: 1,
-  },
-  doneLabel: {
-    fontSize: 18,
-    fontWeight: '500',
-    letterSpacing: 0.6,
-  },
-  farewellLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  farewellCenter: {
-    alignItems: 'center',
-  },
-  farewellContinue: {
-    position: 'absolute',
-    alignSelf: 'center',
-  },
-  // Two-button layout: secondary "just done" pill above the primary
-  // "unlock your apps" pill. Stacking (rather than side-by-side) keeps
-  // both buttons full-width, easy thumb targets in the bottom band.
-  farewellButtonRow: {
-    alignItems: 'center',
-    gap: 14,
-  },
-  farewellSecondaryBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  farewellSecondaryLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    letterSpacing: 0.4,
-    opacity: 0.85,
-  },
-  // Same footprint as the moving main sun (no 1.1x scale) so when the
-  // shared sun glides in, it covers the anchor exactly. Margin matches
-  // the original farewell layout's sun→eyebrow gap.
-  farewellSunAnchor: {
-    width: GRASS_SIZE,
-    height: GRASS_SIZE * (450 / 780),
-    marginBottom: 22,
-  },
-  farewellEyebrow: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 2.4,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    marginBottom: 14,
-  },
-  farewellTitle: {
-    fontSize: 56,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-    lineHeight: 60,
-    marginBottom: 20,
-  },
-  farewellDivider: {
-    width: 44,
-    height: 1.5,
-    backgroundColor: palette.cream,
-    marginBottom: 20,
-    borderRadius: 1,
-  },
-  farewellSub: {
-    fontSize: 18,
-    fontWeight: '400',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  farewellChip: {
-    backgroundColor: palette.cream,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  farewellChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: palette.brown,
-    letterSpacing: 1.8,
-    textTransform: 'uppercase',
   },
 });
