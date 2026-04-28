@@ -467,14 +467,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 14,
   },
-  // Future grains — dark dots so they stay legible on the cream sheet.
-  // Translucent brown reads as "ahead" without competing with the
-  // terracotta past on contrast.
+  // Future grains — same dark brown as the body text. At 2.5px the
+  // full-opacity dark stays restrained while reading clearly.
   progressDot: {
     width: 2.5,
     height: 2.5,
     borderRadius: 100,
-    backgroundColor: 'rgba(51, 52, 49, 0.4)',
+    backgroundColor: BROWN,
   },
   // Past grains — terracotta, slightly bigger so the elapsed side
   // reads as solidly "done".
