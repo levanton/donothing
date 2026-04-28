@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import Animated, {
@@ -51,7 +51,7 @@ import {
 } from '@/lib/screen-time';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
-import { palette, themes, type AppTheme } from '@/lib/theme';
+import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 
@@ -624,19 +624,19 @@ export default function DoNothingScreen() {
 
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     useAppStore.getState().toggleTheme();
   }, []);
 
   // --- Settings ---
   const handleSettingsPress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     settingsSlide.value = withTiming(1, { duration: 400 });
     useAppStore.getState().openSettings();
   }, []);
 
   const handleSettingsClose = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     settingsSlide.value = withTiming(0, { duration: 300 });
     useAppStore.getState().closeSettings();
   }, []);
@@ -644,7 +644,7 @@ export default function DoNothingScreen() {
   // Emergency unlock: bypasses the do-nothing gate. Shown on the block-waiting
   // main screen so the user always has an out.
   const handleForceUnlock = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
     forceUnblockAll().catch(() => {});
@@ -653,7 +653,7 @@ export default function DoNothingScreen() {
 
   const handleStartBlockSession = useCallback(
     (minutes: number) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      haptics.medium();
       activateKeepAwakeAsync('session');
       // Jump the header morph to the "Doing nothing" state so the user doesn't
       // see a flash of "Ready to Do nothing?" when leaving the block-waiting UI.
@@ -844,25 +844,25 @@ export default function DoNothingScreen() {
   // when the user dismisses without buying.
   const promoVisible = useAppStore((s) => s.promoOfferVisible);
   const handleOpenPromo = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     useAppStore.getState().showPromoOffer();
   }, []);
   const handleClosePromo = useCallback(() => {
     useAppStore.getState().hidePromoOffer();
   }, []);
   const toggleDistractionFree = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setDistractionFree((v) => !v);
   }, []);
 
   const handleStart = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.medium();
     activateKeepAwakeAsync('session');
     useAppStore.getState().startSession();
   }, []);
 
   const handleStop = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const elapsed = useAppStore.getState().elapsed;
     if (elapsed > 0) {
       // Pause the timer and let the SessionEndedSheet take over with
@@ -914,7 +914,7 @@ export default function DoNothingScreen() {
   // screen. Without this, "back home" would land on a still-blocked
   // device with no way to recover until the next unlock cycle.
   const handleSheetUnlock = useCallback(async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     deactivateKeepAwake('session');
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
@@ -930,12 +930,12 @@ export default function DoNothingScreen() {
   }, []);
 
   const handleHistory = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     historySlide.value = withTiming(1, { duration: 500 });
   }, []);
 
   const handleHistoryClose = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     historySlide.value = withTiming(0, { duration: 400 });
   }, []);
 
@@ -957,7 +957,7 @@ export default function DoNothingScreen() {
         <Animated.View
           style={[styles.container, animatedContainerStyle, mainSlideStyle]}
         >
-          <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+          <StatusBar style={getStatusBarStyle(themeMode)} />
 
           {/* Settings button — top left */}
           <Pressable

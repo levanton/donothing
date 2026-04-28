@@ -9,7 +9,7 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { Fonts } from '@/constants/theme';
 import { themes, type ThemeMode } from '@/lib/theme';
@@ -72,17 +72,17 @@ function PaywallGate({
   if (!visible) return null;
 
   const handleOpen = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     router.push('/paywall');
   };
 
   const handleAccount = () => {
-    Haptics.selectionAsync();
+    haptics.select();
     onOpenAccount?.();
   };
 
   const handleClose = () => {
-    Haptics.selectionAsync();
+    haptics.select();
     onClose?.();
   };
 

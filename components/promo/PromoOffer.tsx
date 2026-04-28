@@ -16,7 +16,7 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Asset } from 'expo-asset';
 
 import { Fonts } from '@/constants/theme';
@@ -67,12 +67,12 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
   }));
 
   const handleClose = () => {
-    Haptics.selectionAsync();
+    haptics.select();
     onClose();
   };
 
   const handlePurchase = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     onPurchase?.();
   };
 

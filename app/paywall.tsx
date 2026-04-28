@@ -3,7 +3,7 @@ import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
@@ -63,7 +63,7 @@ export default function PaywallRoute() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
 
   const handleSkip = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     // Win-back: surface the half-off promo on home before the user gets back
     // to the gate, giving them one more chance to convert.
     useAppStore.getState().showPromoOffer();
@@ -71,7 +71,7 @@ export default function PaywallRoute() {
   }, [router]);
 
   const handlePurchase = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     // TODO: integrate RevenueCat purchase flow
     router.replace('/');
   }, [router]);

@@ -7,7 +7,7 @@ import {
   getFamilyActivitySelectionId,
   setFamilyActivitySelectionId,
 } from 'react-native-device-activity';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -120,7 +120,7 @@ export default function AppPickerSheet({ theme, selectionId, title, onClose }: P
             outline
             flex
             onPress={() => {
-              Haptics.selectionAsync();
+              haptics.select();
               finish('cancel');
             }}
           />
@@ -130,7 +130,7 @@ export default function AppPickerSheet({ theme, selectionId, title, onClose }: P
             filled
             flex
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              haptics.light();
               finish('save');
             }}
           />

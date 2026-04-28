@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -412,7 +412,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
       if (step !== lastHapticStep.value) {
         lastHapticStep.value = step;
         if (step >= 0) {
-          runOnJS(Haptics.selectionAsync)();
+          runOnJS(haptics.select)();
           runOnJS(handleFirstInteract)();
         }
       }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -53,7 +53,7 @@ export default function TimePickerContent({
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
 
   const toggleDay = (day: number) => {
-    Haptics.selectionAsync();
+    haptics.select();
     setSelectedDays((prev) => {
       if (prev.includes(day)) {
         if (prev.length <= 1) return prev;
@@ -63,10 +63,10 @@ export default function TimePickerContent({
     });
   };
 
-  const incHour = () => { Haptics.selectionAsync(); setHour((h) => (h + 1) % 24); };
-  const decHour = () => { Haptics.selectionAsync(); setHour((h) => (h - 1 + 24) % 24); };
-  const incMin = () => { Haptics.selectionAsync(); setMinute((m) => (m + 5) % 60); };
-  const decMin = () => { Haptics.selectionAsync(); setMinute((m) => (m - 5 + 60) % 60); };
+  const incHour = () => { haptics.select(); setHour((h) => (h + 1) % 24); };
+  const decHour = () => { haptics.select(); setHour((h) => (h - 1 + 24) % 24); };
+  const incMin = () => { haptics.select(); setMinute((m) => (m + 5) % 60); };
+  const decMin = () => { haptics.select(); setMinute((m) => (m - 5 + 60) % 60); };
 
   return (
     <View style={styles.sheetContent}>

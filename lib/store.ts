@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { initDatabase } from './db';
 import {
   addSession as dbAddSession,
@@ -595,7 +595,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('[store.completeSession] dbAddSession failed:', e);
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     set({
       started: false,
       elapsed: 0,
@@ -667,7 +667,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (left <= 0) {
         if (focusInterval) clearInterval(focusInterval);
         focusInterval = null;
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         set({ focusStep: 'done' });
       }
     }, 1000);
@@ -681,7 +681,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   unlockFocus: () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     set({ focusStep: 'hidden', focusRemaining: 0 });
   },
 

@@ -13,7 +13,7 @@ import {
   activitySelectionMetadata,
 } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Notifications from 'expo-notifications';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
@@ -134,7 +134,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   }));
 
   const handleNotifTap = useCallback(async () => {
-    Haptics.selectionAsync();
+    haptics.select();
     if (notifStatus === 'undetermined') {
       try {
         const { status } = await Notifications.requestPermissionsAsync();
@@ -146,7 +146,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   }, [notifStatus]);
 
   const handleScreenTimeBannerTap = useCallback(async () => {
-    Haptics.selectionAsync();
+    haptics.select();
     if (authStatus === 'denied') {
       try { await Linking.openSettings(); } catch {}
     } else {
@@ -168,7 +168,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const blockSheetRef = useRef<BottomSheet>(null);
 
   const handleOpenAccount = () => {
-    Haptics.selectionAsync();
+    haptics.select();
     onOpenAccount();
   };
 
@@ -177,7 +177,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const [pendingBlock, setPendingBlock] = useState<PendingBlockParams | null>(null);
 
   const commitBlock = (p: PendingBlockParams) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const op = editingBlock
       ? store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes)
       : store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
@@ -355,7 +355,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           <Pressable
             key={b.id}
             onPress={() => {
-              Haptics.selectionAsync();
+              haptics.select();
               setEditingBlock(b);
               blockSheetRef.current?.expand();
             }}
@@ -394,7 +394,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               <Switch
                 value={active}
                 onValueChange={() => {
-                  Haptics.selectionAsync();
+                  haptics.select();
                   store().toggleScheduledBlock(b.id);
                 }}
                 trackColor={{ false: theme.textTertiary, true: theme.accent }}
@@ -404,7 +404,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               />
               <Pressable
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  haptics.light();
                   store().removeScheduledBlock(b.id);
                 }}
                 hitSlop={12}
@@ -421,7 +421,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         variant="outline"
         size="small"
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          haptics.light();
           setEditingBlock(null);
           setShowBlockPicker(true);
           blockSheetRef.current?.expand();
@@ -444,7 +444,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
             {neverBlockCount > 0 && (
               <Pressable
                 onPress={async () => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  haptics.light();
                   const status = await requestAuth();
                   if (status === 'approved') setShowNeverBlockPicker(true);
                 }}
@@ -478,7 +478,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           ) : (
             <Pressable
               onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                haptics.light();
                 const status = await requestAuth();
                 if (status === 'approved') setShowNeverBlockPicker(true);
               }}

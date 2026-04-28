@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { palette } from '@/lib/theme';
 
@@ -23,7 +23,7 @@ export default function ChipSelect({
   small = false,
 }: Props) {
   const handlePress = (opt: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     if (multi) {
       const next = selected.includes(opt)
         ? selected.filter((s) => s !== opt)

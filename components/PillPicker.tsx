@@ -18,7 +18,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { NativeViewGestureHandler } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Fonts } from '@/constants/theme';
@@ -96,7 +96,7 @@ export default function PillPicker<T extends string | null>({
     const idx = Math.max(0, Math.min(items.length - 1, Math.round(x / ITEM_WIDTH)));
     if (idx !== lastSelectedIndex.current) {
       lastSelectedIndex.current = idx;
-      Haptics.selectionAsync();
+      haptics.select();
       onSelect(items[idx].id);
     }
   };

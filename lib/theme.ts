@@ -38,12 +38,13 @@ export interface AppTheme {
 }
 
 /**
- * Status-bar style for a given theme mode. Hoists the inline
- * `isDark ? 'light' : 'dark'` ternary that was repeated across
- * SessionCompleteScreen, app/index.tsx, app/onboarding.tsx, etc.
+ * Status-bar style for the active theme. Pass `themeMode` (string)
+ * or `isDark` (boolean) — hoists the inline ternaries that were
+ * repeated across SessionCompleteScreen, app/index.tsx, onboarding etc.
  */
-export function getStatusBarStyle(mode: ThemeMode): 'light' | 'dark' {
-  return mode === 'dark' ? 'light' : 'dark';
+export function getStatusBarStyle(modeOrDark: ThemeMode | boolean): 'light' | 'dark' {
+  const isDark = typeof modeOrDark === 'string' ? modeOrDark === 'dark' : modeOrDark;
+  return isDark ? 'light' : 'dark';
 }
 
 export const themes: Record<ThemeMode, AppTheme> = {

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { themes } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -58,21 +58,21 @@ export function useOnboardingFlow(): OnboardingFlow {
 
   const goNext = useCallback(() => {
     if (currentIndex < totalPages - 1) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
       setCurrentIndex(currentIndex + 1);
     }
   }, [currentIndex, totalPages]);
 
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
       setCurrentIndex(currentIndex - 1);
     }
   }, [currentIndex]);
 
   const jumpTo = useCallback((index: number) => {
     setCurrentIndex(index);
-    Haptics.selectionAsync();
+    haptics.select();
   }, []);
 
   return {

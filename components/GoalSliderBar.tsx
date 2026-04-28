@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Svg, { Circle as SvgCircle, Line as SvgLine } from 'react-native-svg';
 
 import { Fonts } from '@/constants/theme';
@@ -170,7 +170,7 @@ export default function GoalSliderBar({
   // worklet dedupes via `lastSnap` so JS work happens once per
   // integer step, not 60× per second.
   const handleDisplayUpdate = useCallback((mins: number) => {
-    Haptics.selectionAsync();
+    haptics.select();
     setDisplayMins(mins);
     onChange?.(mins);
   }, [onChange]);

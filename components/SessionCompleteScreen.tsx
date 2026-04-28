@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,10 +12,10 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
-import { palette, themes, type ThemeMode } from '@/lib/theme';
+import { palette, themes, getStatusBarStyle, type ThemeMode } from '@/lib/theme';
 import MoodDial, { MOOD_DIAL_DISC_DURATION } from '@/components/MoodDial';
 
 
@@ -38,72 +38,12 @@ const YES_SIZE = 140;
 // screen pulls from there so any other surface (paywall, onboarding,
 // reminder card, etc.) can render the same list without duplicating
 // the data.
-import { type Benefit, pickBenefits } from '@/lib/benefits';
-
-// Same proportions as the Paywall FeatureCarousel — small narrow
-// cards with alternating colored backgrounds.
-const BENEFIT_CARD_W = 150;
-const BENEFIT_CARD_H = 240;
-const BENEFIT_CARD_GAP = 12;
-
-// 6-tone warm-earth palette — refined Mediterranean ceramic feel.
-// Order alternates light and dark so neighbouring cards contrast.
-const BENEFIT_VARIANTS: Array<{ bg: string; fg: string }> = [
-  { bg: '#F0E0BD', fg: palette.brown }, // 0: warm cream (light)
-  { bg: '#5C2F2F', fg: palette.cream }, // 1: deep wine (dark)
-  { bg: '#C5A572', fg: palette.brown }, // 2: antique gold (light pop)
-  { bg: '#7E3A24', fg: palette.cream }, // 3: rich auburn (mid)
-  { bg: '#E8B89A', fg: palette.brown }, // 4: peach blush (light)
-  { bg: '#3D2516', fg: palette.cream }, // 5: dark cocoa (darkest)
-];
-
-function BenefitCard({
-  item,
-  index,
-  revealed,
-}: {
-  item: Benefit;
-  index: number;
-  revealed: boolean;
-}) {
-  const variant = BENEFIT_VARIANTS[index % BENEFIT_VARIANTS.length];
-  // Each card rises, scales and fades on its own delay so the slider
-  // composes itself left-to-right rather than dropping in as a block.
-  // Scale gives the cards a sense of "stepping forward" — without it
-  // the cascade reads as a flat fade.
-  const op = useSharedValue(0);
-  const y = useSharedValue(18);
-  const scale = useSharedValue(0.94);
-  useEffect(() => {
-    if (!revealed) {
-      op.value = 0;
-      y.value = 18;
-      scale.value = 0.94;
-      return;
-    }
-    const delay = index * 130;
-    op.value = withDelay(delay, withTiming(1, { duration: 560, easing: EASE_OUT }));
-    y.value = withDelay(delay, withTiming(0, { duration: 560, easing: EASE_OUT }));
-    scale.value = withDelay(delay, withTiming(1, { duration: 620, easing: EASE_OUT }));
-  }, [revealed, index]);
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ translateY: y.value }, { scale: scale.value }],
-  }));
-  return (
-    <Animated.View
-      style={[styles.benefitCardSlide, { backgroundColor: variant.bg }, cardStyle]}
-    >
-      <View style={styles.benefitIconWrap}>
-        <View style={[styles.benefitIconHalo, { backgroundColor: `${variant.fg}22` }]} />
-        <MaterialCommunityIcons name={item.icon as ComponentProps<typeof MaterialCommunityIcons>['name']} size={48} color={variant.fg} />
-      </View>
-      <Text style={[styles.benefitLabel, { color: variant.fg }]}>
-        {item.title}
-      </Text>
-    </Animated.View>
-  );
-}
+import { pickBenefits } from '@/lib/benefits';
+import BenefitCard, {
+  BENEFIT_CARD_W,
+  BENEFIT_CARD_H,
+  BENEFIT_CARD_GAP,
+} from '@/components/session-complete/BenefitCard';
 
 interface Props {
   visible: boolean;
@@ -222,7 +162,7 @@ function SessionCompleteScreen({
 
   const benefits = useMemo(() => pickBenefits(durationSeconds), [durationSeconds]);
   const revealTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  const statusStyle: 'light' | 'dark' = isDark ? 'light' : 'dark';
+  const statusStyle = getStatusBarStyle(isDark);
 
   const dismissingRef = useRef(false);
   const prevVisibleRef = useRef(false);
@@ -418,7 +358,7 @@ function SessionCompleteScreen({
   }, [hasInteracted, phase]);
 
   const handleNext = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.select();
     // Beat 1 → Beat 2 transition. Fade out benefits and the next pill,
     // then swap the slot's content to "done" (still invisible) and fade
     // in prompt + dial.
@@ -441,7 +381,7 @@ function SessionCompleteScreen({
   }, []);
 
   const handleUnlock = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.medium();
 
     // Beat 1 — fold the dial inward. MoodDial reverses its disc-grow
     // (rings retract toward centre, sage fill collapses, hint dissolves);
@@ -533,7 +473,7 @@ function SessionCompleteScreen({
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
     dismissingRef.current = true;
-    Haptics.selectionAsync();
+    haptics.select();
 
     // Collapse the terracotta disc back onto the home-screen yes button —
     // same shape, same colour, so the handoff is seamless (mirrors the
@@ -991,32 +931,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: BENEFIT_CARD_GAP,
     alignItems: 'center',
-  },
-  benefitCardSlide: {
-    width: BENEFIT_CARD_W,
-    height: BENEFIT_CARD_H,
-    borderRadius: 20,
-    padding: 16,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  benefitIconWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  benefitIconHalo: {
-    position: 'absolute',
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-  },
-  benefitLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 19,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
   },
   headerChip: {
     fontSize: 12,

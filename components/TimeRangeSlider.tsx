@@ -6,7 +6,7 @@ import Animated, {
   useAnimatedProps,
   useSharedValue,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Svg, {
   Circle as SvgCircle,
   Line as SvgLine,
@@ -162,7 +162,7 @@ export default function TimeRangeSlider({
           startSV.value = next;
           if (next !== lastStepStart.value) {
             lastStepStart.value = next;
-            runOnJS(Haptics.selectionAsync)();
+            runOnJS(haptics.select)();
           }
         }
       } else {
@@ -176,7 +176,7 @@ export default function TimeRangeSlider({
           endSV.value = next;
           if (next !== lastStepEnd.value) {
             lastStepEnd.value = next;
-            runOnJS(Haptics.selectionAsync)();
+            runOnJS(haptics.select)();
           }
         }
       }
@@ -203,7 +203,7 @@ export default function TimeRangeSlider({
           startSV.value = next;
           if (next !== lastStepStart.value) {
             lastStepStart.value = next;
-            runOnJS(Haptics.selectionAsync)();
+            runOnJS(haptics.select)();
           }
         }
       } else {
@@ -217,7 +217,7 @@ export default function TimeRangeSlider({
           endSV.value = next;
           if (next !== lastStepEnd.value) {
             lastStepEnd.value = next;
-            runOnJS(Haptics.selectionAsync)();
+            runOnJS(haptics.select)();
           }
         }
       }

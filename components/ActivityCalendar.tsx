@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
@@ -88,7 +88,7 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
   }, [viewYear, viewMonth]);
 
   const goToPrevMonth = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.select();
     if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
     else setViewMonth(viewMonth - 1);
     setSelectedDate(null);
@@ -96,7 +96,7 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
   const goToNextMonth = useCallback(() => {
     if (isCurrentMonth) return;
-    Haptics.selectionAsync();
+    haptics.select();
     if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
     else setViewMonth(viewMonth + 1);
     setSelectedDate(null);
@@ -104,13 +104,13 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
   const handleDeleteDay = useCallback(() => {
     if (!selectedDate) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.medium();
     deleteSessionsByDate(selectedDate);
     setSelectedDate(null);
   }, [selectedDate, deleteSessionsByDate]);
 
   const handleDeleteSession = useCallback((id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     deleteSession(id);
   }, [deleteSession]);
 
@@ -130,7 +130,7 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
         style={styles.cell}
         onPress={() => {
           if (isFuture) return;
-          Haptics.selectionAsync();
+          haptics.select();
           setSelectedDate(isSelected ? null : cell.key);
         }}
       >

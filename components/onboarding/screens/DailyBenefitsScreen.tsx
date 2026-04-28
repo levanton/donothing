@@ -10,7 +10,7 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -34,7 +34,7 @@ function BenefitCard({ icon, text, desc, isMci, delay }: {
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: 500, easing: EASE_OUT }));
     translateY.value = withDelay(delay, withTiming(0, { duration: 500, easing: EASE_OUT }));
-    const t = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), delay);
+    const t = setTimeout(() => haptics.light(), delay);
     return () => clearTimeout(t);
   }, []);
 

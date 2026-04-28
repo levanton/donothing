@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
@@ -81,7 +81,7 @@ export default function BlockPickerContent({
   const softDivider = isLight ? '#CFC4AF' : '#6B6B68';
 
   const toggleDay = (day: number) => {
-    Haptics.selectionAsync();
+    haptics.select();
     setSelectedDays((prev) => {
       if (prev.includes(day)) {
         if (prev.length <= 1) return prev;

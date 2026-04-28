@@ -12,7 +12,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -151,7 +151,7 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
                   text={item.text}
                   isMci={item.isMci}
                   delay={1300 + i * 300}
-                  onAppear={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                  onAppear={() => haptics.light()}
                 />
               ))}
             </View>

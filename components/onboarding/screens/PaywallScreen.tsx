@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -79,7 +79,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
   });
 
   const handleSkip = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     // Win-back: surface the half-off promo on home once onboarding finishes,
     // mirroring the behaviour when the standalone /paywall is dismissed.
     useAppStore.getState().showPromoOffer();
@@ -87,7 +87,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
   }, [onFinish]);
 
   const handlePurchase = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     // TODO: integrate RevenueCat purchase flow
     onFinish();
   }, [onFinish]);

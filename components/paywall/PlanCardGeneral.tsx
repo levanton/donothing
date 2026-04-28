@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { palette } from '@/lib/theme';
 import { Fonts } from '@/constants/theme';
@@ -32,7 +32,7 @@ export default function PlanCard({
   onSelect,
 }: PlanCardProps) {
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     onSelect();
   };
 

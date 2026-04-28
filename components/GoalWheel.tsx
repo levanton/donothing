@@ -18,7 +18,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Fonts } from '@/constants/theme';
@@ -164,7 +164,7 @@ export default function GoalWheel({
     () => Math.round(activeIdx.value),
     (curr, prev) => {
       if (prev !== null && curr !== prev) {
-        runOnJS(Haptics.selectionAsync)();
+        runOnJS(haptics.select)();
       }
     },
   );

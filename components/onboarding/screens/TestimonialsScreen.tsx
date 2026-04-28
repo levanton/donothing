@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -86,7 +86,7 @@ export default function TestimonialsScreen({ isActive, onNext, theme }: Props) {
     const index = Math.round(e.nativeEvent.contentOffset.x / (cardWidth + 12));
     if (index !== lastSnapIndex.current) {
       lastSnapIndex.current = index;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
     }
   }, [cardWidth]);
 

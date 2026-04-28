@@ -12,7 +12,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
@@ -96,7 +96,7 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
 
   // Start: shrink button to dot, start orbiting
   const startSession = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.medium();
     setStarted(true);
 
     // Fade out label
@@ -126,13 +126,13 @@ export default function TryNothingScreen({ isActive, onNext, theme }: Props) {
         if (prev >= SESSION_DURATION - 1) {
           clearInterval(intervalRef.current);
           // Gentle celebration haptic — light taps building up
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), 150);
-          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 300);
-          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 450);
-          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 650);
-          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 850);
-          setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 1100);
+          haptics.light();
+          setTimeout(() => haptics.light(), 150);
+          setTimeout(() => haptics.medium(), 300);
+          setTimeout(() => haptics.medium(), 450);
+          setTimeout(() => haptics.heavy(), 650);
+          setTimeout(() => haptics.heavy(), 850);
+          setTimeout(() => haptics.success(), 1100);
           // Burst animation
           burstOpacity.value = withTiming(1, { duration: 300 });
           burstScale.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.ease) });

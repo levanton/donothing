@@ -3,11 +3,11 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
-import { palette } from '@/lib/theme';
+import { palette, getStatusBarStyle } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
 import { saveOnboardingData } from '@/lib/onboarding-persistence';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
@@ -46,7 +46,7 @@ export default function OnboardingRoute() {
     : screenTheme.text;
 
   const handleFinish = useCallback(async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     try {
       await saveOnboardingData({
         painPoints: flow.painPoints,
@@ -92,7 +92,7 @@ export default function OnboardingRoute() {
 
   return (
     <View style={[styles.container, { backgroundColor: currentPage.bg }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={getStatusBarStyle(isDark)} />
 
       <Animated.View
         key={currentIndex}
@@ -147,7 +147,7 @@ export default function OnboardingRoute() {
       {/* DEV: Page jumper */}
       {__DEV_JUMP__ && (
         <Pressable
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); setShowJumper(true); }}
+          onPress={() => { haptics.heavy(); setShowJumper(true); }}
           style={[styles.jumperButton, { bottom: insets.bottom + 8 }]}
         >
           <Text style={styles.jumperButtonText}>{currentIndex}</Text>

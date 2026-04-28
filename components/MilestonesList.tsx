@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect, Line } from 'react-native-svg';
 
@@ -61,7 +61,7 @@ function MilestonesList({ theme, achievedMilestones }: Props) {
   const [selectedCat, setSelectedCat] = useState('all');
 
   const handleCatPress = useCallback((id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setSelectedCat(id);
   }, []);
 

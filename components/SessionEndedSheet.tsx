@@ -4,7 +4,7 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -89,22 +89,22 @@ function SessionEndedSheet({
     }, [visible]);
 
     const handleContinue = useCallback(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      haptics.medium();
       onContinue?.();
     }, [onContinue]);
 
     const handleStartOver = useCallback(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      haptics.light();
       onStartOver?.();
     }, [onStartOver]);
 
     const handleEnd = useCallback(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      haptics.light();
       onEnd?.();
     }, [onEnd]);
 
     const handleUnlock = useCallback(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       onUnlock?.();
     }, [onUnlock]);
 

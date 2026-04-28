@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import PickerSheet from './PickerSheet';
 import PillButton from './PillButton';
@@ -29,17 +29,17 @@ const ReviewSheet = forwardRef<BottomSheet, ReviewSheetProps>(({ onRate, onDismi
   }, [sheetRef]);
 
   const handleYes = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.select();
     setPhase('rate');
   }, []);
 
   const handleNo = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.select();
     dismiss();
   }, [dismiss]);
 
   const handleRate = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     onRate();
     dismiss();
   }, [onRate, dismiss]);

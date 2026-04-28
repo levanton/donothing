@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Constants from 'expo-constants';
 
 import { Fonts } from '@/constants/theme';
@@ -32,13 +32,13 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
   const [restoring, setRestoring] = useState(false);
 
   const openUrl = async (url: string) => {
-    Haptics.selectionAsync();
+    haptics.select();
     try { await Linking.openURL(url); } catch {}
   };
 
   const handleRestore = async () => {
     if (restoring) return;
-    Haptics.selectionAsync();
+    haptics.select();
     setRestoring(true);
     try {
       if (onRestorePurchases) {
@@ -63,12 +63,12 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
   };
 
   const handleRate = async () => {
-    Haptics.selectionAsync();
+    haptics.select();
     try { await Linking.openURL(APP_STORE_WRITE_REVIEW); } catch {}
   };
 
   const handleDelete = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.medium();
     Alert.alert(
       'Delete account?',
       "All your sessions, schedules and preferences will be removed. This can't be undone.",

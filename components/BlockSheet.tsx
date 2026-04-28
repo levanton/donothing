@@ -4,7 +4,7 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useCallback, useEffect, useRef } from 'react';
 import {
   Dimensions,
@@ -110,7 +110,7 @@ function BlockSheet({
     }, [visible]);
 
     const handleBegin = useCallback(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      haptics.medium();
       onStart(unlockMin);
     }, [onStart, unlockMin]);
 
@@ -118,14 +118,12 @@ function BlockSheet({
     const holdProgress = useSharedValue(0);
 
     const triggerUnlock = useCallback(() => {
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
+      haptics.success();
       onUnlock();
     }, [onUnlock]);
 
     const handleHoldStart = useCallback(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      haptics.light();
       holdProgress.value = withTiming(
         1,
         { duration: 1500, easing: Easing.linear },
