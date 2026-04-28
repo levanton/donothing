@@ -95,20 +95,19 @@ function SessionEndedSheet({
       onEnd?.();
     }, [onEnd]);
 
-    const hasDuration =
-      interruptedDuration != null && interruptedDuration > 0;
-    const eyebrow = 'session ended';
-    const caption = 'well done';
-    // Sub-text — for paused sessions with a goal still ahead, show
-    // the remaining MM:SS so the user sees how close they are.
-    const remaining =
-      hasDuration && goalSeconds > 0 && interruptedDuration! < goalSeconds
-        ? goalSeconds - interruptedDuration!
-        : null;
-    const sub =
-      remaining != null
-        ? `${timerDisplay(remaining)} still ahead`
-        : 'ready when you are';
+    // The user paused mid-session — they did NOT finish. Copy and
+    // visuals lean into "here's what's still ahead" rather than any
+    // congratulatory framing. The big number is the focal point:
+    // remaining time when there's a goal, elapsed time otherwise.
+    const elapsed = Math.max(0, interruptedDuration ?? 0);
+    const hasGoal = goalSeconds > 0;
+    const remaining = hasGoal ? Math.max(0, goalSeconds - elapsed) : 0;
+    const heroSeconds = hasGoal ? remaining : elapsed;
+    const heroLabel = hasGoal ? 'left to do nothing' : 'so far';
+    const eyebrow = hasGoal ? 'still to go' : 'paused';
+    const progressPct = hasGoal
+      ? Math.min(100, Math.max(0, (elapsed / goalSeconds) * 100))
+      : 0;
 
     return (
       <BottomSheetModal
@@ -147,9 +146,10 @@ function SessionEndedSheet({
             </View>
           </View>
 
-          {/* Hero — scattered dots around either the elapsed time
-              (mono, big) or, when we have nothing to display, the
-              caption alone. Same starscape vocabulary as BlockSheet. */}
+          {/* Hero — big mono number with a soft caption underneath.
+              Goal mode: shows time remaining; free mode: shows what
+              they've done so far. Same scattered-dot starscape as
+              BlockSheet for visual continuity. */}
           <View style={styles.starscape}>
             <View
               style={[
@@ -200,55 +200,57 @@ function SessionEndedSheet({
               ]}
             />
 
-            {hasDuration ? (
-              <Text
-                style={[
-                  styles.bigNumber,
-                  { color: theme.text, fontFamily: Fonts!.mono },
-                ]}
-              >
-                {timerDisplay(interruptedDuration!)}
-              </Text>
-            ) : (
-              <View style={styles.heroSpacer} />
-            )}
-
+            <Text
+              style={[
+                styles.bigNumber,
+                { color: theme.text, fontFamily: Fonts!.mono },
+              ]}
+            >
+              {timerDisplay(heroSeconds)}
+            </Text>
             <Text
               style={[
                 styles.heroCaption,
-                { color: theme.text, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {caption}
-            </Text>
-            <Text
-              style={[
-                styles.heroSub,
                 { color: theme.textTertiary, fontFamily: Fonts!.serif },
               ]}
             >
-              {sub}
+              {heroLabel}
             </Text>
           </View>
 
-          <View
-            style={[styles.heroSubRule, { backgroundColor: theme.border }]}
-          />
+          {/* Progress visual — sand track with terracotta fill marks
+              how far the user got. Done/goal labels under the bar
+              anchor the bar in real numbers without forcing a second
+              MM:SS line elsewhere. Hidden in free mode where there's
+              no goal to track against. */}
+          {hasGoal && (
+            <View style={styles.progressWrap}>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${progressPct}%` }]}
+                />
+              </View>
+              <View style={styles.progressLabels}>
+                <Text
+                  style={[
+                    styles.progressLabelText,
+                    { color: TERRACOTTA, fontFamily: Fonts!.mono },
+                  ]}
+                >
+                  {timerDisplay(elapsed)}
+                </Text>
+                <Text
+                  style={[
+                    styles.progressLabelText,
+                    { color: theme.textTertiary, fontFamily: Fonts!.mono },
+                  ]}
+                >
+                  {timerDisplay(goalSeconds)}
+                </Text>
+              </View>
+            </View>
+          )}
 
-          {/* Manual pause action set — continue (primary), start over
-              and back home (chip pair). */}
-          {goalSeconds > 0 &&
-            interruptedDuration != null &&
-            interruptedDuration < goalSeconds && (
-              <Text
-                style={[
-                  styles.motivation,
-                  { color: theme.text, fontFamily: Fonts!.serif },
-                ]}
-              >
-                {timerDisplay(goalSeconds - interruptedDuration)} still ahead
-              </Text>
-            )}
           <Pressable
             onPress={handleContinue}
             style={({ pressed }) => [
@@ -347,29 +349,41 @@ const styles = StyleSheet.create({
     lineHeight: 90,
     includeFontPadding: false,
   },
-  // When the duration is unknown, keep the starscape visually anchored
-  // by reserving roughly the height a number would have taken.
-  heroSpacer: {
-    height: 28,
-  },
   heroCaption: {
-    fontSize: 18,
-    fontWeight: '500',
-    letterSpacing: 0.4,
-    marginTop: 16,
-  },
-  heroSub: {
     fontSize: 13,
     fontWeight: '400',
-    letterSpacing: 0.3,
-    marginTop: 4,
+    letterSpacing: 0.4,
+    marginTop: 8,
   },
-  heroSubRule: {
-    width: 28,
-    height: 1.5,
-    borderRadius: 1,
-    alignSelf: 'center',
-    marginVertical: 18,
+  // Sand track + terracotta fill — the visual answer to "how far did
+  // I get". Done/goal labels under the bar give the exact numbers
+  // without forcing a separate MM:SS line elsewhere on the sheet.
+  progressWrap: {
+    alignSelf: 'stretch',
+    paddingHorizontal: 8,
+    marginTop: 28,
+    marginBottom: 24,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 100,
+    backgroundColor: CHIP_LIGHT,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 100,
+    backgroundColor: TERRACOTTA,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  progressLabelText: {
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.6,
   },
   primaryBtn: {
     alignSelf: 'stretch',
@@ -389,15 +403,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '600',
     letterSpacing: 0.6,
-  },
-  // Quiet motivational line tying the remaining countdown to the
-  // continue action right below it.
-  motivation: {
-    fontSize: 14,
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    opacity: 0.72,
-    marginBottom: 12,
   },
   // Secondary actions in the manual flow — twin warm-sand chips
   // side-by-side. Same vocabulary as BlockSheet's benefit chips so
