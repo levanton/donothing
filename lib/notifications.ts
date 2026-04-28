@@ -6,14 +6,35 @@ import {
   clearNotificationIds,
 } from './db/notification-state';
 
-export function configureNotifications() {
+interface NotificationConfig {
+  /** True when a session is running or paused. While this is true,
+      scheduled-block notifications are kept silent (no banner, no sound)
+      so they don't pop on top of the running/paused UI. They still go
+      to Notification Center via `shouldShowList: true` so the user can
+      check them later. */
+  isSessionActive: () => boolean;
+}
+
+export function configureNotifications(opts: NotificationConfig) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const data = notification.request.content.data;
+      const isBlockNotif = data?.type === 'scheduledBlock';
+      if (isBlockNotif && opts.isSessionActive()) {
+        return {
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+          shouldShowBanner: false,
+          shouldShowList: true,
+        };
+      }
+      return {
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      };
+    },
   });
 }
 

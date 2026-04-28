@@ -38,6 +38,17 @@ export function useAppLifecycle(
   useEffect(() => {
     const handleScheduledBlock = async (data: Record<string, unknown>) => {
       if (!(data?.type === 'scheduledBlock' && data?.durationMinutes)) return;
+      // Don't intrude on an active or paused session — the user is
+      // already doing nothing (which is the block's whole point) or
+      // mid-decision on the pause sheet. The native shield is up
+      // either way, so apps stay locked in the background; we just
+      // skip the BlockSheet UI here. After the session ends the
+      // started→false useEffect in app/index.tsx polls the shield
+      // and surfaces the sheet.
+      const state = useAppStore.getState();
+      if (state.started || state.paused) {
+        return;
+      }
       // Block can only act if Screen Time access is approved AND notifications
       // are granted. If either was revoked after the block was scheduled,
       // skip silently — the gated Settings UI will surface the missing perm.
@@ -82,6 +93,10 @@ export function useAppLifecycle(
       // init() finishes loading scheduledBlocks. Skip until the store is
       // ready — init() itself calls showUnlock() if a block is active.
       if (!state.ready) return;
+      // Same rule as the notification listener — don't intrude on an
+      // active or paused session. Shield stays up natively; the UI
+      // surfaces after the session ends.
+      if (state.started || state.paused) return;
       if (state.focusStep !== 'hidden') return;
       if (!isBlockActive()) return;
       activateKeepAwakeAsync('scheduled-block');

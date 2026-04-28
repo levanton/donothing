@@ -285,7 +285,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('[store.init] cleanupInvalidSessions failed:', e);
     }
-    configureNotifications();
+    configureNotifications({
+      // Mute scheduled-block banners while a session is running or paused
+      // — the native shield still works in the background, but we don't
+      // want a banner sliding in over the timer / pause sheet.
+      isSessionActive: () => {
+        const s = get();
+        return s.started || s.paused;
+      },
+    });
     // Copy shield icon to app group (fire and forget — cosmetic; missing
     // icon falls back to system shield).
     import('./screen-time')

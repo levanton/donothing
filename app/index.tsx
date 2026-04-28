@@ -498,6 +498,25 @@ export default function DoNothingScreen() {
   // app/index.tsx stays focused on the home-screen UI. See useAppLifecycle.
   useAppLifecycle(pollBlockUnlock);
 
+  // When a session ends (started: true → false), check the native shield.
+  // The lifecycle listeners suppress BlockSheet during sessions to avoid
+  // popping over the running UI / pause sheet, so this is the moment we
+  // need to surface it if a scheduled block fired in the meantime and
+  // the shield is still up. pollBlockUnlock has its own retries to
+  // catch any state settle delay.
+  const startedRef = useRef(started);
+  useEffect(() => {
+    const wasStarted = startedRef.current;
+    startedRef.current = started;
+    if (wasStarted && !started) {
+      const cancelledRef = { current: false };
+      pollBlockUnlock(cancelledRef);
+      return () => {
+        cancelledRef.current = true;
+      };
+    }
+  }, [started, pollBlockUnlock]);
+
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
     haptics.light();
