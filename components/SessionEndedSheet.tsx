@@ -19,7 +19,7 @@ import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
-const PAUSE_SIZE = Math.min(Math.round(SCREEN_W * 0.42), 180);
+const PAUSE_SIZE = Math.min(Math.round(SCREEN_W * 0.75), 360);
 const pauseImage = require('@/assets/images/pause.png');
 
 interface Props {
