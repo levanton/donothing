@@ -5,7 +5,7 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { haptics } from '@/lib/haptics';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   Dimensions,
   Image,
@@ -28,6 +28,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
+import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
+import EyebrowChip from '@/components/EyebrowChip';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -99,15 +101,7 @@ function BlockSheet({
 }: Props) {
     const insets = useSafeAreaInsets();
     const internalRef = useRef<BottomSheetModal>(null);
-
-    // Drive present()/dismiss() from the visible prop. BottomSheetModal
-    // queues the request internally if layout isn't ready yet, so a
-    // first-paint cold start shows the sheet reliably without a
-    // requestAnimationFrame song-and-dance.
-    useEffect(() => {
-      if (visible) internalRef.current?.present();
-      else internalRef.current?.dismiss();
-    }, [visible]);
+    useBottomSheetModalVisibility(internalRef, visible);
 
     const handleBegin = useCallback(() => {
       haptics.medium();
@@ -170,16 +164,7 @@ function BlockSheet({
         >
           {/* Eyebrow */}
           <View style={styles.eyebrowRow}>
-            <View style={[styles.eyebrowPill, { backgroundColor: CHIP_LIGHT }]}>
-              <Text
-                style={[
-                  styles.eyebrowText,
-                  { color: BROWN, fontFamily: Fonts!.serif },
-                ]}
-              >
-                your apps are locked
-              </Text>
-            </View>
+            <EyebrowChip text="your apps are locked" />
           </View>
 
           {/* Starscape hero — scattered dots around the number, poetic */}
@@ -377,9 +362,9 @@ const CREAM = palette.cream;
 const BROWN = palette.brown;
 const TERRACOTTA = palette.terracotta;
 // Warm-earth ladder tied to the app palette — sand → salmon → espresso.
-const CHIP_LIGHT = '#EBDAB2'; // warm sand (REST)
-const CHIP_MID = palette.salmon; // dusty salmon (CALM)
-const CHIP_DEEP = '#3F2C22'; // deep espresso (FOCUS)
+const CHIP_LIGHT = palette.sand;
+const CHIP_MID = palette.salmon;
+const CHIP_DEEP = palette.deepBrown;
 
 const styles = StyleSheet.create({
   backdropImageWrap: {
@@ -402,17 +387,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 8,
-  },
-  eyebrowPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-  },
-  eyebrowText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
   },
   starscape: {
     alignSelf: 'stretch',

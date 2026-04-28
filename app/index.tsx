@@ -43,6 +43,7 @@ import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat } from '@/lib/format';
 import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
+import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
@@ -125,18 +126,8 @@ export default function DoNothingScreen() {
   // travels + scales between them, driven by historySlide.
   type Rect = { x: number; y: number; w: number; h: number };
   const journeyBtnRef = useRef<View>(null);
-  const [btnRect, setBtnRect] = useState<Rect | null>(null);
+  const { rect: btnRect, measure: measureJourneyBtn } = useMeasureRect(journeyBtnRef);
   const [headingRect, setHeadingRect] = useState<Rect | null>(null);
-
-  const measureJourneyBtn = useCallback(() => {
-    // Home container has translateY = 0 whenever the pill is visible (slide = 0),
-    // so measureInWindow gives us the at-rest screen coords directly.
-    requestAnimationFrame(() => {
-      journeyBtnRef.current?.measureInWindow((x, y, w, h) => {
-        if (w > 0 && h > 0) setBtnRect({ x, y, w, h });
-      });
-    });
-  }, []);
 
   const handleHeadingLayout = useCallback((rect: Rect) => {
     setHeadingRect(rect);
@@ -573,14 +564,7 @@ export default function DoNothingScreen() {
   // so the splash literally becomes the button with no visible handoff.
   const [splashDone, setSplashDone] = useState(false);
   const yesButtonRef = useRef<View>(null);
-  const [yesBtnRect, setYesBtnRect] = useState<Rect | null>(null);
-  const measureYesButton = useCallback(() => {
-    requestAnimationFrame(() => {
-      yesButtonRef.current?.measureInWindow((x, y, w, h) => {
-        if (w > 0 && h > 0) setYesBtnRect({ x, y, w, h });
-      });
-    });
-  }, []);
+  const { rect: yesBtnRect, measure: measureYesButton } = useMeasureRect(yesButtonRef);
 
   const { width: SCREEN_W_INIT, height: SCREEN_H_INIT } = Dimensions.get('window');
   const YES_SIZE = 140;

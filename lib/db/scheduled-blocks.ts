@@ -35,14 +35,6 @@ export function getAllScheduledBlocks(): ScheduledBlock[] {
   return rows.map(rowToBlock);
 }
 
-export function getEnabledScheduledBlocks(): ScheduledBlock[] {
-  const db = getDb();
-  const rows = db.getAllSync<BlockRow>(
-    `SELECT ${SELECT_COLS} FROM scheduled_blocks WHERE enabled = 1 ORDER BY hour, minute`,
-  );
-  return rows.map(rowToBlock);
-}
-
 export function getScheduledBlockById(id: string): ScheduledBlock | null {
   const db = getDb();
   const row = db.getFirstSync<BlockRow>(

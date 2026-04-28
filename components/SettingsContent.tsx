@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import type BottomSheet from '@gorhom/bottom-sheet';
@@ -13,7 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
 import { usePermissionBanners } from '@/hooks/usePermissionBanners';
-import { requestAuth } from '@/lib/screen-time';
+import { requestAuth, NEVER_BLOCK_SELECTION_ID } from '@/lib/screen-time';
 import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
@@ -28,8 +28,6 @@ interface PendingBlockParams {
   unlockGoalMinutes: number;
   conflictTime?: string | null;
 }
-
-const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
 
 function countFromMeta(meta: {
   applicationCount?: number;
@@ -51,7 +49,6 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const theme = themes[themeMode];
   const isDark = themeMode === 'dark';
 
-  const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [showNeverBlockPicker, setShowNeverBlockPicker] = useState(false);
 
@@ -332,7 +329,6 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         onPress={() => {
           haptics.light();
           setEditingBlock(null);
-          setShowBlockPicker(true);
           blockSheetRef.current?.expand();
         }}
       />
@@ -415,7 +411,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
     <PickerSheet
       ref={blockSheetRef}
       theme={theme}
-      onDismiss={() => { setShowBlockPicker(false); setEditingBlock(null); }}
+      onDismiss={() => { setEditingBlock(null); }}
     >
       <BlockPickerContent
         key={editingBlock?.id ?? 'new'}

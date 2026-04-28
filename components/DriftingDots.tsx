@@ -9,6 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { palette } from '@/lib/theme';
+
 // Tiny epsilon — t.value below this is treated as "never started"
 // (the cycle hadn't crossed the initial-stagger gate yet), so we
 // re-apply the stagger delay rather than resuming from "0".
@@ -29,9 +31,9 @@ const DRIFT_HEIGHT = BAND_BOTTOM + 40;
 
 // Three warm earth-tones that read against terracotta without
 // fighting the cream timer for attention.
-const COLOR_CREAM = '#F9F2E0';
-const COLOR_SAND = '#EBDAB2';
-const COLOR_SALMON = '#E8A99A';
+const COLOR_CREAM = palette.cream;
+const COLOR_SAND = palette.sand;
+const COLOR_SALMON = palette.salmon;
 
 interface DotConfig {
   startX: number;       // px from screen centre

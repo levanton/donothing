@@ -116,7 +116,7 @@ export const MILESTONES: MilestoneDef[] = [
 ];
 
 /** Gather current stats from the database */
-export function getMilestoneStats(): MilestoneStats {
+function getMilestoneStats(): MilestoneStats {
   return {
     totalSessions: getSessionCount(),
     totalDuration: getTotalDuration(),

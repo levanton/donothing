@@ -11,6 +11,11 @@ export const palette = {
   salmon:     '#E8A99A',
   umber:      '#5C4033',
   danger:     '#D94040',
+  // Warm earth accents — used by sheets, benefit cards, drifting dots
+  sand:       '#EBDAB2',
+  deepBrown:  '#3F2C22',
+  warmCream:  '#F0E0BD',
+  auburn:     '#7E3A24',
 } as const;
 
 export const CARD_BORDER_WIDTH = 1.5;

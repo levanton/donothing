@@ -135,29 +135,6 @@ export function getDistinctDatesDesc(limit: number): string[] {
   return rows.map(r => r.date_key);
 }
 
-export function getDailyDurations(days: number): Map<string, number> {
-  const db = getDb();
-  const now = new Date();
-  const startDate = new Date(now);
-  startDate.setDate(startDate.getDate() - days);
-  const startMs = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
-
-  const rows = db.getAllSync<{ date_key: string; total: number }>(
-    `SELECT
-      strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', 'localtime') as date_key,
-      SUM(duration) as total
-    FROM sessions
-    WHERE timestamp >= ?
-    GROUP BY date_key
-    ORDER BY date_key DESC`,
-    startMs,
-  );
-  const map = new Map<string, number>();
-  for (const r of rows) {
-    map.set(r.date_key, r.total);
-  }
-  return map;
-}
 
 export function getMonthDurations(year: number, month: number): Map<string, number> {
   const startMs = new Date(year, month - 1, 1).getTime();
@@ -198,14 +175,3 @@ export function getTotalDuration(): number {
   return row?.total ?? 0;
 }
 
-export function getBestDayDuration(): number {
-  const db = getDb();
-  const row = db.getFirstSync<{ best: number }>(
-    `SELECT COALESCE(MAX(total), 0) as best FROM (
-      SELECT SUM(duration) as total
-      FROM sessions
-      GROUP BY strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', 'localtime')
-    )`,
-  );
-  return row?.best ?? 0;
-}

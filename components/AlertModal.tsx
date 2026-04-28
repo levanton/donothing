@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import {
   BottomSheetBackdrop,
@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 import PillButton from '@/components/PillButton';
+import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 
 type IconName = 'clock' | 'alert-triangle' | 'info';
 
@@ -40,10 +41,7 @@ export default function AlertModal({
     return Math.max(40, Math.round(height * 0.14));
   }, []);
 
-  useEffect(() => {
-    if (visible) sheetRef.current?.present();
-    else sheetRef.current?.dismiss();
-  }, [visible]);
+  useBottomSheetModalVisibility(sheetRef, visible);
 
   const renderBackdrop = (props: any) => (
     <BottomSheetBackdrop

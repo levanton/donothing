@@ -993,12 +993,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     opacity: 0.85,
   },
-  farewellSun: {
-    width: GRASS_SIZE * 1.1,
-    height: GRASS_SIZE * 1.1 * (450 / 780),
-    resizeMode: 'contain',
-    marginBottom: 22,
-  },
   // Same footprint as the moving main sun (no 1.1x scale) so when the
   // shared sun glides in, it covers the anchor exactly. Margin matches
   // the original farewell layout's sun→eyebrow gap.

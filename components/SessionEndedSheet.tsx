@@ -19,6 +19,8 @@ import { Fonts } from '@/constants/theme';
 import { EASE_OUT } from '@/constants/animations';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
+import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
+import EyebrowChip from '@/components/EyebrowChip';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -113,10 +115,7 @@ function SessionEndedSheet({
     // wrestling with the running camera, and `dismiss()` always
     // closes cleanly (controlled `index={-1}` is broken in gorhom v5,
     // since handleSnapToIndex(-1) reads detents[-1] = undefined).
-    useEffect(() => {
-      if (visible) internalRef.current?.present();
-      else internalRef.current?.dismiss();
-    }, [visible]);
+    useBottomSheetModalVisibility(internalRef, visible);
 
     const handleContinue = useCallback(() => {
       haptics.medium();
@@ -191,16 +190,7 @@ function SessionEndedSheet({
           {/* Eyebrow pill — uppercase serif on warm sand chip,
               matching BlockSheet's eyebrow. */}
           <View style={styles.eyebrowRow}>
-            <View style={[styles.eyebrowPill, { backgroundColor: CHIP_LIGHT }]}>
-              <Text
-                style={[
-                  styles.eyebrowText,
-                  { color: BROWN, fontFamily: Fonts!.serif },
-                ]}
-              >
-                {eyebrow}
-              </Text>
-            </View>
+            <EyebrowChip text={eyebrow} />
           </View>
 
           {/* Hero — big mono number with a soft caption underneath.
@@ -385,7 +375,7 @@ export default SessionEndedSheet;
 const CREAM = palette.cream;
 const BROWN = palette.brown;
 const TERRACOTTA = palette.terracotta;
-const CHIP_LIGHT = '#EBDAB2';
+const CHIP_LIGHT = palette.sand;
 
 const styles = StyleSheet.create({
   // Fixed position relative to the screen so the icon doesn't slide
@@ -414,17 +404,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 8,
-  },
-  eyebrowPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-  },
-  eyebrowText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
   },
   starscape: {
     alignSelf: 'stretch',

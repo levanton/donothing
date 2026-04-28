@@ -21,10 +21,10 @@ export const BENEFIT_CARD_GAP = 12;
 // 6-tone warm-earth palette — refined Mediterranean ceramic feel.
 // Order alternates light and dark so neighbouring cards contrast.
 const VARIANTS: Array<{ bg: string; fg: string }> = [
-  { bg: '#F0E0BD', fg: palette.brown }, // 0: warm cream (light)
+  { bg: palette.warmCream, fg: palette.brown }, // 0: warm cream (light)
   { bg: '#5C2F2F', fg: palette.cream }, // 1: deep wine (dark)
   { bg: '#C5A572', fg: palette.brown }, // 2: antique gold (light pop)
-  { bg: '#7E3A24', fg: palette.cream }, // 3: rich auburn (mid)
+  { bg: palette.auburn, fg: palette.cream }, // 3: rich auburn (mid)
   { bg: '#E8B89A', fg: palette.brown }, // 4: peach blush (light)
   { bg: '#3D2516', fg: palette.cream }, // 5: dark cocoa (darkest)
 ];

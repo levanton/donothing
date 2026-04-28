@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   // and lifts `drag` off the cream wash without obscuring the rings
   // on either side. Solid warm-sand keeps brown text readable.
   hintTextPill: {
-    backgroundColor: '#EBDAB2',
+    backgroundColor: palette.sand,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 100,
