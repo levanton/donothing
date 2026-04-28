@@ -646,18 +646,20 @@ function SessionCompleteScreen({
               </Animated.View>
 
               <Animated.View style={[styles.titleBlock, titleStyle]}>
-                <Text style={[styles.titleNumeral, { color: textColor }]}>
-                  {duration.value}
-                </Text>
-                <Animated.Text
-                  style={[
-                    styles.titleUnit,
-                    { color: textColor, fontFamily: Fonts.serif },
-                    titleUnitStyle,
-                  ]}
-                >
-                  {duration.unit}
-                </Animated.Text>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.titleNumeral, { color: textColor }]}>
+                    {duration.value}
+                  </Text>
+                  <Animated.Text
+                    style={[
+                      styles.titleUnit,
+                      { color: textColor, fontFamily: Fonts.serif },
+                      titleUnitStyle,
+                    ]}
+                  >
+                    {duration.unit}
+                  </Animated.Text>
+                </View>
                 <Animated.Text
                   style={[
                     styles.titleSub,
@@ -911,21 +913,27 @@ const styles = StyleSheet.create({
   titleBlock: {
     alignItems: 'center',
   },
+  // numeral + unit on one baseline-aligned row so reads "50 min" not
+  // "50" stacked above "min". Gap gives the unit some breathing room
+  // from the giant numeral without forcing margin onto either child.
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 10,
+  },
   titleNumeral: {
     fontSize: 100,
     fontFamily: Fonts.mono,
     fontVariant: ['tabular-nums'],
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 1,
-    textAlign: 'center',
     lineHeight: 104,
   },
   titleUnit: {
     fontSize: 26,
     fontWeight: '400',
     letterSpacing: 0.4,
-    textAlign: 'center',
-    marginTop: -10,
   },
   subtitleNumeral: {
     fontFamily: Fonts.mono,
