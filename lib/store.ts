@@ -69,6 +69,11 @@ export interface AppState {
   // cleared but `started` stays true so the camera keeps the
   // running visual state behind the sheet.
   paused: boolean;
+  // 'block' when the session came from a scheduled-block unlock flow
+  // (apps locked until the timer completes); 'normal' otherwise.
+  // Drives the pause sheet's third action — "back home" vs
+  // "unlock now" — so the user always has the right out.
+  sessionOrigin: 'normal' | 'block';
   weekStats: WeekDay[];
   ready: boolean;
 
@@ -137,7 +142,7 @@ export interface AppState {
 
   // Actions
   init: () => Promise<void>;
-  startSession: () => void;
+  startSession: (opts?: { fromBlock?: boolean }) => void;
   stopSession: () => Promise<void>;
   // Manual interrupt — pause the timer without saving so the user
   // can decide (continue, start over, or end).
@@ -185,6 +190,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   elapsed: 0,
   started: false,
   paused: false,
+  sessionOrigin: 'normal',
   weekStats: [],
   ready: false,
   themeMode: 'dark',
@@ -237,6 +243,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
     const scheduledBlocks = getAllScheduledBlocks();
 
+    // Capture native shield state BEFORE we touch any monitors. The
+    // reconcile/reschedule loop below stops and re-registers monitors;
+    // when a monitor is currently inside its active window, `scheduleBlock`
+    // skips re-registration (to avoid double-firing intervalDidStart),
+    // which can leave the native side without an active monitor and let
+    // `enableBlockAllMode` flip off — the shield then visually drops on
+    // the next reconcile pass even though the user never unlocked.
+    // We mirror the pre-reconcile shield state into focusStep here so
+    // the BlockSheet shows on cold start regardless of what happens to
+    // the native shield during reconciliation.
+    let wasShieldActive = false;
+    try {
+      const { isBlockActive } = await import('./screen-time');
+      wasShieldActive = isBlockActive();
+    } catch {}
+
     // Reconcile native monitors with DB state, then re-register what's valid.
     try {
       const { reconcileBlocks, scheduleBlock, unscheduleBlock } = await import('./screen-time');
@@ -277,15 +299,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       weekStats: getWeekStats(),
       sessionEndedVisible: false,
       cancelReason: null,
+      // If the shield was already up when we cold-started, surface the
+      // BlockSheet immediately — even if reconcile happened to drop the
+      // native shield as a side effect, the user's intent (apps blocked,
+      // need to unlock) is unchanged.
+      focusStep: wasShieldActive ? 'done' : 'hidden',
       ready: true,
     });
   },
 
   // --- Timer ---
-  startSession: () => {
+  startSession: (opts) => {
     sessionStartTime = Date.now();
     const goalSeconds = get().goalSeconds;
-    set({ started: true, elapsed: 0 });
+    set({
+      started: true,
+      elapsed: 0,
+      sessionOrigin: opts?.fromBlock ? 'block' : 'normal',
+    });
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
@@ -328,6 +359,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       started: false,
       paused: false,
+      sessionOrigin: 'normal',
       weekStats: getWeekStats(),
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
@@ -625,6 +657,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       started: false,
       paused: false,
+      sessionOrigin: 'normal',
       elapsed: 0,
       sessionEndedVisible: false,
       cancelReason: null,

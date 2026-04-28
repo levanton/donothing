@@ -112,11 +112,12 @@ export default function DoNothingScreen() {
   const isSubscribed = useAppStore((s) => s.isSubscribed);
 
   const accountSheetRef = useRef<BottomSheet>(null);
-  const blockSheetRef = useRef<BottomSheet>(null);
-  // SessionEndedSheet is now driven by a `visible` prop instead of a
-  // forwarded ref — the previous useImperativeHandle pattern captured
-  // a stale ref snapshot at mount and silently no-op'd expand() in
-  // some flows. Cleaner and more reliable this way.
+  // BlockSheet and SessionEndedSheet are now driven by a `visible` prop
+  // — the previous imperative ref + expand()/close() pattern raced with
+  // gorhom's first-paint layout (and `index={-1}` doesn't actually
+  // close in v5 because handleSnapToIndex(-1) reads detents[-1]).
+  // Both sheets render via BottomSheetModal which handles open/close
+  // through the modal portal.
   const handleOpenAccount = useCallback(() => {
     accountSheetRef.current?.expand();
   }, []);
@@ -156,6 +157,11 @@ export default function DoNothingScreen() {
   // freezes (timer + dots) and the SessionEndedSheet takes over with
   // the continue / start over / back home actions.
   const paused = useAppStore((s) => s.paused);
+  // 'block' when the running session is part of a scheduled-block
+  // unlock flow — switches the pause sheet's third action from
+  // "back home" (no-op for blocked apps) to "unlock now" so the
+  // user always has a usable out.
+  const sessionOrigin = useAppStore((s) => s.sessionOrigin);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
 
   // Block-waiting state: a scheduled block fired and apps are locked until the
@@ -284,14 +290,7 @@ export default function DoNothingScreen() {
     s.setGoalFromSlider(mins);
   }, []);
 
-  // Drive the block-state bottom sheet from focusStep === 'done'.
-  useEffect(() => {
-    if (blockWaiting) {
-      blockSheetRef.current?.expand();
-    } else {
-      blockSheetRef.current?.close();
-    }
-  }, [blockWaiting]);
+  // BlockSheet visibility is now a prop — no imperative ref needed.
 
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
@@ -468,18 +467,52 @@ export default function DoNothingScreen() {
     state.showUnlock();
   }, [started]);
 
+  // Whether to surface the BlockSheet on the home screen — true when
+  // a scheduled block has fired and the user hasn't unlocked yet.
+  // Wrapped in a ref-friendly poll because the native shield state
+  // sync isn't always immediate on cold start / foreground transition.
+  const checkAndShowBlockUnlock = useCallback(() => {
+    const state = useAppStore.getState();
+    if (state.started) return true;
+    if (state.focusStep !== 'hidden') return true;
+    if (!state.ready) return false;
+    if (!isBlockActive()) return false;
+    activateKeepAwakeAsync('scheduled-block');
+    state.showUnlock();
+    return true;
+  }, []);
+
+  // Polls the native shield state up to three times (now, +300ms,
+  // +900ms). Native is occasionally slow to surface the shield on
+  // a brand-new JS bridge — retrying covers cold start AND backgrounded
+  // foreground transitions where the bridge is fresh. Bails the moment
+  // either a block surfaces or the gate (started / focusStep) flips.
+  const pollBlockUnlock = useCallback(
+    (cancelledRef: { current: boolean }) => {
+      const tick = () => {
+        if (cancelledRef.current) return true;
+        return checkAndShowBlockUnlock();
+      };
+      if (tick()) return;
+      setTimeout(() => {
+        if (tick()) return;
+        setTimeout(tick, 600);
+      }, 300);
+    },
+    [checkAndShowBlockUnlock],
+  );
+
   // --- Init ---
   useEffect(() => {
+    const cancelledRef = { current: false };
     useAppStore
       .getState()
       .init()
-      .then(() => {
-        // Check if a block is currently active (app was closed during block)
-        if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
-          useAppStore.getState().showUnlock();
-        }
-      });
-  }, []);
+      .then(() => pollBlockUnlock(cancelledRef));
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [pollBlockUnlock]);
 
   // --- Notification listener for scheduled blocks ---
   useEffect(() => {
@@ -548,6 +581,7 @@ export default function DoNothingScreen() {
 
   // --- AppState ---
   useEffect(() => {
+    const cancelledRef = { current: false };
     const sub = AppState.addEventListener('change', async (nextState) => {
       // Only 'background' ends a session flow. 'inactive' covers Control
       // Center / notification drawer / incoming-call preview — those don't
@@ -559,14 +593,17 @@ export default function DoNothingScreen() {
       } else if (nextState === 'active' && !isActiveRef.current) {
         isActiveRef.current = true;
         useAppStore.getState().handleForeground();
-        // Check if block is active when returning to foreground
-        if (isBlockActive() && useAppStore.getState().focusStep === 'hidden') {
-          useAppStore.getState().showUnlock();
-        }
+        // Same retry poll as init — every foreground transition gets
+        // the same defensive check, so a backgrounded app coming
+        // back during an active block still surfaces the BlockSheet.
+        pollBlockUnlock(cancelledRef);
       }
     });
-    return () => sub.remove();
-  }, []);
+    return () => {
+      cancelledRef.current = true;
+      sub.remove();
+    };
+  }, [pollBlockUnlock]);
 
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
@@ -611,7 +648,9 @@ export default function DoNothingScreen() {
         focusStep: 'hidden',
         goalSeconds: minutes * 60,
       });
-      useAppStore.getState().startSession();
+      // fromBlock: true so the pause sheet swaps "back home" for
+      // "unlock now" — the only out for a user mid-block session.
+      useAppStore.getState().startSession({ fromBlock: true });
     },
     [hideOpacity, hideWidth, showOpacity, showWidth],
   );
@@ -846,6 +885,23 @@ export default function DoNothingScreen() {
 
   const handleSheetEnd = useCallback(async () => {
     deactivateKeepAwake('session');
+    setDistractionFree(false);
+    await useAppStore.getState().stopSession();
+    useAppStore.getState().dismissSessionEnded();
+    runResetAnimations();
+  }, [runResetAnimations]);
+
+  // Block-flow only — replaces "back home" when the session is part
+  // of a scheduled block. Unblocks Screen Time, ends the session
+  // (saves what they did), then drops the user back on the home
+  // screen. Without this, "back home" would land on a still-blocked
+  // device with no way to recover until the next unlock cycle.
+  const handleSheetUnlock = useCallback(async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    deactivateKeepAwake('session');
+    deactivateKeepAwake('focus');
+    deactivateKeepAwake('scheduled-block');
+    forceUnblockAll().catch(() => {});
     setDistractionFree(false);
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();
@@ -1510,7 +1566,7 @@ export default function DoNothingScreen() {
 
       {/* Block-state sheet — appears when a scheduled block has fired */}
       <BlockSheet
-        ref={blockSheetRef}
+        visible={blockWaiting}
         theme={theme}
         unlockMin={unlockMin}
         onStart={handleStartBlockSession}
@@ -1528,9 +1584,11 @@ export default function DoNothingScreen() {
         interruptedDuration={interruptedDuration}
         goalSeconds={goalSeconds}
         cancelReason={cancelReason}
+        sessionOrigin={sessionOrigin}
         onContinue={handleSheetContinue}
         onStartOver={handleSheetStartOver}
         onEnd={handleSheetEnd}
+        onUnlock={handleSheetUnlock}
       />
 
       {/* Floating Journey label — the one shared element that morphs between the

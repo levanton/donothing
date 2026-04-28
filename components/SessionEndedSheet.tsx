@@ -32,12 +32,18 @@ interface Props {
       (continue / start over / end); 'backgrounded' or null = single
       "back home" acknowledgement. */
   cancelReason: 'backgrounded' | 'manual' | null;
+  /** 'block' when the running session was triggered by a scheduled
+      block (apps still locked behind Screen Time); 'normal' for any
+      user-started session. Drives the third action's label. */
+  sessionOrigin?: 'normal' | 'block';
   /** Resume the paused session. */
   onContinue?: () => void;
   /** Save what's elapsed so far + reset to 0 and keep running. */
   onStartOver?: () => void;
   /** Save the paused session and exit to home. */
   onEnd?: () => void;
+  /** Block-flow only — unblock Screen Time + end the session. */
+  onUnlock?: () => void;
   onClose?: () => void;
 }
 
@@ -63,9 +69,11 @@ function SessionEndedSheet({
   interruptedDuration,
   goalSeconds,
   cancelReason,
+  sessionOrigin = 'normal',
   onContinue,
   onStartOver,
   onEnd,
+  onUnlock,
   onClose,
 }: Props) {
     const insets = useSafeAreaInsets();
@@ -94,6 +102,13 @@ function SessionEndedSheet({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       onEnd?.();
     }, [onEnd]);
+
+    const handleUnlock = useCallback(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onUnlock?.();
+    }, [onUnlock]);
+
+    const isBlockSession = sessionOrigin === 'block';
 
     // The user paused mid-session — they did NOT finish. Copy and
     // visuals lean into "here's what's still ahead" rather than any
@@ -285,18 +300,22 @@ function SessionEndedSheet({
               </Text>
             </Pressable>
             <Pressable
-              onPress={handleEnd}
+              onPress={isBlockSession ? handleUnlock : handleEnd}
               style={({ pressed }) => [
                 styles.secondaryChip,
                 pressed && styles.secondaryChipPressed,
               ]}
               hitSlop={8}
             >
-              <Feather name="home" size={14} color={BROWN} />
+              <Feather
+                name={isBlockSession ? 'unlock' : 'home'}
+                size={14}
+                color={BROWN}
+              />
               <Text
                 style={[styles.secondaryText, { fontFamily: Fonts!.serif }]}
               >
-                back home
+                {isBlockSession ? 'unlock now' : 'back home'}
               </Text>
             </Pressable>
           </View>

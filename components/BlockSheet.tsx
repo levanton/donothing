@@ -1,15 +1,11 @@
 import { Feather } from '@expo/vector-icons';
-import BottomSheet, {
+import {
   type BottomSheetBackdropProps,
+  BottomSheetModal,
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useRef,
-} from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   Dimensions,
   Image,
@@ -40,6 +36,12 @@ const MOUNTAIN_SIZE = Math.min(Math.round(SCREEN_W * 0.62), 280);
 const mountainImage = require('@/assets/images/mountain.png');
 
 interface Props {
+  /** Whether the sheet should be open. Drives present()/dismiss()
+      on the internal BottomSheetModal ref — the controlled-index
+      path of the plain BottomSheet was unreliable on first paint
+      (gorhom v5's handleSnapToIndex(-1) looks up detents[-1] which
+      is undefined), so we use the modal's portal-backed methods. */
+  visible: boolean;
   theme: AppTheme;
   unlockMin: number;
   onStart: (minutes: number) => void;
@@ -87,11 +89,25 @@ function TerracottaBackdrop({
   );
 }
 
-const BlockSheet = forwardRef<BottomSheet, Props>(
-  ({ theme, unlockMin, onStart, onUnlock, onClose }, ref) => {
+function BlockSheet({
+  visible,
+  theme,
+  unlockMin,
+  onStart,
+  onUnlock,
+  onClose,
+}: Props) {
     const insets = useSafeAreaInsets();
-    const internalRef = useRef<BottomSheet>(null);
-    useImperativeHandle(ref, () => internalRef.current as BottomSheet, []);
+    const internalRef = useRef<BottomSheetModal>(null);
+
+    // Drive present()/dismiss() from the visible prop. BottomSheetModal
+    // queues the request internally if layout isn't ready yet, so a
+    // first-paint cold start shows the sheet reliably without a
+    // requestAnimationFrame song-and-dance.
+    useEffect(() => {
+      if (visible) internalRef.current?.present();
+      else internalRef.current?.dismiss();
+    }, [visible]);
 
     const handleBegin = useCallback(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -135,9 +151,8 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
     }));
 
     return (
-      <BottomSheet
+      <BottomSheetModal
         ref={internalRef}
-        index={-1}
         enableDynamicSizing
         enablePanDownToClose={false}
         enableOverDrag={false}
@@ -150,9 +165,7 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
           borderTopLeftRadius: 36,
           borderTopRightRadius: 36,
         }}
-        onChange={(i) => {
-          if (i === -1) onClose?.();
-        }}
+        onDismiss={onClose}
       >
         <BottomSheetView
           style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
@@ -356,12 +369,10 @@ const BlockSheet = forwardRef<BottomSheet, Props>(
             </View>
           </Pressable>
         </BottomSheetView>
-      </BottomSheet>
+      </BottomSheetModal>
     );
-  },
-);
+}
 
-BlockSheet.displayName = 'BlockSheet';
 export default BlockSheet;
 
 const CREAM = palette.cream;
