@@ -586,10 +586,14 @@ function SessionCompleteScreen({
               </Animated.View>
 
               <Animated.View style={[styles.titleBlock, titleStyle]}>
-                <View style={styles.titleRow}>
+                <View style={styles.titleNumeralWrap}>
                   <Text style={[styles.titleNumeral, { color: textColor }]}>
                     {duration.value}
                   </Text>
+                  {/* `min` floats right of the numeral via position:
+                      absolute so the numeral itself stays exactly
+                      centered on screen regardless of its width
+                      (50 vs 120 vs 5). */}
                   <Animated.Text
                     style={[
                       styles.titleUnit,
@@ -837,14 +841,12 @@ const styles = StyleSheet.create({
   titleBlock: {
     alignItems: 'center',
   },
-  // numeral + unit on one baseline-aligned row so reads "50 min" not
-  // "50" stacked above "min". Gap gives the unit some breathing room
-  // from the giant numeral without forcing margin onto either child.
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: 10,
+  // Wrapper has the numeral's natural width (no flex, no fixed
+  // width), and titleBlock's alignItems:center centres it on screen.
+  // The unit floats absolutely off the right edge so it doesn't push
+  // the numeral away from dead-centre regardless of digit count.
+  titleNumeralWrap: {
+    position: 'relative',
   },
   titleNumeral: {
     fontSize: 100,
@@ -855,6 +857,13 @@ const styles = StyleSheet.create({
     lineHeight: 104,
   },
   titleUnit: {
+    position: 'absolute',
+    left: '100%',
+    marginLeft: 8,
+    // Visual baseline alignment with the numeral. With fontSize 100 /
+    // lineHeight 104 the numeral's baseline sits ~14px from the bottom
+    // of its box; offsetting the unit by the same amount lines them up.
+    bottom: 14,
     fontSize: 26,
     fontWeight: '400',
     letterSpacing: 0.4,

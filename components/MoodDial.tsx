@@ -462,8 +462,11 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     discR.value = withTiming(DISC_MAX_R, { duration: MOOD_DIAL_DISC_DURATION, easing });
     introFill.value = withTiming(1, { duration: MOOD_DIAL_DISC_DURATION, easing });
 
-    // After the disc settles, fade in the "← drag →" hint + cream wash
-    // and start the arrow pulse. Both fall away on the first drag.
+    // Kick the "← drag →" hint in well before the disc is done growing
+    // — the rings are visible by ~50% of the growth, so waiting for the
+    // full disc duration + 260ms (~1.5s) makes the hint feel late. Land
+    // it around 600ms so the affordance shows up while the user's eye
+    // is still on the dial.
     const hintTimer = setTimeout(() => {
       if (hasInteractedRef.current) return;
       hintOpacity.value = withTiming(1, { duration: 520 });
@@ -477,7 +480,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
         -1,
         true,
       );
-    }, MOOD_DIAL_DISC_DURATION + 260);
+    }, 600);
 
     return () => clearTimeout(hintTimer);
   }, [reveal]);
