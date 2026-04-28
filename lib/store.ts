@@ -9,6 +9,7 @@ import {
 } from './db/sessions';
 import {
   getAllScheduledBlocks,
+  getScheduledBlockById,
   insertScheduledBlock,
   updateScheduledBlock as dbUpdateScheduledBlock,
   deleteScheduledBlock as dbDeleteScheduledBlock,
@@ -45,19 +46,47 @@ interface PendingSession {
   notificationId: string | null;
 }
 
+// Validate untrusted JSON from device_state — partially-written records
+// (mid-crash) can leave fields undefined, and downstream code (e.g.
+// cancelNotification) crashes if notificationId isn't string|null.
+function isPendingSession(x: unknown): x is PendingSession {
+  if (!x || typeof x !== 'object') return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.startedAt === 'number' &&
+    Number.isFinite(o.startedAt) &&
+    typeof o.goalSeconds === 'number' &&
+    Number.isFinite(o.goalSeconds) &&
+    (o.notificationId === null || typeof o.notificationId === 'string')
+  );
+}
+
 function writePendingSession(p: PendingSession): void {
-  try { setDeviceState(PENDING_SESSION_KEY, JSON.stringify(p)); } catch {}
+  try {
+    setDeviceState(PENDING_SESSION_KEY, JSON.stringify(p));
+  } catch (e) {
+    // Disk full or DB locked — without this the cold-start recovery
+    // can't tell a session was running. Log so it's at least visible.
+    console.error('[store] writePendingSession failed:', e);
+  }
 }
 
 function readPendingSession(): PendingSession | null {
   try {
     const raw = getDeviceState(PENDING_SESSION_KEY);
-    return raw ? (JSON.parse(raw) as PendingSession) : null;
-  } catch { return null; }
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isPendingSession(parsed) ? parsed : null;
+  } catch (e) {
+    console.error('[store] readPendingSession failed:', e);
+    return null;
+  }
 }
 
 function clearPendingSession(): void {
-  try { deleteDeviceState(PENDING_SESSION_KEY); } catch {}
+  try { deleteDeviceState(PENDING_SESSION_KEY); } catch {
+    // Best-effort cleanup; orphan record is harmless until next write.
+  }
 }
 
 export interface AppState {
@@ -81,7 +110,9 @@ export interface AppState {
   themeMode: ThemeMode;
 
   // Subscription — gates premium features (Settings, Journey, etc.)
-  // Default false; flip to true once RevenueCat entitlement is active.
+  // TODO: flip default to false and drive from RevenueCat entitlement
+  // once `react-native-purchases` is installed. Until then, kept true
+  // as a placeholder so premium features are accessible during dev.
   isSubscribed: boolean;
 
   // Win-back promo offer shown after the user closes the main paywall
@@ -232,10 +263,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     await initDatabase();
     // Drop any sessions with bogus duration (timestamp-sized, negative, etc.)
-    try { cleanupInvalidSessions(); } catch {}
+    try {
+      cleanupInvalidSessions();
+    } catch (e) {
+      console.error('[store.init] cleanupInvalidSessions failed:', e);
+    }
     configureNotifications();
-    // Copy shield icon to app group (fire and forget)
-    import('./screen-time').then(({ copyShieldIcon }) => copyShieldIcon()).catch(() => {});
+    // Copy shield icon to app group (fire and forget — cosmetic; missing
+    // icon falls back to system shield).
+    import('./screen-time')
+      .then(({ copyShieldIcon }) => copyShieldIcon())
+      .catch((e) => console.error('[store.init] copyShieldIcon failed:', e));
 
     // Load from SQLite (synchronous reads)
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
@@ -257,7 +295,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const { isBlockActive } = await import('./screen-time');
       wasShieldActive = isBlockActive();
-    } catch {}
+    } catch (e) {
+      console.error('[store.init] isBlockActive probe failed:', e);
+    }
 
     // Reconcile native monitors with DB state, then re-register what's valid.
     try {
@@ -273,22 +313,48 @@ export const useAppStore = create<AppState>((set, get) => ({
           await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays, b.unlockGoalMinutes);
         }
       }
-    } catch {}
+    } catch (e) {
+      // Reconcile failure means scheduled blocks may not fire. The user
+      // sees them in Settings but they're effectively dead until next
+      // foreground. Surface in console at minimum.
+      console.error('[store.init] reconcile scheduled blocks failed:', e);
+    }
 
     // Load milestones
     const achievedMilestones = getAchievedMilestones();
 
-    // Cold-start cleanup: drop any leftover pending session silently.
-    // The recovery sheet (cancelReason: 'backgrounded') is intentionally
-    // suppressed — only the manual pause flow shows the sheet now.
+    // Cold-start: a pending session means the previous app process was
+    // killed mid-session (manual force-quit, OOM, OS reboot). The
+    // recovery sheet was intentionally removed — but we still want to
+    // preserve what the user did. Save the elapsed slice silently if
+    // it's plausible (1s ≤ elapsed; capped at MAX_SESSION_DURATION inside
+    // dbAddSession, and at goal+25% if a finite goal was set).
     const pending = readPendingSession();
     if (pending) {
+      const elapsedMs = Date.now() - pending.startedAt;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const goal = pending.goalSeconds;
+      // Cap finite-goal sessions at goal + 25% buffer (covers small
+      // wall-clock drift); infinite-goal sessions get the standard
+      // 24h ceiling enforced inside dbAddSession.
+      const upperBound = goal > 0 ? Math.floor(goal * 1.25) : Infinity;
+      if (elapsedSec >= 1 && elapsedSec <= upperBound) {
+        try {
+          dbAddSession(elapsedSec);
+        } catch (e) {
+          console.error('[store.init] cold-start partial save failed:', e);
+        }
+      }
       if (pending.notificationId) {
-        try { await cancelNotification(pending.notificationId); } catch {}
+        try { await cancelNotification(pending.notificationId); } catch {
+          // Best-effort — the notification may have already fired.
+        }
       }
       clearPendingSession();
     }
-    try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
+    try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {
+      // Best-effort cleanup of legacy key.
+    }
 
     set({
       themeMode,
@@ -355,7 +421,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     // so paused sessions save the frozen value, not real-time-since-
     // start (which would over-count by the pause duration).
     const duration = get().elapsed;
-    const session = dbAddSession(duration);
+    let session = null;
+    try {
+      session = dbAddSession(duration);
+    } catch (e) {
+      // Don't let a write failure leave the UI in a "stopped but still
+      // started" zombie state — log and reset the timer state anyway.
+      console.error('[store.stopSession] dbAddSession failed:', e);
+    }
     set({
       started: false,
       paused: false,
@@ -450,7 +523,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Save what they did so far so it's not lost from history.
     const prevElapsed = get().elapsed;
     if (prevElapsed > 0) {
-      dbAddSession(prevElapsed);
+      try {
+        dbAddSession(prevElapsed);
+      } catch (e) {
+        // Restart proceeds even if save fails — losing one segment is
+        // better than blocking the user from starting a fresh session.
+        console.error('[store.restartSession] dbAddSession failed:', e);
+      }
     }
     // Reset and (re)start the timer.
     sessionStartTime = Date.now();
@@ -487,7 +566,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     clearPendingSession();
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-    const session = dbAddSession(duration);
+    let session = null;
+    try {
+      session = dbAddSession(duration);
+    } catch (e) {
+      console.error('[store.completeSession] dbAddSession failed:', e);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     set({
       started: false,
@@ -586,8 +670,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeSettings: () => set({ settingsOpen: false }),
 
   setDailyGoal: async (minutes) => {
+    const prev = get().dailyGoalMinutes;
     set({ dailyGoalMinutes: minutes });
-    setSetting('dailyGoal', String(minutes));
+    try {
+      setSetting('dailyGoal', String(minutes));
+    } catch (e) {
+      // Roll back in-memory state so it stays in sync with disk and
+      // re-throw so the caller (Settings UI / onboarding) can react.
+      console.error('[store.setDailyGoal] persistence failed:', e);
+      set({ dailyGoalMinutes: prev });
+      throw e;
+    }
   },
 
   addScheduledBlock: async (hour, minute, durationMinutes, weekdays, unlockGoalMinutes) => {
@@ -602,20 +695,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   editScheduledBlock: async (id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes) => {
+    // DB first (cheap, easy to roll back). Native registration is the
+    // authoritative bit — if it fails, the user's intent didn't take
+    // effect and the DB should reflect that, otherwise UI lies.
+    const prev = getScheduledBlockById(id);
+    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
+    set({ scheduledBlocks: getAllScheduledBlocks() });
     try {
       const { unscheduleBlock, scheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
       await scheduleBlock(id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
-    } catch {}
-    dbUpdateScheduledBlock(id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
-    set({ scheduledBlocks: getAllScheduledBlocks() });
+    } catch (e) {
+      console.error('[store.editScheduledBlock] native register failed:', e);
+      // Rollback DB to the pre-edit values + best-effort restore native.
+      if (prev) {
+        try {
+          dbUpdateScheduledBlock(id, prev.hour, prev.minute, prev.durationMinutes, prev.weekdays, prev.unlockGoalMinutes);
+          set({ scheduledBlocks: getAllScheduledBlocks() });
+          const { scheduleBlock } = await import('./screen-time');
+          await scheduleBlock(id, prev.hour, prev.minute, prev.durationMinutes, prev.weekdays, prev.unlockGoalMinutes);
+        } catch (rollbackErr) {
+          console.error('[store.editScheduledBlock] rollback failed:', rollbackErr);
+        }
+      }
+      throw e;
+    }
   },
 
   removeScheduledBlock: async (id) => {
     try {
       const { unscheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
-    } catch {}
+    } catch (e) {
+      // Removal proceeds even if native unschedule fails — leftover
+      // native monitor without a DB row is reconciled on next init.
+      console.error('[store.removeScheduledBlock] native unschedule failed:', e);
+    }
     clearNotificationIds('scheduledBlock', id);
     dbDeleteScheduledBlock(id);
     set({ scheduledBlocks: getAllScheduledBlocks() });
@@ -635,7 +750,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           const { unscheduleBlock } = await import('./screen-time');
           unscheduleBlock(id);
         }
-      } catch {}
+      } catch (e) {
+        console.error('[store.toggleScheduledBlock] native sync failed:', e);
+      }
     }
   },
 

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,12 +47,23 @@ export default function OnboardingRoute() {
 
   const handleFinish = useCallback(async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveOnboardingData({
-      painPoints: flow.painPoints,
-      screenTime: flow.screenTime,
-      goal: flow.goal,
-      router,
-    });
+    try {
+      await saveOnboardingData({
+        painPoints: flow.painPoints,
+        screenTime: flow.screenTime,
+        goal: flow.goal,
+        router,
+      });
+    } catch (e) {
+      // Persistence failed (disk full, DB locked, etc.). Stay on this
+      // screen so the user can retry — marking onboarding complete now
+      // would lose their answers and skip the flow on next launch.
+      console.error('[onboarding] save failed:', e);
+      Alert.alert(
+        'Could not save',
+        'Something went wrong saving your answers. Please try again.',
+      );
+    }
   }, [flow.painPoints, flow.screenTime, flow.goal, router]);
 
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;

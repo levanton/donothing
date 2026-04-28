@@ -65,17 +65,21 @@ export function runSyncMigrations(db: SQLiteDatabase): void {
 /**
  * Run async migrations (data seeding from AsyncStorage).
  * Called from initDatabase() during app startup.
+ *
+ * Uses `withTransactionAsync` instead of manual BEGIN/COMMIT — holding
+ * a SQLite transaction open across an `await` boundary risks blocking
+ * other writers and leaves the WAL inconsistent if the awaited promise
+ * rejects in unexpected ways.
  */
 export async function runAsyncMigrations(db: SQLiteDatabase): Promise<void> {
   for (const m of asyncMigrations) {
     if (isMigrationApplied(db, m.version)) continue;
     try {
-      db.execSync('BEGIN TRANSACTION');
-      await m.up(db);
-      db.runSync('INSERT INTO _migrations (version) VALUES (?)', m.version);
-      db.execSync('COMMIT');
+      await db.withTransactionAsync(async () => {
+        await m.up(db);
+        db.runSync('INSERT INTO _migrations (version) VALUES (?)', m.version);
+      });
     } catch (e) {
-      db.execSync('ROLLBACK');
       throw new Error(`Migration ${m.version} (${m.name}) failed: ${e}`);
     }
   }

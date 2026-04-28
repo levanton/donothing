@@ -11,6 +11,11 @@ export const migration002: Migration = {
   version: 2,
   name: 'seed_from_async_storage',
   up: async (db) => {
+    // Each entity is wrapped independently so a corrupt JSON for one key
+    // doesn't block the rest from migrating. We log every failure rather
+    // than swallowing — a silent drop here means the user permanently
+    // loses pre-SQLite data without any indication.
+
     // --- Sessions ---
     try {
       const raw = await AsyncStorage.getItem(SESSIONS_KEY);
@@ -23,7 +28,9 @@ export const migration002: Migration = {
           );
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('[migration002] sessions seed failed:', e);
+    }
 
     // --- Theme ---
     try {
@@ -34,7 +41,9 @@ export const migration002: Migration = {
           theme,
         );
       }
-    } catch {}
+    } catch (e) {
+      console.error('[migration002] theme seed failed:', e);
+    }
 
     // --- Daily Goal ---
     try {
@@ -45,7 +54,9 @@ export const migration002: Migration = {
           goal,
         );
       }
-    } catch {}
+    } catch (e) {
+      console.error('[migration002] dailyGoal seed failed:', e);
+    }
 
     // --- Reminders ---
     try {
@@ -74,7 +85,9 @@ export const migration002: Migration = {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('[migration002] reminders seed failed:', e);
+    }
 
     // --- Scheduled Blocks ---
     try {
@@ -102,6 +115,8 @@ export const migration002: Migration = {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('[migration002] scheduled_blocks seed failed:', e);
+    }
   },
 };

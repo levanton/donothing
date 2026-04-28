@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -178,11 +178,18 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
 
   const commitBlock = (p: PendingBlockParams) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (editingBlock) {
-      store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
-    } else {
-      store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
-    }
+    const op = editingBlock
+      ? store().editScheduledBlock(editingBlock.id, p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes)
+      : store().addScheduledBlock(p.hour, p.minute, p.duration, p.weekdays, p.unlockGoalMinutes);
+    op.catch((e) => {
+      // editScheduledBlock rolls back on native fail and rethrows. Surface
+      // it to the user so they don't think the change took effect.
+      console.error('[Settings] commitBlock failed:', e);
+      Alert.alert(
+        'Could not update block',
+        'Check Screen Time permissions and try again.',
+      );
+    });
     blockSheetRef.current?.close();
   };
 
