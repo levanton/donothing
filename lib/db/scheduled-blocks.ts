@@ -35,6 +35,14 @@ export function getAllScheduledBlocks(): ScheduledBlock[] {
   return rows.map(rowToBlock);
 }
 
+export function getEnabledScheduledBlocks(): ScheduledBlock[] {
+  const db = getDb();
+  const rows = db.getAllSync<BlockRow>(
+    `SELECT ${SELECT_COLS} FROM scheduled_blocks WHERE enabled = 1 ORDER BY hour, minute`,
+  );
+  return rows.map(rowToBlock);
+}
+
 export function getScheduledBlockById(id: string): ScheduledBlock | null {
   const db = getDb();
   const row = db.getFirstSync<BlockRow>(
@@ -94,12 +102,15 @@ export function deleteScheduledBlock(id: string): void {
 
 export function toggleScheduledBlock(id: string): boolean {
   const db = getDb();
-  db.runSync(
-    `UPDATE scheduled_blocks SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END, updated_at = datetime('now') WHERE id = ?`,
-    id,
-  );
+  // RETURNING avoids a second SELECT round-trip and removes the
+  // read-after-write race the old code had (an interleaved write
+  // could change enabled between the UPDATE and the SELECT).
   const row = db.getFirstSync<{ enabled: number }>(
-    'SELECT enabled FROM scheduled_blocks WHERE id = ?',
+    `UPDATE scheduled_blocks
+       SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END,
+           updated_at = datetime('now')
+     WHERE id = ?
+     RETURNING enabled`,
     id,
   );
   return row?.enabled === 1;

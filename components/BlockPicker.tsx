@@ -6,9 +6,10 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 
 import { Fonts } from '@/constants/theme';
 import { type AppTheme } from '@/lib/theme';
+import { pad2 } from '@/lib/format';
+import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/lib/weekdays';
 import PillButton from '@/components/PillButton';
 import GoalSliderBar from '@/components/GoalSliderBar';
-import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/components/TimePicker';
 
 const MIN_DURATION = 15;
 const STEP = 5;
@@ -43,10 +44,6 @@ function dateFromMinutes(m: number): Date {
   const d = new Date();
   d.setHours(Math.floor(m / 60), m % 60, 0, 0);
   return d;
-}
-
-function pad2(n: number) {
-  return n < 10 ? `0${n}` : String(n);
 }
 
 function formatTime(m: number) {

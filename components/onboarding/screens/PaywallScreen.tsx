@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
-  interpolate,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { palette } from '@/lib/theme';
@@ -45,7 +45,7 @@ const CTA_LABELS: Record<PlanId, string> = {
   lifetime: 'Get Lifetime — $69.99',
 };
 
-function HeroImage({ scrollY }: { scrollY: Animated.SharedValue<number> }) {
+function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
   const parallaxStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: scrollY.value * 0.5 }],
   }));
@@ -57,20 +57,6 @@ function HeroImage({ scrollY }: { scrollY: Animated.SharedValue<number> }) {
         style={[styles.heroImage, parallaxStyle]}
         resizeMode="contain"
       />
-    </Animated.View>
-  );
-}
-
-function FeatureCard({ id, label, bg, fg, index }: typeof FEATURES[number] & { index: number }) {
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(400 + index * 100).duration(500)}
-      style={[styles.featureCard, { backgroundColor: bg }]}
-    >
-      <View style={styles.featureIllustration}>
-        <FeatureIllustration id={id} color={fg} />
-      </View>
-      <Text style={[styles.featureLabel, { color: fg }]}>{label}</Text>
     </Animated.View>
   );
 }

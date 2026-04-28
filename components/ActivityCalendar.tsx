@@ -5,17 +5,17 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
-import { palette } from '@/lib/theme';
+import { palette, type AppTheme } from '@/lib/theme';
 import { formatTimeShort } from '@/lib/format';
 import { getMonthDurations, getSessionsByDateRange } from '@/lib/db/sessions';
 import type { Session } from '@/lib/db/types';
 import { useAppStore } from '@/lib/store';
+import { WEEKDAY_LABELS } from '@/lib/weekdays';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -31,7 +31,7 @@ function formatTime(ts: number): string {
 }
 
 interface ActivityCalendarProps {
-  theme: any;
+  theme: AppTheme;
 }
 
 export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
@@ -176,7 +176,7 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
       {/* Day-of-week headers */}
       <View style={styles.dayHeaders}>
-        {DAY_LABELS.map((d) => (
+        {WEEKDAY_LABELS.map((d) => (
           <Text key={d} style={[styles.dayHeaderLabel, { color: theme.textTertiary }]}>{d}</Text>
         ))}
       </View>

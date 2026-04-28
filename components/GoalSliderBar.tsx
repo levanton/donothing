@@ -5,11 +5,24 @@ import Animated, {
   runOnJS,
   useAnimatedProps,
   useSharedValue,
+  type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle as SvgCircle, Line as SvgLine } from 'react-native-svg';
 
 import { Fonts } from '@/constants/theme';
+
+/**
+ * Loose theme shape — onboarding screens pass `{ text, bg }` only,
+ * while in-app callers pass full `AppTheme`. Optional fields fall
+ * through to component defaults / explicit colour overrides.
+ */
+export interface GoalSliderTheme {
+  text: string;
+  bg: string;
+  textSecondary?: string;
+  textTertiary?: string;
+}
 
 const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
 const AnimatedLine = Animated.createAnimatedComponent(SvgLine);
@@ -73,7 +86,7 @@ function snapToNearest(raw: number): number {
 
 
 interface GoalSliderBarProps {
-  theme: any;
+  theme: GoalSliderTheme;
   /** Max value in minutes */
   maxMinutes?: number;
   /** Snap step in minutes (only for interactive mode) */
@@ -101,7 +114,7 @@ interface GoalSliderBarProps {
   scaleLabelStyle?: TextStyle;
 
   // --- Controlled mode (main screen): pass progress + width, gesture is external ---
-  progress?: Animated.SharedValue<number>;
+  progress?: SharedValue<number>;
   width?: number;
 
   // --- Interactive mode (settings): pass value + onChange, gesture is built-in ---

@@ -4,29 +4,20 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
+import { pad2 } from '@/lib/format';
+import { WEEKDAY_LABELS, WEEKDAY_SHORT, WEEKDAY_VALUES, ALL_DAYS } from '@/lib/weekdays';
 import PillButton from '@/components/PillButton';
 
-// ── Weekday helpers ─────────────────────────────────────────────────────
-// Expo convention: 1=Sun … 7=Sat, display Mon-first
-export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-export const WEEKDAY_SHORT = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
-export const WEEKDAY_VALUES = [2, 3, 4, 5, 6, 7, 1]; // Mon…Sun in Expo weekday numbers
-export const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7];
-
-export function pad(n: number) {
-  return String(n).padStart(2, '0');
-}
+// Re-export so existing import paths (`@/components/TimePicker`) keep
+// working while we migrate consumers to `@/lib/weekdays` directly.
+export { WEEKDAY_LABELS, WEEKDAY_SHORT, WEEKDAY_VALUES, ALL_DAYS };
 
 export function formatTime12(hour: number, minute: number) {
   const h = hour % 12 || 12;
   const ampm = hour < 12 ? 'AM' : 'PM';
-  return `${h}:${pad(minute)} ${ampm}`;
+  return `${h}:${pad2(minute)} ${ampm}`;
 }
 
-export function splitTime12(hour: number, minute: number) {
-  const h = hour % 12 || 12;
-  return { time: `${h}:${pad(minute)}`, ampm: hour < 12 ? 'am' : 'pm' };
-}
 
 export function weekdaysLabel(days: number[]): string {
   if (!days.length || days.length === 7) return 'every day';
@@ -88,7 +79,7 @@ export default function TimePickerContent({
             <Feather name="chevron-up" size={24} color={theme.textSecondary} />
           </Pressable>
           <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad(hour)}
+            {pad2(hour)}
           </Text>
           <Pressable onPress={decHour} hitSlop={12} style={styles.sheetArrow}>
             <Feather name="chevron-down" size={24} color={theme.textSecondary} />
@@ -100,7 +91,7 @@ export default function TimePickerContent({
             <Feather name="chevron-up" size={24} color={theme.textSecondary} />
           </Pressable>
           <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad(minute)}
+            {pad2(minute)}
           </Text>
           <Pressable onPress={decMin} hitSlop={12} style={styles.sheetArrow}>
             <Feather name="chevron-down" size={24} color={theme.textSecondary} />

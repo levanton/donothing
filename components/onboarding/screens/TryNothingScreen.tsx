@@ -11,13 +11,13 @@ import Animated, {
   withSequence,
   interpolate,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import * as Haptics from 'expo-haptics';
 import OrbitRing, { RING_SIZE } from '@/components/OrbitRing';
 import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 const SESSION_DURATION = 60;
 const RING_R = 42;
 

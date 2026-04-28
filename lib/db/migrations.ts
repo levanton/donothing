@@ -5,6 +5,8 @@ import { migration003 } from './migrations/003_reflection_checkin_milestones';
 import { migration004 } from './migrations/004_block_groups';
 import { migration005 } from './migrations/005_unlock_goal';
 import { migration006 } from './migrations/006_drop_block_groups';
+import { migration007 } from './migrations/007_schema_hygiene';
+import { migration008 } from './migrations/008_drop_reminders';
 
 export interface Migration {
   version: number;
@@ -12,12 +14,20 @@ export interface Migration {
   up: (db: SQLiteDatabase) => void | Promise<void>;
 }
 
+/**
+ * Highest version present in this build. Tools and tests can compare
+ * against `_migrations` to verify a DB is current.
+ */
+export const CURRENT_SCHEMA_VERSION = 8;
+
 const syncMigrations: Migration[] = [
   migration001,
   migration003,
   migration004,
   migration005,
   migration006,
+  migration007,
+  migration008,
 ];
 
 const asyncMigrations: Migration[] = [

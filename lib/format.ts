@@ -1,3 +1,8 @@
+/** Zero-pad a single integer to 2 digits ("5" → "05"). */
+export function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
 export function timerDisplay(seconds: number): string {
   // Always render as MM:SS — slider tops out at 60 min so the hours
   // form was never reachable in the running screen, and "60:00"

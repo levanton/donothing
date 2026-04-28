@@ -8,11 +8,11 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const LINES = [
   { text: 'Your brain forgot how to just...', bold: false, accent: false },

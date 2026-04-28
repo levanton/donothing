@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { palette } from '@/lib/theme';
@@ -19,14 +19,12 @@ interface PillButtonProps {
   /** Optional leading icon (Feather name). */
   icon?: FeatherName;
   flex?: boolean;
-  style?: ViewStyle;
-  labelStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 
-  // Legacy props — kept for backwards compatibility
+  // Legacy boolean shortcuts — both call sites use `outline` / `filled`
+  // instead of `variant="..."`. Kept; the rest were removed as dead.
   filled?: boolean;
-  fillColor?: string;
-  chipBg?: string;
-  small?: boolean;
   outline?: boolean;
 }
 
@@ -37,12 +35,10 @@ export default function PillButton({
   label, onPress, color,
   variant: variantProp, size: sizeProp, bg,
   icon, flex, style, labelStyle,
-  // legacy
-  filled, fillColor, chipBg, small, outline,
+  filled, outline,
 }: PillButtonProps) {
-  // Resolve variant from legacy props if not explicitly set
   const variant: Variant = variantProp ?? (outline ? 'outline' : filled ? 'filled' : 'chip');
-  const size: Size = sizeProp ?? (small ? 'small' : 'medium');
+  const size: Size = sizeProp ?? 'medium';
 
   const sizeStyle = SIZE_STYLES[size];
 
@@ -72,7 +68,7 @@ export default function PillButton({
   }
 
   if (variant === 'filled') {
-    const bgColor = bg ?? fillColor ?? color;
+    const bgColor = bg ?? color;
     const textColor = bg ? color : palette.cream;
     return (
       <Pressable
@@ -85,7 +81,7 @@ export default function PillButton({
   }
 
   // chip
-  const bgColor = bg ?? chipBg ?? palette.cream;
+  const bgColor = bg ?? palette.cream;
   const chipTextColor = filled ? palette.cream : palette.charcoal;
   return (
     <Pressable

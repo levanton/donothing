@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 
@@ -21,7 +22,6 @@ const LINES = [
 const WORD_DELAY = 280;
 
 const grassImage = require('@/assets/images/grass.png');
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 function Word({ text, delay, bold }: { text: string; delay: number; bold?: boolean }) {
   const opacity = useSharedValue(0);

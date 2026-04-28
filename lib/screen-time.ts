@@ -15,6 +15,7 @@ import {
   disableBlockAllMode,
   resetBlocks,
   onDeviceActivityMonitorEvent,
+  type ShieldActions,
 } from 'react-native-device-activity';
 import { Asset } from 'expo-asset';
 
@@ -114,23 +115,26 @@ const SHIELD_CONFIG = {
   iconAppGroupRelativePath: SHIELD_ICON_FILENAME,
 };
 
-const SHIELD_ACTIONS = {
+const SHIELD_ACTIONS: ShieldActions = {
   primary: {
-    behavior: 'close' as const,
+    behavior: 'close',
     actions: [
-      { type: 'openApp' as const },
+      { type: 'openApp' },
       {
-        type: 'sendNotification' as const,
+        type: 'sendNotification',
         payload: {
           title: 'Do Nothing',
           body: 'Tap to open Do Nothing',
           sound: 'default',
-          interruptionLevel: 'timeSensitive',
+          // The package's .d.ts is missing 'timeSensitive', but it's a
+          // real iOS UNNotificationInterruptionLevel value and breaks
+          // through Focus mode — what we want for scheduled-block alerts.
+          interruptionLevel: 'timeSensitive' as 'active',
         },
       },
     ],
   },
-  secondary: { behavior: 'close' as const },
+  secondary: { behavior: 'close' },
 };
 
 export const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';

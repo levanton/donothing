@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -26,7 +27,6 @@ interface Props {
   body?: string;
 }
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 function PaywallGate({
   visible,

@@ -11,12 +11,12 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import * as Haptics from 'expo-haptics';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

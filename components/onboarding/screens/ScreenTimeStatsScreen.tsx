@@ -8,10 +8,10 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const HOURS_MAP: Record<string, number> = {
   '2–3h': 2.5,

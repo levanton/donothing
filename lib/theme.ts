@@ -37,6 +37,15 @@ export interface AppTheme {
   subtle: string;
 }
 
+/**
+ * Status-bar style for a given theme mode. Hoists the inline
+ * `isDark ? 'light' : 'dark'` ternary that was repeated across
+ * SessionCompleteScreen, app/index.tsx, app/onboarding.tsx, etc.
+ */
+export function getStatusBarStyle(mode: ThemeMode): 'light' | 'dark' {
+  return mode === 'dark' ? 'light' : 'dark';
+}
+
 export const themes: Record<ThemeMode, AppTheme> = {
   dark: {
     bg:            palette.charcoal,

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +18,6 @@ import { Fonts } from '@/constants/theme';
 import { palette, themes, type ThemeMode } from '@/lib/theme';
 import MoodDial, { MOOD_DIAL_DISC_DURATION } from '@/components/MoodDial';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const CONTENT_FADE_MS = 500;
 
@@ -96,7 +96,7 @@ function BenefitCard({
     >
       <View style={styles.benefitIconWrap}>
         <View style={[styles.benefitIconHalo, { backgroundColor: `${variant.fg}22` }]} />
-        <MaterialCommunityIcons name={item.icon as any} size={48} color={variant.fg} />
+        <MaterialCommunityIcons name={item.icon as ComponentProps<typeof MaterialCommunityIcons>['name']} size={48} color={variant.fg} />
       </View>
       <Text style={[styles.benefitLabel, { color: variant.fg }]}>
         {item.title}

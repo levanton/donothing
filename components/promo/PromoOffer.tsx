@@ -13,6 +13,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { EASE_OUT } from '@/constants/animations';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +22,6 @@ import { Asset } from 'expo-asset';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 const HERO_IMAGE = require('@/assets/images/present.png');
 // Kick off decode at module load so the bitmap is ready the first time
