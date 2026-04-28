@@ -12,11 +12,13 @@ import UIKit
 import os
 
 func convertBase64StringToImage(imageBase64String: String?) -> UIImage? {
-  guard let imageBase64String = imageBase64String,
-        let imageData = Data(base64Encoded: imageBase64String) else {
-    return nil
+  if let imageBase64String = imageBase64String {
+    let imageData = Data(base64Encoded: imageBase64String)
+    let image = UIImage(data: imageData!)
+    return image
   }
-  return UIImage(data: imageData)
+
+  return nil
 }
 
 func buildLabel(text: String?, with color: UIColor?, placeholders: [String: String?])
@@ -30,12 +32,9 @@ func buildLabel(text: String?, with color: UIColor?, placeholders: [String: Stri
 }
 
 func loadImageFromAppGroupDirectory(relativeFilePath: String) -> UIImage? {
-  guard let appGroupDirectory = getAppGroupDirectory() else {
-    print("Error: App Group directory unavailable — check REACT_NATIVE_DEVICE_ACTIVITY_APP_GROUP")
-    return nil
-  }
+  let appGroupDirectory = getAppGroupDirectory()
 
-  let fileURL = appGroupDirectory.appendingPathComponent(relativeFilePath)
+  let fileURL = appGroupDirectory!.appendingPathComponent(relativeFilePath)
 
   // Load the image data
   guard let imageData = try? Data(contentsOf: fileURL) else {
@@ -135,7 +134,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     let placeholders: [String: String?] = [
       "applicationOrDomainDisplayName": application.localizedDisplayName,
-      "token": "\(application.token?.hashValue ?? 0)",
+      "token": "\(application.token!.hashValue)",
       "tokenType": "application",
       "familyActivitySelectionId": getPossibleFamilyActivitySelectionIds(
         applicationToken: application.token
@@ -162,7 +161,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     let placeholders = [
       "applicationOrDomainDisplayName": application.localizedDisplayName,
-      "token": "\(category.token?.hashValue ?? 0)",
+      "token": "\(category.token!.hashValue)",
       "tokenType": "application_category",
       "familyActivitySelectionId": getPossibleFamilyActivitySelectionIds(
         applicationToken: application.token,
@@ -187,7 +186,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     let placeholders = [
       "applicationOrDomainDisplayName": webDomain.domain,
-      "token": "\(webDomain.token?.hashValue ?? 0)",
+      "token": "\(webDomain.token!.hashValue)",
       "tokenType": "web_domain",
       "familyActivitySelectionId": getPossibleFamilyActivitySelectionIds(
         webDomainToken: webDomain.token
@@ -214,7 +213,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     let placeholders = [
       "applicationOrDomainDisplayName": webDomain.domain,
-      "token": "\(category.token?.hashValue ?? 0)",
+      "token": "\(category.token!.hashValue)",
       "tokenType": "web_domain_category",
       "familyActivitySelectionId": getPossibleFamilyActivitySelectionIds(
         webDomainToken: webDomain.token,
