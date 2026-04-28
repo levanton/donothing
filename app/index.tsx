@@ -44,6 +44,7 @@ import { formatTimeStat } from '@/lib/format';
 import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
+import { useSlideGesture } from '@/hooks/useSlideGesture';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
@@ -339,84 +340,57 @@ export default function DoNothingScreen() {
   });
 
   // Swipe up on main → open history
-  const mainVerticalPan = Gesture.Pan()
-    .enabled(!started)
-    .activeOffsetY(-20)
-    .failOffsetX([-15, 15])
-    .onUpdate((e) => {
-      'worklet';
-      const drag = -e.translationY / SCREEN_H;
-      historySlide.value = Math.max(0, Math.min(1, drag));
-    })
-    .onEnd((e) => {
-      'worklet';
-      const shouldOpen = historySlide.value > 0.3 || -e.velocityY > 500;
-      historySlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
-    });
+  const mainVerticalPan = useSlideGesture({
+    slide: historySlide,
+    direction: 'up',
+    mode: 'open',
+    unit: SCREEN_H,
+    enabled: !started,
+  });
 
-  // Swipe left on main → open settings
+  // Swipe left on main → open settings (commits via store action)
   const openSettingsJS = useCallback(() => {
     useAppStore.getState().openSettings();
   }, []);
-  const mainHorizontalPan = Gesture.Pan()
-    .enabled(!started)
-    .activeOffsetX(20)
-    .failOffsetY([-15, 15])
-    .onUpdate((e) => {
-      'worklet';
-      const drag = e.translationX / SCREEN_W;
-      settingsSlide.value = Math.max(0, Math.min(1, drag));
-    })
-    .onEnd((e) => {
-      'worklet';
-      const shouldOpen = settingsSlide.value > 0.3 || e.velocityX > 500;
-      settingsSlide.value = withTiming(shouldOpen ? 1 : 0, { duration: 300 });
-      if (shouldOpen) runOnJS(openSettingsJS)();
-    });
+  const mainHorizontalPan = useSlideGesture({
+    slide: settingsSlide,
+    direction: 'right',
+    mode: 'open',
+    unit: SCREEN_W,
+    enabled: !started,
+    onCommit: openSettingsJS,
+  });
 
   const mainPanGesture = Gesture.Exclusive(mainVerticalPan, mainHorizontalPan);
 
-  // Swipe right on settings → close settings (only active when settings is open)
+  // Swipe right on settings → close (commits via store action)
   const closeSettingsJS = useCallback(() => {
     useAppStore.getState().closeSettings();
   }, []);
-  const settingsSwipeBack = Gesture.Pan()
-    .enabled(settingsOpen)
-    .activeOffsetX(-20)
-    .failOffsetY([-20, 20])
-    .onUpdate((e) => {
-      'worklet';
-      const drag = -e.translationX / SCREEN_W;
-      settingsSlide.value = Math.max(0, Math.min(1, 1 - Math.max(0, drag)));
-    })
-    .onEnd((e) => {
-      'worklet';
-      const shouldClose = settingsSlide.value < 0.7 || -e.velocityX > 500;
-      settingsSlide.value = withTiming(shouldClose ? 0 : 1, { duration: 300 });
-      if (shouldClose) {
-        runOnJS(closeSettingsJS)();
-      }
-    });
+  const settingsSwipeBack = useSlideGesture({
+    slide: settingsSlide,
+    direction: 'left',
+    mode: 'close',
+    unit: SCREEN_W,
+    enabled: settingsOpen,
+    failPerpendicular: [-20, 20],
+    onCommit: closeSettingsJS,
+  });
 
   // Native gesture for the history ScrollView — lets Pan and Scroll coexist
   const historyScrollNativeGesture = Gesture.Native();
 
-  // Swipe down on history → close (only when scrolled to top)
-  const historyPanGesture = Gesture.Pan()
-    .activeOffsetY([-10000, 20])
-    .simultaneousWithExternalGesture(historyScrollNativeGesture)
-    .onUpdate((e) => {
-      'worklet';
-      if (historyScrollY.value > 5) return;
-      const drag = e.translationY / SCREEN_H;
-      historySlide.value = Math.max(0, Math.min(1, 1 - Math.max(0, drag)));
-    })
-    .onEnd((e) => {
-      'worklet';
-      if (historyScrollY.value > 5) return;
-      const shouldClose = historySlide.value < 0.7 || e.velocityY > 500;
-      historySlide.value = withTiming(shouldClose ? 0 : 1, { duration: 300 });
-    });
+  // Swipe down on history → close (gated on scroll position so the
+  // ScrollView can scroll without triggering a dismiss).
+  const historyPanGesture = useSlideGesture({
+    slide: historySlide,
+    direction: 'down',
+    mode: 'close',
+    unit: SCREEN_H,
+    failPerpendicular: null,
+    scrollGate: { value: historyScrollY, threshold: 5 },
+    simultaneousWith: historyScrollNativeGesture,
+  });
 
   const historyScrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
