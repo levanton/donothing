@@ -26,12 +26,6 @@ const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 const GRASS_SIZE = Math.min(Math.round(SCREEN_H * 0.24), 220);
 
-// Terracotta reveal disc — starts small at the done-button position and
-// grows out to engulf the whole screen, inverting the palette. On close it
-// shrinks back onto the yes button on the home screen so the handoff is
-// seamless (the home yes button is already terracotta).
-const SPLASH_ORIGIN_X = SCREEN_W / 2;
-const SPLASH_MAX_SIZE = Math.hypot(SCREEN_W, SCREEN_H) * 2;
 const YES_SIZE = 140;
 
 // Benefit tier copy + icons live in lib/benefits — the post-session
@@ -49,7 +43,6 @@ interface Props {
   visible: boolean;
   sessionId: string;
   durationSeconds: number;
-  todaySeconds: number;
   themeMode: ThemeMode;
   yesBtnRect?: { x: number; y: number; w: number; h: number } | null;
   /** Closes the screen without releasing apps. */
@@ -82,7 +75,6 @@ function SessionCompleteScreen({
   visible,
   sessionId,
   durationSeconds,
-  todaySeconds,
   themeMode,
   yesBtnRect,
   onClose,
@@ -99,8 +91,6 @@ function SessionCompleteScreen({
   const titleOpacity = useSharedValue(0);
   const titleY = useSharedValue(14);
   const titleScale = useSharedValue(0.96);
-  const subtitleOpacity = useSharedValue(0);
-  const subtitleY = useSharedValue(12);
   const circleBlockOpacity = useSharedValue(0);
   const circleBlockY = useSharedValue(12);
   const closeOpacity = useSharedValue(0);
@@ -143,9 +133,6 @@ function SessionCompleteScreen({
   const fwContinueY = useSharedValue(12);
   const mainContentOpacity = useSharedValue(1);
   const benefitsOpacity = useSharedValue(0);
-  const splashSize = useSharedValue(0);
-  const splashCx = useSharedValue(SPLASH_ORIGIN_X);
-  const splashCy = useSharedValue(SCREEN_H);
   // Slides the sun image down from its mood-screen perch to the
   // farewell-layout anchor while the rings fold up. Title fades alone;
   // only the sun rides this value.
@@ -231,22 +218,15 @@ function SessionCompleteScreen({
       mainContentOpacity.value = 1;
       benefitsOpacity.value = 0;
       sunTranslateY.value = 0;
-      splashSize.value = 0;
-      splashCx.value = SPLASH_ORIGIN_X;
-      splashCy.value = SCREEN_H - insets.bottom - 68;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
 
-      // When the screen opens right after a timer ends, the JS thread is
-      // briefly busy with DB writes, notification cleanup and week-stats
-      // recompute. Giving every intro animation a short head-start keeps
-      // the first frames from looking rushed — the splash doesn't begin
-      // until that work has settled.
+      // Background stays terracotta across the whole transition — the
+      // running screen and this one share the palette — so we just
+      // cross-fade content. A short head-start lets the JS thread settle
+      // (DB writes / notif cleanup / week-stats recompute) before the
+      // first frame so the cascade doesn't look rushed.
       const INTRO_DELAY = 240;
-      splashSize.value = withDelay(
-        INTRO_DELAY,
-        withTiming(SPLASH_MAX_SIZE, { duration: 820, easing: EASE_OUT }),
-      );
       contentOpacity.value = withDelay(
         INTRO_DELAY,
         withTiming(1, { duration: CONTENT_FADE_MS + 120, easing: EASE_OUT }),
@@ -269,9 +249,6 @@ function SessionCompleteScreen({
       titleUnitY.value = withDelay(base + 220, withTiming(0, { duration: 700, easing: EASE_OUT }));
       titleSubOp.value = withDelay(base + 420, withTiming(1, { duration: 700, easing: EASE_OUT }));
       titleSubY.value = withDelay(base + 420, withTiming(0, { duration: 700, easing: EASE_OUT }));
-
-      subtitleOpacity.value = withDelay(base + 700, withTiming(1, { duration: 700, easing: EASE_OUT }));
-      subtitleY.value = withDelay(base + 700, withTiming(0, { duration: 700, easing: EASE_OUT }));
 
       // Benefits layer fades the whole block in; the header rises in
       // lockstep so the chip doesn't lag behind the wash. Cards wait
@@ -307,8 +284,6 @@ function SessionCompleteScreen({
       titleOpacity.value = 0;
       titleY.value = 14;
       titleScale.value = 0.96;
-      subtitleOpacity.value = 0;
-      subtitleY.value = 12;
       circleBlockOpacity.value = 0;
       circleBlockY.value = 12;
       closeOpacity.value = 0;
@@ -339,7 +314,6 @@ function SessionCompleteScreen({
       moodHeaderY.value = 8;
       benefitsOpacity.value = 0;
       sunTranslateY.value = 0;
-      splashSize.value = 0;
       revealTimersRef.current.forEach(clearTimeout);
       revealTimersRef.current = [];
       setHasInteracted(false);
@@ -407,7 +381,6 @@ function SessionCompleteScreen({
     const SETTLE_MS = 720;
     const t1 = setTimeout(() => {
       titleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
-      subtitleOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
       setPhase('farewell');
 
       // Snapshot farewellY's current value (still resting at +12 here)
@@ -471,31 +444,18 @@ function SessionCompleteScreen({
     revealTimersRef.current.push(t1);
   }, []);
 
-  // Keep handleCloseRef in sync so handleUnlock (memoized with [])
-  // always invokes the LATEST handleClose — otherwise it'd capture the
-  // first render's version, when yesBtnRect was still null, and the
-  // splash would shrink to 0 instead of collapsing onto the yes button.
+  // Background stays terracotta on both sides — running screen and home
+  // share the palette during a session — so close is just a content
+  // fade-out, no shape morph back onto the yes button.
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
     dismissingRef.current = true;
     haptics.select();
 
-    // Collapse the terracotta disc back onto the home-screen yes button —
-    // same shape, same colour, so the handoff is seamless (mirrors the
-    // launch splash). If we don't have a measured yes button yet, just
-    // shrink to 0 at the current origin.
-    const duration = 540;
-    if (yesBtnRect) {
-      splashCx.value = withTiming(yesBtnRect.x + yesBtnRect.w / 2, { duration, easing: EASE_OUT });
-      splashCy.value = withTiming(yesBtnRect.y + yesBtnRect.h / 2, { duration, easing: EASE_OUT });
-      splashSize.value = withTiming(YES_SIZE, { duration, easing: EASE_OUT });
-    } else {
-      splashSize.value = withTiming(0, { duration, easing: EASE_OUT });
-    }
-
-    contentOpacity.value = withTiming(0, { duration: 420, easing: EASE_OUT });
+    const duration = 360;
+    contentOpacity.value = withTiming(0, { duration, easing: EASE_OUT });
     setTimeout(onClose, duration + 20);
-  }, [onClose, yesBtnRect]);
+  }, [onClose]);
 
   handleCloseRef.current = handleClose;
 
@@ -514,23 +474,9 @@ function SessionCompleteScreen({
     pointerEvents: contentOpacity.value > 0.5 ? 'auto' : 'none',
   }));
 
-  const splashAnimStyle = useAnimatedStyle(() => {
-    const size = splashSize.value;
-    return {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      left: splashCx.value - size / 2,
-      top: splashCy.value - size / 2,
-    };
-  });
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
     transform: [{ translateY: titleY.value }, { scale: titleScale.value }],
-  }));
-  const subtitleStyle = useAnimatedStyle(() => ({
-    opacity: subtitleOpacity.value,
-    transform: [{ translateY: subtitleY.value }],
   }));
   const circleBlockStyle = useAnimatedStyle(() => ({
     opacity: circleBlockOpacity.value,
@@ -612,20 +558,14 @@ function SessionCompleteScreen({
   // cream. Ring strokes and ring labels stay dark on the cream disc — no
   // colour switch when the fill crosses them.
   const textColor = palette.cream;
-  const softText = 'rgba(249, 242, 224, 0.85)';
 
   const duration = formatMinutes(durationSeconds);
-  const today = formatMinutes(todaySeconds);
 
   return (
     <View style={styles.root}>
       <StatusBar style={statusStyle} />
 
-      {/* Terracotta reveal disc grows from the done-button position to
-          cover the screen before any content fades in. */}
-      <Animated.View pointerEvents="none" style={[styles.splashCircle, splashAnimStyle]} />
-
-      {/* Content layer — transparent, lives on top of the terracotta disc */}
+      {/* Content layer — terracotta root acts as the static background. */}
       <Animated.View style={[StyleSheet.absoluteFillObject, contentStyle]}>
         <Animated.View
           pointerEvents={phase === 'farewell' ? 'none' : 'auto'}
@@ -671,19 +611,6 @@ function SessionCompleteScreen({
                 </Animated.Text>
               </Animated.View>
 
-              {todaySeconds > durationSeconds && (
-                <Animated.Text
-                  style={[
-                    styles.subtitle,
-                    { color: softText, fontFamily: Fonts.serif },
-                    subtitleStyle,
-                  ]}
-                >
-                  {`today, that's `}
-                  <Text style={styles.subtitleNumeral}>{today.value}</Text>
-                  {` ${today.unit}`}
-                </Animated.Text>
-              )}
             </View>
 
             <View style={styles.interaction}>
@@ -878,9 +805,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 120,
     overflow: 'hidden',
-  },
-  splashCircle: {
-    position: 'absolute',
     backgroundColor: palette.terracotta,
   },
   layout: {
@@ -926,7 +850,7 @@ const styles = StyleSheet.create({
     fontSize: 100,
     fontFamily: Fonts.mono,
     fontVariant: ['tabular-nums'],
-    fontWeight: '400',
+    fontWeight: '600',
     letterSpacing: 1,
     lineHeight: 104,
   },
@@ -934,12 +858,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '400',
     letterSpacing: 0.4,
-  },
-  subtitleNumeral: {
-    fontFamily: Fonts.mono,
-    fontVariant: ['tabular-nums'],
-    fontWeight: '600',
-    letterSpacing: 0.5,
   },
   titleSub: {
     fontSize: 18,
@@ -950,13 +868,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     // Italic `f` in "yourself" clips on the right without a trailing pad.
     paddingHorizontal: 6,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: '300',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    marginTop: 22,
   },
   interaction: {
     width: '100%',
