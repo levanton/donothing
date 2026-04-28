@@ -6,12 +6,21 @@ import {
 } from '@gorhom/bottom-sheet';
 import { haptics } from '@/lib/haptics';
 import { useCallback, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
+
+const SCREEN_W = Dimensions.get('window').width;
+const PAUSE_SIZE = Math.min(Math.round(SCREEN_W * 0.42), 180);
+const pauseImage = require('@/assets/images/pause.png');
 
 interface Props {
   /** Whether the sheet should be expanded. Drives expand/close on
@@ -53,12 +62,33 @@ interface Props {
 // with a different static set, which read as "new dots appearing"
 // the moment pause kicked in. By staying transparent, the user sees
 // the same dots they were watching, simply held in place.
-function TerracottaBackdrop({}: BottomSheetBackdropProps) {
+//
+// The pause icon sits centered in the upper terracotta strip so the
+// "you've stopped" signal lands instantly, before the eye reaches the
+// numbers below. It fades in alongside the sheet (animatedIndex
+// interpolates from -1 closed → 0 open).
+function TerracottaBackdrop({
+  animatedIndex,
+  animatedPosition,
+}: BottomSheetBackdropProps) {
+  const pauseStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      animatedIndex.value,
+      [-1, 0],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+    top: Math.max(0, animatedPosition.value * 0.5 - PAUSE_SIZE / 2),
+  }));
   return (
-    <View
-      pointerEvents="auto"
-      style={StyleSheet.absoluteFillObject}
-    />
+    <View pointerEvents="auto" style={StyleSheet.absoluteFillObject}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pauseImageWrap, pauseStyle]}
+      >
+        <Image source={pauseImage} style={styles.pauseImage} fadeDuration={0} />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -331,6 +361,17 @@ const TERRACOTTA = palette.terracotta;
 const CHIP_LIGHT = '#EBDAB2';
 
 const styles = StyleSheet.create({
+  pauseImageWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  pauseImage: {
+    width: PAUSE_SIZE,
+    height: PAUSE_SIZE,
+    resizeMode: 'contain',
+  },
   body: {
     paddingHorizontal: 28,
     paddingTop: 28,
