@@ -78,7 +78,7 @@ function TerracottaBackdrop({
       [0, 1],
       Extrapolation.CLAMP,
     ),
-    top: Math.max(0, animatedPosition.value * 0.65 - PAUSE_SIZE / 2),
+    top: Math.max(0, animatedPosition.value * 0.65 - PAUSE_SIZE / 2 - 10),
   }));
   return (
     <View pointerEvents="auto" style={StyleSheet.absoluteFillObject}>
