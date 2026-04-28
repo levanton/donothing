@@ -8,13 +8,16 @@ import { haptics } from '@/lib/haptics';
 import { useCallback, useEffect, useRef } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  Extrapolation,
-  interpolate,
+  type SharedValue,
   useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
+import { EASE_OUT } from '@/constants/animations';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
 
@@ -65,19 +68,16 @@ interface Props {
 //
 // The pause icon sits centered in the upper terracotta strip so the
 // "you've stopped" signal lands instantly, before the eye reaches the
-// numbers below. It fades in alongside the sheet (animatedIndex
-// interpolates from -1 closed → 0 open).
+// numbers below. Its opacity is driven by an external SharedValue
+// (parent runs `withTiming` over ~700ms with EASE_OUT) — gorhom's
+// own `animatedIndex` transitions too quickly for the icon to feel
+// like it eases in.
 function TerracottaBackdrop({
-  animatedIndex,
   animatedPosition,
-}: BottomSheetBackdropProps) {
+  iconOpacity,
+}: BottomSheetBackdropProps & { iconOpacity: SharedValue<number> }) {
   const pauseStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      animatedIndex.value,
-      [-1, 0],
-      [0, 1],
-      Extrapolation.CLAMP,
-    ),
+    opacity: iconOpacity.value,
     top: Math.max(0, animatedPosition.value * 0.65 - PAUSE_SIZE / 2 - 10),
   }));
   return (
@@ -107,6 +107,30 @@ function SessionEndedSheet({
 }: Props) {
     const insets = useSafeAreaInsets();
     const internalRef = useRef<BottomSheetModal>(null);
+
+    // Pause-icon opacity is driven manually so the fade-in feels
+    // deliberate (700ms with EASE_OUT, after a small delay so the
+    // icon settles in *after* the sheet has started rising). gorhom's
+    // animatedIndex completes the -1→0 spring in ~200ms which reads as
+    // a pop, not a fade.
+    const iconOpacity = useSharedValue(0);
+    useEffect(() => {
+      if (visible) {
+        iconOpacity.value = withDelay(
+          150,
+          withTiming(1, { duration: 700, easing: EASE_OUT }),
+        );
+      } else {
+        iconOpacity.value = withTiming(0, { duration: 220, easing: EASE_OUT });
+      }
+    }, [visible, iconOpacity]);
+
+    const renderBackdrop = useCallback(
+      (props: BottomSheetBackdropProps) => (
+        <TerracottaBackdrop {...props} iconOpacity={iconOpacity} />
+      ),
+      [iconOpacity],
+    );
 
     // BottomSheetModal renders into a portal — no z-index/layout
     // wrestling with the running camera, and `dismiss()` always
@@ -168,7 +192,7 @@ function SessionEndedSheet({
         enableOverDrag={false}
         enableHandlePanningGesture={false}
         enableContentPanningGesture={false}
-        backdropComponent={TerracottaBackdrop}
+        backdropComponent={renderBackdrop}
         handleComponent={null}
         backgroundStyle={{
           backgroundColor: theme.bg,
