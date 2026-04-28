@@ -113,7 +113,10 @@ export default function DoNothingScreen() {
 
   const accountSheetRef = useRef<BottomSheet>(null);
   const blockSheetRef = useRef<BottomSheet>(null);
-  const sessionEndedSheetRef = useRef<BottomSheet>(null);
+  // SessionEndedSheet is now driven by a `visible` prop instead of a
+  // forwarded ref — the previous useImperativeHandle pattern captured
+  // a stale ref snapshot at mount and silently no-op'd expand() in
+  // some flows. Cleaner and more reliable this way.
   const handleOpenAccount = useCallback(() => {
     accountSheetRef.current?.expand();
   }, []);
@@ -147,6 +150,12 @@ export default function DoNothingScreen() {
   const lastSessionDuration = useAppStore((s) => s.lastSessionDuration);
   const completionVisible = useAppStore((s) => s.completionVisible);
   const sessionEndedVisible = useAppStore((s) => s.sessionEndedVisible);
+  const interruptedDuration = useAppStore((s) => s.interruptedDuration);
+  const cancelReason = useAppStore((s) => s.cancelReason);
+  // True while the user has paused via interrupt — the running UI
+  // freezes (timer + dots) and the SessionEndedSheet takes over with
+  // the continue / start over / back home actions.
+  const paused = useAppStore((s) => s.paused);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
 
   // Block-waiting state: a scheduled block fired and apps are locked until the
@@ -236,6 +245,17 @@ export default function DoNothingScreen() {
     hideOpacity.value = 1;
   }, [sessionEndedVisible]);
 
+  // Stale-state normaliser — clears any leftover sessionEndedVisible
+  // that isn't tied to a manual pause. The recovery sheet flow was
+  // removed, so a non-manual `sessionEndedVisible: true` (e.g. from
+  // a previous app version persisted in the store) would otherwise
+  // sit in the store forever, gating other UI off it.
+  useEffect(() => {
+    if (sessionEndedVisible && cancelReason !== 'manual') {
+      useAppStore.getState().dismissSessionEnded();
+    }
+  }, [sessionEndedVisible, cancelReason]);
+
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
   }));
@@ -272,23 +292,6 @@ export default function DoNothingScreen() {
       blockSheetRef.current?.close();
     }
   }, [blockWaiting]);
-
-  // Drive the session-ended sheet — replaces the old full-screen
-  // SessionEndedView with a bottom-sheet that matches BlockSheet's
-  // design language. The expand call is deferred to the next frame
-  // so the BottomSheet has a tick to mount + measure its content
-  // (enableDynamicSizing) before we ask it to animate up — without
-  // this, a cold-start with a persisted cancelled session can race
-  // and leave the sheet half-mounted.
-  useEffect(() => {
-    if (sessionEndedVisible) {
-      const r = requestAnimationFrame(() => {
-        sessionEndedSheetRef.current?.expand();
-      });
-      return () => cancelAnimationFrame(r);
-    }
-    sessionEndedSheetRef.current?.close();
-  }, [sessionEndedVisible]);
 
   // --- History slide ---
   const SCREEN_H = Dimensions.get('window').height;
@@ -789,21 +792,50 @@ export default function DoNothingScreen() {
 
   const handleStop = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const elapsed = useAppStore.getState().elapsed;
+    if (elapsed > 0) {
+      // Pause the timer and let the SessionEndedSheet take over with
+      // the continue / start over / back home actions. The session
+      // stays alive (started: true) so resume can pick up from the
+      // frozen elapsed.
+      useAppStore.getState().pauseSession();
+      return;
+    }
+    // Nothing elapsed — quick stop straight back to home.
     deactivateKeepAwake('session');
     setDistractionFree(false);
     await useAppStore.getState().stopSession();
-    // Camera shrinks back via the runExpand effect; here we just
-    // reverse the resting-state visuals: timer fade, header morph.
+    runResetAnimations();
+  }, []);
+
+  // Reset the resting-state visuals after a session truly ends.
+  const runResetAnimations = useCallback(() => {
     timerOpacity.value = withTiming(0.9, { duration: 700 });
-    // "ing" disappears
     showOpacity.value = withTiming(0, { duration: 400 });
     showWidth.value = withTiming(0, { duration: 860 });
-    // "Ready to " and "?" reappear
     hideWidth.value = withTiming(1, { duration: 690 });
     hideOpacity.value = withTiming(1, { duration: 1125 });
-    // Reset elapsed after animations finish
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
   }, []);
+
+  // Sheet handlers — only used in the manual pause flow.
+  const handleSheetContinue = useCallback(() => {
+    useAppStore.getState().resumeSession();
+    useAppStore.getState().dismissSessionEnded();
+  }, []);
+
+  const handleSheetStartOver = useCallback(() => {
+    useAppStore.getState().restartSession();
+    useAppStore.getState().dismissSessionEnded();
+  }, []);
+
+  const handleSheetEnd = useCallback(async () => {
+    deactivateKeepAwake('session');
+    setDistractionFree(false);
+    await useAppStore.getState().stopSession();
+    useAppStore.getState().dismissSessionEnded();
+    runResetAnimations();
+  }, [runResetAnimations]);
 
   const handleCompletionClose = useCallback(() => {
     useAppStore.getState().dismissCompletion();
@@ -900,25 +932,6 @@ export default function DoNothingScreen() {
               >
                 <Feather
                   name='flag'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={() =>
-                  useAppStore.setState({
-                    sessionEndedVisible: true,
-                    cancelReason: 'backgrounded',
-                  })
-                }
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='alert-octagon'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}
@@ -1345,6 +1358,132 @@ export default function DoNothingScreen() {
         </Animated.View>
       </GestureDetector>
 
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.runCamera,
+          { backgroundColor: theme.accent },
+          terraCameraStyle,
+        ]}
+      />
+
+      {/* Running UI — cream-on-terracotta. Stays mounted briefly after
+          a session ends so the fade-out reads alongside the camera
+          shrinking, then unmounts cleanly. */}
+      {runUiMounted && (
+        <Animated.View
+          style={[styles.runLayer, runUiStyle]}
+          pointerEvents="box-none"
+        >
+          {/* Drifting cream dots — atmospheric layer that floats up
+              through the screen, like dust motes in golden-hour
+              light. Behind the timer in z-order. Wrapped so the
+              hide-toggle fades the whole layer alongside everything
+              else, instead of cutting it off mid-motion. Frozen
+              while paused so the room feels stilled by the user's
+              interruption. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, distractionStyle]}
+            pointerEvents="none"
+          >
+            <DriftingDots
+              active={runUiMounted && !paused}
+              color={palette.cream}
+            />
+          </Animated.View>
+
+          {/* Big cream timer at vertical centre. Each digit slides
+              and fades as it ticks; the whole block fades smoothly
+              with the hide-toggle. */}
+          <Animated.View
+            style={[styles.runCenter, distractionStyle]}
+            pointerEvents="none"
+          >
+            <AnimatedTimerDisplay
+              seconds={
+                goalSeconds > 0
+                  ? Math.max(0, goalSeconds - elapsed)
+                  : elapsed
+              }
+              color={palette.cream}
+              fontSize={96}
+            />
+          </Animated.View>
+
+          {/* Running controls — interrupt + hide. Hidden when paused
+              so they don't peek through the SessionEndedSheet
+              backdrop while it animates in. */}
+          {!paused && (
+            <>
+              <Animated.View
+                style={[
+                  styles.runStopWrap,
+                  { bottom: insets.bottom + 30 },
+                  distractionStyle,
+                ]}
+                pointerEvents={distractionFree ? 'none' : 'auto'}
+              >
+                <Pressable
+                  onPress={handleStop}
+                  style={styles.runStopPill}
+                  hitSlop={12}
+                >
+                  <Text
+                    style={[
+                      styles.runStopLabel,
+                      { fontFamily: Fonts!.serif },
+                    ]}
+                  >
+                    interrupt
+                  </Text>
+                </Pressable>
+              </Animated.View>
+
+              <Animated.View
+                style={[
+                  styles.runHideStack,
+                  { bottom: insets.bottom + 110 },
+                  distractionStyle,
+                ]}
+                pointerEvents={distractionFree ? 'none' : 'box-none'}
+              >
+                <Pressable
+                  onPress={toggleDistractionFree}
+                  style={styles.runHideIconBtn}
+                  hitSlop={16}
+                >
+                  <Feather
+                    name="eye-off"
+                    size={18}
+                    color={palette.cream}
+                    style={{ opacity: 0.78 }}
+                  />
+                </Pressable>
+                <Text
+                  style={[
+                    styles.runHideHint,
+                    { fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  tap so nothing distracts
+                </Text>
+              </Animated.View>
+            </>
+          )}
+
+          {/* Tap-anywhere overlay — only catches taps in distraction-
+              free mode, where it toggles distraction-free off. The
+              session itself is still controlled by the explicit stop
+              link, so no risk of accidental cancellation. */}
+          {distractionFree && (
+            <Pressable
+              onPress={toggleDistractionFree}
+              style={StyleSheet.absoluteFillObject}
+            />
+          )}
+        </Animated.View>
+      )}
+
       {/* Shared account sheet — available from Settings header and from both gates */}
       <AccountSheet
         ref={accountSheetRef}
@@ -1361,21 +1500,30 @@ export default function DoNothingScreen() {
         onUnlock={handleForceUnlock}
       />
 
-      {/* Session-ended sheet — appears when a session was cut short
-          (e.g. the app got backgrounded). Replaces the old full-
-          screen view with a bottom-sheet so the experience feels
-          consistent with BlockSheet. */}
+      {/* Session-ended sheet — only the manual pause flow
+          (continue / start over / back home) shows it. The
+          backgrounded recovery sheet was intentionally removed,
+          so any non-manual sessionEndedVisible state is treated
+          as stale and the sheet stays closed. */}
       <SessionEndedSheet
-        ref={sessionEndedSheetRef}
+        visible={sessionEndedVisible && cancelReason === 'manual'}
         theme={theme}
-        onStartAgain={() => useAppStore.getState().dismissSessionEnded()}
+        interruptedDuration={interruptedDuration}
+        goalSeconds={goalSeconds}
+        cancelReason={cancelReason}
+        onContinue={handleSheetContinue}
+        onStartOver={handleSheetStartOver}
+        onEnd={handleSheetEnd}
       />
 
       {/* Floating Journey label — the one shared element that morphs between the
         home pill and the Journey heading as the panel slides up. Hidden while
-        a session is running or a scheduled block is waiting so the timer UI
-        gets the spotlight. */}
-      {btnRect && headingRect && !started && !blockWaiting && (
+        a session is running or a scheduled block is waiting — those overlays
+        own the screen and the floating proxy would otherwise peek through. */}
+      {btnRect &&
+        headingRect &&
+        !started &&
+        !blockWaiting && (
         <Animated.Text
           pointerEvents='none'
           style={[
@@ -1413,129 +1561,6 @@ export default function DoNothingScreen() {
         yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
       />
-
-      {/* Terracotta camera — yes button expanded into a full-screen
-          sheet on session start. Crisp width/height animation (not
-          scale) so the edges stay sharp during the grow. Always
-          mounted; the animated style gates visibility via opacity. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.runCamera,
-          { backgroundColor: theme.accent },
-          terraCameraStyle,
-        ]}
-      />
-
-      {/* Running UI — cream-on-terracotta. Stays mounted briefly after
-          a session ends so the fade-out reads alongside the camera
-          shrinking, then unmounts cleanly. */}
-      {runUiMounted && (
-        <Animated.View
-          style={[styles.runLayer, runUiStyle]}
-          pointerEvents="box-none"
-        >
-          {/* Drifting cream dots — atmospheric layer that floats up
-              through the screen, like dust motes in golden-hour
-              light. Behind the timer in z-order. Wrapped so the
-              hide-toggle fades the whole layer alongside everything
-              else, instead of cutting it off mid-motion. */}
-          <Animated.View
-            style={[StyleSheet.absoluteFill, distractionStyle]}
-            pointerEvents="none"
-          >
-            <DriftingDots active={runUiMounted} color={palette.cream} />
-          </Animated.View>
-
-          {/* Big cream timer at vertical centre. Each digit slides
-              and fades as it ticks; the whole block fades smoothly
-              with the hide-toggle. */}
-          <Animated.View
-            style={[styles.runCenter, distractionStyle]}
-            pointerEvents="none"
-          >
-            <AnimatedTimerDisplay
-              seconds={
-                goalSeconds > 0
-                  ? Math.max(0, goalSeconds - elapsed)
-                  : elapsed
-              }
-              color={palette.cream}
-              fontSize={96}
-            />
-          </Animated.View>
-
-          {/* Interrupt is the primary action — substantial cream-
-              outline pill at the very bottom, reachable thumb. */}
-          <Animated.View
-            style={[
-              styles.runStopWrap,
-              { bottom: insets.bottom + 30 },
-              distractionStyle,
-            ]}
-            pointerEvents={distractionFree ? 'none' : 'auto'}
-          >
-            <Pressable
-              onPress={handleStop}
-              style={styles.runStopPill}
-              hitSlop={12}
-            >
-              <Text
-                style={[
-                  styles.runStopLabel,
-                  { fontFamily: Fonts!.serif },
-                ]}
-              >
-                interrupt
-              </Text>
-            </Pressable>
-          </Animated.View>
-
-          {/* Hide is secondary — small eye-off icon above the
-              interrupt pill, with its hint underneath. Lighter
-              border, smaller tap area so it reads as auxiliary. */}
-          <Animated.View
-            style={[
-              styles.runHideStack,
-              { bottom: insets.bottom + 110 },
-              distractionStyle,
-            ]}
-            pointerEvents={distractionFree ? 'none' : 'box-none'}
-          >
-            <Pressable
-              onPress={toggleDistractionFree}
-              style={styles.runHideIconBtn}
-              hitSlop={16}
-            >
-              <Feather
-                name="eye-off"
-                size={18}
-                color={palette.cream}
-                style={{ opacity: 0.78 }}
-              />
-            </Pressable>
-            <Text
-              style={[
-                styles.runHideHint,
-                { fontFamily: Fonts!.serif },
-              ]}
-            >
-              tap so nothing distracts
-            </Text>
-          </Animated.View>
-
-          {/* Tap-anywhere overlay — only catches taps in distraction-
-              free mode, where it toggles distraction-free off. The
-              session itself is still controlled by the explicit stop
-              link, so no risk of accidental cancellation. */}
-          {distractionFree && (
-            <Pressable
-              onPress={toggleDistractionFree}
-              style={StyleSheet.absoluteFillObject}
-            />
-          )}
-        </Animated.View>
-      )}
 
       {/* Launch splash — terracotta sheet that covers the screen and
           shrinks in place onto the measured yes button */}
@@ -1771,11 +1796,16 @@ const styles = StyleSheet.create({
     zIndex: 500,
     overflow: 'hidden',
   },
-  // Terracotta camera — yes button expanded to fill the screen during
-  // a session. Shares the splash's positioning math.
+  // Terracotta camera — yes button expanded to fill the screen
+  // during a session. Shares the splash's positioning math. No
+  // explicit zIndex: render order alone keeps it above the resting
+  // content (rendered earlier as a sibling) and below the bottom
+  // sheets (rendered later). An explicit zIndex here would shove
+  // the camera above the SessionEndedSheet and break the manual
+  // pause flow, since gorhom's HostingContainer is not absolutely
+  // positioned and zIndex on its containerStyle isn't reliable.
   runCamera: {
     position: 'absolute',
-    zIndex: 400,
   },
   runLayer: {
     position: 'absolute',
@@ -1783,7 +1813,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 410,
     alignItems: 'center',
     justifyContent: 'center',
   },

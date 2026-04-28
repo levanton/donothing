@@ -9,6 +9,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+// Tiny epsilon — t.value below this is treated as "never started"
+// (the cycle hadn't crossed the initial-stagger gate yet), so we
+// re-apply the stagger delay rather than resuming from "0".
+const RESUME_EPSILON = 1e-4;
+
 // Drifting warm-tone dots that float upward across the running
 // screen, like dust motes in golden-hour light. Mixed colours +
 // mixed sizes give the layer constellation-like variety so it never
@@ -16,7 +21,7 @@ import Animated, {
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 
-const DOT_DURATION = 22000;
+const DOT_DURATION = 28000;
 // Dots travel the full screen — from just above the bottom edge all
 // the way past the top safe-area, fading out as they leave.
 const BAND_BOTTOM = SCREEN_H * 0.95;
@@ -38,29 +43,29 @@ interface DotConfig {
   color: string;
 }
 
-// 18 dots, staggered ~1220ms apart so the layer always has a few in
-// frame at the new slower 22s drift duration. Sizes 4–7px, mixed
+// 18 dots, staggered ~1555ms apart so the layer always has a few in
+// frame at the new slower 28s drift duration. Sizes 4–7px, mixed
 // colours, varied sway so neighbouring dots don't look like a
 // synchronized pattern.
 const DOTS: DotConfig[] = [
   { startX: -SCREEN_W * 0.38, swayAmplitude: 22, swayPhase: 0.0, delay: 0,     peakOpacity: 0.36, size: 5, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.20, swayAmplitude: 30, swayPhase: 0.3, delay: 1220,  peakOpacity: 0.44, size: 4, color: COLOR_SALMON },
-  { startX:  SCREEN_W * 0.04, swayAmplitude: 18, swayPhase: 0.6, delay: 2440,  peakOpacity: 0.40, size: 7, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.22, swayAmplitude: 26, swayPhase: 0.1, delay: 3660,  peakOpacity: 0.32, size: 5, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.30, swayAmplitude: 28, swayPhase: 0.4, delay: 4880,  peakOpacity: 0.46, size: 6, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.36, swayAmplitude: 20, swayPhase: 0.7, delay: 6100,  peakOpacity: 0.34, size: 4, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.08, swayAmplitude: 24, swayPhase: 0.2, delay: 7320,  peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.42, swayAmplitude: 16, swayPhase: 0.5, delay: 8540,  peakOpacity: 0.30, size: 5, color: COLOR_SALMON },
-  { startX:  SCREEN_W * 0.12, swayAmplitude: 32, swayPhase: 0.8, delay: 9760,  peakOpacity: 0.40, size: 4, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.42, swayAmplitude: 22, swayPhase: 0.0, delay: 10980, peakOpacity: 0.36, size: 6, color: COLOR_CREAM },
-  { startX: -SCREEN_W * 0.12, swayAmplitude: 28, swayPhase: 0.55,delay: 12200, peakOpacity: 0.44, size: 7, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.26, swayAmplitude: 18, swayPhase: 0.25,delay: 13420, peakOpacity: 0.32, size: 4, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.30, swayAmplitude: 26, swayPhase: 0.75,delay: 14640, peakOpacity: 0.38, size: 5, color: COLOR_CREAM },
-  { startX:  SCREEN_W * 0.00, swayAmplitude: 14, swayPhase: 0.45,delay: 15860, peakOpacity: 0.40, size: 6, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.34, swayAmplitude: 24, swayPhase: 0.65,delay: 17080, peakOpacity: 0.34, size: 5, color: COLOR_SAND },
-  { startX:  SCREEN_W * 0.18, swayAmplitude: 20, swayPhase: 0.15,delay: 18300, peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
-  { startX:  SCREEN_W * 0.06, swayAmplitude: 30, swayPhase: 0.85,delay: 19520, peakOpacity: 0.36, size: 4, color: COLOR_SALMON },
-  { startX: -SCREEN_W * 0.04, swayAmplitude: 26, swayPhase: 0.35,delay: 20740, peakOpacity: 0.38, size: 6, color: COLOR_SAND },
+  { startX: -SCREEN_W * 0.20, swayAmplitude: 30, swayPhase: 0.3, delay: 1555,  peakOpacity: 0.44, size: 4, color: COLOR_SALMON },
+  { startX:  SCREEN_W * 0.04, swayAmplitude: 18, swayPhase: 0.6, delay: 3110,  peakOpacity: 0.40, size: 7, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.22, swayAmplitude: 26, swayPhase: 0.1, delay: 4665,  peakOpacity: 0.32, size: 5, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.30, swayAmplitude: 28, swayPhase: 0.4, delay: 6220,  peakOpacity: 0.46, size: 6, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.36, swayAmplitude: 20, swayPhase: 0.7, delay: 7775,  peakOpacity: 0.34, size: 4, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.08, swayAmplitude: 24, swayPhase: 0.2, delay: 9330,  peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.42, swayAmplitude: 16, swayPhase: 0.5, delay: 10885, peakOpacity: 0.30, size: 5, color: COLOR_SALMON },
+  { startX:  SCREEN_W * 0.12, swayAmplitude: 32, swayPhase: 0.8, delay: 12440, peakOpacity: 0.40, size: 4, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.42, swayAmplitude: 22, swayPhase: 0.0, delay: 13995, peakOpacity: 0.36, size: 6, color: COLOR_CREAM },
+  { startX: -SCREEN_W * 0.12, swayAmplitude: 28, swayPhase: 0.55,delay: 15550, peakOpacity: 0.44, size: 7, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.26, swayAmplitude: 18, swayPhase: 0.25,delay: 17105, peakOpacity: 0.32, size: 4, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.30, swayAmplitude: 26, swayPhase: 0.75,delay: 18660, peakOpacity: 0.38, size: 5, color: COLOR_CREAM },
+  { startX:  SCREEN_W * 0.00, swayAmplitude: 14, swayPhase: 0.45,delay: 20215, peakOpacity: 0.40, size: 6, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.34, swayAmplitude: 24, swayPhase: 0.65,delay: 21770, peakOpacity: 0.34, size: 5, color: COLOR_SAND },
+  { startX:  SCREEN_W * 0.18, swayAmplitude: 20, swayPhase: 0.15,delay: 23325, peakOpacity: 0.42, size: 7, color: COLOR_CREAM },
+  { startX:  SCREEN_W * 0.06, swayAmplitude: 30, swayPhase: 0.85,delay: 24880, peakOpacity: 0.36, size: 4, color: COLOR_SALMON },
+  { startX: -SCREEN_W * 0.04, swayAmplitude: 26, swayPhase: 0.35,delay: 26435, peakOpacity: 0.38, size: 6, color: COLOR_SAND },
 ];
 
 interface DriftingDotProps {
@@ -75,17 +80,40 @@ const DriftingDot = memo(function DriftingDot({ config, active }: DriftingDotPro
 
   useEffect(() => {
     if (!active) {
+      // Freeze in place. NO `t.value = 0` reset — that's what made
+      // pausing send the dots back to the bottom of the screen.
       cancelAnimation(t);
-      t.value = 0;
       return;
     }
-    const timer = setTimeout(() => {
-      t.value = withRepeat(
-        withTiming(1, { duration: DOT_DURATION, easing: Easing.linear }),
-        -1,
-        false,
+    const startCycle = () => {
+      // From the current position, finish the in-flight cycle (only
+      // covers the remaining 1 - t fraction at the original rate),
+      // then snap back to 0 and repeat indefinitely. Without the
+      // partial first leg, withRepeat would run a full DOT_DURATION
+      // cycle starting from the resume point, which both stretches
+      // the timing and visibly skips the dot to the top.
+      const remaining = 1 - t.value;
+      t.value = withTiming(
+        1,
+        { duration: remaining * DOT_DURATION, easing: Easing.linear },
+        (finished) => {
+          if (!finished) return;
+          t.value = 0;
+          t.value = withRepeat(
+            withTiming(1, { duration: DOT_DURATION, easing: Easing.linear }),
+            -1,
+            false,
+          );
+        },
       );
-    }, config.delay);
+    };
+    // First entrance — apply the stagger so dots don't all surface
+    // at once. Resume — start immediately from the frozen position.
+    if (t.value > RESUME_EPSILON) {
+      startCycle();
+      return () => cancelAnimation(t);
+    }
+    const timer = setTimeout(startCycle, config.delay);
     return () => {
       clearTimeout(timer);
       cancelAnimation(t);

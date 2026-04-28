@@ -64,6 +64,11 @@ export interface AppState {
   // Timer / Session
   elapsed: number;
   started: boolean;
+  // True while a manual interrupt sheet is open and the user is
+  // deciding whether to continue or end. The timer interval is
+  // cleared but `started` stays true so the camera keeps the
+  // running visual state behind the sheet.
+  paused: boolean;
   weekStats: WeekDay[];
   ready: boolean;
 
@@ -105,7 +110,15 @@ export interface AppState {
 
   // Session interruption
   sessionEndedVisible: boolean;
-  cancelReason: 'backgrounded' | null;
+  // 'backgrounded' = the OS pulled focus mid-session (treated as a
+  // soft cancel, no DB save); 'manual' = the user pressed `interrupt`
+  // explicitly and the session was saved.
+  cancelReason: 'backgrounded' | 'manual' | null;
+  // Seconds elapsed at the moment a session was cancelled. Null when
+  // the duration is unknown (e.g. cold-start recovery — the app was
+  // killed and we have no reliable way to tell how long the user was
+  // away). Drives the SessionEndedSheet's hero number.
+  interruptedDuration: number | null;
 
   // Onboarding
   onboardingComplete: boolean;
@@ -126,6 +139,14 @@ export interface AppState {
   init: () => Promise<void>;
   startSession: () => void;
   stopSession: () => Promise<void>;
+  // Manual interrupt — pause the timer without saving so the user
+  // can decide (continue, start over, or end).
+  pauseSession: () => void;
+  // Resume a paused session, picking up from the frozen elapsed.
+  resumeSession: () => void;
+  // Save what's elapsed so far + reset the same session to 0 and
+  // keep running. Used from the interrupt sheet's "start over".
+  restartSession: () => void;
   resetElapsed: () => void;
   toggleTheme: () => void;
   setSubscription: (isSubscribed: boolean) => void;
@@ -163,6 +184,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Initial values
   elapsed: 0,
   started: false,
+  paused: false,
   weekStats: [],
   ready: false,
   themeMode: 'dark',
@@ -186,6 +208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Session interruption
   sessionEndedVisible: false,
   cancelReason: null,
+  interruptedDuration: null,
 
   // Settings
   settingsOpen: false,
@@ -233,20 +256,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load milestones
     const achievedMilestones = getAchievedMilestones();
 
-    // Cold-start recovery: if a session was pending when the app was killed,
-    // treat it as cancelled (we can't verify the user wasn't on another app).
+    // Cold-start cleanup: drop any leftover pending session silently.
+    // The recovery sheet (cancelReason: 'backgrounded') is intentionally
+    // suppressed — only the manual pause flow shows the sheet now.
     const pending = readPendingSession();
-    let sessionEndedVisible = getDeviceState(SESSION_CANCELLED_KEY) === '1';
-    let cancelReason: 'backgrounded' | null = sessionEndedVisible ? 'backgrounded' : null;
     if (pending) {
       if (pending.notificationId) {
         try { await cancelNotification(pending.notificationId); } catch {}
       }
       clearPendingSession();
-      setDeviceState(SESSION_CANCELLED_KEY, '1');
-      sessionEndedVisible = true;
-      cancelReason = 'backgrounded';
     }
+    try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
 
     set({
       themeMode,
@@ -255,8 +275,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       scheduledBlocks,
       achievedMilestones,
       weekStats: getWeekStats(),
-      sessionEndedVisible,
-      cancelReason,
+      sessionEndedVisible: false,
+      cancelReason: null,
       ready: true,
     });
   },
@@ -300,10 +320,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionNotificationId = null;
     }
     clearPendingSession();
-    const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    // Use displayed elapsed instead of (Date.now() - sessionStartTime)
+    // so paused sessions save the frozen value, not real-time-since-
+    // start (which would over-count by the pause duration).
+    const duration = get().elapsed;
     const session = dbAddSession(duration);
     set({
       started: false,
+      paused: false,
       weekStats: getWeekStats(),
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
@@ -312,6 +336,108 @@ export const useAppStore = create<AppState>((set, get) => ({
       goalSeconds: get().sliderMinutes * 60,
     });
     get().checkMilestones();
+  },
+
+  pauseSession: () => {
+    if (!get().started || get().paused) return;
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    // Cancel the scheduled completion notification — its trigger
+    // time was set at session-start and would fire mid-pause,
+    // notifying the user that a session "ended" while they're still
+    // deciding what to do. Will be rescheduled on resume.
+    if (sessionNotificationId) {
+      cancelNotification(sessionNotificationId).catch(() => {});
+      sessionNotificationId = null;
+    }
+    // Open the SessionEndedSheet (gorhom) in 'manual' mode — the
+    // sheet is what surfaces continue / start over / back home.
+    // The session itself stays alive (started: true) so resume can
+    // pick up from the frozen elapsed.
+    set({
+      paused: true,
+      sessionEndedVisible: true,
+      cancelReason: 'manual',
+      interruptedDuration: get().elapsed,
+    });
+  },
+
+  resumeSession: () => {
+    if (!get().started || !get().paused) return;
+    // Re-anchor sessionStartTime to the frozen elapsed so the next
+    // interval tick continues from where we paused.
+    const elapsed = get().elapsed;
+    sessionStartTime = Date.now() - elapsed * 1000;
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
+    }, 1000);
+    set({ paused: false });
+    // Re-schedule the completion notification for the remaining time
+    // (countdown sessions only). Without this, a paused-then-resumed
+    // session would silently complete in-app with no system alert.
+    const goalSeconds = get().goalSeconds;
+    if (goalSeconds > 0) {
+      const remaining = Math.max(1, goalSeconds - elapsed);
+      const remainingMin = Math.max(1, Math.round(remaining / 60));
+      scheduleSessionCompleteNotification(remaining, remainingMin)
+        .then((id) => {
+          sessionNotificationId = id;
+          writePendingSession({
+            startedAt: sessionStartTime,
+            goalSeconds,
+            notificationId: id,
+          });
+        })
+        .catch(() => {
+          writePendingSession({
+            startedAt: sessionStartTime,
+            goalSeconds,
+            notificationId: null,
+          });
+        });
+    } else {
+      writePendingSession({
+        startedAt: sessionStartTime,
+        goalSeconds: 0,
+        notificationId: null,
+      });
+    }
+  },
+
+  restartSession: () => {
+    if (!get().started) return;
+    // Cancel any pending completion notification — its scheduled
+    // time is no longer valid since we're resetting elapsed to 0.
+    if (sessionNotificationId) {
+      cancelNotification(sessionNotificationId).catch(() => {});
+      sessionNotificationId = null;
+    }
+    // Save what they did so far so it's not lost from history.
+    const prevElapsed = get().elapsed;
+    if (prevElapsed > 0) {
+      dbAddSession(prevElapsed);
+    }
+    // Reset and (re)start the timer.
+    sessionStartTime = Date.now();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
+    }, 1000);
+    set({
+      elapsed: 0,
+      paused: false,
+      weekStats: getWeekStats(),
+    });
+    // Re-write pendingSession with fresh start time.
+    const goalSeconds = get().goalSeconds;
+    writePendingSession({
+      startedAt: sessionStartTime,
+      goalSeconds,
+      notificationId: null,
+    });
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
@@ -482,7 +608,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // --- Interruption handling ---
-  cancelSession: async (reason) => {
+  cancelSession: async (_reason) => {
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
@@ -492,24 +618,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionNotificationId = null;
     }
     clearPendingSession();
-    setDeviceState(SESSION_CANCELLED_KEY, '1');
+    // Silent cancel — drops the running session without showing the
+    // recovery sheet. The "session interrupted / back home" UI was
+    // intentionally removed; only the manual pause flow surfaces a
+    // sheet now (set up in pauseSession).
     set({
       started: false,
+      paused: false,
       elapsed: 0,
-      sessionEndedVisible: true,
-      cancelReason: reason,
+      sessionEndedVisible: false,
+      cancelReason: null,
+      interruptedDuration: null,
     });
   },
 
   dismissSessionEnded: () => {
     try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
-    set({ sessionEndedVisible: false, cancelReason: null });
+    set({
+      sessionEndedVisible: false,
+      cancelReason: null,
+      interruptedDuration: null,
+    });
   },
 
   // --- AppState ---
   handleBackground: async () => {
-    const { started } = get();
-    if (!started) return;
+    const { started, paused } = get();
+    // Skip when not running, or when the user has explicitly paused
+    // — the manual sheet should survive a brief background trip
+    // (screenshot, glance at notifications) so they can still resume.
+    if (!started || paused) return;
     await get().cancelSession('backgrounded');
   },
 
