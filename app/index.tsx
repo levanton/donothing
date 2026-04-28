@@ -755,6 +755,21 @@ export default function DoNothingScreen() {
     opacity: distractionFade.value,
   }));
 
+  // Pause fade — drops the running-screen timer (and only the
+  // timer, not the camera or drifting dots) to zero opacity while
+  // the manual pause sheet is up, so the user doesn't see the same
+  // MM:SS twice (once on the running screen, once on the sheet).
+  const pausedTimerFade = useSharedValue(1);
+  const pausedTimerStyle = useAnimatedStyle(() => ({
+    opacity: pausedTimerFade.value,
+  }));
+  useEffect(() => {
+    pausedTimerFade.value = withTiming(paused ? 0 : 1, {
+      duration: 280,
+      easing: Easing.inOut(Easing.cubic),
+    });
+  }, [paused]);
+
   // --- Distraction-free mode: hide timer & button while running ---
   const [distractionFree, setDistractionFree] = useState(false);
 
@@ -1394,9 +1409,11 @@ export default function DoNothingScreen() {
 
           {/* Big cream timer at vertical centre. Each digit slides
               and fades as it ticks; the whole block fades smoothly
-              with the hide-toggle. */}
+              with the hide-toggle, and drops to zero while the
+              manual pause sheet is up so the same MM:SS isn't
+              duplicated above and below the sheet. */}
           <Animated.View
-            style={[styles.runCenter, distractionStyle]}
+            style={[styles.runCenter, distractionStyle, pausedTimerStyle]}
             pointerEvents="none"
           >
             <AnimatedTimerDisplay

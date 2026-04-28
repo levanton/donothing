@@ -104,7 +104,12 @@ function SessionEndedSheet({
     const remaining = hasGoal ? Math.max(0, goalSeconds - elapsed) : 0;
     const heroSeconds = hasGoal ? remaining : elapsed;
     const heroLabel = hasGoal ? 'left to do nothing' : 'so far';
-    const eyebrow = hasGoal ? 'still to go' : 'paused';
+    // Eyebrow is the context badge ("you're on a pause"); the caption
+    // under the big number is the label of the number itself ("this is
+    // what's left"). Keeping eyebrow="paused" for both modes avoids the
+    // earlier dupe where "still to go" + "left to do nothing" said the
+    // same thing twice.
+    const eyebrow = 'paused';
     const progressPct = hasGoal
       ? Math.min(100, Math.max(0, (elapsed / goalSeconds) * 100))
       : 0;
