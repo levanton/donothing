@@ -101,10 +101,12 @@ export function useAppLifecycle(
     // background's set() lands, leaving stale state for pollBlockUnlock.
     let bgInFlight: Promise<void> | null = null;
     const sub = AppState.addEventListener('change', async (nextState) => {
-      // Only 'background' ends a session flow. 'inactive' covers Control
-      // Center / notification drawer / incoming-call preview — those don't
-      // count as leaving the app.
-      if (nextState === 'background' && isActiveRef.current) {
+      // Anything that's not 'active' counts as the user stepping away —
+      // App Switcher (swipe-up gesture), Notification Center, Control
+      // Center, incoming-call preview, lock-screen unlock animation. The
+      // app philosophy is "do nothing", so glancing at any of those breaks
+      // the session the same way as backgrounding does.
+      if (nextState !== 'active' && isActiveRef.current) {
         isActiveRef.current = false;
         deactivateKeepAwake('session');
         bgInFlight = useAppStore.getState().handleBackground();
