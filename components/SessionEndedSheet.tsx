@@ -89,17 +89,15 @@ function SessionEndedSheet({
     // sibling to the modal) — putting it inside the backdrop tied its
     // position to gorhom's animatedPosition, so on dismiss it slid down
     // with the sheet instead of fading in place. With its own
-    // SharedValue we control fade-in (delayed 250ms after present, then
-    // 800ms ease-out) and fade-out (250ms) independently of the sheet.
+    // SharedValue we drive fade-in / fade-out alongside the sheet's
+    // own animation (no delay — the icon should land WITH the sheet,
+    // not after it) and dismiss in the same window.
     const iconOpacity = useSharedValue(0);
     useEffect(() => {
       if (visible) {
-        iconOpacity.value = withDelay(
-          250,
-          withTiming(1, { duration: 800, easing: EASE_OUT }),
-        );
+        iconOpacity.value = withTiming(1, { duration: 360, easing: EASE_OUT });
       } else {
-        iconOpacity.value = withTiming(0, { duration: 250, easing: EASE_OUT });
+        iconOpacity.value = withTiming(0, { duration: 220, easing: EASE_OUT });
       }
     }, [visible, iconOpacity]);
 
