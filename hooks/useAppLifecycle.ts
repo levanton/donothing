@@ -96,9 +96,9 @@ export function useAppLifecycle(
   useEffect(() => {
     const cancelledRef = { current: false };
     // Serialize bg/fg transitions — handleBackground is async (it calls
-    // cancelSession which awaits a notification cancel). A fast bg→fg
-    // toggle can have foreground run before background's set() lands,
-    // leaving stale state for pollBlockUnlock to read.
+    // pauseSession which freezes the timer + surfaces the interrupt
+    // sheet). A fast bg→fg toggle can have foreground run before
+    // background's set() lands, leaving stale state for pollBlockUnlock.
     let bgInFlight: Promise<void> | null = null;
     const sub = AppState.addEventListener('change', async (nextState) => {
       // Only 'background' ends a session flow. 'inactive' covers Control

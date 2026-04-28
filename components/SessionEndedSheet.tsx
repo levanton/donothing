@@ -27,11 +27,10 @@ interface Props {
   /** Configured goal in seconds — shown as context when the user had
       a countdown set. */
   goalSeconds: number;
-  /** What ended the session — drives the eyebrow + caption copy and
-      which action set the sheet shows. 'manual' = pause-and-ask
-      (continue / start over / end); 'backgrounded' or null = single
-      "back home" acknowledgement. */
-  cancelReason: 'backgrounded' | 'manual' | null;
+  /** What ended the session — currently always 'manual' when the sheet
+      is visible (interrupt button or backgrounding both delegate to
+      pauseSession). Kept as a discriminator for future flows. */
+  cancelReason: 'manual' | null;
   /** 'block' when the running session was triggered by a scheduled
       block (apps still locked behind Screen Time); 'normal' for any
       user-started session. Drives the third action's label. */

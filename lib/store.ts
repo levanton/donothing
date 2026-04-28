@@ -166,14 +166,12 @@ export interface AppState {
 
   // Session interruption
   sessionEndedVisible: boolean;
-  // 'backgrounded' = the OS pulled focus mid-session (treated as a
-  // soft cancel, no DB save); 'manual' = the user pressed `interrupt`
-  // explicitly and the session was saved.
-  cancelReason: 'backgrounded' | 'manual' | null;
-  // Seconds elapsed at the moment a session was cancelled. Null when
-  // the duration is unknown (e.g. cold-start recovery — the app was
-  // killed and we have no reliable way to tell how long the user was
-  // away). Drives the SessionEndedSheet's hero number.
+  // 'manual' = the user pressed interrupt OR backgrounded the app
+  // (handleBackground delegates to pauseSession). null = no active
+  // pause; sheet shouldn't render.
+  cancelReason: 'manual' | null;
+  // Seconds elapsed at the moment a session was paused. Drives the
+  // SessionEndedSheet's hero number.
   interruptedDuration: number | null;
 
   // Onboarding
@@ -188,7 +186,6 @@ export interface AppState {
   checkMilestones: () => void;
 
   // Interruption actions
-  cancelSession: (reason: 'backgrounded') => Promise<void>;
   dismissSessionEnded: () => void;
 
   // Actions
@@ -781,35 +778,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // --- Interruption handling ---
-  cancelSession: async (_reason) => {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    if (sessionNotificationId) {
-      try { await cancelNotification(sessionNotificationId); } catch {}
-      sessionNotificationId = null;
-    }
-    clearPendingSession();
-    // Silent cancel — drops the running session without showing the
-    // recovery sheet. The "session interrupted / back home" UI was
-    // intentionally removed; only the manual pause flow surfaces a
-    // sheet now (set up in pauseSession).
-    set({
-      started: false,
-      paused: false,
-      sessionOrigin: 'normal',
-      elapsed: 0,
-      sessionEndedVisible: false,
-      cancelReason: null,
-      interruptedDuration: null,
-      // Same reason as completeSession/stopSession — block sessions
-      // override goalSeconds to unlockMin*60. Without resetting here,
-      // the next "do nothing" tap inherits a stale block duration.
-      goalSeconds: get().sliderMinutes * 60,
-    });
-  },
-
   dismissSessionEnded: () => {
     try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
     set({
@@ -822,11 +790,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- AppState ---
   handleBackground: async () => {
     const { started, paused } = get();
-    // Skip when not running, or when the user has explicitly paused
-    // — the manual sheet should survive a brief background trip
-    // (screenshot, glance at notifications) so they can still resume.
+    // Skip when not running, or when the user has already paused — the
+    // manual sheet is already showing, no need to re-trigger.
     if (!started || paused) return;
-    await get().cancelSession('backgrounded');
+    // Treat a background trip the same as tapping interrupt: freeze the
+    // timer and surface the SessionEndedSheet so the user comes back to
+    // continue / start over / end instead of a silent kill.
+    get().pauseSession();
   },
 
   handleForeground: () => {
