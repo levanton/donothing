@@ -25,6 +25,10 @@ const SCREEN_H = Dimensions.get('window').height;
 const PAUSE_SIZE = Math.min(Math.round(SCREEN_W * 0.6), 280);
 const pauseImage = require('@/assets/images/pause.png');
 
+// 30 grains reads as texture without becoming visually noisy. Higher
+// counts blur into a solid bar; lower counts feel chunky.
+const PROGRESS_DOT_COUNT = 30;
+
 interface Props {
   /** Whether the sheet should be expanded. Drives expand/close on
       the internal BottomSheet ref — replaces forwardRef + parent-
@@ -271,17 +275,35 @@ function SessionEndedSheet({
             </Text>
           </View>
 
-          {/* Progress visual — sand track with terracotta fill marks
-              how far the user got. Done/goal labels under the bar
-              anchor the bar in real numbers without forcing a second
-              MM:SS line elsewhere. Hidden in free mode where there's
+          {/* Progress visual — a row of "sand grains" in tune with the
+              hourglass icon above the sheet. Each grain represents 1/N
+              of the goal; past ones land in terracotta, the leading one
+              is bigger and shadowed (the grain currently dropping), and
+              future ones sit in muted sand. Reads as texture, not a
+              generic progress bar. Hidden in free mode where there's
               no goal to track against. */}
           {hasGoal && (
             <View style={styles.progressWrap}>
               <View style={styles.progressTrack}>
-                <View
-                  style={[styles.progressFill, { width: `${progressPct}%` }]}
-                />
+                {Array.from({ length: PROGRESS_DOT_COUNT }, (_, i) => {
+                  // Each grain occupies 1/N of the bar; we mark grain i
+                  // as "passed" when its centre is on the elapsed side.
+                  const grainCentre = (i + 0.5) / PROGRESS_DOT_COUNT;
+                  const isFilled = grainCentre <= progressPct / 100;
+                  const isLead =
+                    isFilled &&
+                    grainCentre > progressPct / 100 - 1 / PROGRESS_DOT_COUNT;
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.progressDot,
+                        isFilled && styles.progressDotFilled,
+                        isLead && styles.progressDotLead,
+                      ]}
+                    />
+                  );
+                })}
               </View>
               <View style={styles.progressLabels}>
                 <Text
@@ -440,20 +462,42 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   progressTrack: {
-    height: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 14,
+  },
+  // Future grains — small, muted sand. Just visible enough to map the
+  // remaining shape of the goal.
+  progressDot: {
+    width: 2.5,
+    height: 2.5,
     borderRadius: 100,
     backgroundColor: CHIP_LIGHT,
-    overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 100,
+  // Past grains — terracotta, slightly bigger so the elapsed side
+  // reads as solidly "done".
+  progressDotFilled: {
+    width: 4,
+    height: 4,
     backgroundColor: TERRACOTTA,
+  },
+  // Leading grain — the one currently "dropping". Larger with a soft
+  // halo around it; gives the bar a focal point so the eye knows
+  // exactly where progress is.
+  progressDotLead: {
+    width: 9,
+    height: 9,
+    backgroundColor: TERRACOTTA,
+    shadowColor: TERRACOTTA,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 14,
   },
   progressLabelText: {
     fontSize: 12,
