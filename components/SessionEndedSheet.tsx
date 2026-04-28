@@ -8,7 +8,6 @@ import { haptics } from '@/lib/haptics';
 import { useCallback, useEffect, useRef } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -22,6 +21,7 @@ import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
 const PAUSE_SIZE = Math.min(Math.round(SCREEN_W * 0.6), 280);
 const pauseImage = require('@/assets/images/pause.png');
 
@@ -65,31 +65,8 @@ interface Props {
 // with a different static set, which read as "new dots appearing"
 // the moment pause kicked in. By staying transparent, the user sees
 // the same dots they were watching, simply held in place.
-//
-// The pause icon sits centered in the upper terracotta strip so the
-// "you've stopped" signal lands instantly, before the eye reaches the
-// numbers below. Its opacity is driven by an external SharedValue
-// (parent runs `withTiming` over ~700ms with EASE_OUT) — gorhom's
-// own `animatedIndex` transitions too quickly for the icon to feel
-// like it eases in.
-function TerracottaBackdrop({
-  animatedPosition,
-  iconOpacity,
-}: BottomSheetBackdropProps & { iconOpacity: SharedValue<number> }) {
-  const pauseStyle = useAnimatedStyle(() => ({
-    opacity: iconOpacity.value,
-    top: Math.max(0, animatedPosition.value * 0.65 - PAUSE_SIZE / 2 - 10),
-  }));
-  return (
-    <View pointerEvents="auto" style={StyleSheet.absoluteFillObject}>
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.pauseImageWrap, pauseStyle]}
-      >
-        <Image source={pauseImage} style={styles.pauseImage} fadeDuration={0} />
-      </Animated.View>
-    </View>
-  );
+function TerracottaBackdrop({}: BottomSheetBackdropProps) {
+  return <View pointerEvents="auto" style={StyleSheet.absoluteFillObject} />;
 }
 
 function SessionEndedSheet({
@@ -108,29 +85,27 @@ function SessionEndedSheet({
     const insets = useSafeAreaInsets();
     const internalRef = useRef<BottomSheetModal>(null);
 
-    // Pause-icon opacity is driven manually so the fade-in feels
-    // deliberate (700ms with EASE_OUT, after a small delay so the
-    // icon settles in *after* the sheet has started rising). gorhom's
-    // animatedIndex completes the -1→0 spring in ~200ms which reads as
-    // a pop, not a fade.
+    // Pause icon lives in its own absolute overlay (rendered as a
+    // sibling to the modal) — putting it inside the backdrop tied its
+    // position to gorhom's animatedPosition, so on dismiss it slid down
+    // with the sheet instead of fading in place. With its own
+    // SharedValue we control fade-in (delayed 250ms after present, then
+    // 800ms ease-out) and fade-out (250ms) independently of the sheet.
     const iconOpacity = useSharedValue(0);
     useEffect(() => {
       if (visible) {
         iconOpacity.value = withDelay(
-          150,
-          withTiming(1, { duration: 700, easing: EASE_OUT }),
+          250,
+          withTiming(1, { duration: 800, easing: EASE_OUT }),
         );
       } else {
-        iconOpacity.value = withTiming(0, { duration: 220, easing: EASE_OUT });
+        iconOpacity.value = withTiming(0, { duration: 250, easing: EASE_OUT });
       }
     }, [visible, iconOpacity]);
 
-    const renderBackdrop = useCallback(
-      (props: BottomSheetBackdropProps) => (
-        <TerracottaBackdrop {...props} iconOpacity={iconOpacity} />
-      ),
-      [iconOpacity],
-    );
+    const overlayStyle = useAnimatedStyle(() => ({
+      opacity: iconOpacity.value,
+    }));
 
     // BottomSheetModal renders into a portal — no z-index/layout
     // wrestling with the running camera, and `dismiss()` always
@@ -183,6 +158,13 @@ function SessionEndedSheet({
       : 0;
 
     return (
+      <>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pauseOverlay, overlayStyle]}
+      >
+        <Image source={pauseImage} style={styles.pauseImage} fadeDuration={0} />
+      </Animated.View>
       <BottomSheetModal
         ref={internalRef}
         // Size the sheet to its measured content. Modal renders in a
@@ -192,7 +174,7 @@ function SessionEndedSheet({
         enableOverDrag={false}
         enableHandlePanningGesture={false}
         enableContentPanningGesture={false}
-        backdropComponent={renderBackdrop}
+        backdropComponent={TerracottaBackdrop}
         handleComponent={null}
         backgroundStyle={{
           backgroundColor: theme.bg,
@@ -374,6 +356,7 @@ function SessionEndedSheet({
           </View>
         </BottomSheetView>
       </BottomSheetModal>
+      </>
     );
 }
 
@@ -385,11 +368,17 @@ const TERRACOTTA = palette.terracotta;
 const CHIP_LIGHT = '#EBDAB2';
 
 const styles = StyleSheet.create({
-  pauseImageWrap: {
+  // Fixed position relative to the screen so the icon doesn't slide
+  // down with the sheet on dismiss — it just fades. Sits at ~25% from
+  // the top, which lands roughly above the sheet's top edge on
+  // standard iPhone heights regardless of sheet content size.
+  pauseOverlay: {
     position: 'absolute',
+    top: SCREEN_H * 0.25 - PAUSE_SIZE / 2,
     left: 0,
     right: 0,
     alignItems: 'center',
+    zIndex: 0,
   },
   pauseImage: {
     width: PAUSE_SIZE,

@@ -14,8 +14,10 @@
   ],
   "groups" : [
     {
+      "blur-material" : null,
       "layers" : [
         {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
@@ -49,7 +51,7 @@
         }
       ],
       "shadow" : {
-        "kind" : "neutral",
+        "kind" : "layer-color",
         "opacity" : 0.5
       },
       "translucency" : {

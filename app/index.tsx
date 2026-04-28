@@ -1528,6 +1528,7 @@ export default function DoNothingScreen() {
         themeMode={themeMode}
         yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
+        onUnlock={handleForceUnlock}
       />
 
       {/* Launch splash — terracotta sheet that covers the screen and

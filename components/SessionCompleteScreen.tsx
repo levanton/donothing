@@ -52,7 +52,11 @@ interface Props {
   todaySeconds: number;
   themeMode: ThemeMode;
   yesBtnRect?: { x: number; y: number; w: number; h: number } | null;
+  /** Closes the screen without releasing apps. */
   onClose: () => void;
+  /** Optional secondary CTA — closes the screen AND unblocks apps. Shown
+      on the farewell phase as "unlock your apps" when provided. */
+  onUnlock?: () => void;
 }
 
 type Locale = 'en' | 'uk';
@@ -82,6 +86,7 @@ function SessionCompleteScreen({
   themeMode,
   yesBtnRect,
   onClose,
+  onUnlock,
 }: Props) {
   const insets = useSafeAreaInsets();
   const isDark = themeMode === 'dark';
@@ -494,6 +499,16 @@ function SessionCompleteScreen({
 
   handleCloseRef.current = handleClose;
 
+  // Same animation as handleClose, but fires the optional onUnlock first
+  // (e.g. forceUnblockAll for block-flow sessions). Used by the secondary
+  // "unlock your apps" pill on the farewell phase.
+  const handleCloseAndUnlock = useCallback(() => {
+    if (dismissingRef.current) return;
+    haptics.success();
+    onUnlock?.();
+    handleCloseRef.current();
+  }, [onUnlock]);
+
   const contentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
     pointerEvents: contentOpacity.value > 0.5 ? 'auto' : 'none',
@@ -743,11 +758,8 @@ function SessionCompleteScreen({
               }}
             >
               <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-                {phase === 'mood' && (
-                  <Feather name="unlock" size={18} color={palette.terracotta} style={styles.doneIcon} />
-                )}
                 <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                  {phase === 'benefits' ? 'next' : 'unlock apps'}
+                  {phase === 'benefits' ? 'next' : 'next'}
                 </Text>
               </View>
             </Pressable>
@@ -813,16 +825,43 @@ function SessionCompleteScreen({
               fwContinueStyle,
             ]}
           >
-            <Pressable
-              onPress={() => handleCloseRef.current()}
-              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            >
-              <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
-                <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
-                  continue
-                </Text>
+            {onUnlock ? (
+              <View style={styles.farewellButtonRow}>
+                <Pressable
+                  onPress={() => handleCloseRef.current()}
+                  style={({ pressed }) => [
+                    styles.farewellSecondaryBtn,
+                    { opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <Text style={[styles.farewellSecondaryLabel, { color: palette.cream, fontFamily: Fonts.serif }]}>
+                    just done
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleCloseAndUnlock}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+                >
+                  <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+                    <Feather name="unlock" size={16} color={palette.terracotta} style={styles.doneIcon} />
+                    <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
+                      unlock your apps
+                    </Text>
+                  </View>
+                </Pressable>
               </View>
-            </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => handleCloseRef.current()}
+                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              >
+                <View style={[styles.doneBtn, { backgroundColor: palette.cream }]}>
+                  <Text style={[styles.doneLabel, { color: palette.brown, fontFamily: Fonts.serif }]}>
+                    done
+                  </Text>
+                </View>
+              </Pressable>
+            )}
           </Animated.View>
         </Animated.View>
       </Animated.View>
@@ -1008,6 +1047,23 @@ const styles = StyleSheet.create({
   farewellContinue: {
     position: 'absolute',
     alignSelf: 'center',
+  },
+  // Two-button layout: secondary "just done" pill above the primary
+  // "unlock your apps" pill. Stacking (rather than side-by-side) keeps
+  // both buttons full-width, easy thumb targets in the bottom band.
+  farewellButtonRow: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  farewellSecondaryBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  farewellSecondaryLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    letterSpacing: 0.4,
+    opacity: 0.85,
   },
   farewellSun: {
     width: GRASS_SIZE * 1.1,
