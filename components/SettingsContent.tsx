@@ -1,28 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
-import {
-  activitySelectionMetadata,
-} from 'react-native-device-activity';
+import { activitySelectionMetadata } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
-import * as Notifications from 'expo-notifications';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
+import { usePermissionBanners } from '@/hooks/usePermissionBanners';
+import { requestAuth } from '@/lib/screen-time';
 import type { ScheduledBlock } from '@/lib/db/types';
-import { getAuth, requestAuth, type AuthStatus } from '@/lib/screen-time';
 import PillButton from '@/components/PillButton';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
 import BlockPickerContent from '@/components/BlockPicker';
@@ -62,98 +54,15 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [showNeverBlockPicker, setShowNeverBlockPicker] = useState(false);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('notDetermined');
 
-  // iOS notification permission — banner appears when not granted
-  type NotifStatus = 'granted' | 'denied' | 'undetermined';
-  const [notifStatus, setNotifStatus] = useState<NotifStatus | null>(null);
-  const notifBannerOpacity = useSharedValue(0);
-  const notifBannerY = useSharedValue(10);
-  const stBannerOpacity = useSharedValue(0);
-  const stBannerY = useSharedValue(10);
-
-  const checkNotifStatus = useCallback(async () => {
-    if (Platform.OS !== 'ios') return;
-    try {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status === 'granted') setNotifStatus('granted');
-      else if (status === 'denied') setNotifStatus('denied');
-      else setNotifStatus('undetermined');
-    } catch {}
-  }, []);
-
-  const checkAuthStatus = useCallback(async () => {
-    if (Platform.OS !== 'ios') return;
-    try {
-      const s = await getAuth();
-      setAuthStatus(s);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    checkAuthStatus();
-    checkNotifStatus();
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') {
-        checkNotifStatus();
-        checkAuthStatus();
-      }
-    });
-    return () => sub.remove();
-  }, [checkNotifStatus, checkAuthStatus]);
-
-  // Fade each banner in once we know the user hasn't granted that permission
-  useEffect(() => {
-    if (notifStatus === 'denied' || notifStatus === 'undetermined') {
-      notifBannerOpacity.value = withDelay(120, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
-      notifBannerY.value = withDelay(120, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
-    } else {
-      notifBannerOpacity.value = 0;
-      notifBannerY.value = 10;
-    }
-  }, [notifStatus]);
-
-  useEffect(() => {
-    if (authStatus === 'denied' || authStatus === 'notDetermined') {
-      stBannerOpacity.value = withDelay(180, withTiming(1, { duration: 550, easing: Easing.out(Easing.ease) }));
-      stBannerY.value = withDelay(180, withTiming(0, { duration: 550, easing: Easing.out(Easing.ease) }));
-    } else {
-      stBannerOpacity.value = 0;
-      stBannerY.value = 10;
-    }
-  }, [authStatus]);
-
-  const notifBannerStyle = useAnimatedStyle(() => ({
-    opacity: notifBannerOpacity.value,
-    transform: [{ translateY: notifBannerY.value }],
-  }));
-  const stBannerStyle = useAnimatedStyle(() => ({
-    opacity: stBannerOpacity.value,
-    transform: [{ translateY: stBannerY.value }],
-  }));
-
-  const handleNotifTap = useCallback(async () => {
-    haptics.select();
-    if (notifStatus === 'undetermined') {
-      try {
-        const { status } = await Notifications.requestPermissionsAsync();
-        setNotifStatus(status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined');
-      } catch {}
-    } else if (notifStatus === 'denied') {
-      try { await Linking.openSettings(); } catch {}
-    }
-  }, [notifStatus]);
-
-  const handleScreenTimeBannerTap = useCallback(async () => {
-    haptics.select();
-    if (authStatus === 'denied') {
-      try { await Linking.openSettings(); } catch {}
-    } else {
-      const status = await requestAuth();
-      setAuthStatus(status);
-    }
-  }, [authStatus]);
+  const {
+    authStatus,
+    notifStatus,
+    notifBannerStyle,
+    stBannerStyle,
+    handleNotifTap,
+    handleScreenTimeBannerTap,
+  } = usePermissionBanners();
 
   const readCount = (id: string) => {
     if (Platform.OS !== 'ios') return 0;

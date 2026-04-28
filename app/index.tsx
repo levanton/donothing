@@ -2,7 +2,6 @@ import { Entypo, Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AppState,
   Dimensions,
   Platform,
   Pressable,
@@ -14,7 +13,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { haptics } from '@/lib/haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import * as Notifications from 'expo-notifications';
 import Animated, {
   Easing,
   interpolate,
@@ -43,12 +41,8 @@ import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat } from '@/lib/format';
-import {
-  forceUnblockAll,
-  getAuth,
-  isBlockActive,
-  onBlockShieldRaised,
-} from '@/lib/screen-time';
+import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
+import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
@@ -171,8 +165,6 @@ export default function DoNothingScreen() {
     ? findActiveBlock(scheduledBlocks, new Date())
     : null;
   const unlockMin = activeBlock?.unlockGoalMinutes ?? 15;
-
-  const isActiveRef = useRef(true);
 
   const theme = themes[themeMode];
   const stats = getStats();
@@ -502,125 +494,9 @@ export default function DoNothingScreen() {
     [checkAndShowBlockUnlock],
   );
 
-  // --- Init ---
-  useEffect(() => {
-    const cancelledRef = { current: false };
-    useAppStore
-      .getState()
-      .init()
-      .then(() => pollBlockUnlock(cancelledRef));
-    return () => {
-      cancelledRef.current = true;
-    };
-  }, [pollBlockUnlock]);
-
-  // --- Notification listener for scheduled blocks ---
-  useEffect(() => {
-    const handleScheduledBlock = async (data: Record<string, unknown>) => {
-      if (!(data?.type === 'scheduledBlock' && data?.durationMinutes)) return;
-      // Block can only act if Screen Time access is approved AND notifications
-      // are granted. If either was revoked after the block was scheduled,
-      // skip silently — the gated Settings UI will surface the missing perm.
-      const [auth, notif] = await Promise.all([
-        getAuth(),
-        Notifications.getPermissionsAsync(),
-      ]);
-      if (auth !== 'approved' || notif.status !== 'granted') {
-        console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
-        return;
-      }
-      activateKeepAwakeAsync('scheduled-block');
-      // Native DeviceActivity raises the shield at intervalDidStart; we
-      // only need to mirror the UI. If the user taps the banner from
-      // outside the app, this opens the unlock view as they come back in.
-      useAppStore.getState().showUnlock();
-    };
-
-    // When notification received while app is in foreground
-    const sub1 = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        handleScheduledBlock(notification.request.content.data ?? {});
-      },
-    );
-
-    // When user taps notification (app was in background)
-    const sub2 = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleScheduledBlock(response.notification.request.content.data ?? {});
-      },
-    );
-
-    return () => {
-      try { sub1.remove(); } catch (e) { console.error('[index] notif sub1 remove failed:', e); }
-      try { sub2.remove(); } catch (e) { console.error('[index] notif sub2 remove failed:', e); }
-    };
-  }, []);
-
-  // --- Native shield-raised listener ---
-  // The DeviceActivity extension raises the shield natively at the scheduled
-  // time and then posts a Darwin notification; we forward that here as
-  // `onBlockShieldRaised`. Darwin notifications are delivered synchronously
-  // even to foregrounded apps, so this fires reliably in cases where the
-  // expo-notifications foreground listener silently drops. The native
-  // shield is the source of truth: we just mirror it to the UI, which
-  // eliminates polling, timers, debounce bookkeeping, and race windows.
-  useEffect(() => {
-    const sub = onBlockShieldRaised(() => {
-      const state = useAppStore.getState();
-      // Cold-start race: native extension can fire intervalDidStart before
-      // init() finishes loading scheduledBlocks. Skip until the store is
-      // ready — init() itself calls showUnlock() if a block is active.
-      if (!state.ready) return;
-      if (state.focusStep !== 'hidden') return;
-      if (!isBlockActive()) return;
-      activateKeepAwakeAsync('scheduled-block');
-      state.showUnlock();
-    });
-    return () => {
-      try { sub.remove(); } catch (e) { console.error('[index] shield sub remove failed:', e); }
-    };
-  }, []);
-
-  // --- AppState ---
-  useEffect(() => {
-    const cancelledRef = { current: false };
-    // Serialize bg/fg transitions — handleBackground is async (it calls
-    // cancelSession which awaits a notification cancel) and a fast
-    // bg→fg toggle can have foreground run before background's set()
-    // lands, leaving stale state for pollBlockUnlock to read.
-    let bgInFlight: Promise<void> | null = null;
-    const sub = AppState.addEventListener('change', async (nextState) => {
-      // Only 'background' ends a session flow. 'inactive' covers Control
-      // Center / notification drawer / incoming-call preview — those don't
-      // count as leaving the app.
-      if (nextState === 'background' && isActiveRef.current) {
-        isActiveRef.current = false;
-        deactivateKeepAwake('session');
-        bgInFlight = useAppStore.getState().handleBackground();
-        try {
-          await bgInFlight;
-        } finally {
-          bgInFlight = null;
-        }
-      } else if (nextState === 'active' && !isActiveRef.current) {
-        isActiveRef.current = true;
-        // Wait for any in-flight background cleanup so foreground
-        // observes settled state.
-        if (bgInFlight) {
-          try { await bgInFlight; } catch {}
-        }
-        useAppStore.getState().handleForeground();
-        // Same retry poll as init — every foreground transition gets
-        // the same defensive check, so a backgrounded app coming
-        // back during an active block still surfaces the BlockSheet.
-        pollBlockUnlock(cancelledRef);
-      }
-    });
-    return () => {
-      cancelledRef.current = true;
-      try { sub.remove(); } catch (e) { console.error('[index] AppState sub remove failed:', e); }
-    };
-  }, [pollBlockUnlock]);
+  // Init + notification/shield/AppState listeners live in one hook so
+  // app/index.tsx stays focused on the home-screen UI. See useAppLifecycle.
+  useAppLifecycle(pollBlockUnlock);
 
   // --- Theme toggle ---
   const toggleTheme = useCallback(() => {
