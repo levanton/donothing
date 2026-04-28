@@ -30,6 +30,7 @@ import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 import EyebrowChip from '@/components/EyebrowChip';
+import Starscape from '@/components/Starscape';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -169,78 +170,7 @@ function BlockSheet({
 
           {/* Starscape hero — scattered dots around the number, poetic */}
           <View style={styles.starscape}>
-            <View
-              style={[
-                styles.star,
-                { top: 4, left: 24, width: 3, height: 3, backgroundColor: theme.text, opacity: 0.5 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 18, left: 62, width: 5, height: 5, backgroundColor: TERRACOTTA },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 36, left: 8, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.35 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 8, right: 30, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.7 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 48, right: 14, width: 3, height: 3, backgroundColor: TERRACOTTA, opacity: 0.8 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 18, left: 32, width: 5, height: 5, backgroundColor: theme.text, opacity: 0.4 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 30, right: 48, width: 3, height: 3, backgroundColor: TERRACOTTA, opacity: 0.6 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 6, right: 20, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.5 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 60, left: 38, width: 2, height: 2, backgroundColor: theme.text, opacity: 0.4 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 80, right: 60, width: 2, height: 2, backgroundColor: TERRACOTTA, opacity: 0.7 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 50, left: 18, width: 3, height: 3, backgroundColor: TERRACOTTA, opacity: 0.5 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 60, right: 8, width: 2, height: 2, backgroundColor: theme.text, opacity: 0.6 },
-              ]}
-            />
+            <Starscape textColor={theme.text} pattern="block" />
 
             <Text style={[styles.bigNumber, { color: theme.text }]}>
               {unlockMin}
@@ -395,10 +325,6 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingHorizontal: 8,
     position: 'relative',
-  },
-  star: {
-    position: 'absolute',
-    borderRadius: 100,
   },
   bigNumber: {
     fontSize: 84,

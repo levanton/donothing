@@ -21,6 +21,7 @@ import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 import EyebrowChip from '@/components/EyebrowChip';
+import Starscape from '@/components/Starscape';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -198,54 +199,7 @@ function SessionEndedSheet({
               they've done so far. Same scattered-dot starscape as
               BlockSheet for visual continuity. */}
           <View style={styles.starscape}>
-            <View
-              style={[
-                styles.star,
-                { top: 6, left: 30, width: 3, height: 3, backgroundColor: theme.text, opacity: 0.5 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 24, left: 70, width: 5, height: 5, backgroundColor: TERRACOTTA },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 44, left: 12, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.35 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 14, right: 36, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.7 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { top: 48, right: 18, width: 3, height: 3, backgroundColor: TERRACOTTA, opacity: 0.8 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 22, left: 40, width: 5, height: 5, backgroundColor: theme.text, opacity: 0.4 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 32, right: 52, width: 3, height: 3, backgroundColor: TERRACOTTA, opacity: 0.6 },
-              ]}
-            />
-            <View
-              style={[
-                styles.star,
-                { bottom: 8, right: 24, width: 4, height: 4, backgroundColor: theme.text, opacity: 0.5 },
-              ]}
-            />
+            <Starscape textColor={theme.text} pattern="pause" />
 
             <Text
               style={[
@@ -412,10 +366,6 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingHorizontal: 8,
     position: 'relative',
-  },
-  star: {
-    position: 'absolute',
-    borderRadius: 100,
   },
   bigNumber: {
     fontSize: 84,
