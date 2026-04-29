@@ -54,11 +54,11 @@ export default function HistoryContent({
 
   // Theme-aware card tint. Light: palette.sand — slightly darker tan
   // than the warmCream page bg, so the card still reads as a distinct
-  // panel after we adopted warmCream globally. Dark: a slightly-
-  // lighter warm-tinted panel above charcoal page bg (cream-on-cream
-  // text would be invisible). Both values give a readable, theme-
-  // coherent panel that sits clearly above the page.
-  const cardBg = themeMode === 'dark' ? '#5A4F44' : palette.sand;
+  // panel after we adopted warmCream globally. Dark: a slightly
+  // recessed warm panel — darker than charcoal rather than lighter,
+  // so the stats area reads as a "well" the calendar emerges from
+  // instead of a muddy brown rectangle stuck on grey.
+  const cardBg = themeMode === 'dark' ? '#383330' : palette.sand;
 
   // Bg fades in as the panel slides up — wider range than the heading
   // (which snaps in at [0.95, 1]) so the bg eases in gradually across
@@ -561,11 +561,11 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   heroValue: {
-    fontSize: 64,
+    fontSize: 72,
     fontWeight: '500',
-    letterSpacing: -1.2,
+    letterSpacing: -1.4,
     fontVariant: ['tabular-nums'],
-    lineHeight: 68,
+    lineHeight: 76,
     includeFontPadding: false,
   },
   heroUnit: {
