@@ -168,7 +168,7 @@ export default function PaywallRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.cream,
+    backgroundColor: palette.warmCream,
   },
   topBar: {
     flexDirection: 'row',
