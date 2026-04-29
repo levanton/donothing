@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
 import { formatTimeStat } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
 import {
   getMonthDurations,
   getMonthSessionCount,
@@ -18,18 +19,15 @@ import { useAppStore } from '@/lib/store';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
+
 const MONTH_NAMES_SHORT = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december',
 ];
 
-// ── Zen quotes ────────────────────────────────────────────────────────
-const ZEN_QUOTES = [
-  'sitting quietly, doing nothing, spring comes, and the grass grows by itself.',
-  'the quieter you become, the more you can hear.',
-  'in the midst of movement and chaos, keep stillness inside of you.',
-  'silence is the sleep that nourishes wisdom.',
-  'do nothing, and everything is done.',
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 // ── Main component ────────────────────────────────────────────────────
@@ -53,6 +51,24 @@ export default function HistoryContent({
   const weekStats = useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
+
+  // Theme-aware card tint. Light: solid warmCream parchment, distinct
+  // against the cream page bg. Dark: a slightly-lighter warm-tinted
+  // panel above charcoal page bg (NOT cream — cream-on-cream-text in
+  // dark theme makes labels invisible). Both values give a readable,
+  // theme-coherent panel that reads clearly above the page.
+  const cardBg = themeMode === 'dark' ? '#5A4F44' : palette.warmCream;
+
+  // Bg fades in as the panel slides up — wider range than the heading
+  // (which snaps in at [0.95, 1]) so the bg eases in gradually across
+  // the second half of the slide, finishing as the heading settles.
+  // Gives a layered entrance: bg first, heading last.
+  const cardBgStyle = useAnimatedStyle(() => {
+    const p = historySlide ? historySlide.value : 0;
+    return {
+      opacity: interpolate(p, [0.5, 1], [0, 1], 'clamp'),
+    };
+  });
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -149,15 +165,6 @@ export default function HistoryContent({
     return total;
   }, [monthDurationMap]);
 
-  const monthActiveDays = monthDurationMap.size;
-  const monthBestDay = useMemo(() => {
-    let max = 0;
-    for (const dur of monthDurationMap.values()) {
-      if (dur > max) max = dur;
-    }
-    return max;
-  }, [monthDurationMap]);
-
   const monthSessions = useMemo(
     () => getMonthSessionCount(viewYear, viewMonth + 1),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,16 +175,27 @@ export default function HistoryContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [viewYear, viewMonth, weekStats],
   );
+
   const monthAvgSession = monthSessions > 0 ? Math.round(monthDuration / monthSessions) : 0;
 
   const monthDurationStat = formatTimeStat(monthDuration);
   const longestStat = formatTimeStat(monthLongest);
-  const bestDayStat = formatTimeStat(monthBestDay);
   const avgSessionStat = formatTimeStat(monthAvgSession);
   const heroLabel = isCurrentMonth ? 'this month' : MONTH_NAMES_SHORT[viewMonth];
+  const monthLabel = MONTH_NAMES[viewMonth] + (viewYear !== today.getFullYear() ? ` ${viewYear}` : '');
 
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
+  const goToPrevMonth = useCallback(() => {
+    haptics.select();
+    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
+    else setViewMonth(viewMonth - 1);
+  }, [viewYear, viewMonth]);
+
+  const goToNextMonth = useCallback(() => {
+    if (isCurrentMonth) return;
+    haptics.select();
+    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
+    else setViewMonth(viewMonth + 1);
+  }, [viewYear, viewMonth, isCurrentMonth]);
 
   const content = (
     <View style={{ flex: 1 }}>
@@ -211,36 +229,43 @@ export default function HistoryContent({
         onScroll={onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{
-          paddingHorizontal: 24,
-          paddingTop: insets.top + 8,
+          paddingTop: 0,
           paddingBottom: insets.bottom + 40,
         }}
       >
-      <View style={styles.headerRow}>
-        <Animated.Text
-          style={[
-            styles.title,
-            { color: theme.text, fontFamily: Fonts.serif },
-            headingFadeStyle,
-          ]}
-        >
-          My Journey
-        </Animated.Text>
-        <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
-          <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
-        </Pressable>
-      </View>
+      {/* Stats — two-row card. Top: the hero (month duration) on the
+          left, month nav on the right (where sessions+active used to
+          sit). Bottom: only the interesting metrics — sessions, active
+          days, longest single sit. Best day and avg dropped: best day
+          is redundant with the hero on sparse months, avg is derived. */}
+      <Animated.View
+        entering={FadeIn.delay(100).duration(400)}
+        style={[styles.statsBlock, { paddingTop: insets.top + 12 }]}
+      >
+        {/* Animated bg layer — theme-aware tint that fades in as the
+            user scrolls. Sits absolute behind the content. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: cardBg }, cardBgStyle]}
+        />
+        <View style={styles.headerRow}>
+          <Animated.Text
+            style={[
+              styles.title,
+              { color: theme.text, fontFamily: Fonts.serif },
+              headingFadeStyle,
+            ]}
+          >
+            My Journey
+          </Animated.Text>
+          <Pressable onPress={onClose} hitSlop={16} style={styles.closeButton}>
+            <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'✕'}</Text>
+          </Pressable>
+        </View>
 
-      {/* Stats — two-row 3×2 grid scoped to the calendar's viewed
-          month. Top row anchors the headline (month duration + sessions
-          + active days) with the hero numeral. Bottom row adds journey
-          detail (longest single session, best day, average session) at
-          smaller scale. All values mono, all labels serif. */}
-      <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.statsBlock}>
-        {/* Terracotta accent stripe at the top of the card — gives the
-            block an anchor colour and breaks the monotone warm cream. */}
-        <View style={styles.statsAccentStripe} />
-
+        {/* Top row — two parallel headlines: "this month" duration
+            (big terracotta hero) on the left, lifetime "total time"
+            (medium hero) on the right, separated by a hairline. */}
         <View style={styles.statsRow}>
           <View style={styles.statCellHero}>
             <View style={styles.heroValueWrap}>
@@ -253,45 +278,19 @@ export default function HistoryContent({
                 </Text>
               ) : null}
             </View>
-            <View style={styles.statLabelRow}>
-              <Feather name="calendar" size={11} color={palette.terracotta} />
-              <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                {heroLabel}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.statCell}>
-            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts.mono }]}>
-              {monthSessions}
+            <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif, marginTop: 6 }]}>
+              {heroLabel}
             </Text>
-            <View style={styles.statLabelRow}>
-              <Feather name="hash" size={11} color={palette.terracotta} />
-              <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                {monthSessions === 1 ? 'session' : 'sessions'}
-              </Text>
-            </View>
           </View>
 
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.statCell}>
-            <View style={styles.statValueWrap}>
-              <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {monthActiveDays}
-              </Text>
-              <Text style={[styles.statUnit, { color: theme.text, fontFamily: Fonts.serif }]}>
-                {monthActiveDays === 1 ? 'day' : 'days'}
-              </Text>
-            </View>
-            <View style={styles.statLabelRow}>
-              <Feather name="check-circle" size={11} color={palette.terracotta} />
-              <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                active
-              </Text>
-            </View>
+          {/* Right side — a quiet motivational phrase instead of a
+              second metric. Echoes the app's "do nothing" tone: every
+              minute the user spends in stillness is meaningful, even
+              if the totals look small. */}
+          <View style={styles.statCellQuote}>
+            <Text style={[styles.quotePhrase, { color: theme.text, fontFamily: Fonts.serif }]}>
+              {'every minute\nmatters'}
+            </Text>
           </View>
         </View>
 
@@ -299,41 +298,13 @@ export default function HistoryContent({
 
         <View style={styles.statsRow}>
           <View style={styles.statCellSecondary}>
-            <View style={styles.statValueWrap}>
-              <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {longestStat.value}
-              </Text>
-              {longestStat.unit ? (
-                <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
-                  {longestStat.unit}
-                </Text>
-              ) : null}
-            </View>
+            <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
+              {monthSessions}
+            </Text>
             <View style={styles.statLabelRow}>
-              <Feather name="award" size={10} color={palette.terracotta} />
+              <Feather name="hash" size={10} color={palette.terracotta} />
               <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                longest
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.statCellSecondary}>
-            <View style={styles.statValueWrap}>
-              <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {bestDayStat.value}
-              </Text>
-              {bestDayStat.unit ? (
-                <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
-                  {bestDayStat.unit}
-                </Text>
-              ) : null}
-            </View>
-            <View style={styles.statLabelRow}>
-              <Feather name="trending-up" size={10} color={palette.terracotta} />
-              <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                best day
+                {monthSessions === 1 ? 'session' : 'sessions'}
               </Text>
             </View>
           </View>
@@ -354,29 +325,81 @@ export default function HistoryContent({
             <View style={styles.statLabelRow}>
               <Feather name="activity" size={10} color={palette.terracotta} />
               <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                avg
+                avg session
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+
+          <View style={styles.statCellSecondary}>
+            <View style={styles.statValueWrap}>
+              <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
+                {longestStat.value}
+              </Text>
+              {longestStat.unit ? (
+                <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
+                  {longestStat.unit}
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.statLabelRow}>
+              <Feather name="award" size={10} color={palette.terracotta} />
+              <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+                longest
               </Text>
             </View>
           </View>
         </View>
       </Animated.View>
 
-      {/* Hairline between stats and calendar — gives the page two
-          discrete sections without resorting to a card fill. */}
-      <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+      {/* Month switcher — sits flush under the card as a narrow pill
+          with the same warm-cream fill, so it reads as part of the
+          same panel (a tab hanging out from the bottom). Top corners
+          square (attached), bottom corners rounded (free). */}
+      <View style={styles.monthPillRow}>
+        <View style={[styles.monthPill, { overflow: 'hidden' }]}>
+          {/* Animated bg layer — same fade as the card above, so the
+              pill reads as a connected piece of the same panel. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: cardBg }, cardBgStyle]}
+          />
+          <Pressable onPress={goToPrevMonth} hitSlop={16} style={styles.monthPillBtn}>
+            <Feather name="chevron-left" size={18} color={theme.textSecondary} />
+          </Pressable>
+          <Text style={[styles.monthPillLabel, { color: theme.text, fontFamily: Fonts.serif }]}>
+            {monthLabel}
+          </Text>
+          <Pressable
+            onPress={goToNextMonth}
+            hitSlop={16}
+            disabled={isCurrentMonth}
+            style={styles.monthPillBtn}
+          >
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={isCurrentMonth ? theme.border : theme.textSecondary}
+            />
+          </Pressable>
+        </View>
+      </View>
 
-      {/* Calendar */}
-      <ActivityCalendar
-        theme={theme}
-        viewYear={viewYear}
-        viewMonth={viewMonth}
-        onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
-        durationMap={monthDurationMap}
-      />
+      {/* Below-card content — restored horizontal padding so the
+          calendar/footer stay at the page's normal gutter. */}
+      <View style={styles.belowCard}>
+        {/* Hairline between stats and calendar */}
+        <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
-      {/* Footer */}
-      <View style={styles.quoteContainer}>
-        <Text style={[styles.quoteText, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>{quote}</Text>
+        {/* Calendar */}
+        <ActivityCalendar
+          theme={theme}
+          viewYear={viewYear}
+          viewMonth={viewMonth}
+          durationMap={monthDurationMap}
+        />
+
       </View>
       </Animated.ScrollView>
     </View>
@@ -390,7 +413,7 @@ export default function HistoryContent({
 
 const styles = StyleSheet.create({
   // Header
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 38 },
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
@@ -404,25 +427,69 @@ const styles = StyleSheet.create({
   // page a clear "headline panel" instead of stats floating on the
   // background. The fill is *very* subtle (warmCream over the page's
   // cream) so it reads as elevation, not as a heavy box.
+  // Full-bleed top hero block. Touches the safe area edge; flat
+  // rectangle (no rounded corners). Background fills via an absolute
+  // animated layer inside (cardBg + cardBgStyle) so it can fade in
+  // with scroll.
   statsBlock: {
-    marginTop: 8,
-    marginBottom: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    borderRadius: 24,
-    backgroundColor: palette.warmCream,
-    overflow: 'hidden',
+    paddingHorizontal: 24,
+    paddingBottom: 22,
   },
-  // Terracotta accent line at the very top of the stats card — draws
-  // the eye to the headline panel and breaks the warm-cream monotone.
-  statsAccentStripe: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: palette.terracotta,
-    opacity: 0.85,
+  // Wrapper for everything below the full-bleed card — restores the
+  // page's normal horizontal gutter for calendar and footer.
+  belowCard: {
+    paddingHorizontal: 24,
+  },
+  // Hero block — full-width container so the label row beneath the
+  // hero number can use space-between for "this month" + "total time".
+  heroBlock: {
+    width: '100%',
+  },
+  // Bottom of the hero: tag (icon + month) on the left, "total time"
+  // kicker on the right.
+  heroLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  heroSectionLabel: {
+    fontSize: 12,
+    fontWeight: '400',
+    letterSpacing: 0.6,
+  },
+  // Month switcher pill — sits flush under the stats card on the
+  // right side, sharing the warm-cream fill so it reads as a tab
+  // hanging out of the same panel. Top corners square (attached to
+  // the card's bottom edge), bottom corners rounded (free).
+  monthPillRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingRight: 24,
+    marginBottom: 4,
+  },
+  // Pill body — applied with theme.subtle bg via style merge below
+  // since StyleSheet can't read theme. See render-side spread.
+  monthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  monthPillBtn: {
+    padding: 2,
+  },
+  monthPillLabel: {
+    fontSize: 15,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    minWidth: 56,
+    textAlign: 'center',
   },
   // Each stat label sits in a row with its small terracotta icon —
   // gives each metric a quick visual hook so the grid reads as
@@ -446,8 +513,29 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   statCellHero: {
-    flex: 1.4,
+    flex: 1,
     paddingRight: 14,
+  },
+  // Quote cell — sits where the second metric used to be. Short
+  // italic serif phrase, centred both vertically (against the hero
+  // on the left) and horizontally within the cell. `alignSelf:
+  // stretch` overrides the row's flex-end alignment so the cell fills
+  // the row height; `justifyContent: center` then centres the quote
+  // vertically within that full height.
+  statCellQuote: {
+    flex: 1,
+    paddingHorizontal: 12,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quotePhrase: {
+    fontSize: 17,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    lineHeight: 24,
   },
   statCell: {
     flex: 1,
@@ -507,7 +595,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     letterSpacing: 0.5,
-    opacity: 0.75,
   },
   // Secondary row metrics — same shape as the hero row but smaller.
   // Numbers stay mono, units stay serif, label stays small caps-y.
@@ -529,7 +616,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
     letterSpacing: 0.5,
-    opacity: 0.75,
   },
   // Horizontal hairline that visually separates the stats block above
   // from the calendar below. Subtle, no card fill — pure rule line.
@@ -539,7 +625,4 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 
-  // Footer
-  quoteContainer: { marginTop: 40, paddingHorizontal: 16, alignItems: 'center', marginBottom: 20 },
-  quoteText: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', textAlign: 'center', lineHeight: 22 },
 });

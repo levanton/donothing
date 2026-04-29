@@ -13,11 +13,6 @@ import type { Session } from '@/lib/db/types';
 import { useAppStore } from '@/lib/store';
 import { WEEKDAY_LABELS } from '@/lib/weekdays';
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -35,7 +30,6 @@ interface ActivityCalendarProps {
   theme: AppTheme;
   viewYear: number;
   viewMonth: number;
-  onViewChange: (year: number, month: number) => void;
   durationMap: Map<string, number>;
 }
 
@@ -43,7 +37,6 @@ export default function ActivityCalendar({
   theme,
   viewYear,
   viewMonth,
-  onViewChange,
   durationMap,
 }: ActivityCalendarProps) {
   const today = new Date();
@@ -53,7 +46,6 @@ export default function ActivityCalendar({
   const deleteSession = useAppStore((s) => s.deleteSession);
 
   const todayKey = dateKey(today);
-  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
   // Clear any selected day whenever the user navigates between months —
   // the previous selection no longer exists in the new grid.
@@ -96,19 +88,6 @@ export default function ActivityCalendar({
     }
     return cells;
   }, [viewYear, viewMonth]);
-
-  const goToPrevMonth = useCallback(() => {
-    haptics.select();
-    if (viewMonth === 0) onViewChange(viewYear - 1, 11);
-    else onViewChange(viewYear, viewMonth - 1);
-  }, [viewYear, viewMonth, onViewChange]);
-
-  const goToNextMonth = useCallback(() => {
-    if (isCurrentMonth) return;
-    haptics.select();
-    if (viewMonth === 11) onViewChange(viewYear + 1, 0);
-    else onViewChange(viewYear, viewMonth + 1);
-  }, [viewYear, viewMonth, isCurrentMonth, onViewChange]);
 
   const handleDeleteDay = useCallback(() => {
     if (!selectedDate) return;
@@ -167,21 +146,6 @@ export default function ActivityCalendar({
 
   return (
     <View style={styles.container}>
-      {/* Header — month name with prev/next navigation */}
-      <View style={styles.headerRow}>
-        <View style={styles.monthNav}>
-          <Pressable onPress={goToPrevMonth} hitSlop={16}>
-            <Feather name="chevron-left" size={20} color={theme.textSecondary} />
-          </Pressable>
-          <Text style={[styles.monthLabel, { color: theme.text, fontFamily: Fonts!.serif }]}>
-            {MONTH_NAMES[viewMonth]}{!isCurrentMonth || viewYear !== today.getFullYear() ? ` ${viewYear}` : ''}
-          </Text>
-          <Pressable onPress={goToNextMonth} hitSlop={16}>
-            <Feather name="chevron-right" size={20} color={isCurrentMonth ? theme.border : theme.textSecondary} />
-          </Pressable>
-        </View>
-      </View>
-
       {/* Day-of-week headers */}
       <View style={styles.dayHeaders}>
         {WEEKDAY_LABELS.map((d) => (
@@ -278,11 +242,6 @@ const CELL_SIZE = 40;
 const styles = StyleSheet.create({
   container: { marginBottom: 28 },
 
-  // Headers
-  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 },
-  monthNav: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  monthLabel: { fontSize: 18, fontWeight: '400' },
-
   dayHeaders: { flexDirection: 'row', marginBottom: 8 },
   dayHeaderLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '400', letterSpacing: 0.5 },
 
@@ -303,14 +262,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'baseline',
   },
-  selectedDate: { fontSize: 18, fontWeight: '400', letterSpacing: 0.2 },
+  selectedDate: { fontSize: 16, fontWeight: '400', letterSpacing: 0.2 },
   selectedTotalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
   selectedTotal: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.2,
