@@ -5,6 +5,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
+  interpolateColor,
   runOnJS,
   type SharedValue,
   useAnimatedProps,
@@ -26,6 +27,15 @@ const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 const MOODS = ['still', 'lighter', 'refreshed', 'full'] as const;
 export type MoodKey = (typeof MOODS)[number];
 
+// Per-mood fill colors. Earth tonal arc from grounded "still" through
+// warm "lighter" and cool "refreshed" to verdant "full".
+const MOOD_COLORS: readonly string[] = [
+  '#C9BBA3', // still     — pale warm taupe
+  '#D4A66B', // lighter   — warm ochre
+  '#A6C2B8', // refreshed — pale dusty teal
+  '#8FA07A', // full      — sage (the original single fill)
+];
+
 const RING_COUNT = MOODS.length;
 const RING_STEP = 28;
 const RING_MAX = RING_STEP * RING_COUNT;
@@ -40,9 +50,9 @@ const FILL_MIN = 12;
 const FILL_MAX = DISC_MAX_R;
 const DRAG_TRAVEL = RING_MAX * 2;
 
-// Soft sage-olive — a muted warm green that sits as a calm cool
-// complement to the terracotta backdrop without going dramatic.
-const FILL_COLOR = '#8FA07A';
+// How long the fill color tweens between mood steps. Long enough to
+// read as a smooth shift, short enough to feel synced with the haptic.
+const COLOR_TWEEN_MS = 360;
 
 // How long the disc takes to sweep from centre out to its max radius.
 // Exported so the parent can time the hint fade-in to land right after
@@ -372,6 +382,10 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
   // Boolean signal (0/1) read by labels to kill themselves instantly
   // during the parent's collapse phase.
   const collapsing = useSharedValue(0);
+  // Phase 0..3 driving the fill color. Tracks lastHapticStep but tweens
+  // on each transition so the color shift reads as a smooth pour rather
+  // than a hard swap when crossing a ring.
+  const colorPhase = useSharedValue(0);
 
   const hasInteractedRef = useRef(false);
   const onInteractRef = useRef(onInteract);
@@ -427,9 +441,21 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
       if (step >= 0) runOnJS(commitMood)(MOODS[step]);
     });
 
+  // Tween colorPhase toward the active step. Clamp to >=0 so before the
+  // user touches a ring (step = -1) the dot still sits at the "still"
+  // color rather than racing through interpolation in negative space.
+  useAnimatedReaction(
+    () => Math.max(0, lastHapticStep.value),
+    (curr, prev) => {
+      if (curr === prev) return;
+      colorPhase.value = withTiming(curr, { duration: COLOR_TWEEN_MS });
+    },
+  );
+
   const filledCircleProps = useAnimatedProps(() => {
     const base = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    return { r: base * introFill.value };
+    const fill = interpolateColor(colorPhase.value, [0, 1, 2, 3], MOOD_COLORS);
+    return { r: base * introFill.value, fill };
   });
 
   const discCircleProps = useAnimatedProps(() => {
@@ -449,6 +475,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     hintPulse.value = 0;
     progress.value = 0;
     lastHapticStep.value = -1;
+    colorPhase.value = 0;
     collapsing.value = 0;
     hasInteractedRef.current = false;
   }, [visible]);
@@ -535,7 +562,6 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
             cx={RING_CENTER}
             cy={RING_CENTER}
             animatedProps={filledCircleProps}
-            fill={FILL_COLOR}
             stroke={palette.brown}
             strokeWidth={1.4}
           />
