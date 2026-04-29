@@ -19,7 +19,10 @@ type NotifStatus = 'granted' | 'denied' | 'undetermined';
  * Settings.app and coming back updates the banner without a restart.
  */
 export function usePermissionBanners() {
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('notDetermined');
+  // Start as `null` (unknown) rather than 'notDetermined' so the banner
+  // doesn't flash for users who already have access — it only renders
+  // after the first getAuth() roundtrip confirms the status.
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [notifStatus, setNotifStatus] = useState<NotifStatus | null>(null);
 
   const notifBannerOpacity = useSharedValue(0);
