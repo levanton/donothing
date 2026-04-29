@@ -1408,7 +1408,7 @@ export default function DoNothingScreen() {
                           { fontFamily: Fonts!.serif },
                         ]}
                       >
-                        finish
+                        done
                       </Text>
                     </Pressable>
                   )}
