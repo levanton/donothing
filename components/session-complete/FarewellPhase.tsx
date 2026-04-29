@@ -98,11 +98,15 @@ export default function FarewellPhase({
 
         <Animated.View style={[styles.divider, dividerStyle]} />
 
-        <Animated.Text
-          style={[styles.sub, { color: textColor, fontFamily: Fonts.serif }, subStyle]}
-        >
-          your apps are open again
-        </Animated.Text>
+        {/* Apps-unlocked line only fires when there were apps to
+            unlock. Without it, the message lies on free runs. */}
+        {onUnlock && (
+          <Animated.Text
+            style={[styles.sub, { color: textColor, fontFamily: Fonts.serif }, subStyle]}
+          >
+            your apps are open again
+          </Animated.Text>
+        )}
 
         <Animated.View style={[styles.chip, chipStyle]}>
           <Text style={[styles.chipText, { fontFamily: Fonts.serif }]}>

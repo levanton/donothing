@@ -225,7 +225,7 @@ function SessionEndedSheet({
               <Text
                 style={[
                   styles.heroCaption,
-                  { color: theme.textTertiary, fontFamily: Fonts!.serif },
+                  { color: theme.text, fontFamily: Fonts!.serif },
                 ]}
               >
                 {heroLabel}
@@ -256,6 +256,7 @@ function SessionEndedSheet({
                       key={i}
                       style={[
                         styles.progressDot,
+                        { backgroundColor: theme.text },
                         isFilled && styles.progressDotFilled,
                         isLead && styles.progressDotLead,
                       ]}
@@ -275,7 +276,7 @@ function SessionEndedSheet({
                 <Text
                   style={[
                     styles.progressLabelText,
-                    { color: theme.textTertiary, fontFamily: Fonts!.mono },
+                    { color: theme.text, fontFamily: Fonts!.mono },
                   ]}
                 >
                   {timerDisplay(goalSeconds)}
@@ -418,13 +419,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 14,
   },
-  // Future grains — same dark brown as the body text. At 2.5px the
-  // full-opacity dark stays restrained while reading clearly.
+  // Future grains — themed text colour applied inline (brown on light,
+  // cream on dark). At 2.5px the dot stays restrained while reading
+  // clearly on both backgrounds.
   progressDot: {
     width: 2.5,
     height: 2.5,
     borderRadius: 100,
-    backgroundColor: BROWN,
   },
   // Past grains — terracotta, slightly bigger so the elapsed side
   // reads as solidly "done".
