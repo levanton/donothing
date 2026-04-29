@@ -40,7 +40,8 @@ import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
 import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
-import { formatTimeStat } from '@/lib/format';
+import { formatTimeStat, timerDisplay } from '@/lib/format';
+import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
@@ -1390,28 +1391,46 @@ export default function DoNothingScreen() {
                         { fontFamily: Fonts!.serif },
                       ]}
                     >
-                      interrupt
+                      pause
                     </Text>
                   </Pressable>
                   {/* Stopwatch mode has no countdown to auto-complete —
                       surface a finish pill so the user can wrap the run
                       and land on the celebration / mood / farewell flow. */}
-                  {goalSeconds === 0 && (
-                    <Pressable
-                      onPress={handleFinishStopwatch}
-                      style={styles.runFinishPill}
-                      hitSlop={12}
-                    >
-                      <Text
+                  {goalSeconds === 0 && (() => {
+                    const canSave = elapsed >= MIN_SAVABLE_DURATION;
+                    const remaining = Math.max(0, MIN_SAVABLE_DURATION - elapsed);
+                    return (
+                      <Pressable
+                        onPress={canSave ? handleFinishStopwatch : undefined}
+                        disabled={!canSave}
                         style={[
-                          styles.runFinishLabel,
-                          { fontFamily: Fonts!.serif },
+                          styles.runFinishPill,
+                          !canSave && styles.runFinishPillDisabled,
                         ]}
+                        hitSlop={12}
                       >
-                        done
-                      </Text>
-                    </Pressable>
-                  )}
+                        <Text
+                          style={[
+                            styles.runFinishLabel,
+                            { fontFamily: Fonts!.serif },
+                          ]}
+                        >
+                          done
+                        </Text>
+                        {!canSave && (
+                          <Text
+                            style={[
+                              styles.runFinishHint,
+                              { fontFamily: Fonts!.mono },
+                            ]}
+                          >
+                            {timerDisplay(remaining)}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })()}
                 </View>
               </Animated.View>
 
@@ -1537,7 +1556,7 @@ export default function DoNothingScreen() {
         themeMode={themeMode}
         yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
-        onUnlock={handleForceUnlock}
+        onUnlock={sessionOrigin === 'block' ? handleForceUnlock : undefined}
       />
 
       {/* Launch splash — terracotta sheet that covers the screen and
@@ -1841,11 +1860,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Below MIN_SAVABLE_DURATION: button is non-interactive and the
+  // countdown hint reveals when "done" will become live. We dim with
+  // opacity rather than a different fill so the visual identity stays
+  // the same — the user reads it as "the same button, not yet ready".
+  runFinishPillDisabled: {
+    opacity: 0.4,
+  },
   runFinishLabel: {
     color: palette.brown,
     fontSize: 18,
     fontWeight: '500',
     letterSpacing: 0.6,
+  },
+  runFinishHint: {
+    color: palette.brown,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.5,
+    marginTop: 2,
+    opacity: 0.7,
   },
   // Hide is secondary — small icon button above the stop pill, with
   // its hint beneath. Lighter border + half the visual weight.

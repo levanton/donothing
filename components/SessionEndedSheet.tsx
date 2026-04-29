@@ -148,7 +148,11 @@ function SessionEndedSheet({
     const hasGoal = goalSeconds > 0;
     const remaining = hasGoal ? Math.max(0, goalSeconds - elapsed) : 0;
     const heroSeconds = hasGoal ? remaining : elapsed;
-    const heroLabel = hasGoal ? 'left to do nothing' : 'so far';
+    // Only the countdown side needs a caption ("left to do nothing")
+    // because the number alone is ambiguous (remaining vs elapsed). In
+    // stopwatch mode the number is just elapsed time — the PAUSED
+    // eyebrow already gives the context, no caption needed.
+    const heroLabel = hasGoal ? 'left to do nothing' : null;
     // Eyebrow is the context badge ("you're on a pause"); the caption
     // under the big number is the label of the number itself ("this is
     // what's left"). Keeping eyebrow="paused" for both modes avoids the
@@ -209,14 +213,16 @@ function SessionEndedSheet({
             >
               {timerDisplay(heroSeconds)}
             </Text>
-            <Text
-              style={[
-                styles.heroCaption,
-                { color: theme.textTertiary, fontFamily: Fonts!.serif },
-              ]}
-            >
-              {heroLabel}
-            </Text>
+            {heroLabel && (
+              <Text
+                style={[
+                  styles.heroCaption,
+                  { color: theme.textTertiary, fontFamily: Fonts!.serif },
+                ]}
+              >
+                {heroLabel}
+              </Text>
+            )}
           </View>
 
           {/* Progress visual — a row of "sand grains" in tune with the
@@ -374,6 +380,8 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     lineHeight: 90,
     includeFontPadding: false,
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
   heroCaption: {
     fontSize: 13,
@@ -415,12 +423,12 @@ const styles = StyleSheet.create({
   // halo around it; gives the bar a focal point so the eye knows
   // exactly where progress is.
   progressDotLead: {
-    width: 9,
-    height: 9,
+    width: 14,
+    height: 14,
     backgroundColor: TERRACOTTA,
     shadowColor: TERRACOTTA,
     shadowOpacity: 0.35,
-    shadowRadius: 6,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
   },
   progressLabels: {

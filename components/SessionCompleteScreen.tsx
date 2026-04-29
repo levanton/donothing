@@ -68,7 +68,7 @@ function pluralizeMinutes(n: number, locale: Locale): string {
 }
 
 function formatMinutes(seconds: number, locale: Locale = 'en'): { value: string; unit: string } {
-  const m = Math.max(1, Math.round(seconds / 60));
+  const m = Math.round(seconds / 60);
   return { value: String(m), unit: pluralizeMinutes(m, locale) };
 }
 
@@ -576,14 +576,24 @@ function SessionCompleteScreen({
               </Animated.View>
 
               <Animated.View style={[styles.titleBlock, titleStyle]}>
-                <View style={styles.titleNumeralWrap}>
+                <View style={styles.titleRow}>
+                  {/* Invisible mirror of the unit on the left so the
+                      numeral stays exactly screen-centered regardless
+                      of digit count (5 / 50 / 120). The visible unit
+                      hangs off the right with the same footprint. */}
+                  <Text
+                    style={[
+                      styles.titleUnit,
+                      styles.titleUnitMirror,
+                      { fontFamily: Fonts.serif },
+                    ]}
+                    aria-hidden
+                  >
+                    {duration.unit}
+                  </Text>
                   <Text style={[styles.titleNumeral, { color: textColor }]}>
                     {duration.value}
                   </Text>
-                  {/* `min` floats right of the numeral via position:
-                      absolute so the numeral itself stays exactly
-                      centered on screen regardless of its width
-                      (50 vs 120 vs 5). */}
                   <Animated.Text
                     style={[
                       styles.titleUnit,
@@ -749,8 +759,15 @@ const styles = StyleSheet.create({
   // width), and titleBlock's alignItems:center centres it on screen.
   // The unit floats absolutely off the right edge so it doesn't push
   // the numeral away from dead-centre regardless of digit count.
-  titleNumeralWrap: {
-    position: 'relative',
+  // Three-cell row: invisible "min" mirror | numeral | visible "min".
+  // Baseline-aligned so the unit sits on the same line as the numeral,
+  // gap-spaced for breathing room. The mirror spacer keeps the numeral
+  // optically centred on screen.
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 8,
   },
   titleNumeral: {
     fontSize: 100,
@@ -761,16 +778,12 @@ const styles = StyleSheet.create({
     lineHeight: 104,
   },
   titleUnit: {
-    position: 'absolute',
-    left: '100%',
-    marginLeft: 8,
-    // Visual baseline alignment with the numeral. With fontSize 100 /
-    // lineHeight 104 the numeral's baseline sits ~14px from the bottom
-    // of its box; offsetting the unit by the same amount lines them up.
-    bottom: 14,
     fontSize: 26,
     fontWeight: '400',
     letterSpacing: 0.4,
+  },
+  titleUnitMirror: {
+    opacity: 0,
   },
   titleSub: {
     fontSize: 18,

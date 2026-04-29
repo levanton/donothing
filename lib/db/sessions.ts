@@ -29,8 +29,13 @@ function rowToSession(row: SessionRow): Session {
 // (e.g. sessionStartTime not being set before a save).
 const MAX_SESSION_DURATION = 24 * 60 * 60;
 
+// Anything shorter than this is a misfire, not a session — matches the
+// minimum unit of the countdown slider so stopwatch and goal modes both
+// honour the same lower bound.
+export const MIN_SAVABLE_DURATION = 60;
+
 export function addSession(duration: number): Session | null {
-  if (duration < 1) return null;
+  if (duration < MIN_SAVABLE_DURATION) return null;
   if (duration > MAX_SESSION_DURATION) return null;
   const db = getDb();
   const id = generateId();

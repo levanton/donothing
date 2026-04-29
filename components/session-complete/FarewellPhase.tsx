@@ -136,7 +136,7 @@ export default function FarewellPhase({
               onPress={onUnlock}
               style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
             >
-              <DonePill icon="unlock" label="unlock your apps" />
+              <DonePill icon="unlock" label="unlock my apps" />
             </Pressable>
           </View>
         ) : (

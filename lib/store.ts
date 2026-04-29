@@ -6,6 +6,7 @@ import {
   deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
   cleanupInvalidSessions,
+  MIN_SAVABLE_DURATION,
 } from './db/sessions';
 import {
   getAllScheduledBlocks,
@@ -594,6 +595,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     clearPendingSession();
     const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    // Below the threshold this isn't a session — UI guards prevent it,
+    // but if anything calls completeSession through a different path
+    // (background AppState, future feature) we still must NOT write a
+    // false-positive row or surface the celebration screen.
+    if (duration < MIN_SAVABLE_DURATION) {
+      set({
+        started: false,
+        paused: false,
+        elapsed: 0,
+        sessionOrigin: 'normal',
+        goalSeconds: get().sliderMinutes * 60,
+      });
+      return;
+    }
     let session = null;
     try {
       session = dbAddSession(duration);
