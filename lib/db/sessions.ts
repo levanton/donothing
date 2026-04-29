@@ -147,6 +147,28 @@ export function getMonthDurations(year: number, month: number): Map<string, numb
   return getWeekDurations(startMs, endMs);
 }
 
+export function getMonthSessionCount(year: number, month: number): number {
+  const db = getDb();
+  const startMs = new Date(year, month - 1, 1).getTime();
+  const endMs = new Date(year, month, 1).getTime();
+  const row = db.getFirstSync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM sessions WHERE timestamp >= ? AND timestamp < ?',
+    startMs, endMs,
+  );
+  return row?.count ?? 0;
+}
+
+export function getMonthLongestSession(year: number, month: number): number {
+  const db = getDb();
+  const startMs = new Date(year, month - 1, 1).getTime();
+  const endMs = new Date(year, month, 1).getTime();
+  const row = db.getFirstSync<{ max_dur: number }>(
+    'SELECT COALESCE(MAX(duration), 0) as max_dur FROM sessions WHERE timestamp >= ? AND timestamp < ?',
+    startMs, endMs,
+  );
+  return row?.max_dur ?? 0;
+}
+
 export function getSessionCount(): number {
   const db = getDb();
   const row = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM sessions');

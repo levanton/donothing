@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, interpolate, runOnJS, useAnimatedReaction, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -9,42 +9,19 @@ import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
 import { formatTimeStat } from '@/lib/format';
 import {
-  getDurationSince,
-  getSessionCount,
-  getLongestSessionDuration,
-  getTotalDuration,
-  getActiveDaysCount,
-  getDistinctDatesDesc,
+  getMonthDurations,
+  getMonthSessionCount,
+  getMonthLongestSession,
 } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import { useAppStore } from '@/lib/store';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-// Streak — consecutive days from today (or yesterday, so a missed
-// "today yet" doesn't break a long streak before bedtime). Counts
-// back as long as each prior day shows at least one session.
-function dateKeyLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function computeStreak(): number {
-  // 60 most recent active days is more than enough to find any streak
-  // a real user can plausibly have without scanning the entire table.
-  const dates = new Set(getDistinctDatesDesc(60));
-  if (dates.size === 0) return 0;
-  const today = new Date();
-  let cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (!dates.has(dateKeyLocal(cursor))) {
-    cursor.setDate(cursor.getDate() - 1);
-    if (!dates.has(dateKeyLocal(cursor))) return 0;
-  }
-  let streak = 0;
-  while (dates.has(dateKeyLocal(cursor))) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
-}
+const MONTH_NAMES_SHORT = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
 
 // ── Zen quotes ────────────────────────────────────────────────────────
 const ZEN_QUOTES = [
@@ -73,9 +50,14 @@ export default function HistoryContent({
   onHeadingLayout,
   historySlide,
 }: HistoryContentProps) {
-  useAppStore((s) => s.weekStats);
+  const weekStats = useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
+
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
   const headingRef = useRef<View>(null);
   // Animated.ScrollView ref — used to reset scroll to top when the
@@ -153,17 +135,46 @@ export default function HistoryContent({
     },
   );
 
-  const totalSessions = getSessionCount();
-  const longestSession = formatTimeStat(getLongestSessionDuration());
+  // Per-month stats — recompute whenever the calendar's view changes,
+  // and also when sessions mutate (weekStats bumps on add/delete).
+  const monthDurationMap = useMemo(
+    () => getMonthDurations(viewYear, viewMonth + 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewYear, viewMonth, weekStats],
+  );
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const thisMonth = getDurationSince(startOfMonth);
-  const thisMonthStat = formatTimeStat(thisMonth);
+  const monthDuration = useMemo(() => {
+    let total = 0;
+    for (const dur of monthDurationMap.values()) total += dur;
+    return total;
+  }, [monthDurationMap]);
 
-  const allTimeStat = formatTimeStat(getTotalDuration());
-  const activeDays = getActiveDaysCount();
-  const streak = computeStreak();
+  const monthActiveDays = monthDurationMap.size;
+  const monthBestDay = useMemo(() => {
+    let max = 0;
+    for (const dur of monthDurationMap.values()) {
+      if (dur > max) max = dur;
+    }
+    return max;
+  }, [monthDurationMap]);
+
+  const monthSessions = useMemo(
+    () => getMonthSessionCount(viewYear, viewMonth + 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewYear, viewMonth, weekStats],
+  );
+  const monthLongest = useMemo(
+    () => getMonthLongestSession(viewYear, viewMonth + 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewYear, viewMonth, weekStats],
+  );
+  const monthAvgSession = monthSessions > 0 ? Math.round(monthDuration / monthSessions) : 0;
+
+  const monthDurationStat = formatTimeStat(monthDuration);
+  const longestStat = formatTimeStat(monthLongest);
+  const bestDayStat = formatTimeStat(monthBestDay);
+  const avgSessionStat = formatTimeStat(monthAvgSession);
+  const heroLabel = isCurrentMonth ? 'this month' : MONTH_NAMES_SHORT[viewMonth];
 
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
   const quote = ZEN_QUOTES[dayOfYear % ZEN_QUOTES.length];
@@ -220,13 +231,11 @@ export default function HistoryContent({
         </Pressable>
       </View>
 
-      {/* Stats — two-row 3×2 grid. Top row anchors the headline (this
-          month + streak + sessions) with the hero numeral. Bottom row
-          adds journey context (longest, all-time total, active days)
-          at smaller scale so it reads as supporting detail rather
-          than competing data. Vertical hairlines between cells, a
-          horizontal hairline between rows — pure rule lines, no card
-          fill. All values mono, all labels serif. */}
+      {/* Stats — two-row 3×2 grid scoped to the calendar's viewed
+          month. Top row anchors the headline (month duration + sessions
+          + active days) with the hero numeral. Bottom row adds journey
+          detail (longest single session, best day, average session) at
+          smaller scale. All values mono, all labels serif. */}
       <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.statsBlock}>
         {/* Terracotta accent stripe at the top of the card — gives the
             block an anchor colour and breaks the monotone warm cream. */}
@@ -236,18 +245,32 @@ export default function HistoryContent({
           <View style={styles.statCellHero}>
             <View style={styles.heroValueWrap}>
               <Text style={[styles.heroValue, { color: palette.terracotta, fontFamily: Fonts.mono }]}>
-                {thisMonthStat.value}
+                {monthDurationStat.value}
               </Text>
-              {thisMonthStat.unit ? (
+              {monthDurationStat.unit ? (
                 <Text style={[styles.heroUnit, { color: palette.terracotta, fontFamily: Fonts.serif }]}>
-                  {thisMonthStat.unit}
+                  {monthDurationStat.unit}
                 </Text>
               ) : null}
             </View>
             <View style={styles.statLabelRow}>
               <Feather name="calendar" size={11} color={palette.terracotta} />
               <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                this month
+                {heroLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+
+          <View style={styles.statCell}>
+            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts.mono }]}>
+              {monthSessions}
+            </Text>
+            <View style={styles.statLabelRow}>
+              <Feather name="hash" size={11} color={palette.terracotta} />
+              <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+                {monthSessions === 1 ? 'session' : 'sessions'}
               </Text>
             </View>
           </View>
@@ -257,30 +280,16 @@ export default function HistoryContent({
           <View style={styles.statCell}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {streak}
+                {monthActiveDays}
               </Text>
               <Text style={[styles.statUnit, { color: theme.text, fontFamily: Fonts.serif }]}>
-                {streak === 1 ? 'day' : 'days'}
+                {monthActiveDays === 1 ? 'day' : 'days'}
               </Text>
             </View>
             <View style={styles.statLabelRow}>
-              <Feather name="zap" size={11} color={palette.terracotta} />
+              <Feather name="check-circle" size={11} color={palette.terracotta} />
               <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                streak
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-
-          <View style={styles.statCell}>
-            <Text style={[styles.statValue, { color: theme.text, fontFamily: Fonts.mono }]}>
-              {totalSessions}
-            </Text>
-            <View style={styles.statLabelRow}>
-              <Feather name="hash" size={11} color={palette.terracotta} />
-              <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                {totalSessions === 1 ? 'session' : 'sessions'}
+                active
               </Text>
             </View>
           </View>
@@ -292,11 +301,11 @@ export default function HistoryContent({
           <View style={styles.statCellSecondary}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {longestSession.value}
+                {longestStat.value}
               </Text>
-              {longestSession.unit ? (
+              {longestStat.unit ? (
                 <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
-                  {longestSession.unit}
+                  {longestStat.unit}
                 </Text>
               ) : null}
             </View>
@@ -313,18 +322,18 @@ export default function HistoryContent({
           <View style={styles.statCellSecondary}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {allTimeStat.value}
+                {bestDayStat.value}
               </Text>
-              {allTimeStat.unit ? (
+              {bestDayStat.unit ? (
                 <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
-                  {allTimeStat.unit}
+                  {bestDayStat.unit}
                 </Text>
               ) : null}
             </View>
             <View style={styles.statLabelRow}>
-              <Feather name="clock" size={10} color={palette.terracotta} />
+              <Feather name="trending-up" size={10} color={palette.terracotta} />
               <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                all time
+                best day
               </Text>
             </View>
           </View>
@@ -334,16 +343,18 @@ export default function HistoryContent({
           <View style={styles.statCellSecondary}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {activeDays}
+                {avgSessionStat.value}
               </Text>
-              <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
-                {activeDays === 1 ? 'day' : 'days'}
-              </Text>
+              {avgSessionStat.unit ? (
+                <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
+                  {avgSessionStat.unit}
+                </Text>
+              ) : null}
             </View>
             <View style={styles.statLabelRow}>
-              <Feather name="check-circle" size={10} color={palette.terracotta} />
+              <Feather name="activity" size={10} color={palette.terracotta} />
               <Text style={[styles.statLabelSm, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
-                active
+                avg
               </Text>
             </View>
           </View>
@@ -355,7 +366,13 @@ export default function HistoryContent({
       <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
       {/* Calendar */}
-      <ActivityCalendar theme={theme} />
+      <ActivityCalendar
+        theme={theme}
+        viewYear={viewYear}
+        viewMonth={viewMonth}
+        onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+        durationMap={monthDurationMap}
+      />
 
       {/* Footer */}
       <View style={styles.quoteContainer}>

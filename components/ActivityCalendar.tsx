@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
@@ -7,7 +7,7 @@ import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTim
 import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import { formatTimeShort } from '@/lib/format';
-import { getMonthDurations, getSessionsByDateRange } from '@/lib/db/sessions';
+import { getSessionsByDateRange } from '@/lib/db/sessions';
 import { getMoodColor } from '@/lib/mood';
 import type { Session } from '@/lib/db/types';
 import { useAppStore } from '@/lib/store';
@@ -33,12 +33,20 @@ function formatTime(ts: number): string {
 
 interface ActivityCalendarProps {
   theme: AppTheme;
+  viewYear: number;
+  viewMonth: number;
+  onViewChange: (year: number, month: number) => void;
+  durationMap: Map<string, number>;
 }
 
-export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
+export default function ActivityCalendar({
+  theme,
+  viewYear,
+  viewMonth,
+  onViewChange,
+  durationMap,
+}: ActivityCalendarProps) {
   const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const weekStats = useAppStore((s) => s.weekStats);
   const deleteSessionsByDate = useAppStore((s) => s.deleteSessionsByDate);
@@ -47,10 +55,11 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
   const todayKey = dateKey(today);
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
-  const durationMap = useMemo(() => {
-    return getMonthDurations(viewYear, viewMonth + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewYear, viewMonth, weekStats]);
+  // Clear any selected day whenever the user navigates between months —
+  // the previous selection no longer exists in the new grid.
+  useEffect(() => {
+    setSelectedDate(null);
+  }, [viewYear, viewMonth]);
 
   const maxDuration = useMemo(() => {
     let max = 0;
@@ -90,18 +99,16 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
 
   const goToPrevMonth = useCallback(() => {
     haptics.select();
-    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
-    else setViewMonth(viewMonth - 1);
-    setSelectedDate(null);
-  }, [viewYear, viewMonth]);
+    if (viewMonth === 0) onViewChange(viewYear - 1, 11);
+    else onViewChange(viewYear, viewMonth - 1);
+  }, [viewYear, viewMonth, onViewChange]);
 
   const goToNextMonth = useCallback(() => {
     if (isCurrentMonth) return;
     haptics.select();
-    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
-    else setViewMonth(viewMonth + 1);
-    setSelectedDate(null);
-  }, [viewYear, viewMonth, isCurrentMonth]);
+    if (viewMonth === 11) onViewChange(viewYear + 1, 0);
+    else onViewChange(viewYear, viewMonth + 1);
+  }, [viewYear, viewMonth, isCurrentMonth, onViewChange]);
 
   const handleDeleteDay = useCallback(() => {
     if (!selectedDate) return;
