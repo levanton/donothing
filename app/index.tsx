@@ -732,6 +732,18 @@ export default function DoNothingScreen() {
     runResetAnimations();
   }, []);
 
+  // Stopwatch-mode finish — there's no countdown to auto-complete the
+  // session, so the user needs an explicit way to end the run AND see
+  // the completion screen. Routes through completeSession (same flow
+  // a countdown takes when it hits 00:00) so the celebration cascade,
+  // mood dial and farewell beat all run as expected.
+  const handleFinishStopwatch = useCallback(async () => {
+    haptics.success();
+    deactivateKeepAwake('session');
+    setDistractionFree(false);
+    await useAppStore.getState().completeSession();
+  }, []);
+
   // Reset the resting-state visuals after a session truly ends.
   const runResetAnimations = useCallback(() => {
     timerOpacity.value = withTiming(0.9, { duration: 700 });
@@ -1366,20 +1378,41 @@ export default function DoNothingScreen() {
                 ]}
                 pointerEvents={distractionFree ? 'none' : 'auto'}
               >
-                <Pressable
-                  onPress={handleStop}
-                  style={styles.runStopPill}
-                  hitSlop={12}
-                >
-                  <Text
-                    style={[
-                      styles.runStopLabel,
-                      { fontFamily: Fonts!.serif },
-                    ]}
+                <View style={styles.runControlRow}>
+                  <Pressable
+                    onPress={handleStop}
+                    style={styles.runStopPill}
+                    hitSlop={12}
                   >
-                    interrupt
-                  </Text>
-                </Pressable>
+                    <Text
+                      style={[
+                        styles.runStopLabel,
+                        { fontFamily: Fonts!.serif },
+                      ]}
+                    >
+                      interrupt
+                    </Text>
+                  </Pressable>
+                  {/* Stopwatch mode has no countdown to auto-complete —
+                      surface a finish pill so the user can wrap the run
+                      and land on the celebration / mood / farewell flow. */}
+                  {goalSeconds === 0 && (
+                    <Pressable
+                      onPress={handleFinishStopwatch}
+                      style={styles.runFinishPill}
+                      hitSlop={12}
+                    >
+                      <Text
+                        style={[
+                          styles.runFinishLabel,
+                          { fontFamily: Fonts!.serif },
+                        ]}
+                      >
+                        finish
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
               </Animated.View>
 
               <Animated.View
@@ -1774,6 +1807,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
   },
+  // Row layout for the bottom control band — interrupt sits alone in
+  // countdown mode, gets a "finish" companion in stopwatch mode.
+  runControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   runStopPill: {
     minWidth: 152,
     height: 52,
@@ -1787,6 +1827,24 @@ const styles = StyleSheet.create({
   runStopLabel: {
     color: palette.cream,
     fontSize: 18,
+    letterSpacing: 0.6,
+  },
+  // Finish pill — solid cream so it reads as the primary action when
+  // stopwatch mode shows both. Same height as the outline interrupt
+  // pill so the row stays balanced.
+  runFinishPill: {
+    minWidth: 152,
+    height: 52,
+    paddingHorizontal: 28,
+    borderRadius: 100,
+    backgroundColor: palette.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runFinishLabel: {
+    color: palette.brown,
+    fontSize: 18,
+    fontWeight: '500',
     letterSpacing: 0.6,
   },
   // Hide is secondary — small icon button above the stop pill, with
