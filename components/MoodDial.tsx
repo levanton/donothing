@@ -18,23 +18,12 @@ import Animated, {
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 
 import { palette } from '@/lib/theme';
-import { updateSessionMood } from '@/lib/db/sessions';
+import { MOODS, MOOD_COLORS_ARRAY, type MoodKey } from '@/lib/mood';
+import { useAppStore } from '@/lib/store';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedG = Animated.createAnimatedComponent(G);
 const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
-
-const MOODS = ['still', 'lighter', 'refreshed', 'full'] as const;
-export type MoodKey = (typeof MOODS)[number];
-
-// Per-mood fill colors. Earth tonal arc from grounded "still" through
-// warm "lighter" and cool "refreshed" to verdant "full".
-const MOOD_COLORS: readonly string[] = [
-  '#C9BBA3', // still     — pale warm taupe
-  '#D4A66B', // lighter   — warm ochre
-  '#A6C2B8', // refreshed — pale dusty teal
-  '#8FA07A', // full      — sage (the original single fill)
-];
 
 const RING_COUNT = MOODS.length;
 const RING_STEP = 28;
@@ -400,11 +389,12 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
     hintPulse.value = withTiming(0, { duration: 220 });
   }, []);
 
+  const updateSessionMood = useAppStore((s) => s.updateSessionMood);
   const commitMood = useCallback(
     (mood: MoodKey) => {
       if (sessionId) updateSessionMood(sessionId, mood);
     },
-    [sessionId],
+    [sessionId, updateSessionMood],
   );
 
   // Horizontal drag grows the central fill outward; the mood only
@@ -454,7 +444,7 @@ export default memo(function MoodDial({ visible, reveal, collapse, sessionId, on
 
   const filledCircleProps = useAnimatedProps(() => {
     const base = FILL_MIN + progress.value * (FILL_MAX - FILL_MIN);
-    const fill = interpolateColor(colorPhase.value, [0, 1, 2, 3], MOOD_COLORS);
+    const fill = interpolateColor(colorPhase.value, [0, 1, 2, 3], MOOD_COLORS_ARRAY);
     return { r: base * introFill.value, fill };
   });
 

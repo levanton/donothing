@@ -6,6 +6,7 @@ import {
   deleteSessionById as dbDeleteSession,
   deleteSessionsByDateKey,
   cleanupInvalidSessions,
+  updateSessionMood as dbUpdateSessionMood,
   MIN_SAVABLE_DURATION,
 } from './db/sessions';
 import {
@@ -228,6 +229,11 @@ export interface AppState {
   // Session actions
   deleteSession: (id: string) => Promise<void>;
   deleteSessionsByDate: (dateKey: string) => Promise<void>;
+  // Persists the picked mood for a session AND bumps weekStats so
+  // ActivityCalendar's session-list memo re-runs and the new mood
+  // shows up immediately (otherwise it only appeared after a cold
+  // restart).
+  updateSessionMood: (id: string, mood: string) => void;
 
   // AppState
   handleBackground: () => Promise<void>;
@@ -651,6 +657,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteSessionsByDate: async (dateKey: string) => {
     deleteSessionsByDateKey(dateKey);
+    set({ weekStats: getWeekStats() });
+  },
+
+  updateSessionMood: (id, mood) => {
+    dbUpdateSessionMood(id, mood);
+    // weekStats doubles as the journey-list refresh trigger — bumping
+    // it forces ActivityCalendar's selectedSessions memo to re-read
+    // and pick up the newly persisted mood.
     set({ weekStats: getWeekStats() });
   },
 

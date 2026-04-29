@@ -8,6 +8,7 @@ import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import { formatTimeShort } from '@/lib/format';
 import { getMonthDurations, getSessionsByDateRange } from '@/lib/db/sessions';
+import { getMoodColor } from '@/lib/mood';
 import type { Session } from '@/lib/db/types';
 import { useAppStore } from '@/lib/store';
 import { WEEKDAY_LABELS } from '@/lib/weekdays';
@@ -229,8 +230,13 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
                     {formatTimeShort(session.duration)}
                   </Text>
                   {session.mood && (
-                    <View style={[styles.sessionMood, { backgroundColor: MOOD_FILL }]}>
-                      <Text style={[styles.sessionMoodText, { color: palette.cream, fontFamily: Fonts!.serif }]}>
+                    <View
+                      style={[
+                        styles.sessionMood,
+                        { backgroundColor: getMoodColor(session.mood) ?? palette.sand },
+                      ]}
+                    >
+                      <Text style={[styles.sessionMoodText, { color: palette.brown, fontFamily: Fonts!.serif }]}>
                         {session.mood}
                       </Text>
                     </View>
@@ -261,11 +267,6 @@ function formatSelectedDate(key: string): string {
 }
 
 const CELL_SIZE = 40;
-
-// Same sage-olive that fills the mood dial when the user picks a
-// mood — keeps the journey list consistent with the picker UI so a
-// mood looks the same wherever it appears.
-const MOOD_FILL = '#8FA07A';
 
 const styles = StyleSheet.create({
   container: { marginBottom: 28 },
