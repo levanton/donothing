@@ -64,9 +64,10 @@ export default function PaywallRoute() {
 
   const handleSkip = useCallback(() => {
     haptics.light();
-    // Win-back: surface the half-off promo on home before the user gets back
-    // to the gate, giving them one more chance to convert.
-    useAppStore.getState().showPromoOffer();
+    // Win-back: arm the half-off promo. The home screen unwraps it
+    // once its launch splash settles, otherwise the modal animates in
+    // on top of the still-running splash circle.
+    useAppStore.getState().setPendingPromoOnHome(true);
     router.replace('/');
   }, [router]);
 

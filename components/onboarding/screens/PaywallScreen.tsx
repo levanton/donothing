@@ -80,9 +80,10 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
 
   const handleSkip = useCallback(() => {
     haptics.light();
-    // Win-back: surface the half-off promo on home once onboarding finishes,
-    // mirroring the behaviour when the standalone /paywall is dismissed.
-    useAppStore.getState().showPromoOffer();
+    // Win-back: arm the half-off promo. The home screen unwraps it
+    // once its launch splash settles, otherwise the modal animates in
+    // on top of the still-running splash circle.
+    useAppStore.getState().setPendingPromoOnHome(true);
     onFinish();
   }, [onFinish]);
 

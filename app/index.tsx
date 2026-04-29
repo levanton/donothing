@@ -586,6 +586,17 @@ export default function DoNothingScreen() {
     );
   }, [ready, splashDone, yesBtnRect]);
 
+  // Drain the post-paywall promo flag once the launch splash has
+  // settled. The paywall arms `pendingPromoOnHome` instead of opening
+  // the modal directly so the win-back doesn't animate in on top of
+  // the still-running splash circle.
+  useEffect(() => {
+    if (!splashDone) return;
+    if (!useAppStore.getState().pendingPromoOnHome) return;
+    useAppStore.getState().setPendingPromoOnHome(false);
+    useAppStore.getState().showPromoOffer();
+  }, [splashDone]);
+
   const splashStyle = useAnimatedStyle(() => {
     const size =
       splashInitialSize.value + splashProgress.value * (YES_SIZE - splashInitialSize.value);

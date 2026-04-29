@@ -18,7 +18,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.terracotta }}>
       <BottomSheetModalProvider>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.terracotta } }}>
-          <Stack.Screen name="index" />
+          {/* Fade everywhere — slide-from-right was poking through when
+              returning from onboarding/paywall, breaking the sense of
+              "the home screen is just there". */}
+          <Stack.Screen name="index" options={{ animation: 'fade' }} />
           <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="paywall" options={{ animation: 'fade', gestureEnabled: false }} />
         </Stack>
