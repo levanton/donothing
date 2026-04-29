@@ -85,6 +85,28 @@ function snapToNearest(raw: number): number {
 }
 
 
+interface AnimatedTickProps {
+  tx: number;
+  cy: number;
+  threshold: number;
+  activeColor: string;
+  inactiveColor: string;
+  lastSnap: SharedValue<number>;
+}
+
+function AnimatedTick({ tx, cy, threshold, activeColor, inactiveColor, lastSnap }: AnimatedTickProps) {
+  const animatedProps = useAnimatedProps(() => ({
+    stroke: lastSnap.value >= threshold ? activeColor : inactiveColor,
+  }));
+  return (
+    <AnimatedLine
+      x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
+      strokeWidth={1.5}
+      animatedProps={animatedProps}
+    />
+  );
+}
+
 interface GoalSliderBarProps {
   theme: GoalSliderTheme;
   /** Max value in minutes */
@@ -158,6 +180,11 @@ export default function GoalSliderBar({
   const internalProgress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const lastSnap = useSharedValue(value ?? 0);
+  // While true, prop-driven sync is suppressed. Without this, the
+  // gesture worklet advances `lastSnap` faster than the store-roundtrip
+  // can echo `value` back, so the sync effect repeatedly snaps the
+  // thumb back to a stale value and the slider stutters mid-drag.
+  const isDragging = useSharedValue(false);
 
   const progress = externalProgress ?? internalProgress;
   const width = fixedWidth ?? measuredWidth;
@@ -175,24 +202,42 @@ export default function GoalSliderBar({
     onChange?.(mins);
   }, [onChange]);
 
+  // Snap to the touch point — used by both onBegin (tap/initial touch)
+  // and onUpdate (drag). Pulled out so a tap on the track moves the
+  // thumb instantly, with no minDistance delay before activation.
+  const snapToTouch = (eventX: number) => {
+    'worklet';
+    const twVal = trackW.value;
+    if (twVal === 0) return;
+    const x = Math.max(0, Math.min(1, (eventX - pad) / twVal));
+    const raw = posToValue(x, maxMinutes, bp);
+    let snapped = snapToNearest(raw);
+    if (snapped < minMinutes) snapped = minMinutes;
+    internalProgress.value = valueToPos(snapped, maxMinutes, bp);
+    // Cross to JS only on a real value change — the gesture fires
+    // ~60×/sec but the snapped minute changes far less often.
+    // Without this gate, every frame queues a setState + store
+    // write which lags the timer numerals behind the thumb.
+    if (snapped !== lastSnap.value) {
+      lastSnap.value = snapped;
+      runOnJS(handleDisplayUpdate)(snapped);
+    }
+  };
+
   const gesture = Gesture.Pan()
+    .minDistance(0)
+    .onBegin((e) => {
+      'worklet';
+      isDragging.value = true;
+      snapToTouch(e.x);
+    })
     .onUpdate((e) => {
       'worklet';
-      const twVal = trackW.value;
-      if (twVal === 0) return;
-      const x = Math.max(0, Math.min(1, (e.x - pad) / twVal));
-      const raw = posToValue(x, maxMinutes, bp);
-      let snapped = snapToNearest(raw);
-      if (snapped < minMinutes) snapped = minMinutes;
-      internalProgress.value = valueToPos(snapped, maxMinutes, bp);
-      // Cross to JS only on a real value change — the gesture fires
-      // ~60×/sec but the snapped minute changes far less often.
-      // Without this gate, every frame queues a setState + store
-      // write which lags the timer numerals behind the thumb.
-      if (snapped !== lastSnap.value) {
-        lastSnap.value = snapped;
-        runOnJS(handleDisplayUpdate)(snapped);
-      }
+      snapToTouch(e.x);
+    })
+    .onFinalize(() => {
+      'worklet';
+      isDragging.value = false;
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -211,6 +256,7 @@ export default function GoalSliderBar({
   useEffect(() => {
     if (!isInteractive || width <= 0) return;
     requestAnimationFrame(() => {
+      if (isDragging.value) return;
       if (lastSnap.value !== value) {
         internalProgress.value = valueToPos(value!, maxMinutes, bp);
         lastSnap.value = value!;
@@ -265,16 +311,30 @@ export default function GoalSliderBar({
           strokeWidth={bgSW}
           strokeLinecap="round"
         />
-        {/* Tick marks */}
+        {/* Tick marks — interactive ticks animate via the UI-thread
+            `lastSnap` so fill updates land on the same frame as the
+            thumb, without waiting for the store roundtrip. */}
         {ticks.map((m) => {
           const tx = pad + (isInteractive ? valueToPos(m, maxMinutes, bp) : m / maxMinutes) * tw;
-          const filled = isInteractive ? displayMins >= m : false;
+          if (!isInteractive) {
+            return (
+              <SvgLine
+                key={m}
+                x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
+                stroke={trackBgColor ?? theme.textTertiary}
+                strokeWidth={1.5}
+              />
+            );
+          }
           return (
-            <SvgLine
+            <AnimatedTick
               key={m}
-              x1={tx} y1={cy - 4} x2={tx} y2={cy + 4}
-              stroke={filled ? color : (trackBgColor ?? theme.textTertiary)}
-              strokeWidth={1.5}
+              tx={tx}
+              cy={cy}
+              threshold={m}
+              activeColor={color}
+              inactiveColor={trackBgColor ?? theme.textTertiary ?? color}
+              lastSnap={lastSnap}
             />
           );
         })}
