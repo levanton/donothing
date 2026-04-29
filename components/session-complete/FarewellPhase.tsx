@@ -37,7 +37,6 @@ interface FarewellPhaseProps {
   eyebrowStyle: StyleProp<TextStyle>;
   titleStyle: StyleProp<TextStyle>;
   dividerStyle: StyleProp<ViewStyle>;
-  subStyle: StyleProp<TextStyle>;
   chipStyle: StyleProp<ViewStyle>;
   continueStyle: StyleProp<ViewStyle>;
 
@@ -69,7 +68,6 @@ export default function FarewellPhase({
   eyebrowStyle,
   titleStyle,
   dividerStyle,
-  subStyle,
   chipStyle,
   continueStyle,
   onClose,
@@ -97,16 +95,6 @@ export default function FarewellPhase({
         </Animated.Text>
 
         <Animated.View style={[styles.divider, dividerStyle]} />
-
-        {/* Apps-unlocked line only fires when there were apps to
-            unlock. Without it, the message lies on free runs. */}
-        {onUnlock && (
-          <Animated.Text
-            style={[styles.sub, { color: textColor, fontFamily: Fonts.serif }, subStyle]}
-          >
-            your apps are open again
-          </Animated.Text>
-        )}
 
         <Animated.View style={[styles.chip, chipStyle]}>
           <Text style={[styles.chipText, { fontFamily: Fonts.serif }]}>
@@ -196,13 +184,6 @@ const styles = StyleSheet.create({
     backgroundColor: palette.cream,
     marginBottom: 20,
     borderRadius: 1,
-  },
-  sub: {
-    fontSize: 18,
-    fontWeight: '400',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    marginBottom: 28,
   },
   chip: {
     backgroundColor: palette.cream,

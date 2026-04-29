@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { haptics } from '@/lib/haptics';
 import Animated, {
   Easing,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -97,6 +98,11 @@ function SessionCompleteScreen({
   const closeOpacity = useSharedValue(0);
   const closeY = useSharedValue(14);
   const closeBtnScale = useSharedValue(1);
+  // Whole-screen collapse-to-YES progress (0 = full screen, 1 = shrunk
+  // onto the home YES button). Drives the root's scale + translate on
+  // close so the page literally folds back into the seed it started
+  // from, instead of a flat fade-out.
+  const closeProgress = useSharedValue(0);
   const farewellOpacity = useSharedValue(0);
   const farewellY = useSharedValue(12);
   // Title pieces stagger so the numeral lands first, the unit a beat
@@ -126,8 +132,6 @@ function SessionCompleteScreen({
   const fwTitleScale = useSharedValue(0.94);
   const fwDividerOp = useSharedValue(0);
   const fwDividerW = useSharedValue(0);
-  const fwSubOp = useSharedValue(0);
-  const fwSubY = useSharedValue(10);
   const fwChipOp = useSharedValue(0);
   const fwChipY = useSharedValue(10);
   const fwContinueOp = useSharedValue(0);
@@ -217,8 +221,6 @@ function SessionCompleteScreen({
     fwTitleScale.value = 0.94;
     fwDividerOp.value = 0;
     fwDividerW.value = 0;
-    fwSubOp.value = 0;
-    fwSubY.value = 10;
     fwChipOp.value = 0;
     fwChipY.value = 10;
     fwContinueOp.value = 0;
@@ -231,6 +233,10 @@ function SessionCompleteScreen({
   useEffect(() => {
     if (visible) {
       dismissingRef.current = false;
+      // Reset the collapse-to-YES transform so the next entrance
+      // starts at full size (otherwise the second open would render
+      // the screen pre-shrunk onto the seed).
+      closeProgress.value = 0;
       setHasInteracted(false);
       setRevealDial(false);
       setPhase('benefits');
@@ -401,14 +407,11 @@ function SessionCompleteScreen({
         fwDividerOp.value = withDelay(440, withTiming(1, { duration: 540, ...ease }));
         fwDividerW.value = withDelay(440, withTiming(1, { duration: 700, ...ease }));
 
-        fwSubOp.value = withDelay(560, withTiming(1, { duration: RISE, ...ease }));
-        fwSubY.value = withDelay(560, withTiming(0, { duration: RISE, ...ease }));
+        fwChipOp.value = withDelay(560, withTiming(1, { duration: RISE, ...ease }));
+        fwChipY.value = withDelay(560, withTiming(0, { duration: RISE, ...ease }));
 
-        fwChipOp.value = withDelay(740, withTiming(1, { duration: RISE, ...ease }));
-        fwChipY.value = withDelay(740, withTiming(0, { duration: RISE, ...ease }));
-
-        fwContinueOp.value = withDelay(960, withTiming(1, { duration: RISE, ...ease }));
-        fwContinueY.value = withDelay(960, withTiming(0, { duration: RISE, ...ease }));
+        fwContinueOp.value = withDelay(780, withTiming(1, { duration: RISE, ...ease }));
+        fwContinueY.value = withDelay(780, withTiming(0, { duration: RISE, ...ease }));
       };
 
       const fallback = SCREEN_H * 0.2;
@@ -434,18 +437,25 @@ function SessionCompleteScreen({
     revealTimersRef.current.push(t1);
   }, []);
 
-  // Background stays terracotta on both sides — running screen and home
-  // share the palette during a session — so close is just a content
-  // fade-out, no shape morph back onto the yes button.
+  // Close animation — the entire screen scales + translates onto the
+  // measured YES button on the home page, while the inner content
+  // fades faster than the bg so the colour pad reads as the dominant
+  // element folding back to the seed. Both screens share the same
+  // terracotta palette, so the visual reads as one continuous body of
+  // colour shrinking back into the YES dot.
   const handleClose = useCallback(() => {
     if (dismissingRef.current) return;
     dismissingRef.current = true;
     haptics.select();
 
-    const duration = 360;
-    contentOpacity.value = withTiming(0, { duration, easing: EASE_OUT });
+    const duration = 620;
+    const easing = Easing.bezier(0.22, 1, 0.36, 1);
+    // Content (text, sun, button) fades a touch faster so the bg pad
+    // is what visibly contracts onto the YES button.
+    contentOpacity.value = withTiming(0, { duration: 360, easing: EASE_OUT });
+    closeProgress.value = withTiming(1, { duration, easing });
     setTimeout(onClose, duration + 20);
-  }, [onClose]);
+  }, [onClose, closeProgress]);
 
   handleCloseRef.current = handleClose;
 
@@ -463,6 +473,41 @@ function SessionCompleteScreen({
     opacity: contentOpacity.value,
     pointerEvents: contentOpacity.value > 0.5 ? 'auto' : 'none',
   }));
+
+  // Collapse-to-YES bg layer — mirrors the splash/terraCamera pattern
+  // in app/index.tsx: a YES_SIZE square with a YES_SIZE/2 borderRadius
+  // (so it's already a circle), absolute-positioned at the measured
+  // YES button, scaled UP to cover the screen at rest and DOWN to 1
+  // (= YES-sized circle) on close. Visually the entire bg morphs from
+  // a screen-covering disc into the YES seed, instead of a rectangle
+  // shrinking weirdly.
+  const bgCircleStyle = useAnimatedStyle(() => {
+    // Default centre-of-screen anchor — used when yesBtnRect hasn't
+    // been measured yet on the first frame, otherwise the circle
+    // snaps to its static (0, 0) position before the measurement
+    // arrives and the user sees a tiny circle in the top-left for a
+    // split second on entry.
+    const cx = yesBtnRect ? yesBtnRect.x + yesBtnRect.w / 2 : SCREEN_W / 2;
+    const cy = yesBtnRect ? yesBtnRect.y + yesBtnRect.h / 2 : SCREEN_H / 2;
+    // Cover-size = diameter that reaches the farthest screen corner
+    // from the centre point. Match the splash math in app/index.tsx
+    // exactly so both animations carve the same circle path.
+    const maxDist = Math.max(
+      Math.hypot(cx, cy),
+      Math.hypot(SCREEN_W - cx, cy),
+      Math.hypot(cx, SCREEN_H - cy),
+      Math.hypot(SCREEN_W - cx, SCREEN_H - cy),
+    );
+    const coverSize = maxDist * 2 + 80;
+    const maxScale = coverSize / YES_SIZE;
+    // closeProgress 0 → cover, 1 → YES seed.
+    const scale = interpolate(closeProgress.value, [0, 1], [maxScale, 1]);
+    return {
+      left: cx - YES_SIZE / 2,
+      top: cy - YES_SIZE / 2,
+      transform: [{ scale }],
+    };
+  });
 
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
@@ -495,10 +540,6 @@ function SessionCompleteScreen({
   const fwDividerStyle = useAnimatedStyle(() => ({
     opacity: fwDividerOp.value,
     transform: [{ scaleX: fwDividerW.value }],
-  }));
-  const fwSubStyle = useAnimatedStyle(() => ({
-    opacity: fwSubOp.value,
-    transform: [{ translateY: fwSubY.value }],
   }));
   const fwChipStyle = useAnimatedStyle(() => ({
     opacity: fwChipOp.value,
@@ -554,6 +595,9 @@ function SessionCompleteScreen({
   return (
     <View style={styles.root}>
       <StatusBar style={statusStyle} />
+      {/* Bg circle — starts covering the screen, scales down to a
+          YES-sized circle at the measured YES button on close. */}
+      <Animated.View style={[styles.bgCircle, bgCircleStyle]} pointerEvents="none" />
 
       {/* Content layer — terracotta root acts as the static background. */}
       <Animated.View style={[StyleSheet.absoluteFillObject, contentStyle]}>
@@ -705,7 +749,6 @@ function SessionCompleteScreen({
           eyebrowStyle={fwEyebrowStyle}
           titleStyle={fwTitleStyle}
           dividerStyle={fwDividerStyle}
-          subStyle={fwSubStyle}
           chipStyle={fwChipStyle}
           continueStyle={fwContinueStyle}
           onClose={() => handleCloseRef.current()}
@@ -723,6 +766,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 120,
     overflow: 'hidden',
+  },
+  // Animated bg circle — sits behind everything. Width/height = YES
+  // button diameter, fully rounded; transform: scale grows it to
+  // cover the screen at rest and shrinks it back to the YES seed on
+  // close. position: absolute so left/top can drive its anchor.
+  bgCircle: {
+    position: 'absolute',
+    width: YES_SIZE,
+    height: YES_SIZE,
+    borderRadius: YES_SIZE / 2,
     backgroundColor: palette.terracotta,
   },
   layout: {
