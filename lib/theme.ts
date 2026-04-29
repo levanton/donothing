@@ -66,7 +66,7 @@ export const themes: Record<ThemeMode, AppTheme> = {
     subtle:        alpha(palette.salmon, 0.12),
   },
   light: {
-    bg:            palette.cream,
+    bg:            palette.warmCream,
     text:          palette.brown,
     textSecondary: alpha(palette.brown, 0.9),
     textTertiary:  alpha(palette.brown, 0.7),

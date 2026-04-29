@@ -52,12 +52,13 @@ export default function HistoryContent({
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
 
-  // Theme-aware card tint. Light: solid warmCream parchment, distinct
-  // against the cream page bg. Dark: a slightly-lighter warm-tinted
-  // panel above charcoal page bg (NOT cream — cream-on-cream-text in
-  // dark theme makes labels invisible). Both values give a readable,
-  // theme-coherent panel that reads clearly above the page.
-  const cardBg = themeMode === 'dark' ? '#5A4F44' : palette.warmCream;
+  // Theme-aware card tint. Light: palette.sand — slightly darker tan
+  // than the warmCream page bg, so the card still reads as a distinct
+  // panel after we adopted warmCream globally. Dark: a slightly-
+  // lighter warm-tinted panel above charcoal page bg (cream-on-cream
+  // text would be invisible). Both values give a readable, theme-
+  // coherent panel that sits clearly above the page.
+  const cardBg = themeMode === 'dark' ? '#5A4F44' : palette.sand;
 
   // Bg fades in as the panel slides up — wider range than the heading
   // (which snaps in at [0.95, 1]) so the bg eases in gradually across
