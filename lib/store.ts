@@ -31,6 +31,7 @@ import {
   scheduleSessionCompleteNotification,
   cancelNotification,
 } from './notifications';
+import type { SubscriptionStatus } from './subscription';
 
 // Module-level refs (not state, not serializable)
 let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -56,6 +57,49 @@ function trackInterval(id: ReturnType<typeof setInterval>): void {
   if (__DEV__) {
     const g = globalThis as { __doNothingIntervals?: ReturnType<typeof setInterval>[] };
     g.__doNothingIntervals?.push(id);
+  }
+}
+
+// Strip native DeviceActivity monitors when entitlement lapses. SQLite
+// `enabled` flag is left untouched — that's the user intent we restore
+// on renewal. Pairs with `restoreAllBlocksAfterRenewal`.
+async function pauseAllBlocksForExpiry(blocks: ScheduledBlock[]): Promise<void> {
+  try {
+    const { unscheduleBlock, forceUnblockAll } = await import('./screen-time');
+    for (const b of blocks) {
+      if (b.enabled) {
+        try {
+          unscheduleBlock(b.id);
+        } catch (e) {
+          console.error('[store] pauseAllBlocksForExpiry unschedule failed:', b.id, e);
+        }
+      }
+    }
+    // Safety net for the case where a shield is currently up — drop it
+    // so the user isn't stuck behind a paywalled block.
+    await forceUnblockAll();
+  } catch (e) {
+    console.error('[store] pauseAllBlocksForExpiry failed:', e);
+  }
+}
+
+// Re-register native DeviceActivity monitors for every `enabled` block.
+// Called on `unknown→active` (cold start with active entitlement, where
+// native side may have self-cleaned during an offline lapse) and on
+// `inactive→active` (purchase / restore).
+async function restoreAllBlocksAfterRenewal(blocks: ScheduledBlock[]): Promise<void> {
+  try {
+    const { reconcileBlocks, scheduleBlock, unscheduleBlock } = await import('./screen-time');
+    const validIds = new Set(blocks.filter((b) => b.enabled).map((b) => b.id));
+    await reconcileBlocks(validIds);
+    for (const b of blocks) {
+      if (b.enabled) {
+        unscheduleBlock(b.id);
+        await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays, b.unlockGoalMinutes);
+      }
+    }
+  } catch (e) {
+    console.error('[store] restoreAllBlocksAfterRenewal failed:', e);
   }
 }
 
@@ -132,9 +176,11 @@ export interface AppState {
   themeMode: ThemeMode;
 
   // Subscription — gates premium features (Settings, Journey, etc.)
-  // TODO: flip default to false and drive from RevenueCat entitlement
-  // once `react-native-purchases` is installed. Until then, kept true
-  // as a placeholder so premium features are accessible during dev.
+  // `subscriptionStatus` is source of truth; `isSubscribed` is kept as a
+  // derived field for legacy read-sites and equals `status === 'active'`.
+  // While status is `'unknown'` (before first RC resolve) UI should avoid
+  // showing paywall to prevent flicker.
+  subscriptionStatus: SubscriptionStatus;
   isSubscribed: boolean;
 
   // Win-back promo offer shown after the user closes the main paywall
@@ -209,7 +255,7 @@ export interface AppState {
   restartSession: () => void;
   resetElapsed: () => void;
   toggleTheme: () => void;
-  setSubscription: (isSubscribed: boolean) => void;
+  setSubscriptionStatus: (next: SubscriptionStatus) => void;
 
   // Goal actions
   setSliderMinutes: (m: number) => void;
@@ -254,7 +300,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   weekStats: [],
   ready: false,
   themeMode: 'dark',
-  isSubscribed: true,
+  subscriptionStatus: 'unknown',
+  isSubscribed: false,
   goalSeconds: 10 * 60,
   sliderMinutes: 10,
   focusStep: 'hidden',
@@ -680,8 +727,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     setDeviceState('theme', next);
   },
 
-  setSubscription: (isSubscribed: boolean) => {
-    set({ isSubscribed });
+  setSubscriptionStatus: async (next: SubscriptionStatus) => {
+    const prev = get().subscriptionStatus;
+    if (prev === next) return;
+    set({ subscriptionStatus: next, isSubscribed: next === 'active' });
+
+    // Transition side-effects: keep native DeviceActivity monitors aligned
+    // with entitlement state so a lapsed subscription doesn't keep firing
+    // shields, and a renewal restores everything the user had.
+    try {
+      if (prev === 'active' && next === 'inactive') {
+        await pauseAllBlocksForExpiry(get().scheduledBlocks);
+      } else if (next === 'active') {
+        // unknown→active or inactive→active. Either way, native side may
+        // have stopped monitors (StoreKit-guard self-cleanup during a
+        // lapsed period), so re-register from DB intent.
+        await restoreAllBlocksAfterRenewal(get().scheduledBlocks);
+      } else if (prev === 'unknown' && next === 'inactive') {
+        // Defensive cleanup on cold start for non-subscribed users —
+        // catches legacy / pre-gating monitors that may still exist.
+        try {
+          const { forceUnblockAll } = await import('./screen-time');
+          await forceUnblockAll();
+        } catch (e) {
+          console.error('[store.setSubscriptionStatus] forceUnblockAll failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('[store.setSubscriptionStatus] transition failed:', e);
+    }
   },
 
   promoOfferVisible: false,

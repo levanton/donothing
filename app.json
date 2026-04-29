@@ -1,22 +1,22 @@
 {
   "expo": {
     "name": "Nothing",
-    "slug": "donothing",
+    "slug": "nothing",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "donothing",
+    "scheme": "nothing",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.levanton.donothing",
+      "bundleIdentifier": "com.levanton.nothing",
       "appleTeamId": "45DBHDBF45",
       "icon": "./assets/Icon.icon"
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.levanton.donothing"
+      "package": "com.levanton.nothing"
     },
     "web": {
       "output": "static"
@@ -54,7 +54,7 @@
         "react-native-device-activity",
         {
           "appleTeamId": "45DBHDBF45",
-          "appGroup": "group.com.levanton.donothing"
+          "appGroup": "group.com.levanton.nothing"
         }
       ],
       "expo-asset",
@@ -64,6 +64,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "revenueCatIosKey": ""
     }
   }
 }

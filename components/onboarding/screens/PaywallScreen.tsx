@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
@@ -16,6 +16,12 @@ import { Fonts } from '@/constants/theme';
 import { useAppStore } from '@/lib/store';
 import PlanCard from '@/components/paywall/PlanCard';
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
+import {
+  getOfferings,
+  purchasePackage,
+  restorePurchases,
+} from '@/lib/subscription';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 type PlanId = 'monthly' | 'yearly' | 'lifetime';
 
@@ -68,15 +74,42 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
+const RC_PACKAGE_BY_PLAN: Record<PlanId, string[]> = {
+  monthly: ['$rc_monthly'],
+  yearly: ['$rc_annual'],
+  lifetime: ['$rc_lifetime'],
+};
+
 export default function PaywallScreen({ isActive, onFinish }: Props) {
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
+  const [packagesByPlan, setPackagesByPlan] = useState<
+    Partial<Record<PlanId, PurchasesPackage>>
+  >({});
+  const [purchasing, setPurchasing] = useState(false);
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y;
     },
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    getOfferings().then((offering) => {
+      if (cancelled || !offering) return;
+      const map: Partial<Record<PlanId, PurchasesPackage>> = {};
+      for (const plan of Object.keys(RC_PACKAGE_BY_PLAN) as PlanId[]) {
+        const ids = RC_PACKAGE_BY_PLAN[plan];
+        const pkg = offering.availablePackages.find((p) => ids.includes(p.identifier));
+        if (pkg) map[plan] = pkg;
+      }
+      setPackagesByPlan(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSkip = useCallback(() => {
     haptics.light();
@@ -87,10 +120,37 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
     onFinish();
   }, [onFinish]);
 
-  const handlePurchase = useCallback(() => {
-    haptics.success();
-    // TODO: integrate RevenueCat purchase flow
-    onFinish();
+  const handlePurchase = useCallback(async () => {
+    if (purchasing) return;
+    const pkg = packagesByPlan[selectedPlan];
+    if (!pkg) {
+      console.warn('[onboarding paywall] no RC package for plan', selectedPlan);
+      return;
+    }
+    haptics.light();
+    setPurchasing(true);
+    try {
+      const result = await purchasePackage(pkg);
+      if (result === 'active') {
+        haptics.success();
+        await useAppStore.getState().setSubscriptionStatus('active');
+        onFinish();
+      } else if (result !== 'cancelled') {
+        haptics.error();
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  }, [onFinish, packagesByPlan, purchasing, selectedPlan]);
+
+  const handleRestore = useCallback(async () => {
+    haptics.light();
+    const status = await restorePurchases();
+    if (status === 'active') {
+      haptics.success();
+      await useAppStore.getState().setSubscriptionStatus('active');
+      onFinish();
+    }
   }, [onFinish]);
 
   return (
@@ -158,7 +218,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
-          <Pressable hitSlop={8}>
+          <Pressable hitSlop={8} onPress={handleRestore}>
             <Text style={styles.footerLink}>Restore Purchases</Text>
           </Pressable>
         </Animated.View>

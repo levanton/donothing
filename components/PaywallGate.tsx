@@ -34,7 +34,7 @@ function PaywallGate({
   insets,
   onClose,
   onOpenAccount,
-  title = 'unlock donothing',
+  title = 'unlock Nothing',
   body = 'Join to open Journey, schedule screen blocks and everything that keeps you away from the screen.',
 }: Props) {
   const theme = themes[themeMode];

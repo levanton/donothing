@@ -5,6 +5,11 @@ import * as Notifications from 'expo-notifications';
 
 import { useAppStore } from '@/lib/store';
 import { getAuth, isBlockActive, onBlockShieldRaised } from '@/lib/screen-time';
+import {
+  initRevenueCat,
+  getCurrentStatus,
+  addStatusListener,
+} from '@/lib/subscription';
 
 /**
  * Wires the home screen to platform/native lifecycle events:
@@ -25,14 +30,32 @@ export function useAppLifecycle(
   // --- Init: hydrate store, then poll for an active block ---
   useEffect(() => {
     const cancelledRef = { current: false };
+    initRevenueCat();
     useAppStore
       .getState()
       .init()
-      .then(() => pollBlockUnlock(cancelledRef));
+      .then(async () => {
+        // Resolve subscription status once DB is ready so the transition
+        // side-effects (pause/restore blocks) operate on the freshly-loaded
+        // scheduledBlocks rather than the empty initial array.
+        const status = await getCurrentStatus();
+        await useAppStore.getState().setSubscriptionStatus(status);
+        pollBlockUnlock(cancelledRef);
+      });
     return () => {
       cancelledRef.current = true;
     };
   }, [pollBlockUnlock]);
+
+  // --- RevenueCat: react to entitlement changes pushed by RC ---
+  useEffect(() => {
+    const unsub = addStatusListener((status) => {
+      useAppStore.getState().setSubscriptionStatus(status);
+    });
+    return () => {
+      try { unsub(); } catch (e) { console.error('[lifecycle] RC unsub failed:', e); }
+    };
+  }, []);
 
   // --- expo-notifications: scheduled block alerts ---
   useEffect(() => {
@@ -49,6 +72,10 @@ export function useAppLifecycle(
       if (state.started || state.paused) {
         return;
       }
+      // Don't surface unlock UI for users without an active entitlement.
+      // Native StoreKit-guard suppresses block actions, but the notification
+      // payload may still slip through for in-flight schedules.
+      if (state.subscriptionStatus !== 'active') return;
       // Block can only act if Screen Time access is approved AND notifications
       // are granted. If either was revoked after the block was scheduled,
       // skip silently — the gated Settings UI will surface the missing perm.
@@ -98,6 +125,10 @@ export function useAppLifecycle(
       // surfaces after the session ends.
       if (state.started || state.paused) return;
       if (state.focusStep !== 'hidden') return;
+      // Don't surface BlockSheet without an active entitlement. The
+      // native StoreKit-guard skips firing for inactive users, but a
+      // stale shield from a just-lapsed period could still be up.
+      if (state.subscriptionStatus !== 'active') return;
       if (!isBlockActive()) return;
       activateKeepAwakeAsync('scheduled-block');
       state.showUnlock();
@@ -138,6 +169,12 @@ export function useAppLifecycle(
           try { await bgInFlight; } catch {}
         }
         useAppStore.getState().handleForeground();
+        // Refresh subscription on every foreground in case RC didn't
+        // push an update while we were backgrounded (renewal, refund,
+        // sandbox-expired). Don't await — UI shouldn't block on this.
+        getCurrentStatus()
+          .then((status) => useAppStore.getState().setSubscriptionStatus(status))
+          .catch((e) => console.error('[lifecycle] foreground RC refresh failed:', e));
         // Same retry poll as init — every foreground transition gets
         // the same defensive check, so a backgrounded app coming back
         // during an active block still surfaces the BlockSheet.

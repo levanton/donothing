@@ -1,6 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { migration001 } from './migrations/001_initial';
-import { migration002 } from './migrations/002_seed_from_async_storage';
 import { migration003 } from './migrations/003_reflection_checkin_milestones';
 import { migration004 } from './migrations/004_block_groups';
 import { migration005 } from './migrations/005_unlock_goal';
@@ -30,9 +29,7 @@ const syncMigrations: Migration[] = [
   migration008,
 ];
 
-const asyncMigrations: Migration[] = [
-  migration002,
-];
+const asyncMigrations: Migration[] = [];
 
 function ensureMigrationsTable(db: SQLiteDatabase): void {
   db.execSync(`
@@ -73,8 +70,8 @@ export function runSyncMigrations(db: SQLiteDatabase): void {
 }
 
 /**
- * Run async migrations (data seeding from AsyncStorage).
- * Called from initDatabase() during app startup.
+ * Run async migrations. Currently empty — kept for future migrations
+ * that need awaitable work (e.g. data import from a remote source).
  *
  * Uses `withTransactionAsync` instead of manual BEGIN/COMMIT — holding
  * a SQLite transaction open across an `await` boundary risks blocking

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,12 @@ import { useAppStore } from '@/lib/store';
 import PillButton from '@/components/PillButton';
 import PlanCard from '@/components/paywall/PlanCardGeneral';
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
+import {
+  getOfferings,
+  purchasePackage,
+  restorePurchases,
+} from '@/lib/subscription';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 type PlanId = 'monthly' | 'yearly' | 'lifetime';
 
@@ -57,10 +63,43 @@ function HeroImage() {
   );
 }
 
+// RevenueCat package identifiers — match these in App Store Connect /
+// RC dashboard. `$rc_*` are the default identifiers RC assigns when you
+// create packages in the dashboard.
+const RC_PACKAGE_BY_PLAN: Record<PlanId, string[]> = {
+  monthly: ['$rc_monthly'],
+  yearly: ['$rc_annual'],
+  lifetime: ['$rc_lifetime'],
+};
+
 export default function PaywallRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
+  const [packagesByPlan, setPackagesByPlan] = useState<
+    Partial<Record<PlanId, PurchasesPackage>>
+  >({});
+  const [purchasing, setPurchasing] = useState(false);
+
+  // Load offerings on mount so the CTA has a real package to purchase.
+  // If RC isn't configured (missing key), we silently fall back to a
+  // no-op CTA — the paywall still renders for layout review.
+  useEffect(() => {
+    let cancelled = false;
+    getOfferings().then((offering) => {
+      if (cancelled || !offering) return;
+      const map: Partial<Record<PlanId, PurchasesPackage>> = {};
+      for (const plan of Object.keys(RC_PACKAGE_BY_PLAN) as PlanId[]) {
+        const ids = RC_PACKAGE_BY_PLAN[plan];
+        const pkg = offering.availablePackages.find((p) => ids.includes(p.identifier));
+        if (pkg) map[plan] = pkg;
+      }
+      setPackagesByPlan(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSkip = useCallback(() => {
     haptics.light();
@@ -71,10 +110,41 @@ export default function PaywallRoute() {
     router.replace('/');
   }, [router]);
 
-  const handlePurchase = useCallback(() => {
-    haptics.success();
-    // TODO: integrate RevenueCat purchase flow
-    router.replace('/');
+  const handlePurchase = useCallback(async () => {
+    if (purchasing) return;
+    const pkg = packagesByPlan[selectedPlan];
+    if (!pkg) {
+      console.warn('[paywall] no RC package for plan', selectedPlan);
+      return;
+    }
+    haptics.light();
+    setPurchasing(true);
+    try {
+      const result = await purchasePackage(pkg);
+      if (result === 'active') {
+        haptics.success();
+        // Optimistic — RC listener will also push the same status, but
+        // we update now so the home screen unwraps without waiting.
+        await useAppStore.getState().setSubscriptionStatus('active');
+        router.replace('/');
+      } else if (result === 'cancelled') {
+        // User dismissed the system sheet. No-op.
+      } else {
+        haptics.error();
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  }, [packagesByPlan, purchasing, router, selectedPlan]);
+
+  const handleRestore = useCallback(async () => {
+    haptics.light();
+    const status = await restorePurchases();
+    if (status === 'active') {
+      haptics.success();
+      await useAppStore.getState().setSubscriptionStatus('active');
+      router.replace('/');
+    }
   }, [router]);
 
   return (
@@ -157,7 +227,7 @@ export default function PaywallRoute() {
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
-          <Pressable hitSlop={8}>
+          <Pressable hitSlop={8} onPress={handleRestore}>
             <Text style={styles.footerLink}>Restore Purchases</Text>
           </Pressable>
         </Animated.View>

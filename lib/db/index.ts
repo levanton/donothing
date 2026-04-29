@@ -10,7 +10,7 @@ let db: SQLite.SQLiteDatabase | null = null;
  */
 export function getDb(): SQLite.SQLiteDatabase {
   if (!db) {
-    db = SQLite.openDatabaseSync('donothing.db');
+    db = SQLite.openDatabaseSync('nothing.db');
     db.execSync('PRAGMA journal_mode = WAL;');
     db.execSync('PRAGMA foreign_keys = ON;');
     runSyncMigrations(db);

@@ -10,9 +10,9 @@ import { palette, type AppTheme } from '@/lib/theme';
 import PickerSheet from '@/components/PickerSheet';
 
 // TODO: replace with real URLs before App Store submission
-const TERMS_URL = 'https://donothing.app/terms';
-const PRIVACY_URL = 'https://donothing.app/privacy';
-const SUPPORT_EMAIL = 'mailto:support@donothing.app';
+const TERMS_URL = 'https://nothing.app/terms';
+const PRIVACY_URL = 'https://nothing.app/privacy';
+const SUPPORT_EMAIL = 'mailto:support@nothing.app';
 const IOS_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 // TODO: drop in the real App Store ID once it's minted
 const APP_STORE_WRITE_REVIEW = 'itms-apps://apps.apple.com/app/id0000000000?action=write-review';
@@ -144,7 +144,7 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
           />
           <Row
             icon="star"
-            label="Rate donothing"
+            label="Rate Nothing"
             theme={theme}
             onPress={handleRate}
             isLast

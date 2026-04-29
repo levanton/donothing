@@ -137,7 +137,7 @@ const SHIELD_ACTIONS: ShieldActions = {
   secondary: { behavior: 'close' },
 };
 
-export const NEVER_BLOCK_SELECTION_ID = 'donothing-never-block';
+export const NEVER_BLOCK_SELECTION_ID = 'nothing-never-block';
 
 const ALL_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 

@@ -422,6 +422,11 @@ export default function DoNothingScreen() {
     const state = useAppStore.getState();
     if (state.completionVisible || state.sessionEndedVisible) return;
     if (state.focusStep !== 'hidden') return;
+    // Don't surface BlockSheet when entitlement isn't active. Native
+    // StoreKit-guard skips firing in that case, but a stale shield from
+    // before the lapse could still be up — the unlock UI without a way
+    // to actually keep blocking is misleading.
+    if (state.subscriptionStatus !== 'active') return;
     if (!isBlockActive()) return;
     activateKeepAwakeAsync('scheduled-block');
     state.showUnlock();
@@ -436,6 +441,10 @@ export default function DoNothingScreen() {
     if (state.started) return true;
     if (state.focusStep !== 'hidden') return true;
     if (!state.ready) return false;
+    // Treat 'unknown' (RC not yet resolved) as "don't surface yet" — the
+    // RC-resolved transition will call back into pollBlockUnlock if needed.
+    // 'inactive' should never surface the unlock UI either.
+    if (state.subscriptionStatus !== 'active') return false;
     if (!isBlockActive()) return false;
     activateKeepAwakeAsync('scheduled-block');
     state.showUnlock();
@@ -1319,7 +1328,7 @@ export default function DoNothingScreen() {
             insets={insets}
             onClose={handleSettingsClose}
             onOpenAccount={handleOpenAccount}
-            title='unlock donothing'
+            title='unlock Nothing'
             body='Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way.'
           />
         </Animated.View>

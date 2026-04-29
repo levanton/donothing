@@ -10,12 +10,57 @@ import FamilyControls
 import Foundation
 import ManagedSettings
 import NotificationCenter
+import StoreKit
 import os
+
+// Product IDs that grant access to scheduled blocks. Must match the
+// products configured in App Store Connect / RevenueCat. Lifetime IAPs
+// have `expirationDate == nil` and pass through the active check.
+private let NOTHING_PRO_PRODUCT_IDS: Set<String> = [
+  "nothing_monthly",
+  "nothing_yearly",
+  "nothing_lifetime",
+]
+
+@available(iOS 15.0, *)
+private func hasActiveNothingSubscription(timeout: TimeInterval) -> Bool {
+  let semaphore = DispatchSemaphore(value: 0)
+  var active = false
+  Task {
+    for await result in Transaction.currentEntitlements {
+      if case .verified(let txn) = result,
+         NOTHING_PRO_PRODUCT_IDS.contains(txn.productID),
+         txn.revocationDate == nil,
+         (txn.expirationDate.map { $0 > Date() } ?? true) {
+        active = true
+        break
+      }
+    }
+    semaphore.signal()
+  }
+  // Fail-open on timeout — don't strand a paying user behind a missed
+  // block from a transient StoreKit hiccup. Authoritative cases (refund,
+  // cancellation, expiry) resolve in well under the timeout.
+  return semaphore.wait(timeout: .now() + timeout) == .timedOut ? true : active
+}
 
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
   override func intervalDidStart(for activity: DeviceActivityName) {
     super.intervalDidStart(for: activity)
     logger.log("intervalDidStart")
+
+    // Subscription gate. Reads StoreKit 2 entitlements directly — Apple
+    // updates these locally on refund/cancel/expiry even when the host
+    // app is closed, so a lapsed user's blocks stop firing without the
+    // app ever re-opening. Self-cleanup via stopMonitoring ensures this
+    // monitor doesn't fire again once the subscription is gone.
+    if #available(iOS 15.0, *) {
+      if !hasActiveNothingSubscription(timeout: 2.0) {
+        logger.log("intervalDidStart skipped — no active subscription")
+        DeviceActivityCenter().stopMonitoring([activity])
+        return
+      }
+    }
 
     self.executeActionsForEvent(
       activityName: activity.rawValue,
