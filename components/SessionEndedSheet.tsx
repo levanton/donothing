@@ -201,8 +201,16 @@ function SessionEndedSheet({
           {/* Hero — big mono number with a soft caption underneath.
               Goal mode: shows time remaining; free mode: shows what
               they've done so far. Same scattered-dot starscape as
-              BlockSheet for visual continuity. */}
-          <View style={styles.starscape}>
+              BlockSheet for visual continuity. In stopwatch (free)
+              mode the progress bar is hidden, so we add bottom
+              padding here to keep breathing room before the
+              continue pill instead of cramming the timer onto it. */}
+          <View
+            style={[
+              styles.starscape,
+              !hasGoal && styles.starscapeFree,
+            ]}
+          >
             <Starscape textColor={theme.text} pattern="pause" />
 
             <Text
@@ -372,6 +380,12 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingHorizontal: 8,
     position: 'relative',
+  },
+  // Stopwatch mode hides the progress bar between the timer and the
+  // continue pill — without that gap the pill crowds the numeral. Add
+  // the same vertical air the progress block normally provides.
+  starscapeFree: {
+    paddingBottom: 36,
   },
   bigNumber: {
     fontSize: 84,

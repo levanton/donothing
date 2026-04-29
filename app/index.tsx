@@ -327,11 +327,13 @@ export default function DoNothingScreen() {
     const cx = interpolate(p, [0, 1], [startCX, endCX]);
     const cy = interpolate(p, [0, 1], [startCY, endCY]);
     const scale = interpolate(p, [0, 1], [19 / 32, 1]);
+    // Proxy carries the morph during the transition, then hands off
+    // to the real heading inside the ScrollView once the panel is
+    // settled (slide = 1). After handoff the heading scrolls along
+    // with the rest of the content like normal page content.
+    const opacity = interpolate(p, [0.95, 1], [1, 0], 'clamp');
     return {
-      opacity: 1,
-      // Base position (home ↔ history morph) + sideways offset that follows
-      // the home container when Settings slides in from the right. The proxy
-      // should feel like it lives on the home screen.
+      opacity,
       transform: [
         { translateX: cx - headingRect.w / 2 + s * SCREEN_W },
         { translateY: cy - headingRect.h / 2 },

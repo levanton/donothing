@@ -186,29 +186,29 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
       </View>
 
 
-      {/* Selected day detail */}
+      {/* Selected day detail — no card fill, just an open frame with
+          a hairline divider above the session list. Empty state
+          collapses to a single quiet italic line so an unused day
+          doesn't take up the same visual real estate as a busy one. */}
       {selectedDate && (
-        <Animated.View
-          entering={FadeIn.duration(250)}
-          style={[styles.selectedDetail, { backgroundColor: theme.subtle, borderColor: theme.cardBorder }]}
-        >
+        <Animated.View entering={FadeIn.duration(250)} style={styles.selectedDetail}>
           <View style={styles.selectedHeader}>
-            <View>
-              <Text style={[styles.selectedDate, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                {formatSelectedDate(selectedDate)}
-              </Text>
-              <Text style={[styles.selectedTotal, { color: selectedDuration > 0 ? theme.accent : theme.textTertiary, fontFamily: Fonts!.serif }]}>
-                {selectedDuration > 0 ? formatTimeShort(selectedDuration) : 'no sessions'}
-              </Text>
-            </View>
-            {selectedSessions.length > 0 && (
-              <Pressable onPress={handleDeleteDay} hitSlop={12}>
-                <Feather name="trash-2" size={16} color={theme.textTertiary} />
-              </Pressable>
-            )}
+            <Text style={[styles.selectedDate, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              {formatSelectedDate(selectedDate)}
+            </Text>
+            {selectedDuration > 0 ? (
+              <View style={styles.selectedTotalRow}>
+                <Text style={[styles.selectedTotal, { color: theme.text, fontFamily: Fonts.mono }]}>
+                  {formatTimeShort(selectedDuration)}
+                </Text>
+                <Pressable onPress={handleDeleteDay} hitSlop={12} style={styles.selectedDeleteBtn}>
+                  <Feather name="trash-2" size={15} color={theme.textTertiary} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
-          {selectedSessions.length > 0 && (
+          {selectedSessions.length > 0 ? (
             <View style={[styles.sessionsList, { borderTopColor: theme.border }]}>
               {selectedSessions.map((session, idx) => (
                 <Animated.View
@@ -216,18 +216,21 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
                   entering={FadeInDown.delay(idx * 60).duration(200)}
                   style={[
                     styles.sessionRow,
-                    idx < selectedSessions.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+                    idx < selectedSessions.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: theme.border,
+                    },
                   ]}
                 >
                   <Text style={[styles.sessionTime, { color: theme.textTertiary, fontFamily: Fonts.mono }]}>
                     {formatTime(session.timestamp)}
                   </Text>
-                  <Text style={[styles.sessionDuration, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                  <Text style={[styles.sessionDuration, { color: theme.text, fontFamily: Fonts.mono }]}>
                     {formatTimeShort(session.duration)}
                   </Text>
                   {session.mood && (
-                    <View style={[styles.sessionMood, { backgroundColor: theme.accent + '20' }]}>
-                      <Text style={[styles.sessionMoodText, { color: theme.accent, fontFamily: Fonts!.serif }]}>
+                    <View style={[styles.sessionMood, { backgroundColor: MOOD_FILL }]}>
+                      <Text style={[styles.sessionMoodText, { color: palette.cream, fontFamily: Fonts!.serif }]}>
                         {session.mood}
                       </Text>
                     </View>
@@ -238,6 +241,10 @@ export default function ActivityCalendar({ theme }: ActivityCalendarProps) {
                 </Animated.View>
               ))}
             </View>
+          ) : (
+            <Text style={[styles.emptyDay, { color: theme.textTertiary, fontFamily: Fonts!.serif }]}>
+              a quiet day — nothing logged
+            </Text>
           )}
         </Animated.View>
       )}
@@ -254,6 +261,11 @@ function formatSelectedDate(key: string): string {
 }
 
 const CELL_SIZE = 40;
+
+// Same sage-olive that fills the mood dial when the user picks a
+// mood — keeps the journey list consistent with the picker UI so a
+// mood looks the same wherever it appears.
+const MOOD_FILL = '#8FA07A';
 
 const styles = StyleSheet.create({
   container: { marginBottom: 28 },
@@ -274,17 +286,65 @@ const styles = StyleSheet.create({
   activityBubble: { position: 'absolute' },
 
 
-  // Selected day detail
-  selectedDetail: { marginTop: 16, padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
-  selectedHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  selectedDate: { fontSize: 15, fontWeight: '400' },
-  selectedTotal: { fontSize: 22, fontWeight: '300', marginTop: 2 },
+  // Selected day detail — open frame, no card fill, no surrounding
+  // border. The page itself supplies the visual container; this
+  // section just adds content under the calendar.
+  selectedDetail: { marginTop: 24, paddingHorizontal: 4 },
+  selectedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  selectedDate: { fontSize: 18, fontWeight: '400', letterSpacing: 0.2 },
+  selectedTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  selectedTotal: {
+    fontSize: 18,
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.2,
+  },
+  selectedDeleteBtn: {
+    padding: 2,
+  },
+  emptyDay: {
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    letterSpacing: 0.2,
+    lineHeight: 22,
+  },
 
   // Sessions
-  sessionsList: { marginTop: 14, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  sessionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
-  sessionTime: { fontSize: 12, fontWeight: '300', width: 64 },
-  sessionDuration: { fontSize: 15, fontWeight: '300', flex: 1 },
+  sessionsList: {
+    marginTop: 14,
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 14,
+  },
+  sessionTime: {
+    fontSize: 12,
+    fontWeight: '400',
+    fontVariant: ['tabular-nums'],
+    width: 70,
+    letterSpacing: 0.4,
+  },
+  sessionDuration: {
+    fontSize: 15,
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.2,
+    flex: 1,
+  },
   sessionMood: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   sessionMoodText: { fontSize: 11, fontWeight: '500' },
   sessionDelete: { padding: 4, marginLeft: 4 },
