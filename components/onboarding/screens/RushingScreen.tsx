@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
@@ -14,15 +13,20 @@ import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
 
+const HEADING = 'Now.';
 const LINES = [
-  { text: 'We have things to do.', bold: false },
-  { text: '\nWork. Home. Errands. Meetings. Chores. Repeat.', bold: false },
-  { text: '\nIn between — we scroll. To unwind. To escape.', bold: false },
-  { text: '\nBut it never helps. We swap one task for another and never stop to think about who we are or where we\'re going.', bold: false },
-  { text: '\nWe\'re exhausted.', bold: true },
+  { text: 'Work. Home. Errands. Repeat.', bold: false },
+  { text: '\nIn between — we scroll.', bold: false },
+  { text: '\nNot to feel something — but to feel nothing.', bold: false },
+  { text: '\nAnd it never helps.', bold: false },
+  { text: '\nWe’re exhausted.', bold: true },
   { text: '\nDays, months, years — gone in a blur.', bold: true },
 ];
-const WORD_DELAY = 180;
+const WORD_DELAY = 110;
+const WORD_DURATION = 400;
+const HEADING_DELAY = 200;
+const HEADING_DURATION = 600;
+const BODY_START = HEADING_DELAY + HEADING_DURATION;
 
 
 function Word({ text, delay, bold }: { text: string; delay: number; bold?: boolean }) {
@@ -30,8 +34,8 @@ function Word({ text, delay, bold }: { text: string; delay: number; bold?: boole
   const translateY = useSharedValue(8);
 
   useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    translateY.value = withDelay(delay, withTiming(0, { duration: 600, easing: EASE_OUT }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: WORD_DURATION, easing: EASE_OUT }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: WORD_DURATION, easing: EASE_OUT }));
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -50,46 +54,35 @@ interface Props {
 
 export default function RushingScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
-  const [showBody, setShowBody] = useState(false);
 
-  const titleOpacity = useSharedValue(0);
-  const titleScale = useSharedValue(0.92);
+  const headingOpacity = useSharedValue(0);
+  const headingTranslateY = useSharedValue(8);
   const imageOpacity = useSharedValue(0);
   const imageScale = useSharedValue(0.92);
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
 
   const allWords = LINES.flatMap(l => l.text.split(' ').map(w => ({ word: w, bold: l.bold })));
-  const totalWordsDuration = allWords.length * WORD_DELAY + 600;
+  const totalWordsDuration = allWords.length * WORD_DELAY + WORD_DURATION;
 
   useEffect(() => {
     if (!isActive) return;
-    // Title: fade in + scale up
-    titleOpacity.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
-    titleScale.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
+    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_OUT }));
+    headingTranslateY.value = withDelay(HEADING_DELAY, withTiming(0, { duration: HEADING_DURATION, easing: EASE_OUT }));
 
-    // Title: fade out + scale down
-    const t1 = setTimeout(() => {
-      titleOpacity.value = withTiming(0, { duration: 700, easing: EASE_OUT });
-      titleScale.value = withTiming(0.92, { duration: 700, easing: EASE_OUT });
-    }, 1800);
-    // Show image + words
-    const t2 = setTimeout(() => {
-      setShowBody(true);
-      imageOpacity.value = withTiming(1, { duration: 1200, easing: EASE_OUT });
-      imageScale.value = withTiming(1, { duration: 1200, easing: EASE_OUT });
-    }, 2500);
-    // Button
-    const t3 = setTimeout(() => {
-      buttonOpacity.value = withTiming(1, { duration: 600, easing: EASE_OUT });
-      buttonTranslateY.value = withTiming(0, { duration: 600, easing: EASE_OUT });
-    }, 2500 + totalWordsDuration + 400);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    imageOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    imageScale.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
+
+    const t = setTimeout(() => {
+      buttonOpacity.value = withTiming(1, { duration: 500, easing: EASE_OUT });
+      buttonTranslateY.value = withTiming(0, { duration: 500, easing: EASE_OUT });
+    }, BODY_START + totalWordsDuration + 200);
+    return () => clearTimeout(t);
   }, [isActive]);
 
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-    transform: [{ scale: titleScale.value }],
+  const headingStyle = useAnimatedStyle(() => ({
+    opacity: headingOpacity.value,
+    transform: [{ translateY: headingTranslateY.value }],
   }));
 
   const imageStyle = useAnimatedStyle(() => ({
@@ -104,34 +97,25 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      {/* Title */}
-      {!showBody && (
-        <Animated.View style={[styles.titleOverlay, titleStyle]}>
-          <Text style={[styles.title, { color: theme.text }]}>Now.</Text>
-        </Animated.View>
-      )}
-
-      {/* Image on top, text below */}
-      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom, opacity: showBody ? 1 : 0 }]}>
-        <View style={styles.centerArea}>
+      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.centerStack}>
           <Animated.View style={[styles.imageArea, imageStyle]}>
             <Image source={rushImage} style={styles.image} fadeDuration={0} />
           </Animated.View>
 
           <View style={styles.textArea}>
-            {showBody && (
-              <Text style={[styles.body, { color: theme.text }]}>
-                {allWords.map((w, i) => (
-                  <Word key={i} text={w.word} delay={i * WORD_DELAY} bold={w.bold} />
-                ))}
-              </Text>
-            )}
+            <Animated.Text style={[styles.heading, { color: theme.text }, headingStyle]}>
+              {HEADING}
+            </Animated.Text>
+            <Text style={[styles.body, { color: theme.text }]}>
+              {allWords.map((w, i) => (
+                <Word key={i} text={w.word} delay={BODY_START + i * WORD_DELAY} bold={w.bold} />
+              ))}
+            </Text>
           </View>
         </View>
 
-        <Animated.View
-          style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}
-        >
+        <Animated.View style={[styles.buttonArea, buttonAnimStyle]}>
           <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
             <Feather name="arrow-right" size={22} color={theme.text} />
           </Pressable>
@@ -145,41 +129,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  titleOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontFamily: Fonts?.serif,
-    fontSize: 38,
-    fontWeight: '400',
-    textAlign: 'center',
-  },
   content: {
     flex: 1,
     paddingHorizontal: 32,
+    paddingBottom: 24,
   },
-  centerArea: {
+  centerStack: {
     flex: 1,
     justifyContent: 'center',
   },
   imageArea: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 56,
   },
   image: {
-    width: 260,
-    height: 260,
+    width: 220,
+    height: 220,
     resizeMode: 'contain',
   },
   textArea: {},
+  heading: {
+    fontFamily: Fonts?.serif,
+    fontSize: 22,
+    fontWeight: '500',
+    textAlign: 'left',
+    lineHeight: 30,
+    marginBottom: 12,
+  },
   body: {
     fontFamily: Fonts?.serif,
-    fontSize: 21,
+    fontSize: 18,
     fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 34,
+    lineHeight: 26,
   },
   buttonArea: {
     alignItems: 'flex-end',

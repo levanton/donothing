@@ -21,10 +21,10 @@ import { palette } from '@/lib/theme';
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const FACTS = [
-  { icon: 'heart', text: 'Cortisol dropped', isMci: false },
-  { icon: 'zap', text: 'Focus sharpened', isMci: false },
-  { icon: 'compass', text: 'Clearer decisions', isMci: false },
-  { icon: 'brain', text: 'Brain recharging', isMci: true },
+  { icon: 'heart', text: 'Cortisol slowly drops', isMci: false },
+  { icon: 'zap', text: 'Focus naturally sharpens', isMci: false },
+  { icon: 'compass', text: 'Mind starts to settle', isMci: false },
+  { icon: 'brain', text: 'Brain begins to recharge', isMci: true },
 ];
 
 function getTodayIndex(): number {
@@ -67,7 +67,6 @@ function FactRow({ icon, text, isMci, delay, onAppear }: {
       <Text style={[styles.factText, { color: palette.cream }]}>
         {text}
       </Text>
-      <Feather name="check" size={16} color={'#FFFFFF'} style={{ marginLeft: 4 }} />
     </Animated.View>
   );
 }
@@ -158,9 +157,6 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
           )}
 
           <Animated.View style={[styles.weekCard, weekStyle]}>
-            <Text style={[styles.streakHint, { color: palette.charcoal }]}>
-              Day 1. Let's fill the rest.
-            </Text>
             <View style={styles.weekGrid}>
               {DAYS.map((day, i) => {
                 const isToday = i === todayIdx;

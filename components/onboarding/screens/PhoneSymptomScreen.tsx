@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
@@ -13,23 +12,29 @@ import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
+const whatIfImage = require('@/assets/images/what-if.png');
 
+const HEADING = 'What if…';
 const LINES = [
-  { text: 'Your brain forgot how to just...', bold: false, accent: false },
-  { text: '\nbe still.', bold: true, accent: false },
-  { text: '\nYou scroll not to feel something — but to feel nothing.', bold: false, accent: false },
-  { text: '\nAnd it\'s not working.', bold: true, accent: true },
+  { text: 'you just stopped?', bold: false, accent: false },
+  { text: '\nDid nothing. Like you used to.', bold: false, accent: false },
+  { text: '\n\nEven one minute a day', bold: false, accent: false },
+  { text: '\ncan change everything.', bold: true, accent: true },
 ];
 
-const WORD_DELAY = 220;
+const WORD_DELAY = 130;
+const WORD_DURATION = 400;
+const HEADING_DELAY = 200;
+const HEADING_DURATION = 600;
+const BODY_START = HEADING_DELAY + HEADING_DURATION;
 
 function Word({ text, delay, bold, accent }: { text: string; delay: number; bold?: boolean; accent?: boolean }) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(8);
 
   useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: 600, easing: EASE_OUT }));
-    translateY.value = withDelay(delay, withTiming(0, { duration: 600, easing: EASE_OUT }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: WORD_DURATION, easing: EASE_OUT }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: WORD_DURATION, easing: EASE_OUT }));
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -58,40 +63,42 @@ interface Props {
 
 export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
-  const [showBody, setShowBody] = useState(false);
 
-  const titleOpacity = useSharedValue(0);
-  const titleScale = useSharedValue(0.92);
+  const headingOpacity = useSharedValue(0);
+  const headingTranslateY = useSharedValue(8);
+  const imageOpacity = useSharedValue(0);
+  const imageScale = useSharedValue(0.92);
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
 
   const allWords = LINES.flatMap(l =>
     l.text.split(' ').map(w => ({ word: w, bold: l.bold, accent: l.accent }))
   );
-  const totalWordsDuration = allWords.length * WORD_DELAY + 600;
+  const totalWordsDuration = allWords.length * WORD_DELAY + WORD_DURATION;
 
   useEffect(() => {
     if (!isActive) return;
-    titleOpacity.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
-    titleScale.value = withDelay(200, withTiming(1, { duration: 700, easing: EASE_OUT }));
+    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_OUT }));
+    headingTranslateY.value = withDelay(HEADING_DELAY, withTiming(0, { duration: HEADING_DURATION, easing: EASE_OUT }));
 
-    const t1 = setTimeout(() => {
-      titleOpacity.value = withTiming(0, { duration: 700, easing: EASE_OUT });
-      titleScale.value = withTiming(0.92, { duration: 700, easing: EASE_OUT });
-    }, 1800);
-    const t2 = setTimeout(() => {
-      setShowBody(true);
-    }, 2500);
-    const t3 = setTimeout(() => {
-      buttonOpacity.value = withTiming(1, { duration: 600, easing: EASE_OUT });
-      buttonTranslateY.value = withTiming(0, { duration: 600, easing: EASE_OUT });
-    }, 2500 + totalWordsDuration + 400);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    imageOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    imageScale.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
+
+    const t = setTimeout(() => {
+      buttonOpacity.value = withTiming(1, { duration: 500, easing: EASE_OUT });
+      buttonTranslateY.value = withTiming(0, { duration: 500, easing: EASE_OUT });
+    }, BODY_START + totalWordsDuration + 200);
+    return () => clearTimeout(t);
   }, [isActive]);
 
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-    transform: [{ scale: titleScale.value }],
+  const headingStyle = useAnimatedStyle(() => ({
+    opacity: headingOpacity.value,
+    transform: [{ translateY: headingTranslateY.value }],
+  }));
+
+  const imageStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
+    transform: [{ scale: imageScale.value }],
   }));
 
   const buttonAnimStyle = useAnimatedStyle(() => ({
@@ -101,28 +108,25 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      {!showBody && (
-        <Animated.View style={[styles.titleOverlay, titleStyle]}>
-          <Text style={[styles.title, { color: palette.terracotta }]}>
-            stop.
-          </Text>
-        </Animated.View>
-      )}
+      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.centerStack}>
+          <Animated.View style={[styles.imageArea, imageStyle]}>
+            <Image source={whatIfImage} style={styles.image} fadeDuration={0} />
+          </Animated.View>
 
-      <View style={[styles.content, { paddingBottom: insets.bottom, opacity: showBody ? 1 : 0 }]}>
-        <View style={styles.centerArea}>
           <View style={styles.textArea}>
-            {showBody && (
-              <Text style={[styles.body, { color: theme.text }]}>
-                {allWords.map((w, i) => (
-                  <Word key={i} text={w.word} delay={i * WORD_DELAY} bold={w.bold} accent={w.accent} />
-                ))}
-              </Text>
-            )}
+            <Animated.Text style={[styles.heading, { color: palette.terracotta }, headingStyle]}>
+              {HEADING}
+            </Animated.Text>
+            <Text style={[styles.body, { color: theme.text }]}>
+              {allWords.map((w, i) => (
+                <Word key={i} text={w.word} delay={BODY_START + i * WORD_DELAY} bold={w.bold} accent={w.accent} />
+              ))}
+            </Text>
           </View>
         </View>
 
-        <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
+        <Animated.View style={[styles.buttonArea, buttonAnimStyle]}>
           <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
             <Feather name="arrow-right" size={22} color={theme.text} />
           </Pressable>
@@ -136,32 +140,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  titleOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  title: {
-    fontFamily: Fonts?.serif,
-    fontSize: 48,
-    fontWeight: '500',
-  },
   content: {
     flex: 1,
     paddingHorizontal: 32,
+    paddingBottom: 24,
   },
-  centerArea: {
+  centerStack: {
     flex: 1,
     justifyContent: 'center',
   },
+  imageArea: {
+    alignItems: 'center',
+    marginBottom: 56,
+  },
+  image: {
+    width: 220,
+    height: 220,
+    resizeMode: 'contain',
+  },
   textArea: {},
+  heading: {
+    fontFamily: Fonts?.serif,
+    fontSize: 22,
+    fontWeight: '500',
+    textAlign: 'left',
+    lineHeight: 30,
+    marginBottom: 12,
+  },
   body: {
     fontFamily: Fonts?.serif,
-    fontSize: 21,
+    fontSize: 18,
     fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 32,
+    lineHeight: 26,
   },
   buttonArea: {
     alignItems: 'flex-end',

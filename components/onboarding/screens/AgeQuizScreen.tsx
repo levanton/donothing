@@ -3,7 +3,7 @@ import ChipSelect from '../ChipSelect';
 import { Fonts } from '@/constants/theme';
 import { SCREENS } from '@/lib/onboarding-data';
 
-const screen = SCREENS.find((s) => s.id === 'painQuiz')!;
+const screen = SCREENS.find((s) => s.id === 'ageQuiz')!;
 
 interface Props {
   isActive: boolean;
@@ -13,14 +13,11 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function PainQuizScreen({ isActive, onNext, selected, onSelect, theme }: Props) {
+export default function AgeQuizScreen({ isActive, onNext, selected, onSelect, theme }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts?.serif }]}>
         {screen.heading}
-      </Text>
-      <Text style={[styles.hint, { color: theme.text, fontFamily: Fonts?.serif }]}>
-        Pick as many as you’d like.
       </Text>
 
       <View style={styles.chips}>
@@ -29,7 +26,6 @@ export default function PainQuizScreen({ isActive, onNext, selected, onSelect, t
             options={screen.options!}
             selected={selected}
             onSelect={onSelect}
-            multi
             color={theme.text}
           />
         )}
@@ -49,15 +45,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '300',
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  hint: {
-    fontSize: 15,
-    fontWeight: '300',
-    textAlign: 'center',
     marginBottom: 36,
   },
   chips: {
-    minHeight: 200,
+    minHeight: 120,
   },
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   useSharedValue,
@@ -25,9 +26,16 @@ interface Props {
 }
 
 export default function TryNothingScreen({ isActive, onNext }: Props) {
+  const insets = useSafeAreaInsets();
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const handleSkip = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    haptics.light();
+    onNext();
+  }, [onNext]);
 
   const entryOpacity = useSharedValue(0);
   const entryTranslateY = useSharedValue(12);
@@ -134,6 +142,14 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
         </View>
       </Animated.View>
 
+      <Pressable
+        onPress={handleSkip}
+        style={[styles.skipButton, { bottom: insets.bottom + 28 }]}
+        hitSlop={16}
+      >
+        <Text style={[styles.skipLabel, { fontFamily: Fonts?.serif }]}>skip</Text>
+      </Pressable>
+
       <View style={styles.burstWrap}>
         <Animated.View
           style={[
@@ -177,6 +193,19 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.5,
     color: palette.terracotta,
+  },
+  skipButton: {
+    position: 'absolute',
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  skipLabel: {
+    fontSize: 16,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+    color: palette.cream,
+    opacity: 0.7,
   },
   burstWrap: {
     ...StyleSheet.absoluteFillObject,

@@ -43,6 +43,7 @@ export const SCREENS: OnboardingScreen[] = [
     options: [
       'I scroll too much',
       'I can\'t stop rushing',
+      'I can\'t focus',
       'I don\'t have time for myself',
       'I feel anxious and overwhelmed',
       'I want better sleep',
@@ -55,6 +56,12 @@ export const SCREENS: OnboardingScreen[] = [
     type: 'quiz',
     heading: 'How many hours a day on your phone?',
     options: ['2–3h', '4–5h', '6–7h', '8+'],
+  },
+  {
+    id: 'ageQuiz',
+    type: 'quiz',
+    heading: 'How old are you? Roughly.',
+    options: ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+'],
   },
   {
     id: 'theTurn',
@@ -101,7 +108,7 @@ export const GOAL_MINUTES: Record<string, number> = {
 
 export type PageId =
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
-  | 'painQuiz' | 'screenTimeQuiz'
+  | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
   | 'testimonials' | 'howItWorks' | 'setGoal' | 'personalResult'
   | 'paywall';
@@ -118,13 +125,14 @@ export interface OnboardingPage {
 export const PAGES: OnboardingPage[] = [
   { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
-  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'ageQuiz',         bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'testimonials',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },

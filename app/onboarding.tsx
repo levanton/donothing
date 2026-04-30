@@ -20,6 +20,7 @@ import RushingScreen from '@/components/onboarding/screens/RushingScreen';
 import PhoneSymptomScreen from '@/components/onboarding/screens/PhoneSymptomScreen';
 import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
 import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuizScreen';
+import AgeQuizScreen from '@/components/onboarding/screens/AgeQuizScreen';
 import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
 import SetGoalScreen from '@/components/onboarding/screens/SetGoalScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
@@ -77,7 +78,8 @@ export default function OnboardingRoute() {
       case 'phoneSymptom':    return <PhoneSymptomScreen {...props} />;
       case 'painQuiz':        return <PainQuizScreen {...props} selected={flow.painPoints} onSelect={flow.setPainPoints} />;
       case 'screenTimeQuiz':  return <ScreenTimeQuizScreen {...props} selected={flow.screenTime} onSelect={flow.setScreenTime} />;
-      case 'screenTimeStats': return <ScreenTimeStatsScreen {...props} screenTimeAnswer={flow.screenTime[0] ?? ''} />;
+      case 'ageQuiz':         return <AgeQuizScreen {...props} selected={flow.age} onSelect={flow.setAge} />;
+      case 'screenTimeStats': return <ScreenTimeStatsScreen {...props} screenTimeAnswer={flow.screenTime[0] ?? ''} ageAnswer={flow.age[0] ?? ''} />;
       case 'tryNothing':      return <TryNothingScreen {...props} />;
       case 'firstMinuteDone': return <FirstMinuteDoneScreen {...props} />;
       case 'dailyBenefits':   return <DailyBenefitsScreen {...props} />;

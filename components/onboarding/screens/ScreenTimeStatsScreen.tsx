@@ -20,24 +20,41 @@ const HOURS_MAP: Record<string, number> = {
   '8+': 8,
 };
 
+// Approximate years remaining, assuming an ~80-year lifespan and the
+// midpoint of each bucket. Used to personalize the "scrolling over your
+// remaining years" stat — younger users see a bigger number.
+const YEARS_LEFT_MAP: Record<string, number> = {
+  'Under 18': 65,
+  '18–24': 58,
+  '25–34': 50,
+  '35–44': 40,
+  '45–54': 30,
+  '55+': 20,
+};
+const DEFAULT_YEARS_LEFT = 50;
+
 type Token = { word: string; accent: boolean; bold: boolean };
 
-function buildLines(hoursPerDay: number): { text: string; accent: boolean; bold: boolean }[] {
+function buildLines(hoursPerDay: number, yearsLeft: number): { text: string; accent: boolean; bold: boolean }[] {
   const hoursPerYear = Math.round(hoursPerDay * 365);
   const daysPerYear = Math.round(hoursPerYear / 24);
-  const yearsLifetime = Math.round((hoursPerDay * 365 * 50) / 8760);
+  const yearsScrollingLeft = Math.round((hoursPerDay * 365 * yearsLeft) / 8760);
 
+  // Use non-breaking space ( ) inside accent phrases so they stay
+  // on a single line — the word-by-word splitter below uses regular
+  // space as the delimiter, and the renderer treats   as
+  // unbreakable, so e.g. "~6 years" never wraps mid-phrase.
   return [
     { text: `That's`, accent: false, bold: false },
-    { text: `~${hoursPerYear.toLocaleString()} hours`, accent: true, bold: true },
+    { text: `~${hoursPerYear.toLocaleString()} hours`, accent: true, bold: true },
     { text: `on your phone this year.`, accent: false, bold: false },
-    { text: `\n\n~${daysPerYear} full days.`, accent: true, bold: true },
+    { text: `\n\n~${daysPerYear} full days.`, accent: true, bold: true },
     { text: `Gone.`, accent: false, bold: true },
-    { text: `\n\nOver a lifetime,`, accent: false, bold: false },
-    { text: `~${yearsLifetime} years`, accent: true, bold: true },
+    { text: `\n\nOver your next ~${yearsLeft} years —`, accent: false, bold: false },
+    { text: `~${yearsScrollingLeft} years`, accent: true, bold: true },
     { text: `of scrolling.`, accent: false, bold: false },
     { text: `\n\nWhat if you took just`, accent: false, bold: false },
-    { text: `one minute`, accent: true, bold: true },
+    { text: `one minute`, accent: true, bold: true },
     { text: `back?`, accent: false, bold: false },
   ];
 }
@@ -73,19 +90,27 @@ interface Props {
   isActive: boolean;
   onNext: () => void;
   screenTimeAnswer: string;
+  ageAnswer: string;
   theme: { text: string; bg: string };
 }
 
-export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnswer, theme }: Props) {
+export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnswer, ageAnswer, theme }: Props) {
   const insets = useSafeAreaInsets();
 
   const hoursPerDay = HOURS_MAP[screenTimeAnswer] ?? 4.5;
-  const lines = useMemo(() => buildLines(hoursPerDay), [hoursPerDay]);
+  const yearsLeft = YEARS_LEFT_MAP[ageAnswer] ?? DEFAULT_YEARS_LEFT;
+  const lines = useMemo(() => buildLines(hoursPerDay, yearsLeft), [hoursPerDay, yearsLeft]);
 
+  // Accent phrases are kept as a single token (with internal spaces
+  // swapped for NBSP) so the colored stat — e.g. "~6 years" — never
+  // wraps mid-phrase. Non-accent lines split into words as before.
   const allWords: Token[] = useMemo(() =>
-    lines.flatMap(l =>
-      l.text.split(' ').map(w => ({ word: w, bold: l.bold, accent: l.accent }))
-    ), [lines]);
+    lines.flatMap(l => {
+      if (l.accent) {
+        return [{ word: l.text.replace(/ /g, ' '), bold: l.bold, accent: l.accent }];
+      }
+      return l.text.split(' ').map(w => ({ word: w, bold: l.bold, accent: l.accent }));
+    }), [lines]);
 
   const WORD_DELAY = 120;
   const totalWordsDuration = allWords.length * WORD_DELAY + 700;
