@@ -23,8 +23,6 @@ export interface OnboardingFlow {
   setScreenTime: (v: string[]) => void;
   age: string[];
   setAge: (v: string[]) => void;
-  goal: string[];
-  setGoal: (v: string[]) => void;
 
   screenTheme: AppTheme;
   isDark: boolean;
@@ -36,7 +34,6 @@ export function useOnboardingFlow(): OnboardingFlow {
   const [painPoints, setPainPoints] = useState<string[]>([]);
   const [screenTime, setScreenTime] = useState<string[]>([]);
   const [age, setAge] = useState<string[]>([]);
-  const [goal, setGoal] = useState<string[]>([]);
 
   const currentPage = PAGES[currentIndex];
   const totalPages = PAGES.length;
@@ -54,8 +51,6 @@ export function useOnboardingFlow(): OnboardingFlow {
         return screenTime.length > 0;
       case 'ageQuiz':
         return age.length > 0;
-      case 'setGoal':
-        return goal.length > 0;
       default:
         return true;
     }
@@ -96,8 +91,6 @@ export function useOnboardingFlow(): OnboardingFlow {
     setScreenTime,
     age,
     setAge,
-    goal,
-    setGoal,
     screenTheme,
     isDark,
   };

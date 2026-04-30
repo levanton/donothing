@@ -133,7 +133,6 @@ export const PAGES: OnboardingPage[] = [
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'permissions',     bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'paywall',          bg: palette.warmCream,  theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },

@@ -23,7 +23,6 @@ import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuiz
 import AgeQuizScreen from '@/components/onboarding/screens/AgeQuizScreen';
 import PermissionsScreen from '@/components/onboarding/screens/PermissionsScreen';
 import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
-import SetGoalScreen from '@/components/onboarding/screens/SetGoalScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
 import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
 import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
@@ -53,7 +52,6 @@ export default function OnboardingRoute() {
       await saveOnboardingData({
         painPoints: flow.painPoints,
         screenTime: flow.screenTime,
-        goal: flow.goal,
         router,
       });
     } catch (e) {
@@ -66,7 +64,7 @@ export default function OnboardingRoute() {
         'Something went wrong saving your answers. Please try again.',
       );
     }
-  }, [flow.painPoints, flow.screenTime, flow.goal, router]);
+  }, [flow.painPoints, flow.screenTime, router]);
 
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;
 
@@ -86,7 +84,6 @@ export default function OnboardingRoute() {
       case 'dailyBenefits':   return <DailyBenefitsScreen {...props} />;
       case 'testimonials':    return <TestimonialsScreen {...props} />;
       case 'howItWorks':      return <HowItWorksScreen {...props} />;
-      case 'setGoal':         return <SetGoalScreen {...props} selected={flow.goal} onSelect={flow.setGoal} screenTimeAnswer={flow.screenTime[0] ?? ''} />;
       case 'permissions':     return <PermissionsScreen {...props} />;
       case 'personalResult':  return <PersonalizedResultScreen {...props} />;
       case 'paywall':         return <PaywallScreen {...props} onFinish={handleFinish} />;
