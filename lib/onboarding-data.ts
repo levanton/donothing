@@ -74,35 +74,11 @@ export const SCREENS: OnboardingScreen[] = [
     heading: 'Open. Start. Put your phone down. Breathe. That\'s it.',
   },
   {
-    id: 'setGoal',
-    type: 'setup',
-    heading: 'How much nothing per day?',
-    body: 'Start small. You can always increase later.',
-    options: ['1m', '5m', '10m', '15m', '30m'],
-  },
-  {
     id: 'personalResult',
     type: 'info',
     heading: 'Your plan is ready.',
   },
 ];
-
-// Goal recommendation based on screen time answer
-export const GOAL_BY_SCREEN_TIME: Record<string, number> = {
-  '2–3h': 5,
-  '4–5h': 10,
-  '6–7h': 15,
-  '8+': 15,
-};
-
-// Goal option label → minutes
-export const GOAL_MINUTES: Record<string, number> = {
-  '1m': 1,
-  '5m': 5,
-  '10m': 10,
-  '15m': 15,
-  '30m': 30,
-};
 
 // ── Flat page list — single source of truth for the onboarding flow ──────
 
@@ -110,7 +86,7 @@ export type PageId =
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
-  | 'testimonials' | 'howItWorks' | 'setGoal' | 'permissions' | 'personalResult'
+  | 'testimonials' | 'howItWorks' | 'permissions' | 'personalResult'
   | 'paywall';
 
 export interface OnboardingPage {

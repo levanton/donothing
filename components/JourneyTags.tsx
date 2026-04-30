@@ -4,19 +4,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
 import { palette } from '@/lib/theme';
-import { getJourneyTags, type JourneyTag } from '@/lib/journey-tags';
+import { getJourneyTags } from '@/lib/journey-tags';
 
 interface Props {
   theme: AppTheme;
-  dailyGoalMinutes: number;
-  todayDuration: number;
 }
 
-function JourneyTags({ theme, dailyGoalMinutes, todayDuration }: Props) {
-  const tags = useMemo(
-    () => getJourneyTags(dailyGoalMinutes, todayDuration),
-    [dailyGoalMinutes, todayDuration],
-  );
+function JourneyTags({ theme }: Props) {
+  const tags = useMemo(() => getJourneyTags(), []);
 
   if (tags.length === 0) return null;
 
@@ -24,14 +19,13 @@ function JourneyTags({ theme, dailyGoalMinutes, todayDuration }: Props) {
     <View style={styles.container}>
       {tags.map((tag) => {
         const isStage = tag.type === 'stage';
-        const isGoalReached = tag.id === 'goal' && tag.label === 'goal reached';
 
         return (
           <View
             key={tag.id}
             style={[
               styles.tag,
-              isStage || isGoalReached
+              isStage
                 ? { backgroundColor: palette.terracotta }
                 : { backgroundColor: theme.subtle },
             ]}
@@ -41,7 +35,7 @@ function JourneyTags({ theme, dailyGoalMinutes, todayDuration }: Props) {
                 styles.tagText,
                 {
                   fontFamily: Fonts.serif,
-                  color: isStage || isGoalReached ? palette.cream : theme.text,
+                  color: isStage ? palette.cream : theme.text,
                 },
               ]}
             >

@@ -1,19 +1,17 @@
-import { getSessionCount, getLongestSessionDuration, getTotalDuration } from './db/sessions';
+import { getSessionCount } from './db/sessions';
 import { getStreak, getWeekStats } from './stats';
 
 export interface JourneyTag {
   id: string;
   label: string;
-  type: 'stage' | 'streak' | 'achievement' | 'goal';
+  type: 'stage' | 'streak' | 'achievement';
 }
 
 /** Compute dynamic tags based on current user stats */
-export function getJourneyTags(dailyGoalMinutes: number, todayDuration: number): JourneyTag[] {
+export function getJourneyTags(): JourneyTag[] {
   const tags: JourneyTag[] = [];
   const sessions = getSessionCount();
   const streak = getStreak();
-  const longest = getLongestSessionDuration();
-  const total = getTotalDuration();
   const week = getWeekStats();
 
   // ── Stage tag (always exactly one) ──────────────────────────────
@@ -46,16 +44,6 @@ export function getJourneyTags(dailyGoalMinutes: number, todayDuration: number):
     daysPassedThisWeek.every((d) => d.duration > 0);
   if (allDaysActive && daysPassedThisWeek.length >= 3) {
     tags.push({ id: 'consistent', label: 'consistent', type: 'achievement' });
-  }
-
-  // ── Goal tag ────────────────────────────────────────────────────
-  if (dailyGoalMinutes > 0) {
-    const goalSeconds = dailyGoalMinutes * 60;
-    if (todayDuration >= goalSeconds) {
-      tags.push({ id: 'goal', label: 'goal reached', type: 'goal' });
-    } else if (todayDuration > 0) {
-      tags.push({ id: 'goal', label: `${dailyGoalMinutes}m goal`, type: 'goal' });
-    }
   }
 
   return tags;

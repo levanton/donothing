@@ -204,7 +204,6 @@ export interface AppState {
 
   // Settings
   settingsOpen: boolean;
-  dailyGoalMinutes: number;
   scheduledBlocks: ScheduledBlock[];
 
   // Last session metadata (used by SessionCompleteScreen)
@@ -271,7 +270,6 @@ export interface AppState {
   // Settings actions
   openSettings: () => void;
   closeSettings: () => void;
-  setDailyGoal: (minutes: number) => Promise<void>;
   addScheduledBlock: (hour: number, minute: number, durationMinutes: number, weekdays: number[], unlockGoalMinutes: number) => Promise<void>;
   editScheduledBlock: (id: string, hour: number, minute: number, durationMinutes: number, weekdays: number[], unlockGoalMinutes: number) => Promise<void>;
   removeScheduledBlock: (id: string) => Promise<void>;
@@ -325,7 +323,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Settings
   settingsOpen: false,
-  dailyGoalMinutes: 0,
   scheduledBlocks: [],
 
   // Onboarding
@@ -362,7 +359,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load from SQLite (synchronous reads)
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
     const onboardingComplete = getSetting('onboardingComplete') === '1';
-    const dailyGoalMinutes = Number(getSetting('dailyGoal') ?? '0');
     const scheduledBlocks = getAllScheduledBlocks();
 
     // Capture native shield state BEFORE we touch any monitors. The
@@ -442,7 +438,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({
       themeMode,
-      dailyGoalMinutes,
       onboardingComplete,
       scheduledBlocks,
       achievedMilestones,
@@ -807,20 +802,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --- Settings ---
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
-
-  setDailyGoal: async (minutes) => {
-    const prev = get().dailyGoalMinutes;
-    set({ dailyGoalMinutes: minutes });
-    try {
-      setSetting('dailyGoal', String(minutes));
-    } catch (e) {
-      // Roll back in-memory state so it stays in sync with disk and
-      // re-throw so the caller (Settings UI / onboarding) can react.
-      console.error('[store.setDailyGoal] persistence failed:', e);
-      set({ dailyGoalMinutes: prev });
-      throw e;
-    }
-  },
 
   addScheduledBlock: async (hour, minute, durationMinutes, weekdays, unlockGoalMinutes) => {
     const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
