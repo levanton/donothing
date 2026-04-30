@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -11,45 +9,38 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
-import { palette } from '@/lib/theme';
-import { Fonts } from '@/constants/theme';
-import { useAppStore } from '@/lib/store';
-import PlanCard from '@/components/paywall/PlanCard';
+
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
-import {
-  getOfferings,
-  purchasePackage,
-  restorePurchases,
-} from '@/lib/subscription';
-import type { PurchasesPackage } from 'react-native-purchases';
+import PlanCard from '@/components/paywall/PlanCard';
+import { Fonts } from '@/constants/theme';
+import { usePaywall } from '@/hooks/usePaywall';
+import { ctaLabel, type PlanId } from '@/lib/paywall-config';
+import { palette } from '@/lib/theme';
 
-type PlanId = 'monthly' | 'yearly' | 'lifetime';
-
-const PLANS: { id: PlanId; name: string; price: string; oldPrice?: string; subtitle?: string; badge?: string }[] = [
-  { id: 'monthly', name: 'Monthly', price: '$4.99 / month' },
+// UI metadata for the onboarding paywall cards. Prices and purchase
+// logic come from usePaywall(); changes here are pure visual tweaks.
+const PLANS: {
+  id: PlanId;
+  name: string;
+  periodSuffix?: string;
+  subtitle?: string;
+  badge?: string;
+}[] = [
+  { id: 'monthly', name: 'Monthly', periodSuffix: ' / month' },
   {
     id: 'yearly',
     name: 'Yearly',
-    price: '$34.99 / year',
-    oldPrice: '$49.99',
+    periodSuffix: ' / year',
     subtitle: 'First 3 days FREE!',
     badge: 'Popular',
   },
   {
     id: 'lifetime',
     name: 'Lifetime',
-    price: '$69.99',
     subtitle: 'Pay once, own forever',
     badge: 'Limited',
   },
 ];
-
-
-const CTA_LABELS: Record<PlanId, string> = {
-  monthly: 'Subscribe — $4.99/mo',
-  yearly: 'Try Free for 3 Days',
-  lifetime: 'Get Lifetime — $69.99',
-};
 
 function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
   const parallaxStyle = useAnimatedStyle(() => ({
@@ -57,7 +48,10 @@ function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
   }));
 
   return (
-    <Animated.View entering={FadeIn.delay(100).duration(800)} style={styles.heroContainer}>
+    <Animated.View
+      entering={FadeIn.delay(100).duration(800)}
+      style={styles.heroContainer}
+    >
       <Animated.Image
         source={require('@/assets/images/grass-old.png')}
         style={[styles.heroImage, parallaxStyle]}
@@ -74,19 +68,18 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-const RC_PACKAGE_BY_PLAN: Record<PlanId, string[]> = {
-  monthly: ['$rc_monthly'],
-  yearly: ['$rc_annual'],
-  lifetime: ['$rc_lifetime'],
-};
-
 export default function PaywallScreen({ isActive, onFinish }: Props) {
   const insets = useSafeAreaInsets();
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
-  const [packagesByPlan, setPackagesByPlan] = useState<
-    Partial<Record<PlanId, PurchasesPackage>>
-  >({});
-  const [purchasing, setPurchasing] = useState(false);
+  const {
+    selectedPlan,
+    setSelectedPlan,
+    packagesByPlan,
+    anchorYearly,
+    skip,
+    purchase,
+    restore,
+  } = usePaywall({ onClose: onFinish, enabled: isActive });
+
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -94,77 +87,24 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
     },
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    getOfferings().then((offering) => {
-      if (cancelled || !offering) return;
-      const map: Partial<Record<PlanId, PurchasesPackage>> = {};
-      for (const plan of Object.keys(RC_PACKAGE_BY_PLAN) as PlanId[]) {
-        const ids = RC_PACKAGE_BY_PLAN[plan];
-        const pkg = offering.availablePackages.find((p) => ids.includes(p.identifier));
-        if (pkg) map[plan] = pkg;
-      }
-      setPackagesByPlan(map);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleSkip = useCallback(() => {
-    haptics.light();
-    // Win-back: arm the half-off promo. The home screen unwraps it
-    // once its launch splash settles, otherwise the modal animates in
-    // on top of the still-running splash circle.
-    useAppStore.getState().setPendingPromoOnHome(true);
-    onFinish();
-  }, [onFinish]);
-
-  const handlePurchase = useCallback(async () => {
-    if (purchasing) return;
-    const pkg = packagesByPlan[selectedPlan];
-    if (!pkg) {
-      console.warn('[onboarding paywall] no RC package for plan', selectedPlan);
-      return;
-    }
-    haptics.light();
-    setPurchasing(true);
-    try {
-      const result = await purchasePackage(pkg);
-      if (result === 'active') {
-        haptics.success();
-        await useAppStore.getState().setSubscriptionStatus('active');
-        onFinish();
-      } else if (result !== 'cancelled') {
-        haptics.error();
-      }
-    } finally {
-      setPurchasing(false);
-    }
-  }, [onFinish, packagesByPlan, purchasing, selectedPlan]);
-
-  const handleRestore = useCallback(async () => {
-    haptics.light();
-    const status = await restorePurchases();
-    if (status === 'active') {
-      haptics.success();
-      await useAppStore.getState().setSubscriptionStatus('active');
-      onFinish();
-    }
-  }, [onFinish]);
+  const ctaBg =
+    selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta;
+  const yearlyPrice = packagesByPlan.yearly?.product.priceString;
 
   return (
     <View style={styles.container}>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top, paddingBottom: insets.bottom + 24 },
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Top bar: skip */}
         <View style={styles.topBar}>
-          <Pressable onPress={handleSkip} hitSlop={16} style={styles.closeButton}>
+          <Pressable onPress={skip} hitSlop={16} style={styles.closeButton}>
             <Feather name="x" size={22} color={palette.brown} />
           </Pressable>
         </View>
@@ -173,43 +113,56 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
 
         <FeatureCarousel />
 
-        {/* Plan cards */}
-        <Animated.View entering={FadeInUp.delay(800).duration(500)} style={styles.plans}>
-          {PLANS.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              name={plan.name}
-              price={plan.price}
-              oldPrice={plan.oldPrice}
-              subtitle={plan.subtitle}
-              badge={plan.badge}
-              variant={plan.id === 'lifetime' ? 'dark' : 'default'}
-              isSelected={selectedPlan === plan.id}
-              onSelect={() => setSelectedPlan(plan.id)}
-            />
-          ))}
+        <Animated.View
+          entering={FadeInUp.delay(800).duration(500)}
+          style={styles.plans}
+        >
+          {PLANS.map((plan) => {
+            const pkg = packagesByPlan[plan.id];
+            const basePrice = pkg?.product.priceString ?? '';
+            const price = basePrice
+              ? `${basePrice}${plan.periodSuffix ?? ''}`
+              : '';
+            return (
+              <PlanCard
+                key={plan.id}
+                name={plan.name}
+                price={price}
+                oldPrice={plan.id === 'yearly' ? anchorYearly ?? undefined : undefined}
+                subtitle={plan.subtitle}
+                badge={plan.badge}
+                variant={plan.id === 'lifetime' ? 'dark' : 'default'}
+                isSelected={selectedPlan === plan.id}
+                onSelect={() => setSelectedPlan(plan.id)}
+              />
+            );
+          })}
         </Animated.View>
 
-        {/* CTA */}
-        <Animated.View entering={FadeInUp.delay(1000).duration(500)} style={styles.cta}>
+        <Animated.View
+          entering={FadeInUp.delay(1000).duration(500)}
+          style={styles.cta}
+        >
           <Pressable
-            onPress={handlePurchase}
-            style={[styles.ctaButton, {
-              backgroundColor: selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta,
-              shadowColor: selectedPlan === 'lifetime' ? '#2C4A3E' : palette.terracotta,
-            }]}
+            onPress={purchase}
+            style={[
+              styles.ctaButton,
+              { backgroundColor: ctaBg, shadowColor: ctaBg },
+            ]}
           >
-            <Text style={styles.ctaText}>{CTA_LABELS[selectedPlan]}</Text>
+            <Text style={styles.ctaText}>{ctaLabel(selectedPlan, packagesByPlan)}</Text>
           </Pressable>
           <Text style={styles.cancelText}>
-            {selectedPlan === 'yearly'
-              ? '3 days free, then $34.99/year. Cancel anytime.'
+            {selectedPlan === 'yearly' && yearlyPrice
+              ? `3 days free, then ${yearlyPrice}/year. Cancel anytime.`
               : 'Cancel anytime.'}
           </Text>
         </Animated.View>
 
-        {/* Footer */}
-        <Animated.View entering={FadeInUp.delay(1100).duration(500)} style={styles.footer}>
+        <Animated.View
+          entering={FadeInUp.delay(1100).duration(500)}
+          style={styles.footer}
+        >
           <Pressable hitSlop={8}>
             <Text style={styles.footerLink}>Privacy Policy</Text>
           </Pressable>
@@ -218,7 +171,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
-          <Pressable hitSlop={8} onPress={handleRestore}>
+          <Pressable hitSlop={8} onPress={restore}>
             <Text style={styles.footerLink}>Restore Purchases</Text>
           </Pressable>
         </Animated.View>

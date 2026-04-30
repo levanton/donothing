@@ -32,9 +32,19 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onPurchase?: () => void;
+  // Apple-localized strings pulled from the RC package — never hardcode
+  // because Apple uses per-region pricing tiers (USD/EUR/AUD/etc.)
+  priceString?: string;
+  introPriceString?: string;
 }
 
-function PromoOffer({ visible, onClose, onPurchase }: Props) {
+function PromoOffer({
+  visible,
+  onClose,
+  onPurchase,
+  priceString,
+  introPriceString,
+}: Props) {
   const insets = useSafeAreaInsets();
 
   const backdropOpacity = useSharedValue(0);
@@ -137,7 +147,7 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
               <View style={styles.bulletRow}>
                 <Feather name="check" size={16} color={palette.cream} />
                 <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                  unlimited access
+                  full access
                 </Text>
               </View>
             </View>
@@ -151,15 +161,17 @@ function PromoOffer({ visible, onClose, onPurchase }: Props) {
                 <Text
                   style={[styles.priceSubtitle, { fontFamily: Fonts!.serif }]}
                 >
-                  Then 49,99 USD/year
+                  {priceString ? `Then ${priceString}/year` : ' '}
                 </Text>
               </View>
               <View style={styles.priceRight}>
-                <Text style={[styles.priceOld, { fontFamily: Fonts!.mono }]}>
-                  49,99
-                </Text>
+                {priceString && (
+                  <Text style={[styles.priceOld, { fontFamily: Fonts!.mono }]}>
+                    {priceString}
+                  </Text>
+                )}
                 <Text style={[styles.priceValue, { fontFamily: Fonts!.mono }]}>
-                  22,99 USD
+                  {introPriceString ?? ''}
                 </Text>
               </View>
             </View>

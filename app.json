@@ -11,7 +11,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.levanton.nothing",
       "appleTeamId": "45DBHDBF45",
-      "icon": "./assets/Icon.icon"
+      "icon": "./assets/Icon.icon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -66,7 +69,50 @@
       "reactCompiler": true
     },
     "extra": {
-      "revenueCatIosKey": ""
-    }
+      "revenueCatIosKey": "appl_zdMtZwqdMxYPPzTeIWsHKycpvYv",
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.levanton.nothing.ShieldConfiguration",
+                  "targetName": "ShieldConfiguration",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.levanton.nothing"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.levanton.nothing.ShieldAction",
+                  "targetName": "ShieldAction",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.levanton.nothing"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.levanton.nothing.ActivityMonitorExtension",
+                  "targetName": "ActivityMonitorExtension",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.levanton.nothing"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "e23ef0bf-6be8-4298-a617-6bffcdec76c8"
+      }
+    },
+    "owner": "levanton"
   }
 }

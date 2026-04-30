@@ -1,59 +1,57 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
-import { palette } from '@/lib/theme';
-import { Fonts } from '@/constants/theme';
-import { useAppStore } from '@/lib/store';
-import PillButton from '@/components/PillButton';
-import PlanCard from '@/components/paywall/PlanCardGeneral';
+
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
-import {
-  getOfferings,
-  purchasePackage,
-  restorePurchases,
-} from '@/lib/subscription';
-import type { PurchasesPackage } from 'react-native-purchases';
+import PlanCard from '@/components/paywall/PlanCard';
+import PillButton from '@/components/PillButton';
+import { Fonts } from '@/constants/theme';
+import { usePaywall } from '@/hooks/usePaywall';
+import { ctaLabel, type PlanId } from '@/lib/paywall-config';
+import { palette } from '@/lib/theme';
 
-type PlanId = 'monthly' | 'yearly' | 'lifetime';
-
-const PLANS = [
-  { id: 'monthly' as PlanId, planName: 'Monthly', price: '$4.99', period: '/month' },
+// UI metadata for the plan cards. Prices and purchase logic come from
+// usePaywall(); changes here are pure visual.
+const PLANS: {
+  id: PlanId;
+  name: string;
+  periodSuffix?: string;
+  subtitle?: string;
+  badge?: string;
+}[] = [
+  { id: 'monthly', name: 'Monthly', periodSuffix: ' / month' },
   {
-    id: 'yearly' as PlanId,
-    planName: 'Yearly',
-    price: '$34.99',
-    period: '/year',
-    oldPrice: '$49.99',
-    trialText: 'First 3 days FREE',
+    id: 'yearly',
+    name: 'Yearly',
+    periodSuffix: ' / year',
+    subtitle: 'First 3 days FREE!',
     badge: 'Popular',
-    isRecommended: true,
   },
   {
-    id: 'lifetime' as PlanId,
-    planName: 'Lifetime',
-    price: '$69.99',
-    trialText: 'Pay once, own forever',
+    id: 'lifetime',
+    name: 'Lifetime',
+    subtitle: 'Pay once, own forever',
     badge: 'Limited',
-    badgeColor: palette.umber,
-    accentColor: palette.umber,
   },
 ];
 
-const CTA_LABELS: Record<PlanId, string> = {
-  monthly: 'Subscribe — $4.99/mo',
-  yearly: 'Try Free for 3 Days',
-  lifetime: 'Get Lifetime — $69.99',
-};
-
-// Decorative hero orbit illustration
 function HeroImage() {
   return (
-    <Animated.View entering={FadeIn.delay(100).duration(800)} style={styles.heroContainer}>
+    <Animated.View
+      entering={FadeIn.delay(100).duration(800)}
+      style={styles.heroContainer}
+    >
       <Image
         source={require('@/assets/images/grass-old.png')}
         style={styles.heroImage}
@@ -63,158 +61,99 @@ function HeroImage() {
   );
 }
 
-// RevenueCat package identifiers — match these in App Store Connect /
-// RC dashboard. `$rc_*` are the default identifiers RC assigns when you
-// create packages in the dashboard.
-const RC_PACKAGE_BY_PLAN: Record<PlanId, string[]> = {
-  monthly: ['$rc_monthly'],
-  yearly: ['$rc_annual'],
-  lifetime: ['$rc_lifetime'],
-};
-
 export default function PaywallRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
-  const [packagesByPlan, setPackagesByPlan] = useState<
-    Partial<Record<PlanId, PurchasesPackage>>
-  >({});
-  const [purchasing, setPurchasing] = useState(false);
+  const onClose = useCallback(() => router.replace('/'), [router]);
+  const {
+    selectedPlan,
+    setSelectedPlan,
+    packagesByPlan,
+    anchorYearly,
+    skip,
+    purchase,
+    restore,
+  } = usePaywall({ onClose });
 
-  // Load offerings on mount so the CTA has a real package to purchase.
-  // If RC isn't configured (missing key), we silently fall back to a
-  // no-op CTA — the paywall still renders for layout review.
-  useEffect(() => {
-    let cancelled = false;
-    getOfferings().then((offering) => {
-      if (cancelled || !offering) return;
-      const map: Partial<Record<PlanId, PurchasesPackage>> = {};
-      for (const plan of Object.keys(RC_PACKAGE_BY_PLAN) as PlanId[]) {
-        const ids = RC_PACKAGE_BY_PLAN[plan];
-        const pkg = offering.availablePackages.find((p) => ids.includes(p.identifier));
-        if (pkg) map[plan] = pkg;
-      }
-      setPackagesByPlan(map);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleSkip = useCallback(() => {
-    haptics.light();
-    // Win-back: arm the half-off promo. The home screen unwraps it
-    // once its launch splash settles, otherwise the modal animates in
-    // on top of the still-running splash circle.
-    useAppStore.getState().setPendingPromoOnHome(true);
-    router.replace('/');
-  }, [router]);
-
-  const handlePurchase = useCallback(async () => {
-    if (purchasing) return;
-    const pkg = packagesByPlan[selectedPlan];
-    if (!pkg) {
-      console.warn('[paywall] no RC package for plan', selectedPlan);
-      return;
-    }
-    haptics.light();
-    setPurchasing(true);
-    try {
-      const result = await purchasePackage(pkg);
-      if (result === 'active') {
-        haptics.success();
-        // Optimistic — RC listener will also push the same status, but
-        // we update now so the home screen unwraps without waiting.
-        await useAppStore.getState().setSubscriptionStatus('active');
-        router.replace('/');
-      } else if (result === 'cancelled') {
-        // User dismissed the system sheet. No-op.
-      } else {
-        haptics.error();
-      }
-    } finally {
-      setPurchasing(false);
-    }
-  }, [packagesByPlan, purchasing, router, selectedPlan]);
-
-  const handleRestore = useCallback(async () => {
-    haptics.light();
-    const status = await restorePurchases();
-    if (status === 'active') {
-      haptics.success();
-      await useAppStore.getState().setSubscriptionStatus('active');
-      router.replace('/');
-    }
-  }, [router]);
+  const ctaColor =
+    selectedPlan === 'lifetime' ? palette.umber : palette.terracotta;
+  const yearlyPrice = packagesByPlan.yearly?.product.priceString;
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top, paddingBottom: insets.bottom + 24 },
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Top bar: close button */}
         <View style={styles.topBar}>
-          <Pressable onPress={handleSkip} hitSlop={16} style={styles.closeButton}>
+          <Pressable onPress={skip} hitSlop={16} style={styles.closeButton}>
             <Feather name="x" size={22} color={palette.brown} />
           </Pressable>
         </View>
 
-        {/* Hero illustration */}
         <HeroImage />
 
         <FeatureCarousel />
 
-        {/* Plan cards */}
         <Animated.View
           entering={FadeInUp.delay(800).duration(500)}
           style={styles.plans}
         >
-          {PLANS.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              planName={plan.planName}
-              price={plan.price}
-              period={plan.period}
-              oldPrice={plan.oldPrice}
-              trialText={plan.trialText}
-              badge={plan.badge}
-              badgeColor={plan.badgeColor}
-              accentColor={plan.accentColor}
-              isRecommended={plan.isRecommended}
-              isSelected={selectedPlan === plan.id}
-              onSelect={() => setSelectedPlan(plan.id)}
-            />
-          ))}
+          {PLANS.map((plan) => {
+            const pkg = packagesByPlan[plan.id];
+            const basePrice = pkg?.product.priceString ?? '';
+            const price = basePrice
+              ? `${basePrice}${plan.periodSuffix ?? ''}`
+              : '';
+            return (
+              <PlanCard
+                key={plan.id}
+                name={plan.name}
+                price={price}
+                oldPrice={plan.id === 'yearly' ? anchorYearly ?? undefined : undefined}
+                subtitle={plan.subtitle}
+                badge={plan.badge}
+                variant={plan.id === 'lifetime' ? 'dark' : 'default'}
+                isSelected={selectedPlan === plan.id}
+                onSelect={() => setSelectedPlan(plan.id)}
+              />
+            );
+          })}
         </Animated.View>
 
-        {/* CTA */}
         <Animated.View
           entering={FadeInUp.delay(1000).duration(500)}
           style={styles.cta}
         >
           <PillButton
-            label={CTA_LABELS[selectedPlan]}
-            onPress={handlePurchase}
-            color={selectedPlan === 'lifetime' ? palette.umber : palette.terracotta}
+            label={ctaLabel(selectedPlan, packagesByPlan)}
+            onPress={purchase}
+            color={ctaColor}
             variant="filled"
             size="large"
-            style={[styles.ctaButton, {
-              shadowColor: selectedPlan === 'lifetime' ? palette.umber : palette.terracotta,
-              shadowOpacity: 0.25,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 4 },
-            }]}
+            style={[
+              styles.ctaButton,
+              {
+                shadowColor: ctaColor,
+                shadowOpacity: 0.25,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 },
+              },
+            ]}
           />
-          {selectedPlan === 'yearly' && (
-            <Text style={styles.ctaHelper}>Then $34.99/year. Cancel anytime.</Text>
+          {selectedPlan === 'yearly' && yearlyPrice && (
+            <Text style={styles.ctaHelper}>
+              Then {yearlyPrice}/year. Cancel anytime.
+            </Text>
           )}
         </Animated.View>
 
-        {/* Footer */}
         <Animated.View
           entering={FadeInUp.delay(1100).duration(500)}
           style={styles.footer}
@@ -227,7 +166,7 @@ export default function PaywallRoute() {
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
-          <Pressable hitSlop={8} onPress={handleRestore}>
+          <Pressable hitSlop={8} onPress={restore}>
             <Text style={styles.footerLink}>Restore Purchases</Text>
           </Pressable>
         </Animated.View>
@@ -254,7 +193,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scroll: {},
-  // Hero
   heroContainer: {
     alignItems: 'center',
     marginTop: 8,
@@ -264,14 +202,11 @@ const styles = StyleSheet.create({
     width: 280,
     height: 160,
   },
-  // Feature carousel
-  // Plans
   plans: {
     marginTop: 28,
     paddingHorizontal: 24,
     gap: 12,
   },
-  // CTA
   cta: {
     marginTop: 24,
     paddingHorizontal: 24,
@@ -287,7 +222,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  // Footer
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

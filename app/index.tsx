@@ -34,6 +34,12 @@ import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import DriftingDots from '@/components/DriftingDots';
 import PaywallGate from '@/components/PaywallGate';
 import PromoOffer from '@/components/promo/PromoOffer';
+import { WINBACK_PACKAGE_ID } from '@/lib/paywall-config';
+import {
+  getOfferings,
+  purchasePackage,
+} from '@/lib/subscription';
+import type { PurchasesPackage } from 'react-native-purchases';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
 import SettingsContent from '@/components/SettingsContent';
@@ -726,6 +732,48 @@ export default function DoNothingScreen() {
   const handleClosePromo = useCallback(() => {
     useAppStore.getState().hidePromoOffer();
   }, []);
+
+  // Win-back package loaded on mount so the modal can show Apple-localized
+  // prices (per-region tiers, not hardcoded USD). Identifier comes from
+  // paywall-config — change it there if you ever rename the RC package.
+  const [winbackPkg, setWinbackPkg] = useState<PurchasesPackage | null>(null);
+  const [promoPurchasing, setPromoPurchasing] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getOfferings().then((offering) => {
+      if (cancelled || !offering) return;
+      const pkg = offering.availablePackages.find(
+        (p) => p.identifier === WINBACK_PACKAGE_ID,
+      );
+      if (pkg) setWinbackPkg(pkg);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const handlePromoPurchase = useCallback(async () => {
+    if (promoPurchasing) return;
+    if (!winbackPkg) {
+      console.warn(`[promo] ${WINBACK_PACKAGE_ID} package not loaded`);
+      handleClosePromo();
+      return;
+    }
+    setPromoPurchasing(true);
+    try {
+      const result = await purchasePackage(winbackPkg);
+      if (result === 'active') {
+        haptics.success();
+        await useAppStore.getState().setSubscriptionStatus('active');
+        handleClosePromo();
+      } else if (result !== 'cancelled') {
+        // User dismissed the system sheet → leave modal open so they
+        // can retry. Anything else (network/storekit error) → error haptic.
+        haptics.error();
+      }
+    } finally {
+      setPromoPurchasing(false);
+    }
+  }, [handleClosePromo, promoPurchasing, winbackPkg]);
   const toggleDistractionFree = useCallback(() => {
     haptics.light();
     setDistractionFree((v) => !v);
@@ -1564,10 +1612,9 @@ export default function DoNothingScreen() {
       <PromoOffer
         visible={promoVisible}
         onClose={handleClosePromo}
-        onPurchase={() => {
-          // TODO: hook into RevenueCat purchase flow
-          handleClosePromo();
-        }}
+        onPurchase={handlePromoPurchase}
+        priceString={winbackPkg?.product.priceString}
+        introPriceString={winbackPkg?.product.introPrice?.priceString}
       />
 
       {/* Countdown completion screen */}

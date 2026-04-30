@@ -7,7 +7,7 @@ import Purchases, {
 
 export type SubscriptionStatus = 'unknown' | 'active' | 'inactive';
 
-export const PRO_ENTITLEMENT_ID = 'pro';
+export const PRO_ENTITLEMENT_ID = 'full';
 
 let configured = false;
 
@@ -23,7 +23,14 @@ function isDevForceSubscribed(): boolean {
 }
 
 function statusFromCustomerInfo(info: CustomerInfo): 'active' | 'inactive' {
-  return info.entitlements.active[PRO_ENTITLEMENT_ID] ? 'active' : 'inactive';
+  if (info.entitlements.active[PRO_ENTITLEMENT_ID]) return 'active';
+  // Fallback: any active entitlement (handles entitlement ID drift in RC)
+  if (Object.keys(info.entitlements.active).length > 0) return 'active';
+  // Last resort: an active subscription product is enough since we have a
+  // single-tier model — if RC sees an active sub on this customer, treat
+  // them as 'pro' regardless of how the entitlement was named.
+  if (info.activeSubscriptions.length > 0) return 'active';
+  return 'inactive';
 }
 
 export function initRevenueCat(): void {
@@ -73,6 +80,22 @@ export async function getOfferings(): Promise<PurchasesOffering | null> {
     return offerings.current ?? null;
   } catch (e) {
     console.warn('[subscription] getOfferings failed:', e);
+    return null;
+  }
+}
+
+// Fetch a single product by its store identifier — used for the "old
+// price" anchor on the yearly plan, since `nothing_yearly` isn't in any
+// RC package (it's not buyable, just a strikethrough reference price).
+export async function getProductPriceString(
+  productId: string,
+): Promise<string | null> {
+  if (!configured) return null;
+  try {
+    const products = await Purchases.getProducts([productId]);
+    return products[0]?.priceString ?? null;
+  } catch (e) {
+    console.warn('[subscription] getProducts failed:', e);
     return null;
   }
 }
