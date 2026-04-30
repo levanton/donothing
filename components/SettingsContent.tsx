@@ -19,6 +19,7 @@ import PillButton from '@/components/PillButton';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
+import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
 
 interface PendingBlockParams {
   hour: number;
@@ -101,22 +102,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
 
   const handleConfirmBlock = (hour: number, minute: number, duration: number, weekdays: number[], unlockGoalMinutes: number) => {
     const params: PendingBlockParams = { hour, minute, duration, weekdays, unlockGoalMinutes };
-    const startMin = hour * 60 + minute;
-
-    // Reject blocks sitting within an hour of an existing one (wall-clock,
-    // circular over 24h). Catches duplicates and near-duplicates.
-    let conflictTime: string | null = null;
-    for (const b of scheduledBlocks) {
-      if (editingBlock && editingBlock.id === b.id) continue;
-      const otherMin = b.hour * 60 + b.minute;
-      const d = Math.abs(startMin - otherMin);
-      const circular = Math.min(d, 24 * 60 - d);
-      if (circular < 60) {
-        conflictTime = formatTime12(b.hour, b.minute);
-        break;
-      }
-    }
-
+    const conflictTime = findBlockConflict(scheduledBlocks, hour, minute, editingBlock?.id);
     if (conflictTime) {
       setPendingBlock({ ...params, conflictTime });
       return;
@@ -277,7 +263,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
                 <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
                   {b.unlockGoalMinutes} min
                 </Text>
-                {' nothing to unlock'}
+                {' nothing'}
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
@@ -434,7 +420,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
       title="Too close to another block"
       message={
         pendingBlock?.conflictTime
-          ? `You already have a block at ${pendingBlock.conflictTime}. Blocks must be at least an hour apart.`
+          ? `You already have a block at ${pendingBlock.conflictTime}. Blocks must be at least ${MIN_BLOCK_GAP_LABEL} apart.`
           : ''
       }
       closeLabel="got it"

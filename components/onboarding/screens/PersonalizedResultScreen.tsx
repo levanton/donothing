@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type BottomSheet from '@gorhom/bottom-sheet';
@@ -11,7 +11,9 @@ import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import PickerSheet from '@/components/PickerSheet';
 import BlockPickerContent from '@/components/BlockPicker';
+import AlertModal from '@/components/AlertModal';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
 
 interface Props {
   isActive: boolean;
@@ -19,7 +21,7 @@ interface Props {
   theme: AppTheme;
 }
 
-export default function PersonalizedResultScreen({ theme: screenTheme, onNext }: Props) {
+export default function PersonalizedResultScreen({ isActive, theme: screenTheme, onNext }: Props) {
   const insets = useSafeAreaInsets();
   const themeMode = useAppStore((s) => s.themeMode);
   const theme = themes[themeMode];
@@ -28,7 +30,27 @@ export default function PersonalizedResultScreen({ theme: screenTheme, onNext }:
   const store = useAppStore.getState;
 
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
+  const [conflictTime, setConflictTime] = useState<string | null>(null);
   const blockSheetRef = useRef<BottomSheet>(null);
+
+  // Seed two short default blocks (morning + evening) the first time the
+  // user lands on this screen so they see a starter daily reset rather
+  // than an empty card. Ref-guarded so navigating back/forward never
+  // re-adds them, and skipped entirely if any blocks already exist.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!isActive || seededRef.current) return;
+    seededRef.current = true;
+    if (store().scheduledBlocks.length > 0) return;
+    (async () => {
+      try {
+        await store().addScheduledBlock(6, 0, 30, [], 1);
+        await store().addScheduledBlock(13, 0, 30, [], 1);
+      } catch (e) {
+        console.error('[PersonalizedResult] seed failed:', e);
+      }
+    })();
+  }, [isActive, store]);
 
   const handleConfirm = (
     hour: number,
@@ -37,6 +59,12 @@ export default function PersonalizedResultScreen({ theme: screenTheme, onNext }:
     weekdays: number[],
     unlockGoalMinutes: number,
   ) => {
+    const conflict = findBlockConflict(store().scheduledBlocks, hour, minute, editingBlock?.id);
+    if (conflict) {
+      setConflictTime(conflict);
+      return;
+    }
+
     haptics.light();
     const op = editingBlock
       ? store().editScheduledBlock(editingBlock.id, hour, minute, duration, weekdays, unlockGoalMinutes)
@@ -120,7 +148,7 @@ export default function PersonalizedResultScreen({ theme: screenTheme, onNext }:
                     <Text style={{ fontFamily: Fonts?.mono, fontWeight: '600', color: screenTheme.text }}>
                       {b.unlockGoalMinutes} min
                     </Text>
-                    {' nothing to unlock'}
+                    {' nothing'}
                   </Text>
                   <View style={styles.cardDays}>
                     {WEEKDAY_VALUES.map((day, i) => {
@@ -207,6 +235,20 @@ export default function PersonalizedResultScreen({ theme: screenTheme, onNext }:
           onCancel={() => blockSheetRef.current?.close()}
         />
       </PickerSheet>
+
+      <AlertModal
+        visible={conflictTime !== null}
+        theme={theme}
+        icon="clock"
+        title="Too close to another block"
+        message={
+          conflictTime
+            ? `You already have a block at ${conflictTime}. Blocks must be at least ${MIN_BLOCK_GAP_LABEL} apart.`
+            : ''
+        }
+        closeLabel="got it"
+        onClose={() => setConflictTime(null)}
+      />
     </View>
   );
 }
