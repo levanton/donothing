@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
@@ -20,7 +21,7 @@ interface CardSpec {
   onPress: () => void;
 }
 
-export default function PermissionsScreen({ theme }: Props) {
+export default function PermissionsScreen({ isActive, onNext, theme }: Props) {
   const {
     authStatus,
     notifStatus,
@@ -32,7 +33,7 @@ export default function PermissionsScreen({ theme }: Props) {
   const notifGranted = notifStatus === 'granted';
   const stGranted = authStatus === 'approved';
 
-  const cards: CardSpec[] = [
+  const allCards: CardSpec[] = [
     {
       id: 'notif',
       icon: 'bell',
@@ -56,6 +57,17 @@ export default function PermissionsScreen({ theme }: Props) {
       onPress: handleScreenTimeBannerTap,
     },
   ];
+
+  const cards = allCards.filter((c) => !c.granted);
+
+  useEffect(() => {
+    if (!isActive) return;
+    if (Platform.OS !== 'ios') return;
+    if (notifGranted && stGranted) {
+      const t = setTimeout(onNext, 350);
+      return () => clearTimeout(t);
+    }
+  }, [isActive, notifGranted, stGranted, onNext]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -87,7 +99,7 @@ export default function PermissionsScreen({ theme }: Props) {
               disabled={c.granted}
               style={[styles.card, { backgroundColor: c.cardBg }, c.granted && styles.cardGranted]}
             >
-              <View style={[styles.iconWrap, { backgroundColor: palette.white }]}>
+              <View style={[styles.iconWrap, { backgroundColor: theme.bg }]}>
                 <Feather name={c.icon} size={20} color={palette.brown} />
               </View>
               <View style={styles.textCol}>
