@@ -142,6 +142,12 @@ interface GoalSliderBarProps {
   // --- Interactive mode (settings): pass value + onChange, gesture is built-in ---
   value?: number;
   onChange?: (minutes: number) => void;
+  /** Fired once when the user releases the slider, with the final
+   * snapped value. Use this for store writes that fan out to the rest
+   * of the screen — onChange fires per snap step and is fine for
+   * tightly memoised display state, but anything that triggers
+   * widespread re-renders should hook into onRelease instead. */
+  onRelease?: (minutes: number) => void;
   /** Lower bound for interactive snapping (default 0) */
   minMinutes?: number;
 }
@@ -164,6 +170,7 @@ export default function GoalSliderBar({
   width: fixedWidth,
   value,
   onChange,
+  onRelease,
   minMinutes = 0,
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
@@ -238,6 +245,12 @@ export default function GoalSliderBar({
     .onFinalize(() => {
       'worklet';
       isDragging.value = false;
+      // Final-only store write — keeps the dragging path off any
+      // selector that fans out re-renders. JS-thread no-op if caller
+      // doesn't pass onRelease.
+      if (onRelease) {
+        runOnJS(onRelease)(lastSnap.value);
+      }
     });
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {

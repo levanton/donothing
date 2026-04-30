@@ -274,11 +274,16 @@ export default function DoNothingScreen() {
   }));
 
   // --- Goal slider ---
+  // Drag updates only `sliderMinutes` (consumed by two memoised tiny
+  // components), so the 1700-line MainScreen never re-renders mid-drag.
+  // The actual goal — which a lot of UI subscribes to via `goalSeconds` —
+  // is committed once on release.
   const SLIDER_W = 300;
   const handleSliderChange = useCallback((mins: number) => {
-    const s = useAppStore.getState();
-    s.setSliderMinutes(mins);
-    s.setGoalFromSlider(mins);
+    useAppStore.getState().setSliderMinutes(mins);
+  }, []);
+  const handleSliderRelease = useCallback((mins: number) => {
+    useAppStore.getState().setGoalFromSlider(mins);
   }, []);
 
   // BlockSheet visibility is now a prop — no imperative ref needed.
@@ -1158,6 +1163,7 @@ export default function DoNothingScreen() {
                   theme={theme}
                   width={SLIDER_W}
                   onChange={handleSliderChange}
+                  onRelease={handleSliderRelease}
                 />
               </View>
             )}
@@ -2022,12 +2028,14 @@ interface RestingSliderWrapProps {
   theme: AppTheme;
   width: number;
   onChange: (minutes: number) => void;
+  onRelease: (minutes: number) => void;
 }
 
 const RestingSliderWrap = memo(function RestingSliderWrap({
   theme,
   width,
   onChange,
+  onRelease,
 }: RestingSliderWrapProps) {
   const sliderMinutes = useAppStore((s) => s.sliderMinutes);
   return (
@@ -2035,6 +2043,7 @@ const RestingSliderWrap = memo(function RestingSliderWrap({
       theme={theme}
       value={sliderMinutes}
       onChange={onChange}
+      onRelease={onRelease}
       width={width}
       maxMinutes={60}
       minMinutes={0}
