@@ -21,6 +21,7 @@ import PhoneSymptomScreen from '@/components/onboarding/screens/PhoneSymptomScre
 import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
 import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuizScreen';
 import AgeQuizScreen from '@/components/onboarding/screens/AgeQuizScreen';
+import PermissionsScreen from '@/components/onboarding/screens/PermissionsScreen';
 import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
 import SetGoalScreen from '@/components/onboarding/screens/SetGoalScreen';
 import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
@@ -80,13 +81,14 @@ export default function OnboardingRoute() {
       case 'screenTimeQuiz':  return <ScreenTimeQuizScreen {...props} selected={flow.screenTime} onSelect={flow.setScreenTime} />;
       case 'ageQuiz':         return <AgeQuizScreen {...props} selected={flow.age} onSelect={flow.setAge} />;
       case 'screenTimeStats': return <ScreenTimeStatsScreen {...props} screenTimeAnswer={flow.screenTime[0] ?? ''} ageAnswer={flow.age[0] ?? ''} />;
-      case 'tryNothing':      return <TryNothingScreen {...props} />;
+      case 'tryNothing':      return <TryNothingScreen {...props} onSkip={() => flow.jumpTo(currentIndex + 2)} />;
       case 'firstMinuteDone': return <FirstMinuteDoneScreen {...props} />;
       case 'dailyBenefits':   return <DailyBenefitsScreen {...props} />;
       case 'testimonials':    return <TestimonialsScreen {...props} />;
       case 'howItWorks':      return <HowItWorksScreen {...props} />;
       case 'setGoal':         return <SetGoalScreen {...props} selected={flow.goal} onSelect={flow.setGoal} screenTimeAnswer={flow.screenTime[0] ?? ''} />;
-      case 'personalResult':  return <PersonalizedResultScreen {...props} painPoints={flow.painPoints} screenTime={flow.screenTime[0] ?? ''} goal={flow.goal[0] ?? '5m'} />;
+      case 'permissions':     return <PermissionsScreen {...props} />;
+      case 'personalResult':  return <PersonalizedResultScreen {...props} />;
       case 'paywall':         return <PaywallScreen {...props} onFinish={handleFinish} />;
       default:                return null;
     }

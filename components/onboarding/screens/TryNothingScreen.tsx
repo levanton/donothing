@@ -22,10 +22,11 @@ const YES_BUTTON_SIZE = 140;
 interface Props {
   isActive: boolean;
   onNext: () => void;
+  onSkip?: () => void;
   theme: { text: string; bg: string };
 }
 
-export default function TryNothingScreen({ isActive, onNext }: Props) {
+export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const insets = useSafeAreaInsets();
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -34,8 +35,8 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
   const handleSkip = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     haptics.light();
-    onNext();
-  }, [onNext]);
+    (onSkip ?? onNext)();
+  }, [onNext, onSkip]);
 
   const entryOpacity = useSharedValue(0);
   const entryTranslateY = useSharedValue(12);

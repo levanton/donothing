@@ -110,7 +110,7 @@ export type PageId =
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
-  | 'testimonials' | 'howItWorks' | 'setGoal' | 'personalResult'
+  | 'testimonials' | 'howItWorks' | 'setGoal' | 'permissions' | 'personalResult'
   | 'paywall';
 
 export interface OnboardingPage {
@@ -132,13 +132,11 @@ export const PAGES: OnboardingPage[] = [
   { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
-  { id: 'dailyBenefits',   bg: palette.charcoal,   theme: 'dark',  hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'testimonials',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
-  { id: 'howItWorks',      bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'setGoal',         bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
-  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
-  { id: 'paywall',          bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'permissions',     bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'paywall',          bg: palette.warmCream,  theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];
 
 // How-it-works steps with Feather icon names
