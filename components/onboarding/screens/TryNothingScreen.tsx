@@ -42,6 +42,8 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const entryTranslateY = useSharedValue(12);
 
   const yesOpacity = useSharedValue(1);
+  const headerOpacity = useSharedValue(1);
+  const hintOpacity = useSharedValue(1);
   const breathePulse = useSharedValue(1);
 
   const burstScale = useSharedValue(0);
@@ -58,6 +60,8 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     setStarted(true);
 
     yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
+    headerOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
+    hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
 
     breathePulse.value = withRepeat(
       withSequence(
@@ -109,6 +113,14 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     opacity: yesOpacity.value,
   }));
 
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+  }));
+
+  const hintStyle = useAnimatedStyle(() => ({
+    opacity: hintOpacity.value,
+  }));
+
   const { width, height } = Dimensions.get('window');
   const burstSize = Math.hypot(width, height);
 
@@ -122,6 +134,12 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, entryStyle]}>
+        <Animated.View style={headerStyle}>
+          <Text style={[styles.headerText, { fontFamily: Fonts?.serif }]}>
+            Ready to Do nothing?
+          </Text>
+        </Animated.View>
+
         <Animated.View style={pulseStyle}>
           <AnimatedTimerDisplay
             seconds={remaining}
@@ -141,6 +159,12 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
             </Pressable>
           </Animated.View>
         </View>
+
+        <Animated.View style={hintStyle} pointerEvents="none">
+          <Text style={[styles.hintText, { fontFamily: Fonts?.serif }]}>
+            that's all you have to do.
+          </Text>
+        </Animated.View>
       </Animated.View>
 
       <Pressable
@@ -170,15 +194,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.terracotta,
   },
+  headerText: {
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: 1,
+    fontWeight: '400',
+    color: palette.cream,
+    textAlign: 'center',
+  },
   content: {
     alignItems: 'center',
-    gap: 36,
+    gap: 28,
   },
   yesWrap: {
     width: YES_BUTTON_SIZE,
     height: YES_BUTTON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hintText: {
+    fontSize: 17,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+    color: palette.cream,
+    textAlign: 'center',
   },
   yesButton: {
     width: YES_BUTTON_SIZE,
@@ -203,10 +242,9 @@ const styles = StyleSheet.create({
   },
   skipLabel: {
     fontSize: 16,
-    fontWeight: '300',
+    fontWeight: '400',
     letterSpacing: 0.5,
     color: palette.cream,
-    opacity: 0.7,
   },
   burstWrap: {
     ...StyleSheet.absoluteFillObject,
