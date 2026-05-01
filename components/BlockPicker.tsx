@@ -5,7 +5,7 @@ import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { Fonts } from '@/constants/theme';
-import { type AppTheme } from '@/lib/theme';
+import { palette, type AppTheme } from '@/lib/theme';
 import { pad2 } from '@/lib/format';
 import { ALL_DAYS, WEEKDAY_LABELS, WEEKDAY_VALUES } from '@/lib/weekdays';
 import PillButton from '@/components/PillButton';
@@ -76,7 +76,7 @@ export default function BlockPickerContent({
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
   const [unlockGoal, setUnlockGoal] = useState<number>(initialUnlockGoal ?? DEFAULT_UNLOCK);
 
-  const isLight = theme.bg === '#F9F2E0';
+  const isLight = theme.bg !== palette.charcoal;
   const strongBorder = theme.text;
   const softDivider = isLight ? '#CFC4AF' : '#6B6B68';
 
@@ -127,7 +127,7 @@ export default function BlockPickerContent({
           </Text>
         </View>
         <View style={styles.unlockValueWrap}>
-          <Text style={[styles.unlockValue, { color: theme.accent, fontFamily: Fonts!.serif }]}>
+          <Text style={[styles.unlockValue, { color: theme.accent, fontFamily: Fonts!.mono }]}>
             {unlockGoal}
           </Text>
           <Text style={[styles.unlockUnit, { color: theme.textSecondary, fontFamily: Fonts!.serif }]}>
@@ -172,7 +172,7 @@ export default function BlockPickerContent({
               display="compact"
               minuteInterval={5}
               onChange={onStartChange}
-              themeVariant={theme.bg === '#F9F2E0' ? 'light' : 'dark'}
+              themeVariant={isLight ? 'light' : 'dark'}
               accentColor={theme.accent}
             />
           ) : (
