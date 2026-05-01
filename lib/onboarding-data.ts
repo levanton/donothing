@@ -1,6 +1,6 @@
 // Onboarding screen definitions (v1 — Main, Status = Ready only)
 
-import { palette } from '@/lib/theme';
+import { palette, APP_BG } from '@/lib/theme';
 import type { ThemeMode } from '@/lib/theme';
 
 export type ScreenType = 'story' | 'quiz' | 'info' | 'setup' | 'cta';
@@ -100,20 +100,20 @@ export interface OnboardingPage {
 }
 
 export const PAGES: OnboardingPage[] = [
-  { id: 'welcome',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
-  { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
-  { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'nostalgia',       bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'rushing',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'phoneSymptom',    bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'ageQuiz',         bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
-  { id: 'screenTimeStats', bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'screenTimeStats', bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'evidence',        bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'permissions',     bg: palette.cream,      theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
-  { id: 'personalResult',  bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
-  { id: 'paywall',          bg: palette.warmCream,  theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'evidence',        bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'permissions',     bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
+  { id: 'personalResult',  bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'paywall',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];
 
 // How-it-works steps with Feather icon names

@@ -100,7 +100,7 @@ export default function OnboardingRoute() {
       <Animated.View
         key={currentIndex}
         entering={FadeIn.duration(400)}
-        exiting={FadeOut.duration(200)}
+        exiting={FadeOut.duration(400)}
         style={styles.page}
       >
         {renderScreen()}
