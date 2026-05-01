@@ -54,7 +54,7 @@ export const SCREENS: OnboardingScreen[] = [
   {
     id: 'screenTimeQuiz',
     type: 'quiz',
-    heading: 'How many hours a day on your phone?',
+    heading: 'How many hours a day\non your phone?',
     options: ['2–3h', '4–5h', '6–7h', '8+'],
   },
   {
