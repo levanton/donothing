@@ -8,35 +8,6 @@ import Animated, { FadeIn, FadeOut, withTiming } from 'react-native-reanimated';
 import { EASE_IN_OUT } from '@/constants/animations';
 import { Feather } from '@expo/vector-icons';
 
-// Custom "page-flip" enter/exit. Reanimated's stock SlideInRight starts
-// the entering view from the full screen-edge; we want a much smaller
-// drift (~60px) so the next page softly emerges into view rather than
-// flying in from off-screen.
-const PAGE_SLIDE_OFFSET = 60;
-const PAGE_SLIDE_MS = 1100;
-
-function pageEnter() {
-  'worklet';
-  return {
-    initialValues: { transform: [{ translateX: PAGE_SLIDE_OFFSET }], opacity: 0 },
-    animations: {
-      transform: [{ translateX: withTiming(0, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }) }],
-      opacity: withTiming(1, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }),
-    },
-  };
-}
-
-function pageExit() {
-  'worklet';
-  return {
-    initialValues: { transform: [{ translateX: 0 }], opacity: 1 },
-    animations: {
-      transform: [{ translateX: withTiming(-PAGE_SLIDE_OFFSET, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }) }],
-      opacity: withTiming(0, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }),
-    },
-  };
-}
-
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
 import { saveOnboardingData } from '@/lib/onboarding-persistence';
@@ -61,6 +32,37 @@ import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsSc
 import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
 import TestimonialsScreen from '@/components/onboarding/screens/TestimonialsScreen';
 import PaywallScreen from '@/components/onboarding/screens/PaywallScreen';
+
+// Custom "page-flip" enter/exit. Reanimated's stock SlideInRight starts
+// the entering view from the full screen-edge; we want a much smaller
+// drift (~60px) so the next page softly emerges into view rather than
+// flying in from off-screen. Exit is a touch faster than enter so the
+// outgoing page clears before the new one fully settles.
+const PAGE_SLIDE_OFFSET = 60;
+const PAGE_ENTER_MS = 1300;
+const PAGE_EXIT_MS = 800;
+
+function pageEnter() {
+  'worklet';
+  return {
+    initialValues: { transform: [{ translateX: PAGE_SLIDE_OFFSET }], opacity: 0 },
+    animations: {
+      transform: [{ translateX: withTiming(0, { duration: PAGE_ENTER_MS, easing: EASE_IN_OUT }) }],
+      opacity: withTiming(1, { duration: PAGE_ENTER_MS, easing: EASE_IN_OUT }),
+    },
+  };
+}
+
+function pageExit() {
+  'worklet';
+  return {
+    initialValues: { transform: [{ translateX: 0 }], opacity: 1 },
+    animations: {
+      transform: [{ translateX: withTiming(-PAGE_SLIDE_OFFSET, { duration: PAGE_EXIT_MS, easing: EASE_IN_OUT }) }],
+      opacity: withTiming(0, { duration: PAGE_EXIT_MS, easing: EASE_IN_OUT }),
+    },
+  };
+}
 
 const __DEV_JUMP__ = __DEV__;
 
@@ -130,14 +132,20 @@ export default function OnboardingRoute() {
       <Animated.View
         key={currentIndex}
         entering={
-          currentPage.id === 'welcome' || currentPage.id === 'nostalgia'
-            ? FadeIn.duration(800)
-            : pageEnter
+          // Slide-from-right only on the story-screen sequence (rushing,
+          // phoneSymptom). Welcome/nostalgia fade in; everything past
+          // phoneSymptom (quizzes, etc.) uses the default fade.
+          currentPage.id === 'rushing' || currentPage.id === 'phoneSymptom'
+            ? pageEnter
+            : FadeIn.duration(800)
         }
         exiting={
-          currentPage.id === 'welcome'
-            ? FadeOut.duration(800)
-            : pageExit
+          // Slide-out only when leaving INTO another story screen, i.e.
+          // when this page is nostalgia or rushing. Welcome and
+          // phoneSymptom (which leads into the quiz) fade out.
+          currentPage.id === 'nostalgia' || currentPage.id === 'rushing'
+            ? pageExit
+            : FadeOut.duration(800)
         }
         style={styles.page}
       >
