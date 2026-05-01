@@ -114,16 +114,8 @@ export const PAGES: OnboardingPage[] = [
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'evidence',        bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'howItWorks',      bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: false, showBackButton: true  },
   { id: 'permissions',     bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'paywall',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
-];
-
-// How-it-works steps with Feather icon names
-export const HOW_IT_WORKS_STEPS = [
-  { text: 'Open.', icon: 'smartphone' as const },
-  { text: 'Start.', icon: 'play' as const },
-  { text: 'Put your phone down.', icon: 'arrow-down' as const },
-  { text: 'Breathe.', icon: 'wind' as const },
-  { text: 'That\'s it.', icon: 'check' as const },
 ];
