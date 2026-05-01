@@ -40,20 +40,20 @@ export default function HowItWorksScreen({ isActive, theme }: Props) {
         </Text>
 
         <View style={styles.cards}>
-          <View style={[styles.card, { backgroundColor: palette.brown }]}>
-            <Feather name="lock" size={36} color={palette.cream} style={styles.cardIcon} />
-            <Text style={[styles.cardLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
+          <View style={[styles.card, { backgroundColor: '#E8B59A' }]}>
+            <Feather name="lock" size={36} color={palette.brown} style={styles.cardIcon} />
+            <Text style={[styles.cardLabel, { color: palette.brown, fontFamily: Fonts?.serif }]}>
               Your apps block
             </Text>
           </View>
 
           <View style={styles.arrow}>
-            <Text style={[styles.arrowText, { color: palette.terracotta, fontFamily: Fonts?.serif }]}>
+            <Text style={[styles.arrowText, { color: theme.text, fontFamily: Fonts?.serif }]}>
               →
             </Text>
           </View>
 
-          <View style={[styles.card, { backgroundColor: palette.terracotta }]}>
+          <View style={[styles.card, { backgroundColor: '#3D5547' }]}>
             <Feather name="wind" size={36} color={palette.cream} style={styles.cardIcon} />
             <Text style={[styles.cardLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
               Do nothing to unblock
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 22,
-    fontWeight: '500',
+    fontWeight: '700',
     letterSpacing: -0.2,
     lineHeight: 28,
     textAlign: 'left',
@@ -117,5 +117,6 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '300',
     lineHeight: 34,
+    opacity: 0.5,
   },
 });

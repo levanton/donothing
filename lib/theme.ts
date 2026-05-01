@@ -16,6 +16,7 @@ export const palette = {
   deepBrown:  '#3F2C22',
   warmCream:  '#F0E0BD',
   auburn:     '#7E3A24',
+  sage:       '#8FA672',
 } as const;
 
 export const CARD_BORDER_WIDTH = 1.5;
