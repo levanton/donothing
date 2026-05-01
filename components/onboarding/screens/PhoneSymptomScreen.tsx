@@ -23,14 +23,14 @@ const LINES = [
 ];
 
 const WORD_DELAY = 130;
-const WORD_DURATION = 400;
+const WORD_DURATION = 750;
 const HEADING_DELAY = 200;
-const HEADING_DURATION = 600;
+const HEADING_DURATION = 850;
 const BODY_START = HEADING_DELAY + HEADING_DURATION;
 
 function Word({ text, delay, bold, accent }: { text: string; delay: number; bold?: boolean; accent?: boolean }) {
   const opacity = useSharedValue(0);
-  const translateY = useSharedValue(8);
+  const translateY = useSharedValue(12);
 
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: WORD_DURATION, easing: EASE_OUT }));
@@ -65,7 +65,7 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
 
   const headingOpacity = useSharedValue(0);
-  const headingTranslateY = useSharedValue(8);
+  const headingTranslateY = useSharedValue(12);
   const imageOpacity = useSharedValue(0);
   const imageScale = useSharedValue(0.92);
   const buttonOpacity = useSharedValue(0);
@@ -81,8 +81,8 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
     headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_OUT }));
     headingTranslateY.value = withDelay(HEADING_DELAY, withTiming(0, { duration: HEADING_DURATION, easing: EASE_OUT }));
 
-    imageOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
-    imageScale.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 800, easing: EASE_OUT }));
+    imageOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 1100, easing: EASE_OUT }));
+    imageScale.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 1100, easing: EASE_OUT }));
 
     const t = setTimeout(() => {
       buttonOpacity.value = withTiming(1, { duration: 500, easing: EASE_OUT });
