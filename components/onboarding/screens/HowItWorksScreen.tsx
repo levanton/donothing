@@ -36,7 +36,7 @@ export default function HowItWorksScreen({ isActive, theme }: Props) {
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Animated.View style={[styles.content, enterStyle]}>
         <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts?.serif }]}>
-          Nothing is simple.
+          Nothing is simple
         </Text>
 
         <View style={styles.cards}>
