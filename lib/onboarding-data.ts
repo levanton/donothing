@@ -95,15 +95,18 @@ export interface OnboardingPage {
   bg: string;
   theme: ThemeMode;
   hasOwnButton: boolean;
+  /** Render a bottom-right circular arrow button (rendered in the shell, above
+   *  the sliding view, so it stays put across page transitions). */
+  hasCircleNext?: boolean;
   showProgress: boolean;
   showBackButton: boolean;
 }
 
 export const PAGES: OnboardingPage[] = [
   { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
-  { id: 'nostalgia',       bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
-  { id: 'rushing',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
-  { id: 'phoneSymptom',    bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
+  { id: 'nostalgia',       bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
+  { id: 'rushing',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: true  },
+  { id: 'phoneSymptom',    bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: false, showBackButton: true  },
   { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'ageQuiz',         bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },

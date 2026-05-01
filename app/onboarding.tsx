@@ -4,8 +4,38 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, withTiming } from 'react-native-reanimated';
+import { EASE_IN_OUT } from '@/constants/animations';
 import { Feather } from '@expo/vector-icons';
+
+// Custom "page-flip" enter/exit. Reanimated's stock SlideInRight starts
+// the entering view from the full screen-edge; we want a much smaller
+// drift (~60px) so the next page softly emerges into view rather than
+// flying in from off-screen.
+const PAGE_SLIDE_OFFSET = 60;
+const PAGE_SLIDE_MS = 1100;
+
+function pageEnter() {
+  'worklet';
+  return {
+    initialValues: { transform: [{ translateX: PAGE_SLIDE_OFFSET }], opacity: 0 },
+    animations: {
+      transform: [{ translateX: withTiming(0, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }) }],
+      opacity: withTiming(1, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }),
+    },
+  };
+}
+
+function pageExit() {
+  'worklet';
+  return {
+    initialValues: { transform: [{ translateX: 0 }], opacity: 1 },
+    animations: {
+      transform: [{ translateX: withTiming(-PAGE_SLIDE_OFFSET, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }) }],
+      opacity: withTiming(0, { duration: PAGE_SLIDE_MS, easing: EASE_IN_OUT }),
+    },
+  };
+}
 
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
@@ -99,8 +129,16 @@ export default function OnboardingRoute() {
 
       <Animated.View
         key={currentIndex}
-        entering={FadeIn.duration(400)}
-        exiting={FadeOut.duration(400)}
+        entering={
+          currentPage.id === 'welcome' || currentPage.id === 'nostalgia'
+            ? FadeIn.duration(800)
+            : pageEnter
+        }
+        exiting={
+          currentPage.id === 'welcome'
+            ? FadeOut.duration(800)
+            : pageExit
+        }
         style={styles.page}
       >
         {renderScreen()}
@@ -119,6 +157,18 @@ export default function OnboardingRoute() {
             variant={flow.isLastScreen ? 'filled' : 'outline'}
           />
         </Animated.View>
+      )}
+
+      {/* Circle next arrow — rendered above the sliding view so it stays put
+          while page content slides in/out. */}
+      {currentPage.hasCircleNext && (
+        <Pressable
+          onPress={flow.goNext}
+          style={[styles.circleNext, { bottom: insets.bottom + 24, borderColor: screenTheme.text }]}
+          hitSlop={12}
+        >
+          <Feather name="arrow-right" size={22} color={screenTheme.text} />
+        </Pressable>
       )}
 
       {/* Top bar: back button + progress */}
@@ -195,6 +245,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  circleNext: {
+    position: 'absolute',
+    right: 32,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topBar: {
     position: 'absolute',

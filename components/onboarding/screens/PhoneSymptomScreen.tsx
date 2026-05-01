@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -7,8 +7,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { EASE_OUT, EASE_IN_OUT } from '@/constants/animations';
-import { Feather } from '@expo/vector-icons';
+import { EASE_IN_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
@@ -30,12 +29,8 @@ const LINES: LineSpec[] = [
   { text: 'can change everything.', bold: true, accent: true },
 ];
 
-const IMAGE_DELAY = 150;
-const IMAGE_DURATION = 800;
-const HEADING_DELAY = 500;
-const HEADING_DURATION = 700;
-const BODY_DELAY = 1000;
-const BODY_DURATION = 1100;
+const ENTER_DELAY = 200;
+const ENTER_DURATION = 1100;
 
 interface Props {
   isActive: boolean;
@@ -43,55 +38,34 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
+export default function PhoneSymptomScreen({ isActive, theme }: Props) {
   const insets = useSafeAreaInsets();
 
-  const headingOpacity = useSharedValue(0);
-  const bodyOpacity = useSharedValue(0);
-  const imageOpacity = useSharedValue(0);
-  const buttonOpacity = useSharedValue(0);
+  const enterOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (!isActive) return;
-    imageOpacity.value = withDelay(IMAGE_DELAY, withTiming(1, { duration: IMAGE_DURATION, easing: EASE_IN_OUT }));
-
-    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_IN_OUT }));
-
-    bodyOpacity.value = withDelay(BODY_DELAY, withTiming(1, { duration: BODY_DURATION, easing: EASE_IN_OUT }));
-
-    buttonOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: IMAGE_DURATION, easing: EASE_OUT }));
+    enterOpacity.value = withDelay(ENTER_DELAY, withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }));
   }, [isActive]);
 
-  const headingStyle = useAnimatedStyle(() => ({
-    opacity: headingOpacity.value,
-  }));
-
-  const bodyStyle = useAnimatedStyle(() => ({
-    opacity: bodyOpacity.value,
-  }));
-
-  const imageStyle = useAnimatedStyle(() => ({
-    opacity: imageOpacity.value,
-  }));
-
-  const buttonAnimStyle = useAnimatedStyle(() => ({
-    opacity: buttonOpacity.value,
+  const enterStyle = useAnimatedStyle(() => ({
+    opacity: enterOpacity.value,
   }));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.centerStack}>
-          <Animated.View style={[styles.imageArea, imageStyle]}>
+          <Animated.View style={[styles.imageArea, enterStyle]}>
             <Image source={whatIfImage} style={styles.image} fadeDuration={0} />
           </Animated.View>
 
-          <View style={styles.textArea}>
-            <Animated.Text style={[styles.heading, { color: palette.terracotta }, headingStyle]}>
+          <Animated.View style={[styles.textArea, enterStyle]}>
+            <Text style={[styles.heading, { color: palette.terracotta }]}>
               {HEADING}
-            </Animated.Text>
+            </Text>
 
-            <Animated.View style={[styles.body, bodyStyle]}>
+            <View style={styles.body}>
               {LINES.map((spec, i) => (
                 <Text
                   key={i}
@@ -105,15 +79,9 @@ export default function PhoneSymptomScreen({ isActive, onNext, theme }: Props) {
                   {spec.text}
                 </Text>
               ))}
-            </Animated.View>
-          </View>
+            </View>
+          </Animated.View>
         </View>
-
-        <Animated.View style={[styles.buttonArea, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={[styles.circleButton, { borderColor: theme.text }]}>
-            <Feather name="arrow-right" size={22} color={theme.text} />
-          </Pressable>
-        </Animated.View>
       </View>
     </View>
   );
@@ -157,16 +125,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'left',
     lineHeight: 26,
-  },
-  buttonArea: {
-    alignItems: 'flex-end',
-  },
-  circleButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
