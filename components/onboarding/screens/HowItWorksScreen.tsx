@@ -41,7 +41,7 @@ export default function HowItWorksScreen({ isActive, theme }: Props) {
 
         <View style={styles.cards}>
           <View style={[styles.card, { backgroundColor: palette.brown }]}>
-            <Feather name="lock" size={28} color={palette.cream} style={styles.cardIcon} />
+            <Feather name="lock" size={36} color={palette.cream} style={styles.cardIcon} />
             <Text style={[styles.cardLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
               Your apps block
             </Text>
@@ -54,7 +54,7 @@ export default function HowItWorksScreen({ isActive, theme }: Props) {
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.terracotta }]}>
-            <Feather name="wind" size={28} color={palette.cream} style={styles.cardIcon} />
+            <Feather name="wind" size={36} color={palette.cream} style={styles.cardIcon} />
             <Text style={[styles.cardLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
               Do nothing to unblock
             </Text>
@@ -75,10 +75,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heading: {
-    fontSize: 20,
+    fontSize: 34,
     fontWeight: '400',
     marginBottom: 32,
-    textAlign: 'center',
+    textAlign: 'left',
+    alignSelf: 'flex-start',
   },
   cards: {
     flexDirection: 'row',
