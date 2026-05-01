@@ -47,7 +47,7 @@ export default function WelcomeScreen({ isActive, onNext, theme }: Props) {
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Animated.View style={textStyle}>
         <Text style={[styles.greeting, { color: theme.text, fontFamily: Fonts?.serif }]}>
-          Welcome to nothing
+          {'Welcome\nto nothing'}
         </Text>
       </Animated.View>
     </View>
@@ -62,10 +62,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   greeting: {
-    fontSize: 44,
+    fontSize: 38,
     fontWeight: '500',
     letterSpacing: -0.5,
-    lineHeight: 52,
+    lineHeight: 46,
     textAlign: 'center',
   },
 });
