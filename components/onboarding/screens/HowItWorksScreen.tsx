@@ -5,14 +5,26 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
+  withRepeat,
+  withSequence,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
-import { EASE_IN_OUT } from '@/constants/animations';
+import { EASE_IN_OUT, EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const ENTER_DELAY = 200;
-const ENTER_DURATION = 1100;
+const HEADING_DELAY = 100;
+const CARD1_DELAY = 600;
+const CARD1_RISE_MS = 800;
+
+const ICON_RISE_MS = 600;
+const CARD1_ICON_DELAY = CARD1_DELAY + 400;
+
+const CARD2_DELAY = CARD1_ICON_DELAY + ICON_RISE_MS + 200;
+const CARD2_RISE_MS = 800;
+const CARD2_ICON_DELAY = CARD2_DELAY + 400;
+
+const FADE_DURATION = 700;
 
 interface Props {
   isActive: boolean;
@@ -21,46 +33,116 @@ interface Props {
 }
 
 export default function HowItWorksScreen({ isActive, theme }: Props) {
-  const enterOpacity = useSharedValue(0);
+  const headingOpacity = useSharedValue(0);
+
+  const card1Opacity = useSharedValue(0);
+  const card1Translate = useSharedValue(-40);
+
+  const lockOpacity = useSharedValue(0);
+  const lockScale = useSharedValue(0.4);
+
+  const card2Opacity = useSharedValue(0);
+  const card2Translate = useSharedValue(40);
+
+  const windOpacity = useSharedValue(0);
+  const windScale = useSharedValue(0.4);
+
+  const lockBreath = useSharedValue(0);
+  const windSway = useSharedValue(0);
 
   useEffect(() => {
     if (!isActive) return;
-    enterOpacity.value = withDelay(ENTER_DELAY, withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }));
+
+    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: FADE_DURATION, easing: EASE_OUT }));
+
+    card1Opacity.value = withDelay(CARD1_DELAY, withTiming(1, { duration: FADE_DURATION, easing: EASE_OUT }));
+    card1Translate.value = withDelay(CARD1_DELAY, withTiming(0, { duration: CARD1_RISE_MS, easing: EASE_OUT }));
+
+    lockOpacity.value = withDelay(CARD1_ICON_DELAY, withTiming(1, { duration: ICON_RISE_MS, easing: EASE_OUT }));
+    lockScale.value = withDelay(CARD1_ICON_DELAY, withTiming(1, { duration: ICON_RISE_MS, easing: EASE_OUT }));
+
+    card2Opacity.value = withDelay(CARD2_DELAY, withTiming(1, { duration: FADE_DURATION, easing: EASE_OUT }));
+    card2Translate.value = withDelay(CARD2_DELAY, withTiming(0, { duration: CARD2_RISE_MS, easing: EASE_OUT }));
+
+    windOpacity.value = withDelay(CARD2_ICON_DELAY, withTiming(1, { duration: ICON_RISE_MS, easing: EASE_OUT }));
+    windScale.value = withDelay(CARD2_ICON_DELAY, withTiming(1, { duration: ICON_RISE_MS, easing: EASE_OUT }));
+
+    lockBreath.value = withDelay(
+      CARD1_ICON_DELAY + ICON_RISE_MS,
+      withRepeat(
+        withTiming(1, { duration: 2400, easing: EASE_IN_OUT }),
+        -1,
+        true,
+      ),
+    );
+
+    windSway.value = withDelay(
+      CARD2_ICON_DELAY + ICON_RISE_MS,
+      withSequence(
+        withTiming(-1, { duration: 900, easing: EASE_IN_OUT }),
+        withRepeat(
+          withTiming(1, { duration: 1800, easing: EASE_IN_OUT }),
+          -1,
+          true,
+        ),
+      ),
+    );
   }, [isActive]);
 
-  const enterStyle = useAnimatedStyle(() => ({
-    opacity: enterOpacity.value,
+  const headingStyle = useAnimatedStyle(() => ({
+    opacity: headingOpacity.value,
+  }));
+
+  const card1Style = useAnimatedStyle(() => ({
+    opacity: card1Opacity.value,
+    transform: [{ translateX: card1Translate.value }],
+  }));
+
+  const card2Style = useAnimatedStyle(() => ({
+    opacity: card2Opacity.value,
+    transform: [{ translateX: card2Translate.value }],
+  }));
+
+  const lockIconStyle = useAnimatedStyle(() => ({
+    opacity: lockOpacity.value,
+    transform: [{ scale: lockScale.value * (1 + lockBreath.value * 0.05) }],
+  }));
+
+  const windIconStyle = useAnimatedStyle(() => ({
+    opacity: windOpacity.value,
+    transform: [
+      { scale: windScale.value },
+      { translateX: windSway.value * 5 },
+    ],
   }));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Animated.View style={[styles.content, enterStyle]}>
-        <Text style={[styles.heading, { color: theme.text, fontFamily: Fonts?.serif }]}>
+      <View style={styles.content}>
+        <Animated.Text style={[styles.heading, headingStyle, { color: theme.text, fontFamily: Fonts?.serif }]}>
           Nothing is simple
-        </Text>
+        </Animated.Text>
 
         <View style={styles.cards}>
-          <View style={[styles.card, { backgroundColor: '#DDB97A' }]}>
-            <Feather name="lock" size={36} color={palette.brown} style={styles.cardIcon} />
+          <Animated.View style={[styles.card, { backgroundColor: '#DDB97A' }, card1Style]}>
+            <Animated.View style={[styles.cardIcon, lockIconStyle]}>
+              <Feather name="lock" size={36} color={palette.brown} />
+            </Animated.View>
             <Text style={[styles.cardLabel, { color: palette.brown, fontFamily: Fonts?.serif }]}>
               Your apps block
             </Text>
-          </View>
+          </Animated.View>
 
-          <View style={styles.arrow}>
-            <Text style={[styles.arrowText, { color: theme.text, fontFamily: Fonts?.serif }]}>
-              →
-            </Text>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: '#3D5547' }]}>
-            <Feather name="wind" size={36} color={palette.cream} style={styles.cardIcon} />
+          <Animated.View style={[styles.card, { backgroundColor: '#3D5547' }, card2Style]}>
+            <Animated.View style={[styles.cardIcon, windIconStyle]}>
+              <Feather name="wind" size={36} color={palette.cream} />
+            </Animated.View>
             <Text style={[styles.cardLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
-              Do nothing to unblock
+              {'Do nothing to unblock'}
             </Text>
-          </View>
+          </Animated.View>
         </View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -85,11 +167,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
   },
   card: {
     flex: 1,
-    minHeight: 200,
+    minHeight: 215,
     paddingTop: 22,
     paddingBottom: 22,
     paddingHorizontal: 20,
@@ -100,7 +182,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 22,
     left: 20,
-    opacity: 0.9,
   },
   cardLabel: {
     fontSize: 22,
@@ -108,14 +189,5 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     lineHeight: 28,
     textAlign: 'left',
-  },
-  arrow: {
-    paddingHorizontal: 2,
-    alignSelf: 'center',
-  },
-  arrowText: {
-    fontSize: 30,
-    fontWeight: '300',
-    lineHeight: 34,
   },
 });
