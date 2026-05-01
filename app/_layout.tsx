@@ -3,7 +3,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
-import { palette } from '@/lib/theme';
+import { APP_BG } from '@/lib/theme';
 
 // Strict mode flags benign reads of .value that happen when useAnimatedStyle
 // captures React state (e.g. measured rects). Our animation code is correct,
@@ -15,9 +15,9 @@ configureReanimatedLogger({
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.terracotta }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: APP_BG }}>
       <BottomSheetModalProvider>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.terracotta } }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: APP_BG } }}>
           {/* Fade everywhere — slide-from-right was poking through when
               returning from onboarding/paywall, breaking the sense of
               "the home screen is just there". */}

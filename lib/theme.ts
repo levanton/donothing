@@ -20,6 +20,13 @@ export const palette = {
 
 export const CARD_BORDER_WIDTH = 1.5;
 
+// ── Global app background ────────────────────────────────────────────────
+// Color shown behind every screen (Root view + Stack contentStyle in
+// app/_layout.tsx). It's also the light-theme bg, so screens that don't
+// override their background blend with the root during fade transitions.
+// Change here to re-skin the global backdrop in one place.
+export const APP_BG = palette.warmCream;
+
 // ── Opacity helpers ──────────────────────────────────────────────────────
 const alpha = (hex: string, opacity: number): string => {
   const r = parseInt(hex.slice(1, 3), 16);

@@ -83,6 +83,7 @@ export const SCREENS: OnboardingScreen[] = [
 // ── Flat page list — single source of truth for the onboarding flow ──────
 
 export type PageId =
+  | 'welcome'
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
   | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
@@ -99,6 +100,7 @@ export interface OnboardingPage {
 }
 
 export const PAGES: OnboardingPage[] = [
+  { id: 'welcome',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   { id: 'nostalgia',       bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   { id: 'rushing',         bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'phoneSymptom',    bg: palette.cream,      theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },

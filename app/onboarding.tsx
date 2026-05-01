@@ -14,6 +14,7 @@ import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import PillButton from '@/components/PillButton';
 
 // Screens
+import WelcomeScreen from '@/components/onboarding/screens/WelcomeScreen';
 import NostalgiaScreen from '@/components/onboarding/screens/NostalgiaScreen';
 import EvidenceScreen from '@/components/onboarding/screens/EvidenceScreen';
 import RushingScreen from '@/components/onboarding/screens/RushingScreen';
@@ -71,6 +72,7 @@ export default function OnboardingRoute() {
   const renderScreen = () => {
     const props = { isActive: true, onNext: flow.goNext, theme: screenTheme };
     switch (currentPage.id) {
+      case 'welcome':         return <WelcomeScreen {...props} />;
       case 'nostalgia':       return <NostalgiaScreen {...props} />;
       case 'rushing':         return <RushingScreen {...props} />;
       case 'evidence':        return <EvidenceScreen {...props} />;
