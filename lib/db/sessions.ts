@@ -1,5 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { getDb } from './index';
+import { SessionInputSchema, SESSION_MIN_DURATION_S, SESSION_MAX_DURATION_S } from './schemas';
 import type { Session } from './types';
 
 function generateId(): string {
@@ -24,27 +25,24 @@ function rowToSession(row: SessionRow): Session {
   };
 }
 
-// Sanity cap — no single session can plausibly last longer than 24 hours.
-// This also protects against timestamp-sized values leaking in via bad state
-// (e.g. sessionStartTime not being set before a save).
-const MAX_SESSION_DURATION = 24 * 60 * 60;
-
-// Anything shorter than this is a misfire, not a session — matches the
-// minimum unit of the countdown slider so stopwatch and goal modes both
-// honour the same lower bound.
-export const MIN_SAVABLE_DURATION = 60;
+// Bounds live in lib/db/schemas.ts now — re-exported here for callers
+// that still consume the named constants. The canonical source is the
+// SessionInputSchema parser, which rejects out-of-range durations
+// instead of letting them silently round-trip through SQLite.
+export const MAX_SESSION_DURATION = SESSION_MAX_DURATION_S;
+export const MIN_SAVABLE_DURATION = SESSION_MIN_DURATION_S;
 
 export function addSession(duration: number): Session | null {
-  if (duration < MIN_SAVABLE_DURATION) return null;
-  if (duration > MAX_SESSION_DURATION) return null;
+  const parsed = SessionInputSchema.safeParse({ duration });
+  if (!parsed.success) return null;
   const db = getDb();
   const id = generateId();
   const timestamp = Date.now();
   db.runSync(
     'INSERT INTO sessions (id, timestamp, duration) VALUES (?, ?, ?)',
-    id, timestamp, duration,
+    id, timestamp, parsed.data.duration,
   );
-  return { id, timestamp, duration };
+  return { id, timestamp, duration: parsed.data.duration };
 }
 
 /** Delete any rows with absurd durations (e.g. timestamp-sized values). */

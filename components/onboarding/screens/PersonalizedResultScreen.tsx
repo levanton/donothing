@@ -44,8 +44,9 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
     if (store().scheduledBlocks.length > 0) return;
     (async () => {
       try {
-        await store().addScheduledBlock(6, 0, 30, [], 1);
-        await store().addScheduledBlock(13, 0, 30, [], 1);
+        const allDays = [1, 2, 3, 4, 5, 6, 7];
+        await store().addScheduledBlock(6, 0, 30, allDays, 1);
+        await store().addScheduledBlock(13, 0, 30, allDays, 1);
       } catch (e) {
         console.error('[PersonalizedResult] seed failed:', e);
       }
@@ -152,7 +153,7 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
                   </Text>
                   <View style={styles.cardDays}>
                     {WEEKDAY_VALUES.map((day, i) => {
-                      const dayActive = !b.weekdays?.length || b.weekdays.includes(day);
+                      const dayActive = b.weekdays.includes(day);
                       return (
                         <View key={day} style={styles.cardDayCol}>
                           <View style={[styles.cardDot, {

@@ -85,8 +85,6 @@ export async function scheduleSessionCompleteNotification(
   });
 }
 
-const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
-
 export async function scheduleWeeklyNotification(
   hour: number,
   minute: number,
@@ -114,7 +112,7 @@ export async function syncScheduledBlockNotifications(blocks: ScheduledBlock[]):
     }
 
     if (b.enabled) {
-      const days = b.weekdays?.length ? b.weekdays : ALL_WEEKDAYS;
+      const days = b.weekdays;
       const notificationIds: string[] = [];
       for (const day of days) {
         const nid = await scheduleWeeklyNotification(

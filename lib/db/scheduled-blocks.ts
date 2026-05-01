@@ -1,5 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { getDb } from './index';
+import { ScheduledBlockInputSchema } from './schemas';
 import type { ScheduledBlock } from './types';
 
 interface BlockRow {
@@ -13,14 +14,24 @@ interface BlockRow {
 }
 
 function rowToBlock(row: BlockRow): ScheduledBlock {
-  return {
-    id: row.id,
+  // Run the row through the same schema we use on writes. Catches any
+  // legacy row that pre-dates the validation layer (e.g. weekdays
+  // stored as `[]` from before the normalize-on-write change).
+  const parsed = ScheduledBlockInputSchema.parse({
     hour: row.hour,
     minute: row.minute,
     durationMinutes: row.duration_minutes,
     weekdays: JSON.parse(row.weekdays),
-    enabled: row.enabled === 1,
     unlockGoalMinutes: row.unlock_goal_minutes,
+  });
+  return {
+    id: row.id,
+    hour: parsed.hour,
+    minute: parsed.minute,
+    durationMinutes: parsed.durationMinutes,
+    weekdays: parsed.weekdays,
+    enabled: row.enabled === 1,
+    unlockGoalMinutes: parsed.unlockGoalMinutes,
   };
 }
 
@@ -51,19 +62,29 @@ export function insertScheduledBlock(
   weekdays: number[],
   unlockGoalMinutes: number,
 ): ScheduledBlock {
+  const valid = ScheduledBlockInputSchema.parse({
+    hour, minute, durationMinutes, weekdays, unlockGoalMinutes,
+  });
   const db = getDb();
   const id = randomUUID();
-  const goal = unlockGoalMinutes ?? 5;
   db.runSync(
     'INSERT INTO scheduled_blocks (id, hour, minute, duration_minutes, weekdays, enabled, unlock_goal_minutes) VALUES (?, ?, ?, ?, ?, 1, ?)',
     id,
-    hour,
-    minute,
-    durationMinutes,
-    JSON.stringify(weekdays),
-    goal,
+    valid.hour,
+    valid.minute,
+    valid.durationMinutes,
+    JSON.stringify(valid.weekdays),
+    valid.unlockGoalMinutes,
   );
-  return { id, hour, minute, durationMinutes, weekdays, enabled: true, unlockGoalMinutes: goal };
+  return {
+    id,
+    hour: valid.hour,
+    minute: valid.minute,
+    durationMinutes: valid.durationMinutes,
+    weekdays: valid.weekdays,
+    enabled: true,
+    unlockGoalMinutes: valid.unlockGoalMinutes,
+  };
 }
 
 export function updateScheduledBlock(
@@ -74,15 +95,17 @@ export function updateScheduledBlock(
   weekdays: number[],
   unlockGoalMinutes: number,
 ): void {
+  const valid = ScheduledBlockInputSchema.parse({
+    hour, minute, durationMinutes, weekdays, unlockGoalMinutes,
+  });
   const db = getDb();
-  const goal = unlockGoalMinutes ?? 5;
   db.runSync(
     `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, unlock_goal_minutes = ?, updated_at = datetime('now') WHERE id = ?`,
-    hour,
-    minute,
-    durationMinutes,
-    JSON.stringify(weekdays),
-    goal,
+    valid.hour,
+    valid.minute,
+    valid.durationMinutes,
+    JSON.stringify(valid.weekdays),
+    valid.unlockGoalMinutes,
     id,
   );
 }

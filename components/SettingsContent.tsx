@@ -267,7 +267,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               </Text>
               <View style={styles.cardDays}>
                 {WEEKDAY_VALUES.map((day, i) => {
-                  const dayActive = !b.weekdays?.length || b.weekdays.includes(day);
+                  const dayActive = b.weekdays.includes(day);
                   return (
                     <View key={day} style={styles.cardDayCol}>
                       <View style={[styles.cardDot, {

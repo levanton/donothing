@@ -73,7 +73,13 @@ export default function BlockPickerContent({
     : defaultStart;
 
   const [startMinutes, setStartMinutes] = useState(initStart);
-  const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
+  // Empty `initialDays` is treated as "every day" everywhere else (card
+  // display, native scheduling). Mirror that here so the chip row reflects
+  // the same intent, otherwise the user opens the sheet and sees nothing
+  // selected on a block that was visibly running every day.
+  const [selectedDays, setSelectedDays] = useState<number[]>(
+    initialDays && initialDays.length > 0 ? initialDays : ALL_DAYS,
+  );
   const [unlockGoal, setUnlockGoal] = useState<number>(initialUnlockGoal ?? DEFAULT_UNLOCK);
 
   const isLight = theme.bg !== palette.charcoal;
@@ -102,7 +108,11 @@ export default function BlockPickerContent({
     const minute = startMinutes % 60;
     // Trigger fires at start; block persists until user unlocks. A short interval
     // avoids the wrap where iOS sees "now" as inside the window and fires immediately.
-    onConfirm(hour, minute, 15, selectedDays, unlockGoal);
+    // Defensive: if every chip somehow ended up off, fall back to all days
+    // so the block actually runs. The toggle logic prevents this in normal
+    // use, but a stale prop or programmatic change could leave it empty.
+    const days = selectedDays.length > 0 ? selectedDays : ALL_DAYS;
+    onConfirm(hour, minute, 15, days, unlockGoal);
   };
 
   return (
@@ -196,7 +206,7 @@ export default function BlockPickerContent({
                     styles.dayCircle,
                     active
                       ? { backgroundColor: theme.text, borderColor: theme.text }
-                      : { backgroundColor: 'transparent', borderColor: theme.textTertiary },
+                      : { backgroundColor: 'transparent', borderColor: theme.textTertiary, opacity: 0.9 },
                   ]}>
                     <Text style={[
                       styles.dayLabel,
