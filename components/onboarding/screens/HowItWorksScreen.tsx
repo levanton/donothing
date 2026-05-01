@@ -40,7 +40,7 @@ export default function HowItWorksScreen({ isActive, theme }: Props) {
         </Text>
 
         <View style={styles.cards}>
-          <View style={[styles.card, { backgroundColor: '#E8B59A' }]}>
+          <View style={[styles.card, { backgroundColor: '#DDB97A' }]}>
             <Feather name="lock" size={36} color={palette.brown} style={styles.cardIcon} />
             <Text style={[styles.cardLabel, { color: palette.brown, fontFamily: Fonts?.serif }]}>
               Your apps block
@@ -117,6 +117,5 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '300',
     lineHeight: 34,
-    opacity: 0.5,
   },
 });
