@@ -27,12 +27,12 @@ const LINES: LineSpec[] = [
   { text: 'Time just… stopped.', bold: true },
 ];
 
-const IMAGE_DELAY = 200;
-const IMAGE_DURATION = 1300;
-const HEADING_DELAY = 800;
-const HEADING_DURATION = 1100;
-const BODY_DELAY = 1700;
-const BODY_DURATION = 1800;
+const IMAGE_DELAY = 150;
+const IMAGE_DURATION = 800;
+const HEADING_DELAY = 500;
+const HEADING_DURATION = 700;
+const BODY_DELAY = 1000;
+const BODY_DURATION = 1100;
 
 const grassImage = require('@/assets/images/grass.png');
 
