@@ -1,20 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withDelay,
-  withRepeat,
-  withSequence,
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
 import { haptics } from '@/lib/haptics';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
+import { useAppStore } from '@/lib/store';
 
 const SESSION_DURATION = 60;
 const YES_BUTTON_SIZE = 140;
@@ -44,10 +42,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const yesOpacity = useSharedValue(1);
   const headerOpacity = useSharedValue(1);
   const hintOpacity = useSharedValue(1);
-  const breathePulse = useSharedValue(1);
-
-  const burstScale = useSharedValue(0);
-  const burstOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (!isActive) return;
@@ -63,30 +57,17 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     headerOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
     hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
 
-    breathePulse.value = withRepeat(
-      withSequence(
-        withTiming(1.03, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-
     setElapsed(0);
     intervalRef.current = setInterval(() => {
       setElapsed(prev => {
         if (prev >= SESSION_DURATION - 1) {
           clearInterval(intervalRef.current);
-          haptics.light();
-          setTimeout(() => haptics.light(), 150);
-          setTimeout(() => haptics.medium(), 300);
-          setTimeout(() => haptics.medium(), 450);
-          setTimeout(() => haptics.heavy(), 650);
-          setTimeout(() => haptics.heavy(), 850);
-          setTimeout(() => haptics.success(), 1100);
-          burstOpacity.value = withTiming(1, { duration: 300 });
-          burstScale.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.ease) });
-          setTimeout(() => onNext(), 1200);
+          // Persist the onboarding minute as a real session so the home
+          // screen stats aren't empty on first launch. recordSession also
+          // refreshes weekStats and checks milestones in one shot.
+          useAppStore.getState().recordSession(SESSION_DURATION);
+          haptics.success();
+          onNext();
           return SESSION_DURATION;
         }
         return prev + 1;
@@ -105,10 +86,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     transform: [{ translateY: entryTranslateY.value }],
   }));
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: breathePulse.value }],
-  }));
-
   const yesStyle = useAnimatedStyle(() => ({
     opacity: yesOpacity.value,
   }));
@@ -119,14 +96,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
 
   const hintStyle = useAnimatedStyle(() => ({
     opacity: hintOpacity.value,
-  }));
-
-  const { width, height } = Dimensions.get('window');
-  const burstSize = Math.hypot(width, height);
-
-  const burstStyle = useAnimatedStyle(() => ({
-    opacity: burstOpacity.value,
-    transform: [{ scale: burstScale.value }],
   }));
 
   const remaining = SESSION_DURATION - elapsed;
@@ -140,13 +109,11 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
           </Text>
         </Animated.View>
 
-        <Animated.View style={pulseStyle}>
-          <AnimatedTimerDisplay
-            seconds={remaining}
-            color={palette.cream}
-            fontSize={96}
-          />
-        </Animated.View>
+        <AnimatedTimerDisplay
+          seconds={remaining}
+          color={palette.cream}
+          fontSize={96}
+        />
 
         <View style={styles.yesWrap}>
           <Animated.View style={yesStyle} pointerEvents={started ? 'none' : 'auto'}>
@@ -174,15 +141,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
       >
         <Text style={[styles.skipLabel, { fontFamily: Fonts?.serif }]}>skip</Text>
       </Pressable>
-
-      <View style={styles.burstWrap}>
-        <Animated.View
-          style={[
-            { width: burstSize, height: burstSize, borderRadius: burstSize / 2, backgroundColor: palette.cream },
-            burstStyle,
-          ]}
-        />
-      </View>
     </View>
   );
 }
@@ -245,11 +203,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.5,
     color: palette.cream,
-  },
-  burstWrap: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    pointerEvents: 'none',
   },
 });

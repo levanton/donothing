@@ -21,7 +21,7 @@ import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceSta
 import {
   clearNotificationIds,
 } from './db/notification-state';
-import type { ScheduledBlock } from './db/types';
+import type { ScheduledBlock, Session } from './db/types';
 import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
@@ -276,6 +276,13 @@ export interface AppState {
   toggleScheduledBlock: (id: string) => Promise<void>;
 
   // Session actions
+  /**
+   * Persist a finished session and refresh derived state in one call.
+   * Use this for "fire-and-forget" inserts (e.g. onboarding minute) that
+   * don't go through the normal stop/complete state machine. Returns the
+   * inserted Session or null if the duration is below MIN_SAVABLE_DURATION.
+   */
+  recordSession: (duration: number) => Session | null;
   deleteSession: (id: string) => Promise<void>;
   deleteSessionsByDate: (dateKey: string) => Promise<void>;
   // Persists the picked mood for a session AND bumps weekStats so
@@ -695,6 +702,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (newIds.length > 0) {
       set({ achievedMilestones: getAchievedMilestones() });
     }
+  },
+
+  recordSession: (duration: number) => {
+    let session: Session | null = null;
+    try {
+      session = dbAddSession(duration);
+    } catch (e) {
+      console.error('[store.recordSession] dbAddSession failed:', e);
+      return null;
+    }
+    if (!session) return null;
+    set({ weekStats: getWeekStats() });
+    get().checkMilestones();
+    return session;
   },
 
   deleteSession: async (id: string) => {
