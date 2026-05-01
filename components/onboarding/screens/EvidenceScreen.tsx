@@ -14,10 +14,22 @@ interface Fact {
   body: string;
   src: string;
   url: string;
+}
+
+// Card colour cycle. Reordering FACTS no longer touches colours — the
+// position in the array picks the theme. Add/remove themes here to
+// re-skin the whole carousel.
+interface CardTheme {
   bg: string;
   textColor: string;
   accentColor: string;
 }
+
+const CARD_THEMES: CardTheme[] = [
+  { bg: palette.terracotta, textColor: palette.cream, accentColor: palette.cream },
+  { bg: palette.salmon,     textColor: palette.brown, accentColor: palette.brown },
+  { bg: palette.charcoal,   textColor: palette.cream, accentColor: palette.cream },
+];
 
 const FACTS: Fact[] = [
   {
@@ -26,9 +38,6 @@ const FACTS: Fact[] = [
     body: 'More than double what doctors recommend. A 14% increase from last year — before counting tablets or TV.',
     src: 'harmonyhit.com · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#C26749',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: 'Rest',
@@ -36,9 +45,6 @@ const FACTS: Fact[] = [
     body: 'J.K. Rowling dreamed up Harry Potter during 4 boring hours on a train. Your brain does its best work when you stop.',
     src: 'UCLan · 2014',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '43 sec',
@@ -46,9 +52,6 @@ const FACTS: Fact[] = [
     body: '12 seconds shorter than two years ago. We switch tasks 566 times per workday. Never finishing a thought.',
     src: 'Gloria Mark · 2023',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
   },
   {
     stat: '82%',
@@ -56,9 +59,6 @@ const FACTS: Fact[] = [
     body: 'Gen Z peaks at 25 — seventeen years earlier than before. Doing nothing isn\'t laziness. It\'s recovery.',
     src: 'Mercer · 2024',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#C26749',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '150×',
@@ -66,9 +66,6 @@ const FACTS: Fact[] = [
     body: 'Every 10 minutes. Silencing it makes it worse — anxiety of missing something makes you check even more.',
     src: 'slicktext.com · 2026',
     url: 'https://www.slicktext.com/blog/smartphone-addiction-statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
   },
   {
     stat: '70',
@@ -76,9 +73,6 @@ const FACTS: Fact[] = [
     body: '1 day per week, 6 per month, 70 per year. Over two months of your life, every year, scrolling.',
     src: 'addictionhelp.com · 2025',
     url: 'https://www.addictionhelp.com/phone-addiction/statistics/',
-    bg: '#C26749',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '23 min',
@@ -86,9 +80,6 @@ const FACTS: Fact[] = [
     body: 'Even a 3-second notification resets your focus clock. Every buzz, every banner — deep work never begins.',
     src: 'UC Irvine · 2023',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '−IQ',
@@ -96,9 +87,6 @@ const FACTS: Fact[] = [
     body: 'Even face down, silent — your brain wastes energy resisting the urge to check it.',
     src: 'UT Austin · 2017',
     url: 'https://www.sci-tech-today.com/stats/cell-phone-smartphone-addiction-statistics/',
-    bg: '#E8A99A',
-    textColor: '#333431',
-    accentColor: '#333431',
   },
   {
     stat: '55%',
@@ -106,9 +94,6 @@ const FACTS: Fact[] = [
     body: '70% say phones interfere with relationships daily. We\'re physically present but mentally scrolling.',
     src: 'harmonyhit.com · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#C26749',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '76%',
@@ -116,9 +101,6 @@ const FACTS: Fact[] = [
     body: 'It\'s called nomophobia. 88% check within 10 min of waking. 4 in 5 addicts wish they weren\'t.',
     src: 'Reviews.org · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
   {
     stat: '53%',
@@ -126,9 +108,6 @@ const FACTS: Fact[] = [
     body: '33% more than two years ago. The desire is real. You\'re here. The first step is small.',
     src: 'harmonyhit.com · 2025',
     url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-    bg: '#333431',
-    textColor: '#F9F2E0',
-    accentColor: '#F9F2E0',
   },
 ];
 
@@ -180,29 +159,32 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
             decelerationRate="fast"
             snapToInterval={cardWidth + 12}
           >
-            {FACTS.map((f, i) => (
-              <Pressable
-                key={i}
-                onPress={() => Linking.openURL(f.url)}
-                style={[
-                  styles.card,
-                  {
-                    width: cardWidth,
-                    height: cardHeight,
-                    backgroundColor: f.bg,
-                  },
-                ]}
-              >
-                <Text style={[styles.stat, { color: f.textColor }]}>{f.stat}</Text>
-                <Text style={[styles.line, { color: f.textColor }]}>{f.line}</Text>
-                <View style={styles.cardBottom}>
-                  <Text style={[styles.body, { color: f.accentColor }]}>{f.body}</Text>
-                  <View style={[styles.srcChip, { borderColor: f.accentColor }]}>
-                    <Text style={[styles.src, { color: f.accentColor }]}>{f.src}</Text>
+            {FACTS.map((f, i) => {
+              const cardTheme = CARD_THEMES[i % CARD_THEMES.length];
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => Linking.openURL(f.url)}
+                  style={[
+                    styles.card,
+                    {
+                      width: cardWidth,
+                      height: cardHeight,
+                      backgroundColor: cardTheme.bg,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.stat, { color: cardTheme.textColor }]}>{f.stat}</Text>
+                  <Text style={[styles.line, { color: cardTheme.textColor }]}>{f.line}</Text>
+                  <View style={styles.cardBottom}>
+                    <Text style={[styles.body, { color: cardTheme.accentColor }]}>{f.body}</Text>
+                    <View style={[styles.srcChip, { borderColor: cardTheme.accentColor }]}>
+                      <Text style={[styles.src, { color: cardTheme.accentColor }]}>{f.src}</Text>
+                    </View>
                   </View>
-                </View>
-              </Pressable>
-            ))}
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </Animated.View>
       </View>
