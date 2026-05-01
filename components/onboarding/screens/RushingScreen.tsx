@@ -7,44 +7,35 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { EASE_OUT } from '@/constants/animations';
+import { EASE_OUT, EASE_IN_OUT } from '@/constants/animations';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
 
 const HEADING = 'Now.';
-const LINES = [
-  { text: 'Work. Home. Errands. Repeat.', bold: false },
-  { text: '\nIn between — we scroll.', bold: false },
-  { text: '\nNot to feel something — but to feel nothing.', bold: false },
-  { text: '\nAnd it never helps.', bold: false },
-  { text: '\nWe’re exhausted.', bold: true },
-  { text: '\nDays, months, years — gone in a blur.', bold: true },
-];
-const WORD_DELAY = 130;
-const WORD_DURATION = 750;
-const HEADING_DELAY = 200;
-const HEADING_DURATION = 850;
-const BODY_START = HEADING_DELAY + HEADING_DURATION;
 
-
-function Word({ text, delay, bold }: { text: string; delay: number; bold?: boolean }) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(12);
-
-  useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: WORD_DURATION, easing: EASE_OUT }));
-    translateY.value = withDelay(delay, withTiming(0, { duration: WORD_DURATION, easing: EASE_OUT }));
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return <Animated.Text style={[animStyle, bold && { fontWeight: '600' }]}>{text} </Animated.Text>;
+interface LineSpec {
+  text: string;
+  bold?: boolean;
+  paragraph?: boolean;
 }
+
+const LINES: LineSpec[] = [
+  { text: 'Work. Home. Errands. Repeat.' },
+  { text: 'In between — we scroll.' },
+  { text: 'Not to feel something — but to feel nothing.' },
+  { text: 'And it never helps.' },
+  { text: 'We’re exhausted.', bold: true },
+  { text: 'Days, months, years — gone in a blur.', bold: true },
+];
+
+const IMAGE_DELAY = 200;
+const IMAGE_DURATION = 1300;
+const HEADING_DELAY = 800;
+const HEADING_DURATION = 1100;
+const BODY_DELAY = 1700;
+const BODY_DURATION = 1800;
 
 interface Props {
   isActive: boolean;
@@ -56,43 +47,35 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
   const insets = useSafeAreaInsets();
 
   const headingOpacity = useSharedValue(0);
-  const headingTranslateY = useSharedValue(12);
+  const bodyOpacity = useSharedValue(0);
   const imageOpacity = useSharedValue(0);
-  const imageScale = useSharedValue(0.92);
   const buttonOpacity = useSharedValue(0);
-  const buttonTranslateY = useSharedValue(12);
-
-  const allWords = LINES.flatMap(l => l.text.split(' ').map(w => ({ word: w, bold: l.bold })));
-  const totalWordsDuration = allWords.length * WORD_DELAY + WORD_DURATION;
 
   useEffect(() => {
     if (!isActive) return;
-    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_OUT }));
-    headingTranslateY.value = withDelay(HEADING_DELAY, withTiming(0, { duration: HEADING_DURATION, easing: EASE_OUT }));
+    imageOpacity.value = withDelay(IMAGE_DELAY, withTiming(1, { duration: IMAGE_DURATION, easing: EASE_IN_OUT }));
 
-    imageOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 1100, easing: EASE_OUT }));
-    imageScale.value = withDelay(HEADING_DELAY, withTiming(1, { duration: 1100, easing: EASE_OUT }));
+    headingOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: HEADING_DURATION, easing: EASE_IN_OUT }));
 
-    const t = setTimeout(() => {
-      buttonOpacity.value = withTiming(1, { duration: 500, easing: EASE_OUT });
-      buttonTranslateY.value = withTiming(0, { duration: 500, easing: EASE_OUT });
-    }, BODY_START + totalWordsDuration + 200);
-    return () => clearTimeout(t);
+    bodyOpacity.value = withDelay(BODY_DELAY, withTiming(1, { duration: BODY_DURATION, easing: EASE_IN_OUT }));
+
+    buttonOpacity.value = withDelay(HEADING_DELAY, withTiming(1, { duration: IMAGE_DURATION, easing: EASE_OUT }));
   }, [isActive]);
 
   const headingStyle = useAnimatedStyle(() => ({
     opacity: headingOpacity.value,
-    transform: [{ translateY: headingTranslateY.value }],
+  }));
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: bodyOpacity.value,
   }));
 
   const imageStyle = useAnimatedStyle(() => ({
     opacity: imageOpacity.value,
-    transform: [{ scale: imageScale.value }],
   }));
 
   const buttonAnimStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
-    transform: [{ translateY: buttonTranslateY.value }],
   }));
 
   return (
@@ -107,11 +90,22 @@ export default function RushingScreen({ isActive, onNext, theme }: Props) {
             <Animated.Text style={[styles.heading, { color: theme.text }, headingStyle]}>
               {HEADING}
             </Animated.Text>
-            <Text style={[styles.body, { color: theme.text }]}>
-              {allWords.map((w, i) => (
-                <Word key={i} text={w.word} delay={BODY_START + i * WORD_DELAY} bold={w.bold} />
+
+            <Animated.View style={[styles.body, bodyStyle]}>
+              {LINES.map((spec, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.line,
+                    { color: theme.text },
+                    spec.bold && { fontWeight: '600' },
+                    spec.paragraph && { marginTop: 18 },
+                  ]}
+                >
+                  {spec.text}
+                </Text>
               ))}
-            </Text>
+            </Animated.View>
           </View>
         </View>
 
@@ -143,20 +137,21 @@ const styles = StyleSheet.create({
     marginBottom: 56,
   },
   image: {
-    width: 220,
-    height: 220,
+    width: 270,
+    height: 270,
     resizeMode: 'contain',
   },
   textArea: {},
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '500',
     textAlign: 'left',
-    lineHeight: 30,
-    marginBottom: 12,
+    lineHeight: 36,
+    marginBottom: 14,
   },
-  body: {
+  body: {},
+  line: {
     fontFamily: Fonts?.serif,
     fontSize: 18,
     fontWeight: '400',
