@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useCopilot } from 'react-native-copilot';
 
 import { haptics } from '@/lib/haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -44,6 +45,7 @@ import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
 import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
+import { TutorialController, TutorialStepWrapper } from '@/components/tutorial';
 import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat, timerDisplay } from '@/lib/format';
@@ -880,6 +882,33 @@ export default function DoNothingScreen() {
     historySlide.value = withTiming(0, { duration: 400 });
   }, []);
 
+  // Tutorial drivers — silent (no haptics) so the auto-advance during
+  // the tour doesn't feel like the user pressed something.
+  const tutorialShowHome = useCallback(() => {
+    settingsSlide.value = withTiming(0, { duration: 300 });
+    historySlide.value = withTiming(0, { duration: 300 });
+    useAppStore.getState().closeSettings();
+  }, []);
+  const tutorialShowSettings = useCallback(() => {
+    settingsSlide.value = withTiming(1, { duration: 400 });
+    useAppStore.getState().openSettings();
+  }, []);
+  const tutorialShowHistory = useCallback(() => {
+    historySlide.value = withTiming(1, { duration: 500 });
+  }, []);
+
+  // Dev-only: replay the spotlight tour from step 1 even if it was
+  // already marked complete. Calls copilot.start() directly — the
+  // controller handles panel transitions on stepChange.
+  const { start: startTutorial } = useCopilot();
+  const handleReplayTutorial = useCallback(() => {
+    haptics.light();
+    settingsSlide.value = withTiming(0, { duration: 0 });
+    historySlide.value = withTiming(0, { duration: 0 });
+    useAppStore.getState().closeSettings();
+    void startTutorial();
+  }, [startTutorial]);
+
   if (!ready) {
     // Match the launch splash colour so there is no dark flash between the
     // native splash hiding and the JS splash overlay mounting.
@@ -894,6 +923,11 @@ export default function DoNothingScreen() {
   // =========================================================================
   return (
     <View style={[styles.screenStack, { backgroundColor: theme.bg }]}>
+      <TutorialController
+        showHome={tutorialShowHome}
+        showSettings={tutorialShowSettings}
+        showHistory={tutorialShowHistory}
+      />
       <GestureDetector gesture={mainPanGesture}>
         <Animated.View
           style={[styles.container, animatedContainerStyle, mainSlideStyle]}
@@ -901,9 +935,8 @@ export default function DoNothingScreen() {
           <StatusBar style={getStatusBarStyle(themeMode)} />
 
           {/* Settings button — top left */}
-          <Pressable
-            onPress={handleSettingsPress}
-            disabled={started}
+          <TutorialStepWrapper
+            name="home.settings"
             style={[
               styles.lockButton,
               {
@@ -911,15 +944,20 @@ export default function DoNothingScreen() {
                 opacity: started ? 0 : 1,
               },
             ]}
-            hitSlop={16}
           >
-            <Feather
-              name='sliders'
-              size={24}
-              color={theme.text}
-              style={{ opacity: 0.9 }}
-            />
-          </Pressable>
+            <Pressable
+              onPress={handleSettingsPress}
+              disabled={started}
+              hitSlop={16}
+            >
+              <Feather
+                name='sliders'
+                size={24}
+                color={theme.text}
+                style={{ opacity: 0.9 }}
+              />
+            </Pressable>
+          </TutorialStepWrapper>
 
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
           {__DEV__ && (
@@ -1013,6 +1051,20 @@ export default function DoNothingScreen() {
                   style={{ opacity: 0.9 }}
                 />
               </Pressable>
+
+              <Pressable
+                onPress={handleReplayTutorial}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='help-circle'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
             </View>
           )}
 
@@ -1091,83 +1143,86 @@ export default function DoNothingScreen() {
             />
           </Pressable>
 
-          {/* Timer */}
-          <View
-            style={{ opacity: distractionFree ? 0 : 1 }}
-            pointerEvents={distractionFree ? 'none' : 'auto'}
-          >
-            <Animated.View style={[timerEntryStyle, styles.centerContent]}>
-              {!started ? (
-                <RestingTimerText color={theme.text} />
-              ) : (
-                <TimerDisplay
-                  seconds={
-                    goalSeconds > 0
-                      ? Math.max(0, goalSeconds - elapsed)
-                      : elapsed
-                  }
-                  color={theme.text}
-                  fontSize={64}
-                  style={{ letterSpacing: 4 }}
-                />
-              )}
-            </Animated.View>
-          </View>
-
-          {/* Yes button — static terracotta pill at rest. The old
-              orbit-ring + shrink-to-dot animation was removed; the
-              terracotta camera now carries the running state, and
-              the yes button just sits behind it. */}
-          <View
-            style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
-            pointerEvents={distractionFree ? 'none' : 'auto'}
-          >
-            <View style={styles.orbitArea}>
-              <Pressable
-                ref={yesButtonRef}
-                onLayout={measureYesButton}
-                onPress={handleStart}
-                disabled={started}
-                style={styles.orbitCenter}
-              >
-                <View
-                  style={[
-                    styles.yesButton,
-                    { backgroundColor: theme.accent },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.nothingLabel,
-                      { color: theme.accentText, fontFamily: Fonts!.serif },
-                    ]}
-                  >
-                    yes
-                  </Text>
-                </View>
-              </Pressable>
+          {/* Timer + yes button + goal slider — grouped under one
+              spotlight so the tutorial reads as "this is the do-nothing
+              control" instead of three separate rings stacked vertically. */}
+          <TutorialStepWrapper name="home.timer" style={styles.heroGroup}>
+            {/* Timer */}
+            <View
+              style={{ opacity: distractionFree ? 0 : 1 }}
+              pointerEvents={distractionFree ? 'none' : 'auto'}
+            >
+              <Animated.View style={[timerEntryStyle, styles.centerContent]}>
+                {!started ? (
+                  <RestingTimerText color={theme.text} />
+                ) : (
+                  <TimerDisplay
+                    seconds={
+                      goalSeconds > 0
+                        ? Math.max(0, goalSeconds - elapsed)
+                        : elapsed
+                    }
+                    color={theme.text}
+                    fontSize={64}
+                    style={{ letterSpacing: 4 }}
+                  />
+                )}
+              </Animated.View>
             </View>
-          </View>
 
-          {/* Goal slider */}
-          <View
-            style={[
-              styles.messageSliderArea,
-              { opacity: started ? 0 : 1 },
-            ]}
-            pointerEvents={started ? 'none' : 'auto'}
-          >
-            {!started && (
-              <View style={styles.goalSliderWrap}>
-                <RestingSliderWrap
-                  theme={theme}
-                  width={SLIDER_W}
-                  onChange={handleSliderChange}
-                  onRelease={handleSliderRelease}
-                />
+            {/* Yes button — static terracotta pill at rest. */}
+            <View
+              style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
+              pointerEvents={distractionFree ? 'none' : 'auto'}
+            >
+              <View style={styles.orbitArea}>
+                <View style={styles.orbitCenter}>
+                  <Pressable
+                    ref={yesButtonRef}
+                    onLayout={measureYesButton}
+                    onPress={handleStart}
+                    disabled={started}
+                  >
+                    <View
+                      style={[
+                        styles.yesButton,
+                        { backgroundColor: theme.accent },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.nothingLabel,
+                          { color: theme.accentText, fontFamily: Fonts!.serif },
+                        ]}
+                      >
+                        yes
+                      </Text>
+                    </View>
+                  </Pressable>
+                </View>
               </View>
-            )}
-          </View>
+            </View>
+
+            {/* Goal slider */}
+            <View
+              style={[
+                styles.messageSliderArea,
+                { opacity: started ? 0 : 1 },
+              ]}
+              pointerEvents={started ? 'none' : 'auto'}
+            >
+              {!started && (
+                <View style={styles.goalSliderWrap}>
+                  <RestingSliderWrap
+                    theme={theme}
+                    width={SLIDER_W}
+                    onChange={handleSliderChange}
+                    onRelease={handleSliderRelease}
+                  />
+                </View>
+              )}
+            </View>
+          </TutorialStepWrapper>
 
           {/* Stats — with goal slider overlaid */}
           <Pressable
@@ -1234,12 +1289,12 @@ export default function DoNothingScreen() {
 
           {/* Week dots */}
           {weekStats.length > 0 && (
-            <View
+            <TutorialStepWrapper
+              name="home.week"
               style={[
                 styles.weekSection,
                 { opacity: started ? 0 : 1 },
               ]}
-              pointerEvents={started ? 'none' : 'auto'}
             >
               <View style={styles.weekGrid}>
                 {weekStats.map((day) => {
@@ -1276,7 +1331,7 @@ export default function DoNothingScreen() {
                   );
                 })}
               </View>
-            </View>
+            </TutorialStepWrapper>
           )}
 
           {/* Bottom buttons */}
@@ -1712,6 +1767,11 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontWeight: '200',
     letterSpacing: 4,
+  },
+  // Combined wrapper for timer + yes-button + slider so the tutorial
+  // can spotlight all three as one logical control.
+  heroGroup: {
+    alignItems: 'center',
   },
   orbitCenter: {
     position: 'absolute',

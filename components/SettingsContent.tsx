@@ -20,6 +20,7 @@ import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePi
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
+import { TutorialStepWrapper } from '@/components/tutorial';
 
 interface PendingBlockParams {
   hour: number;
@@ -307,17 +308,21 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           </Pressable>
         );
       })}
-      <PillButton
-        label="+ add block"
-        color={theme.text}
-        variant="outline"
-        size="small"
-        onPress={() => {
-          haptics.light();
-          setEditingBlock(null);
-          blockSheetRef.current?.expand();
-        }}
-      />
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+        <TutorialStepWrapper name="settings.block">
+          <PillButton
+            label="+ add block"
+            color={theme.text}
+            variant="outline"
+            size="small"
+            onPress={() => {
+              haptics.light();
+              setEditingBlock(null);
+              blockSheetRef.current?.expand();
+            }}
+          />
+        </TutorialStepWrapper>
+      </View>
 
       {/* Always allowed */}
       {Platform.OS === 'ios' && (
@@ -347,47 +352,49 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               </Pressable>
             )}
           </View>
-          {neverBlockCount > 0 ? (
-            <View
-              style={{
-                height: 240,
-                borderWidth: 1,
-                borderColor: theme.border,
-                borderRadius: 16,
-                overflow: 'hidden',
-              }}
-            >
-              <AppLabelsView
-                activitySelectionId={NEVER_BLOCK_SELECTION_ID}
-                iconSize={44}
-                layout="list"
-                tintColor={theme.text}
-                ringColor={theme.bg}
-                style={{ flex: 1 }}
-              />
-            </View>
-          ) : (
-            <Pressable
-              onPress={async () => {
-                haptics.light();
-                const status = await requestAuth();
-                if (status === 'approved') setShowNeverBlockPicker(true);
-              }}
-              style={[styles.allowEmpty, { borderColor: theme.textTertiary }]}
-            >
-              <View style={[styles.allowEmptyIcon, { backgroundColor: theme.border }]}>
-                <Feather name="plus" size={20} color={theme.textSecondary} />
+          <TutorialStepWrapper name="settings.allowed">
+            {neverBlockCount > 0 ? (
+              <View
+                style={{
+                  height: 240,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                }}
+              >
+                <AppLabelsView
+                  activitySelectionId={NEVER_BLOCK_SELECTION_ID}
+                  iconSize={44}
+                  layout="list"
+                  tintColor={theme.text}
+                  ringColor={theme.bg}
+                  style={{ flex: 1 }}
+                />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.allowEmptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                  Allow some apps
-                </Text>
-                <Text style={[styles.allowEmptySub, { color: theme.textTertiary }]}>
-                  Pick apps that stay usable while blocking
-                </Text>
-              </View>
-            </Pressable>
-          )}
+            ) : (
+              <Pressable
+                onPress={async () => {
+                  haptics.light();
+                  const status = await requestAuth();
+                  if (status === 'approved') setShowNeverBlockPicker(true);
+                }}
+                style={[styles.allowEmpty, { borderColor: theme.textTertiary }]}
+              >
+                <View style={[styles.allowEmptyIcon, { backgroundColor: theme.border }]}>
+                  <Feather name="plus" size={20} color={theme.textSecondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.allowEmptyTitle, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                    Allow some apps
+                  </Text>
+                  <Text style={[styles.allowEmptySub, { color: theme.textTertiary }]}>
+                    Pick apps that stay usable while blocking
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+          </TutorialStepWrapper>
         </>
       )}
       </View>

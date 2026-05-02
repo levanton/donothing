@@ -64,3 +64,11 @@ export const SessionInputSchema = z.object({
 });
 
 export type SessionInput = z.infer<typeof SessionInputSchema>;
+
+// ── Boolean flags persisted to settings table ──────────────────────
+// Stored as the literal string '1' (presence = true, absence = false).
+// Re-used by onboardingComplete and tutorialCompleted; parse before
+// every write so we never persist anything ambiguous.
+
+export const BooleanFlagSchema = z.literal('1');
+export type BooleanFlag = z.infer<typeof BooleanFlagSchema>;

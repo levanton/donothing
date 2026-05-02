@@ -18,6 +18,7 @@ import {
   toggleScheduledBlock as dbToggleScheduledBlock,
 } from './db/scheduled-blocks';
 import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
+import { BooleanFlagSchema } from './db/schemas';
 import {
   clearNotificationIds,
 } from './db/notification-state';
@@ -230,6 +231,14 @@ export interface AppState {
   onboardingComplete: boolean;
   setOnboardingComplete: () => void;
 
+  // First-launch tutorial (spotlight tour over home + settings + journey)
+  tutorialCompleted: boolean;
+  setTutorialCompleted: () => void;
+  // Set true by onboarding finish; consumed by home screen to call
+  // copilot's `start()` once on the next mount, then cleared.
+  tutorialPending: boolean;
+  setTutorialPending: (next: boolean) => void;
+
   // Completion actions
   completeSession: () => Promise<void>;
   dismissCompletion: () => void;
@@ -335,9 +344,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Onboarding
   onboardingComplete: false,
   setOnboardingComplete: () => {
-    setSetting('onboardingComplete', '1');
+    setSetting('onboardingComplete', BooleanFlagSchema.parse('1'));
     set({ onboardingComplete: true });
   },
+
+  // Tutorial
+  tutorialCompleted: false,
+  tutorialPending: false,
+  setTutorialCompleted: () => {
+    setSetting('tutorialCompleted', BooleanFlagSchema.parse('1'));
+    set({ tutorialCompleted: true, tutorialPending: false });
+  },
+  setTutorialPending: (next) => set({ tutorialPending: next }),
 
   // --- Init ---
   init: async () => {
@@ -366,6 +384,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load from SQLite (synchronous reads)
     const themeMode = (getDeviceState('theme') as ThemeMode) ?? 'dark';
     const onboardingComplete = getSetting('onboardingComplete') === '1';
+    const tutorialCompleted = getSetting('tutorialCompleted') === '1';
     const scheduledBlocks = getAllScheduledBlocks();
 
     // Capture native shield state BEFORE we touch any monitors. The
@@ -446,6 +465,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       themeMode,
       onboardingComplete,
+      tutorialCompleted,
       scheduledBlocks,
       achievedMilestones,
       weekStats: getWeekStats(),
