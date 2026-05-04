@@ -50,11 +50,13 @@ import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat, timerDisplay } from '@/lib/format';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
+import { getDb } from '@/lib/db';
+import { randomUUID } from 'expo-crypto';
 import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
-import { getStats } from '@/lib/stats';
+import { getStats, getWeekStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
@@ -909,6 +911,63 @@ export default function DoNothingScreen() {
     void startTutorial();
   }, [startTutorial]);
 
+  // Dev-only: seed ~18 fake sessions across ~8 distinct days in the
+  // past month so the history calendar looks lived-in for App Store
+  // screenshots. Durations 1–50 min with one 30+ min "longest", and
+  // a session today + a couple this week so today/week are non-zero.
+  const handleSeedFakeData = useCallback(() => {
+    haptics.light();
+    const db = getDb();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Pick 8 distinct day offsets in [0, 29]. Always include 0 (today)
+    // and 1, 2 (recent week) so both stats are populated.
+    const dayOffsets = new Set<number>([0, 1, 2]);
+    while (dayOffsets.size < 8) {
+      dayOffsets.add(3 + Math.floor(Math.random() * 27));
+    }
+
+    // Per-day session count distribution — total ≈ 18.
+    const offsets = [...dayOffsets];
+    const sessionsPerDay = offsets.map((_, i) =>
+      i === 0 ? 2 : i < 3 ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3),
+    );
+
+    db.withTransactionSync(() => {
+      let placedLongest = false;
+      offsets.forEach((daysAgo, idx) => {
+        const dayStart = today.getTime() - daysAgo * 86_400_000;
+        const count = sessionsPerDay[idx];
+        for (let s = 0; s < count; s++) {
+          // Spread sessions across the day (8:00–22:00) so the
+          // timestamps look realistic instead of stacked at midnight.
+          const hour = 8 + Math.floor(Math.random() * 14);
+          const minute = Math.floor(Math.random() * 60);
+          const ts = dayStart + hour * 3_600_000 + minute * 60_000;
+
+          let durationMin: number;
+          if (!placedLongest && idx >= 2) {
+            durationMin = 30 + Math.floor(Math.random() * 21); // 30–50
+            placedLongest = true;
+          } else {
+            // Bias toward 3–20 min, occasional 25+
+            durationMin = Math.random() < 0.85
+              ? 1 + Math.floor(Math.random() * 22)
+              : 22 + Math.floor(Math.random() * 12);
+          }
+          db.runSync(
+            'INSERT INTO sessions (id, timestamp, duration) VALUES (?, ?, ?)',
+            randomUUID(), ts, durationMin * 60,
+          );
+        }
+      });
+    });
+
+    useAppStore.setState({ weekStats: getWeekStats() });
+    useAppStore.getState().checkMilestones();
+  }, []);
+
   if (!ready) {
     // Match the launch splash colour so there is no dark flash between the
     // native splash hiding and the JS splash overlay mounting.
@@ -1060,6 +1119,20 @@ export default function DoNothingScreen() {
               >
                 <Feather
                   name='help-circle'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={handleSeedFakeData}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='database'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}

@@ -107,30 +107,12 @@ export default function FarewellPhase({
         style={[styles.continue, { bottom: bottomInset + 40 }, continueStyle]}
       >
         {onUnlock ? (
-          <View style={styles.buttonRow}>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                { opacity: pressed ? 0.85 : 1 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.secondaryLabel,
-                  { color: palette.cream, fontFamily: Fonts.serif },
-                ]}
-              >
-                just done
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={onUnlock}
-              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            >
-              <DonePill icon="unlock" label="unlock my apps" />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={onUnlock}
+            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+          >
+            <DonePill icon="unlock" label="unlock my apps" />
+          </Pressable>
         ) : (
           <Pressable
             onPress={onClose}
@@ -201,19 +183,5 @@ const styles = StyleSheet.create({
   continue: {
     position: 'absolute',
     alignSelf: 'center',
-  },
-  buttonRow: {
-    alignItems: 'center',
-    gap: 14,
-  },
-  secondaryBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  secondaryLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    letterSpacing: 0.4,
-    opacity: 0.85,
   },
 });
