@@ -73,9 +73,9 @@ export async function scheduleSessionCompleteNotification(
 ): Promise<string> {
   return Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Do Nothing',
+      title: 'Nothing',
       body: `You were in silence for ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.`,
-      sound: 'default',
+      sound: 'timer_end.caf',
       data: { type: 'sessionComplete' },
     },
     trigger: {
@@ -92,9 +92,10 @@ export async function scheduleWeeklyNotification(
   title: string,
   body: string,
   data?: Record<string, unknown>,
+  sound: string = 'default',
 ): Promise<string> {
   return Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: 'default', data },
+    content: { title, body, sound, data },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
       hour,
@@ -117,9 +118,10 @@ export async function syncScheduledBlockNotifications(blocks: ScheduledBlock[]):
       for (const day of days) {
         const nid = await scheduleWeeklyNotification(
           b.hour, b.minute, day,
-          'Do Nothing',
+          'Nothing',
           `Screen block for ${b.durationMinutes} min starts now.`,
           { type: 'scheduledBlock', id: b.id, durationMinutes: b.durationMinutes },
+          'block_start.caf',
         );
         notificationIds.push(nid);
       }

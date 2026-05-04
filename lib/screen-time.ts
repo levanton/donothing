@@ -102,12 +102,12 @@ export async function copyShieldIcon(): Promise<void> {
 
 // Colors in 0-255 range (native getColor divides by 255)
 const SHIELD_CONFIG = {
-  title: 'Do Nothing',
+  title: 'Nothing',
   titleColor: { red: 43, green: 37, blue: 34, alpha: 1.0 },
   subtitle: 'time to do nothing.',
   subtitleColor: { red: 43, green: 37, blue: 34, alpha: 0.55 },
   backgroundColor: { red: 249, green: 243, blue: 224, alpha: 1.0 },
-  primaryButtonLabel: 'Open Do Nothing',
+  primaryButtonLabel: 'Open Nothing',
   primaryButtonLabelColor: { red: 255, green: 255, blue: 255, alpha: 1.0 },
   primaryButtonBackgroundColor: { red: 199, green: 91, blue: 58, alpha: 1.0 },
   secondaryButtonLabel: 'Close',
@@ -123,10 +123,12 @@ const SHIELD_ACTIONS: ShieldActions = {
       {
         type: 'sendNotification',
         payload: {
-          title: 'Do Nothing',
-          body: 'Tap to open Do Nothing',
-          sound: 'default',
-          // The package's .d.ts is missing 'timeSensitive', but it's a
+          title: 'Nothing',
+          body: 'Tap to open Nothing',
+          // The package's .d.ts narrows `sound` to system constants, but
+          // iOS accepts any bundled .caf filename via UNNotificationSound.
+          sound: 'block_start.caf' as 'default',
+          // Same .d.ts gap on `interruptionLevel`: 'timeSensitive' is a
           // real iOS UNNotificationInterruptionLevel value and breaks
           // through Focus mode — what we want for scheduled-block alerts.
           interruptionLevel: 'timeSensitive' as 'active',
@@ -186,7 +188,7 @@ export async function scheduleBlock(
     {
       type: 'sendNotification',
       payload: {
-        title: 'Do Nothing',
+        title: 'Nothing',
         body: 'Time to do nothing.',
       },
     },

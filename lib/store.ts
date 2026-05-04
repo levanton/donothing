@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { haptics } from '@/lib/haptics';
+import { sound } from '@/lib/sound';
 import { initDatabase, wipeUserData } from './db';
 import {
   addSession as dbAddSession,
@@ -706,6 +707,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('[store.completeSession] dbAddSession failed:', e);
     }
     haptics.success();
+    sound.complete();
     set({
       started: false,
       elapsed: 0,

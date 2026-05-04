@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
 import PlanCard from '@/components/paywall/PlanCard';
+import PurchasingOverlay from '@/components/paywall/PurchasingOverlay';
 import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 import { usePaywall } from '@/hooks/usePaywall';
@@ -70,6 +71,7 @@ export default function PaywallRoute() {
     setSelectedPlan,
     packagesByPlan,
     anchorYearly,
+    purchasing,
     skip,
     purchase,
     restore,
@@ -171,6 +173,8 @@ export default function PaywallRoute() {
           </Pressable>
         </Animated.View>
       </ScrollView>
+
+      <PurchasingOverlay visible={purchasing} />
     </View>
   );
 }

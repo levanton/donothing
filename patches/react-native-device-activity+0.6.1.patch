@@ -1,3 +1,27 @@
+diff --git a/node_modules/react-native-device-activity/ios/Shared.swift b/node_modules/react-native-device-activity/ios/Shared.swift
+index 4839430..e62ef9b 100644
+--- a/node_modules/react-native-device-activity/ios/Shared.swift
++++ b/node_modules/react-native-device-activity/ios/Shared.swift
+@@ -314,14 +314,12 @@ func sendNotification(contents: [String: Any], placeholders: [String: String?])
+   if let sound = contents["sound"] as? String {
+     if sound == "default" {
+       content.sound = .default
+-    }
+-    if sound == "defaultCritical" {
++    } else if sound == "defaultCritical" {
+       content.sound = .defaultCritical
+-    }
+-    if #available(iOS 15.2, *) {
+-      if sound == "defaultRingtone" {
+-        content.sound = .defaultRingtone
+-      }
++    } else if #available(iOS 15.2, *), sound == "defaultRingtone" {
++      content.sound = .defaultRingtone
++    } else {
++      content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: sound))
+     }
+   }
+ 
 diff --git a/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift b/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift
 index f3d73de..090a7d4 100644
 --- a/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift

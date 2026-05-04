@@ -1,4 +1,5 @@
 import { Entypo, Feather } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -10,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useCopilot } from 'react-native-copilot';
 
 import { haptics } from '@/lib/haptics';
+import { sound } from '@/lib/sound';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Animated, {
   Easing,
@@ -735,10 +736,6 @@ export default function DoNothingScreen() {
   // Lives in the store so the standalone paywall route can trigger it
   // when the user dismisses without buying.
   const promoVisible = useAppStore((s) => s.promoOfferVisible);
-  const handleOpenPromo = useCallback(() => {
-    haptics.light();
-    useAppStore.getState().showPromoOffer();
-  }, []);
   const handleClosePromo = useCallback(() => {
     useAppStore.getState().hidePromoOffer();
   }, []);
@@ -919,18 +916,6 @@ export default function DoNothingScreen() {
     historySlide.value = withTiming(1, { duration: 500 });
   }, []);
 
-  // Dev-only: replay the spotlight tour from step 1 even if it was
-  // already marked complete. Calls copilot.start() directly — the
-  // controller handles panel transitions on stepChange.
-  const { start: startTutorial } = useCopilot();
-  const handleReplayTutorial = useCallback(() => {
-    haptics.light();
-    settingsSlide.value = withTiming(0, { duration: 0 });
-    historySlide.value = withTiming(0, { duration: 0 });
-    useAppStore.getState().closeSettings();
-    void startTutorial();
-  }, [startTutorial]);
-
   // Dev-only: seed ~18 fake sessions across ~8 distinct days in the
   // past month so the history calendar looks lived-in for App Store
   // screenshots. Durations 1–50 min with one 30+ min "longest", and
@@ -1085,13 +1070,16 @@ export default function DoNothingScreen() {
               </Pressable>
 
               <Pressable
-                onPress={handleOpenPromo}
+                onPress={() => {
+                  haptics.light();
+                  sound.blockStart();
+                }}
                 disabled={started}
                 style={styles.devIconBtn}
                 hitSlop={12}
               >
                 <Feather
-                  name='gift'
+                  name='volume-2'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}
@@ -1100,45 +1088,26 @@ export default function DoNothingScreen() {
 
               <Pressable
                 onPress={() => {
-                  const past = new Date(Date.now() - 60 * 1000);
-                  const fakeBlock: ScheduledBlock = {
-                    id: 'dev-mock-1min',
-                    hour: past.getHours(),
-                    minute: past.getMinutes(),
-                    durationMinutes: 15,
-                    weekdays: [past.getDay() + 1],
-                    enabled: true,
-                    unlockGoalMinutes: 1,
-                  };
-                  const existing = useAppStore.getState().scheduledBlocks;
-                  useAppStore.setState({
-                    scheduledBlocks: [
-                      ...existing.filter((b) => b.id !== 'dev-mock-1min'),
-                      fakeBlock,
-                    ],
-                  });
-                  useAppStore.getState().showUnlock();
+                  haptics.light();
+                  Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: 'Nothing',
+                      body: 'Test block notification.',
+                      sound: 'block_start.caf',
+                      data: { type: 'devTest' },
+                    },
+                    trigger: {
+                      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                      seconds: 2,
+                    },
+                  }).catch(() => {});
                 }}
                 disabled={started}
                 style={styles.devIconBtn}
                 hitSlop={12}
               >
                 <Feather
-                  name='lock'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={handleReplayTutorial}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='help-circle'
+                  name='bell'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}

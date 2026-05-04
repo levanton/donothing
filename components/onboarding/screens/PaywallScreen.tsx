@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
 import PlanCard from '@/components/paywall/PlanCard';
+import PurchasingOverlay from '@/components/paywall/PurchasingOverlay';
 import { Fonts } from '@/constants/theme';
 import { usePaywall } from '@/hooks/usePaywall';
 import { ctaLabel, type PlanId } from '@/lib/paywall-config';
@@ -75,6 +76,7 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
     setSelectedPlan,
     packagesByPlan,
     anchorYearly,
+    purchasing,
     skip,
     purchase,
     restore,
@@ -176,6 +178,8 @@ export default function PaywallScreen({ isActive, onFinish }: Props) {
           </Pressable>
         </Animated.View>
       </Animated.ScrollView>
+
+      <PurchasingOverlay visible={purchasing} />
     </View>
   );
 }

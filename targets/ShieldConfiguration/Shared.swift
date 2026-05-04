@@ -314,14 +314,12 @@ func sendNotification(contents: [String: Any], placeholders: [String: String?]) 
   if let sound = contents["sound"] as? String {
     if sound == "default" {
       content.sound = .default
-    }
-    if sound == "defaultCritical" {
+    } else if sound == "defaultCritical" {
       content.sound = .defaultCritical
-    }
-    if #available(iOS 15.2, *) {
-      if sound == "defaultRingtone" {
-        content.sound = .defaultRingtone
-      }
+    } else if #available(iOS 15.2, *), sound == "defaultRingtone" {
+      content.sound = .defaultRingtone
+    } else {
+      content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: sound))
     }
   }
 
