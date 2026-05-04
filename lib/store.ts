@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { haptics } from '@/lib/haptics';
-import { initDatabase } from './db';
+import { initDatabase, wipeUserData } from './db';
 import {
   addSession as dbAddSession,
   deleteSessionById as dbDeleteSession,
@@ -303,6 +303,16 @@ export interface AppState {
   // AppState
   handleBackground: () => Promise<void>;
   handleForeground: () => void;
+
+  /**
+   * Wipe every piece of locally stored user data — sessions, blocks,
+   * settings, milestones, completed-onboarding flag — and reset the
+   * in-memory store back to first-launch defaults. Also stops live
+   * timers, cancels pending notifications, and releases the native
+   * screen-time shield so nothing keeps ticking after the user has
+   * asked the app to forget them.
+   */
+  deleteLocalAccount: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -955,5 +965,91 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ focusRemaining: left });
       }
     }
+  },
+
+  deleteLocalAccount: async () => {
+    // Stop any live timers before tearing down state — leaving them
+    // ticking against a wiped DB would dispatch set() calls into a
+    // store that no longer reflects them and double-write the next
+    // session row from a stale sessionStartTime.
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    if (focusInterval) {
+      clearInterval(focusInterval);
+      focusInterval = null;
+    }
+    sessionStartTime = 0;
+    focusEndTime = 0;
+
+    // Cancel the in-flight session-complete notification if a session
+    // was running when the user tapped delete. Other scheduled-block
+    // notifications get cleared in the bulk cancel below.
+    if (sessionNotificationId) {
+      try { await cancelNotification(sessionNotificationId); } catch {}
+      sessionNotificationId = null;
+    }
+
+    // Wipe all scheduled notifications (block alerts, etc.) so the
+    // user doesn't get a banner referencing data that no longer exists.
+    try {
+      const Notifications = await import('expo-notifications');
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (e) {
+      console.error('[store.deleteLocalAccount] cancel notifications failed:', e);
+    }
+
+    // Release the native screen-time shield + drop every DeviceActivity
+    // monitor — otherwise apps stay blocked even after the schedules
+    // that authorised the block are gone from SQLite.
+    try {
+      const { unscheduleBlock, forceUnblockAll } = await import('./screen-time');
+      for (const b of get().scheduledBlocks) {
+        try { unscheduleBlock(b.id); } catch {}
+      }
+      await forceUnblockAll();
+    } catch (e) {
+      console.error('[store.deleteLocalAccount] unblock failed:', e);
+    }
+
+    clearPendingSession();
+
+    // Drop every row from user-data tables. Schema is preserved so
+    // the next write hits ready tables instead of re-running DDL.
+    try {
+      wipeUserData();
+    } catch (e) {
+      console.error('[store.deleteLocalAccount] wipeUserData failed:', e);
+    }
+
+    // Reset Zustand back to first-launch defaults. Mirrors the
+    // initial values declared at the top of create() — keep the two
+    // in sync if you add new state fields.
+    set({
+      elapsed: 0,
+      started: false,
+      paused: false,
+      sessionOrigin: 'normal',
+      weekStats: [],
+      themeMode: 'dark',
+      goalSeconds: 10 * 60,
+      sliderMinutes: 10,
+      focusStep: 'hidden',
+      focusRemaining: 0,
+      focusTotal: 0,
+      lastSessionId: '',
+      lastSessionDuration: 0,
+      completionVisible: false,
+      achievedMilestones: new Map(),
+      sessionEndedVisible: false,
+      cancelReason: null,
+      interruptedDuration: null,
+      settingsOpen: false,
+      scheduledBlocks: [],
+      onboardingComplete: false,
+      tutorialCompleted: false,
+      tutorialPending: false,
+    });
   },
 }));

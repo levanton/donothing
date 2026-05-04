@@ -128,10 +128,6 @@ export default function DoNothingScreen() {
   const handleOpenAccount = useCallback(() => {
     accountSheetRef.current?.expand();
   }, []);
-  const handleDeleteAccount = useCallback(async () => {
-    // TODO: wire up real account deletion — clear local DB, detach RevenueCat, etc.
-    console.warn('[Account] delete tapped — stub; no-op until wired');
-  }, []);
 
   // Shared element: Journey pill on home ↔ Journey heading in history.
   // We measure both on-screen rects and float a proxy Text that smoothly
@@ -883,6 +879,20 @@ export default function DoNothingScreen() {
   const handleCompletionClose = useCallback(() => {
     useAppStore.getState().dismissCompletion();
   }, []);
+
+  const handleDeleteAccount = useCallback(async () => {
+    // Close the account sheet + the slides so the user lands on a
+    // clean home before the wipe redraws the empty stats. AccountSheet
+    // is controlled via its imperative ref since it's a gorhom sheet.
+    try { accountSheetRef.current?.close(); } catch {}
+    settingsSlide.value = 0;
+    historySlide.value = 0;
+    try {
+      await useAppStore.getState().deleteLocalAccount();
+    } catch (e) {
+      console.error('[handleDeleteAccount] failed:', e);
+    }
+  }, [settingsSlide, historySlide]);
 
   const handleHistory = useCallback(() => {
     haptics.light();
