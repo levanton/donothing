@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Image: v9-brand.jpg</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 1200px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    .header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .content {
+      padding: 40px;
+    }
+    .image-container {
+      text-align: center;
+      margin-bottom: 30px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .image-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .metadata {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .metadata h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .metadata-item {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .metadata-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .metadata-label {
+      font-weight: 600;
+      color: #667eea;
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metadata-value {
+      color: #555;
+      line-height: 1.6;
+    }
+    .prompt-box {
+      background: #fff;
+      border: 2px solid #667eea;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 10px;
+      position: relative;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+    .copy-btn:hover {
+      background: #5568d3;
+    }
+    .copy-btn:active {
+      background: #4a5bc4;
+    }
+    .copy-btn.copied {
+      background: #10b981;
+    }
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background: #5568d3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Gemini Generated Image</h1>
+      <p>Created with Google Gemini AI (Nano Banana Pro)</p>
+    </div>
+
+    <div class="content">
+      <div class="image-container">
+        <img src="/Users/antonlev/Documents/CODE/PERSONAL/APPS/donothing/donothing/screenshots/01-stop-the-rush/v9-brand.jpg" alt="Generated image">
+      </div>
+
+      <div class="metadata">
+        <h2>Generation Details</h2>
+
+        <div class="metadata-item">
+          <span class="metadata-label">Prompt</span>
+          <div class="prompt-box" id="promptBox">
+            <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+            [EDIT] Transform this scaffold (FIRST image) into a high-impact, on-brand App Store screenshot for the meditation app "Nothing".
+
+The SECOND image is the brand's signature illustration style — STUDY IT CAREFULLY before generating. The brand uses:
+- A hand-drawn TERRACOTTA "enso" (zen brushstroke ring/half-ring), painted with an imperfect brush, with a rough textured edge
+- A BLACK silkscreen-style silhouette of a figure lying in grass (legs bent, arms relaxed)
+- Scattered HAND-DRAWN DOTS in cream and peach (varying sizes, some clustered in arcs, some lone), looking like dust or stars — NOT clean digital circles, they have the rough screen-print look
+- Subtle GRAINY/RISOGRAPH TEXTURE on the silhouettes and the enso ring (like printed paper, not vector)
+
+YOUR TASK: Add brand-style hand-drawn elements to the scaffold while preserving:
+- The headline "STOP THE RUSH" / "DO NOTHING" (heavy bold white sans-serif, two lines, top of canvas — DO NOT change wording or position)
+- The flat solid terracotta (#C26749) background
+- The dark home screen UI inside the device
+
+ENHANCE WITH THESE ON-BRAND ELEMENTS:
+
+1. **Photorealistic iPhone 15 Pro** — matte black titanium, dynamic island, side buttons visible, soft realistic shadow beneath. Medium-balanced size, positioned high in canvas with bottom of UI peeking at the lower edge.
+
+2. **Hand-drawn ENSO behind the device** — A large terracotta/peach (slightly lighter than the bg, ~#E8A99A or cream) brushstroke half-ring/enso circle painted BEHIND the iPhone, peeking out from above and around the top of the device. Hand-drawn imperfect texture, like the brand's enso. About 1.3x the device width. Crucially: it sits BEHIND the device frame so the iPhone overlaps the lower part of the ring. This creates a halo/sun effect.
+
+3. **Black silhouette at the bottom — person lying in grass** — Below the device (in the lower portion of the canvas, anywhere device frame isn't covering), add a small silkscreen-style BLACK silhouette of a figure lying in grass with grass blades around them (like the second reference image). Hand-drawn imperfect linework with grainy texture. Roughly 30-40% of canvas width. Position it so it doesn't overlap the device — to the side or behind/below it. This shows visually what "DO NOTHING" looks like.
+
+4. **Scattered hand-drawn DOTS** — Around the canvas, especially around the enso and silhouette, scatter ~15-25 small dots in CREAM (#F9F2E0) and PEACH (#E8A99A) of varying sizes. They should look HAND-DRAWN with rough edges, not perfect digital circles — like the dust-mote dots in the second reference image. Some clustered in arcs around the enso, some lone. NEVER on the headline text, NEVER on the device screen.
+
+CRITICAL CONSTRAINTS:
+- Headline text MUST stay within the centre 70% of canvas width — at least 15% padding on each side. The image gets cropped on the sides during post-processing.
+- Background remains FLAT solid terracotta (#C26749) — no gradients, no glow, no light effects. The enso, silhouette and dots are the only allowed deviations.
+- ALL added elements must match the second image's style: rough texture, hand-drawn imperfection, grainy risograph feel — NEVER clean vector or perfect digital circles.
+- NO watermarks, no extra text, no app store UI chrome.
+
+The result should look like a screen-print poster designed by the same hand that made the brand's onboarding illustrations — warm, textured, soulful, deliberately imperfect.
+          </div>
+        </div>
+
+        
+
+        <div class="metadata-item">
+          <span class="metadata-label">Generated</span>
+          <div class="metadata-value">5/4/2026, 12:21:40 PM</div>
+        </div>
+
+        <div class="metadata-item">
+          <span class="metadata-label">File</span>
+          <div class="metadata-value">v9-brand.jpg</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a href="/Users/antonlev/Documents/CODE/PERSONAL/APPS/donothing/donothing/screenshots/01-stop-the-rush/v9-brand.jpg" download class="btn">Download Image</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      Generated by Gemini MCP Server &middot; @houtini/gemini-mcp
+    </div>
+  </div>
+
+  <script>
+    function copyPrompt() {
+      const promptText = document.getElementById('promptBox').innerText.replace('Copy', '').trim();
+      navigator.clipboard.writeText(promptText).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
