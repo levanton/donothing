@@ -552,11 +552,16 @@ export default function DoNothingScreen() {
         focusStep: 'hidden',
         goalSeconds: minutes * 60,
       });
+      // Same reason as handleStart: snap to home so the camera/timer
+      // are anchored to the visible screen when the block flow fires
+      // while the user was on settings or history.
+      settingsSlide.value = 0;
+      historySlide.value = 0;
       // fromBlock: true so the pause sheet swaps "back home" for
       // "unlock now" — the only out for a user mid-block session.
       useAppStore.getState().startSession({ fromBlock: true });
     },
-    [hideOpacity, hideWidth, showOpacity, showWidth],
+    [hideOpacity, hideWidth, showOpacity, showWidth, settingsSlide, historySlide],
   );
 
   // --- Launch splash — terracotta fills the screen, then shrinks in place
@@ -791,8 +796,13 @@ export default function DoNothingScreen() {
   const handleStart = useCallback(() => {
     haptics.medium();
     activateKeepAwakeAsync('session');
+    // Snap to home so the running camera + timer aren't drawn at an
+    // off-screen anchor when start fires while settings/history slides
+    // are still partially open (block-session-from-settings flow).
+    settingsSlide.value = 0;
+    historySlide.value = 0;
     useAppStore.getState().startSession();
-  }, []);
+  }, [settingsSlide, historySlide]);
 
   const handleStop = useCallback(async () => {
     haptics.light();
@@ -1516,23 +1526,33 @@ export default function DoNothingScreen() {
         </Animated.View>
       </GestureDetector>
 
+      {/* Camera + running UI ride the same slide transform as the home
+          content so the terracotta circle (which is anchored to the
+          measured yes-button position on home) doesn't sit pinned at
+          screen-centre while the user has swiped to settings/history.
+          Without this wrapper, the post-session shrink and any in-flight
+          animation read as a free-floating circle on the wrong screen. */}
       <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.runCamera,
-          { backgroundColor: theme.accent },
-          terraCameraStyle,
-        ]}
-      />
-
-      {/* Running UI — cream-on-terracotta. Stays mounted briefly after
-          a session ends so the fade-out reads alongside the camera
-          shrinking, then unmounts cleanly. */}
-      {runUiMounted && (
+        pointerEvents="box-none"
+        style={[StyleSheet.absoluteFill, mainSlideStyle]}
+      >
         <Animated.View
-          style={[styles.runLayer, runUiStyle]}
-          pointerEvents="box-none"
-        >
+          pointerEvents="none"
+          style={[
+            styles.runCamera,
+            { backgroundColor: theme.accent },
+            terraCameraStyle,
+          ]}
+        />
+
+        {/* Running UI — cream-on-terracotta. Stays mounted briefly after
+            a session ends so the fade-out reads alongside the camera
+            shrinking, then unmounts cleanly. */}
+        {runUiMounted && (
+          <Animated.View
+            style={[styles.runLayer, runUiStyle]}
+            pointerEvents="box-none"
+          >
           {/* Drifting cream dots — atmospheric layer that floats up
               through the screen, like dust motes in golden-hour
               light. Behind the timer in z-order. Wrapped so the
@@ -1680,8 +1700,9 @@ export default function DoNothingScreen() {
               style={StyleSheet.absoluteFillObject}
             />
           )}
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
+      </Animated.View>
 
       {/* Shared account sheet — available from Settings header and from both gates */}
       <AccountSheet
@@ -1763,25 +1784,33 @@ export default function DoNothingScreen() {
       />
 
       {/* Launch splash — terracotta sheet that covers the screen and
-          shrinks in place onto the measured yes button */}
+          shrinks in place onto the measured yes button. Wrapped in the
+          same slide transform as the home content so a swipe to
+          settings/history during the splash carries the circle off-
+          screen instead of leaving it pinned at the visual centre. */}
       {!splashDone && (
         <Animated.View
           pointerEvents="none"
-          style={[
-            styles.splashCircle,
-            { backgroundColor: theme.accent },
-            splashStyle,
-          ]}
+          style={[StyleSheet.absoluteFill, mainSlideStyle]}
         >
-          <Animated.View style={[splashLabelStyle, styles.splashLabelWrap]}>
-            <Text
-              style={[
-                styles.splashLabel,
-                { color: theme.accentText, fontFamily: Fonts!.serif },
-              ]}
-            >
-              yes
-            </Text>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.splashCircle,
+              { backgroundColor: theme.accent },
+              splashStyle,
+            ]}
+          >
+            <Animated.View style={[splashLabelStyle, styles.splashLabelWrap]}>
+              <Text
+                style={[
+                  styles.splashLabel,
+                  { color: theme.accentText, fontFamily: Fonts!.serif },
+                ]}
+              >
+                yes
+              </Text>
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       )}
