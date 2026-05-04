@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poster — illustration</title>
+<style>
+  /*
+   * poster-illustration
+   *
+   * Headway-style. Bold left-aligned headline in the top ~60% of canvas,
+   * SVG illustration filling the bottom ~40%. Best for concrete benefits
+   * where a hand-drawn visual reinforces the words.
+   *
+   * Bring your own illustration (SVG file) — pass it via --illustration.
+   * The SVG content is inlined into the .illo container, so it inherits
+   * sizing from the layout below.
+   *
+   * Placeholders:
+   *   {{verb}}           {{desc}}          {{line3}}
+   *   {{subtitle}}       {{bg}}            {{text_color}}
+   *   {{accent_color}}   {{illustration}}
+   */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1290px;
+    height: 2796px;
+    overflow: hidden;
+  }
+  body {
+    background: {{bg}};
+    color: {{text_color}};
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .text-block {
+    padding: 220px 110px 40px 110px;
+  }
+
+  .headline {
+    font-weight: 900;
+    font-size: 220px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .headline .line { display: block; white-space: nowrap; }
+  .headline .line + .line { margin-top: 8px; }
+  .line:empty { display: none; }
+
+  .subtitle {
+    margin-top: 56px;
+    font-size: 52px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: {{accent_color}};
+    max-width: 880px;
+  }
+  .subtitle:empty { display: none; }
+
+  .illo {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 80px 140px 80px;
+    overflow: hidden;
+  }
+  .illo svg {
+    width: 100%;
+    height: 100%;
+    max-width: 1130px;
+    max-height: 920px;
+    display: block;
+  }
+  /* Fallback if no illustration was supplied — leave gracefully empty. */
+  .illo:empty { padding: 0; }
+</style>
+</head>
+<body>
+  <div class="text-block">
+    <h1 class="headline">
+      <span class="line">{{verb}}</span>
+      <span class="line">{{desc}}</span>
+      <span class="line">{{line3}}</span>
+    </h1>
+    <p class="subtitle">{{subtitle}}</p>
+  </div>
+  <div class="illo">{{illustration}}</div>
+</body>
+</html>

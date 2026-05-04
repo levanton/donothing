@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poster — photo</title>
+<style>
+  /*
+   * poster-photo
+   *
+   * Endel-style. Full-bleed photograph (or rendered scene) with a dark
+   * gradient overlay and headline laid over the lower portion. Best for
+   * one screenshot in a set — usually the closing/emotional one.
+   *
+   * The photo is supplied as a path or URL via --photo. It scales to
+   * cover the whole canvas. Ensure the photo is at least 1290 × 2796.
+   *
+   * Placeholders:
+   *   {{verb}}           {{desc}}          {{line3}}
+   *   {{subtitle}}       {{bg}}            {{text_color}}
+   *   {{accent_color}}   {{photo}}
+   */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1290px;
+    height: 2796px;
+    overflow: hidden;
+  }
+  body {
+    background: {{bg}};
+    color: {{text_color}};
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    position: relative;
+  }
+
+  .photo {
+    position: absolute;
+    inset: 0;
+    background-image: url("{{photo}}");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(0,0,0,0.10) 0%,
+        rgba(0,0,0,0.20) 35%,
+        rgba(0,0,0,0.65) 70%,
+        rgba(0,0,0,0.85) 100%
+      );
+  }
+
+  .text-block {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 110px 220px 110px;
+  }
+
+  .headline {
+    font-weight: 900;
+    font-size: 220px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 30px rgba(0,0,0,0.4);
+  }
+  .headline .line { display: block; white-space: nowrap; }
+  .headline .line + .line { margin-top: 8px; }
+  .line:empty { display: none; }
+
+  .subtitle {
+    margin-top: 56px;
+    font-size: 52px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: {{accent_color}};
+    max-width: 880px;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.4);
+  }
+  .subtitle:empty { display: none; }
+</style>
+</head>
+<body>
+  <div class="photo"></div>
+  <div class="scrim"></div>
+  <div class="text-block">
+    <h1 class="headline">
+      <span class="line">{{verb}}</span>
+      <span class="line">{{desc}}</span>
+      <span class="line">{{line3}}</span>
+    </h1>
+    <p class="subtitle">{{subtitle}}</p>
+  </div>
+</body>
+</html>

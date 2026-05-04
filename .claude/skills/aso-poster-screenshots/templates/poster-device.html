@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poster — device frame (real iPhone)</title>
+<style>
+  /*
+   * poster-device
+   *
+   * Headline + a real iPhone 15 Pro mockup (titanium chassis, dynamic
+   * island, side buttons) with the UI screenshot placed inside the
+   * transparent screen cut-out.
+   *
+   * Frame asset: assets/device_frame.png (398 × 816 source, scaled up to
+   * 1030 × 2110 in the layout below). Inside that scaled frame, the
+   * screen rectangle is at (52, 65) → (978, 2046), giving a screen of
+   * 925 × 1980 — matching the real iPhone aspect ratio of ~0.467.
+   *
+   * Placeholders:
+   *   {{verb}} {{desc}} {{line3}} {{subtitle}} {{bg}} {{text_color}}
+   *   {{accent_color}} {{headline_size}} {{subtitle_size}} {{align}}
+   *   {{photo}} {{ui_scale}} {{ui_bleed}} {{ui_top}} {{frame_url}}
+   */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1290px;
+    height: 2796px;
+    overflow: hidden;
+  }
+  body {
+    background: {{bg}};
+    color: {{text_color}};
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    text-align: {{align}};
+    position: relative;
+  }
+
+  .text-block {
+    padding: 200px 110px 0 110px;
+  }
+
+  .headline {
+    font-weight: 900;
+    font-size: {{headline_size}}px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .headline .line { display: block; white-space: nowrap; }
+  .headline .line + .line { margin-top: 8px; }
+  .line:empty { display: none; }
+
+  .subtitle {
+    margin-top: 48px;
+    font-size: {{subtitle_size}}px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: {{accent_color}};
+    max-width: 920px;
+  }
+  .subtitle:empty { display: none; }
+
+  /* Device frame (scaled iPhone 15 Pro mockup) */
+  .device {
+    position: absolute;
+    left: 50%;
+    top: {{ui_top}}px;
+    width: 1030px;
+    height: 2110px;
+    transform: translateX(-50%) scale({{ui_scale}});
+    transform-origin: top center;
+    margin-bottom: -{{ui_bleed}}px;
+    /* Soft drop shadow to ground the device on the brand colour */
+    filter: drop-shadow(0 35px 60px rgba(0, 0, 0, 0.35))
+            drop-shadow(0 12px 24px rgba(0, 0, 0, 0.20));
+  }
+
+  /* Screen rectangle inside the frame — UI image goes here.
+     Coordinates measured from the SVG-rendered iPhone 15 Pro mockup
+     (assets/device_frame.png, 1030×2110). */
+  .screen {
+    position: absolute;
+    top: 42px;
+    left: 30px;
+    width: 970px;
+    height: 2038px;
+    border-radius: 105px;
+    overflow: hidden;
+    background: #000;
+  }
+  .screen img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* iPhone mockup overlay (transparent screen, opaque frame + island) */
+  .frame {
+    position: absolute;
+    inset: 0;
+    background: url("{{frame_url}}") no-repeat center / 1030px 2110px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div class="text-block">
+    <h1 class="headline">
+      <span class="line">{{verb}}</span>
+      <span class="line">{{desc}}</span>
+      <span class="line">{{line3}}</span>
+    </h1>
+    <p class="subtitle">{{subtitle}}</p>
+  </div>
+  <div class="device">
+    <div class="screen"><img src="{{photo}}" alt=""></div>
+    <div class="frame"></div>
+  </div>
+</body>
+</html>

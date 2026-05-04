@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poster — UI screenshot</title>
+<style>
+  /*
+   * poster-ui
+   *
+   * Modern Notion / Linear / Arc style. Bold left-aligned headline in the
+   * top ~40%, then a single full-width UI screenshot floating below with
+   * rounded corners and a soft shadow. NO iPhone device frame — the UI is
+   * the hero, presented cleanly without the meta-frame distraction.
+   *
+   * Pass the simulator screenshot via --illustration (any image format
+   * Chrome can decode: PNG, JPG, WEBP). The image stretches to ~85% of
+   * canvas width and bleeds gracefully off the bottom.
+   *
+   * Placeholders:
+   *   {{verb}}           {{desc}}          {{line3}}
+   *   {{subtitle}}       {{bg}}            {{text_color}}
+   *   {{accent_color}}   {{headline_size}} {{subtitle_size}}
+   *   {{align}}          {{photo}}         (UI image path)
+   */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1290px;
+    height: 2796px;
+    overflow: hidden;
+  }
+  body {
+    background: {{bg}};
+    color: {{text_color}};
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    text-align: {{align}};
+    display: flex;
+    flex-direction: column;
+  }
+
+  .text-block {
+    padding: 200px 110px 64px 110px;
+    flex-shrink: 0;
+  }
+
+  .headline {
+    font-weight: 900;
+    font-size: {{headline_size}}px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .headline .line {
+    display: block;
+    white-space: nowrap;
+  }
+  .headline .line + .line { margin-top: 8px; }
+  .line:empty { display: none; }
+
+  .subtitle {
+    margin-top: 48px;
+    font-size: {{subtitle_size}}px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: {{accent_color}};
+    max-width: 920px;
+  }
+  .subtitle:empty { display: none; }
+
+  .ui-stage {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 95px;
+    overflow: visible;
+  }
+  .ui-card {
+    width: 100%;
+    max-width: 1100px;
+    border-radius: 56px;
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.28),
+      0 8px 24px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    background: #000;
+    /* Bleed the bottom off the canvas for a dynamic, modern feel. */
+    margin-bottom: -260px;
+  }
+  .ui-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+</style>
+</head>
+<body>
+  <div class="text-block">
+    <h1 class="headline">
+      <span class="line">{{verb}}</span>
+      <span class="line">{{desc}}</span>
+      <span class="line">{{line3}}</span>
+    </h1>
+    <p class="subtitle">{{subtitle}}</p>
+  </div>
+  <div class="ui-stage">
+    <div class="ui-card"><img src="{{photo}}" alt=""></div>
+  </div>
+</body>
+</html>

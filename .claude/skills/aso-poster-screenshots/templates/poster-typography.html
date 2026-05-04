@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poster — typography</title>
+<style>
+  /*
+   * poster-typography
+   *
+   * Calm-style. Bold left-aligned headline (1–3 lines) plus optional
+   * subtitle. No illustration, no device frame. Pure type on a flat
+   * brand colour. Best for abstract benefits where the words alone
+   * carry the message ("STOP THE RUSH", "DO NOTHING", "JUST BREATHE").
+   *
+   * Placeholders (substituted by render.py):
+   *   {{verb}}           {{desc}}          {{line3}}
+   *   {{subtitle}}       {{bg}}            {{text_color}}
+   *   {{accent_color}}
+   */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1290px;
+    height: 2796px;
+    overflow: hidden;
+  }
+  body {
+    background: {{bg}};
+    color: {{text_color}};
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-feature-settings: "ss01", "kern";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    padding: 240px 110px 220px 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    text-align: {{align}};
+  }
+
+  .headline {
+    font-weight: 900;
+    font-size: {{headline_size}}px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+  .headline .line {
+    display: block;
+    white-space: nowrap;
+  }
+  .headline .line + .line {
+    margin-top: 8px;
+  }
+
+  .subtitle {
+    margin-top: 64px;
+    font-size: {{subtitle_size}}px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: {{accent_color}};
+    max-width: 920px;
+    letter-spacing: 0.005em;
+  }
+
+  /* Hide empty lines so a missing line3 doesn't take vertical space. */
+  .line:empty { display: none; }
+  .subtitle:empty { display: none; }
+</style>
+</head>
+<body>
+  <h1 class="headline">
+    <span class="line">{{verb}}</span>
+    <span class="line">{{desc}}</span>
+    <span class="line">{{line3}}</span>
+  </h1>
+  <p class="subtitle">{{subtitle}}</p>
+</body>
+</html>
