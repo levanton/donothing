@@ -17,31 +17,19 @@ export const TUTORIAL_STEPS: readonly TutorialStepDef[] = [
     name: 'home.timer',
     order: 1,
     screen: 'home',
-    text: 'set how long you want to sit, then tap yes — and do nothing',
+    text: 'set a duration and tap yes — a moment of stillness, any time, no blocks required',
   },
   {
-    name: 'home.week',
+    name: 'home.journey',
     order: 2,
     screen: 'home',
-    text: 'your week of stillness — and your full history is one swipe down',
+    text: 'swipe down to see your full history of stillness',
   },
   {
     name: 'home.settings',
     order: 3,
     screen: 'home',
-    text: 'settings live here',
-  },
-  {
-    name: 'settings.block',
-    order: 4,
-    screen: 'settings',
-    text: 'schedule a screen block — pick a time and a duration',
-  },
-  {
-    name: 'settings.allowed',
-    order: 5,
-    screen: 'settings',
-    text: "pick the apps that stay open while you're blocked",
+    text: 'tap here to schedule screen blocks, pick apps that stay allowed, and manage your account',
   },
 ] as const;
 

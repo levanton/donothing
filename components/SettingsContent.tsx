@@ -309,19 +309,17 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         );
       })}
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-        <TutorialStepWrapper name="settings.block">
-          <PillButton
-            label="+ add block"
-            color={theme.text}
-            variant="outline"
-            size="small"
-            onPress={() => {
-              haptics.light();
-              setEditingBlock(null);
-              blockSheetRef.current?.expand();
-            }}
-          />
-        </TutorialStepWrapper>
+        <PillButton
+          label="+ add block"
+          color={theme.text}
+          variant="outline"
+          size="small"
+          onPress={() => {
+            haptics.light();
+            setEditingBlock(null);
+            blockSheetRef.current?.expand();
+          }}
+        />
       </View>
 
       {/* Always allowed */}

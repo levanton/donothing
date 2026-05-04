@@ -1382,8 +1382,7 @@ export default function DoNothingScreen() {
 
           {/* Week dots */}
           {weekStats.length > 0 && (
-            <TutorialStepWrapper
-              name="home.week"
+            <View
               style={[
                 styles.weekSection,
                 { opacity: started ? 0 : 1 },
@@ -1424,7 +1423,7 @@ export default function DoNothingScreen() {
                   );
                 })}
               </View>
-            </TutorialStepWrapper>
+            </View>
           )}
 
           {/* Bottom buttons */}
@@ -1435,45 +1434,47 @@ export default function DoNothingScreen() {
             ]}
             pointerEvents={started ? 'none' : 'auto'}
           >
-            <Animated.View style={journeyPillStyle}>
-              <Pressable
-                onPress={handleHistory}
-                hitSlop={16}
-                style={styles.journeyBtn}
-              >
-                <View
-                  ref={journeyBtnRef}
-                  onLayout={measureJourneyBtn}
-                  collapsable={false}
+            <TutorialStepWrapper name="home.journey">
+              <Animated.View style={journeyPillStyle}>
+                <Pressable
+                  onPress={handleHistory}
+                  hitSlop={16}
+                  style={styles.journeyBtn}
                 >
-                  <Text
-                    style={[
-                      styles.journeyPillText,
-                      {
-                        color:
-                          themeMode === 'dark' ? palette.cream : palette.brown,
-                        fontFamily: Fonts!.serif,
-                        opacity: 0,
-                      },
-                    ]}
+                  <View
+                    ref={journeyBtnRef}
+                    onLayout={measureJourneyBtn}
+                    collapsable={false}
                   >
-                    My Journey
-                  </Text>
-                </View>
-                <Animated.View
-                  style={[styles.journeyArrow, journeyChevronStyle]}
-                  pointerEvents='none'
-                >
-                  <Entypo
-                    name='chevron-thin-down'
-                    size={20}
-                    color={
-                      themeMode === 'dark' ? palette.cream : palette.brown
-                    }
-                  />
-                </Animated.View>
-              </Pressable>
-            </Animated.View>
+                    <Text
+                      style={[
+                        styles.journeyPillText,
+                        {
+                          color:
+                            themeMode === 'dark' ? palette.cream : palette.brown,
+                          fontFamily: Fonts!.serif,
+                          opacity: 0,
+                        },
+                      ]}
+                    >
+                      My Journey
+                    </Text>
+                  </View>
+                  <Animated.View
+                    style={[styles.journeyArrow, journeyChevronStyle]}
+                    pointerEvents='none'
+                  >
+                    <Entypo
+                      name='chevron-thin-down'
+                      size={20}
+                      color={
+                        themeMode === 'dark' ? palette.cream : palette.brown
+                      }
+                    />
+                  </Animated.View>
+                </Pressable>
+              </Animated.View>
+            </TutorialStepWrapper>
           </View>
 
           {/* (Running-mode UI — phrase, stop, eye-toggle — now lives in
