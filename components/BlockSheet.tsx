@@ -139,7 +139,15 @@ function BlockSheet({
       });
     }, [holdProgress]);
 
-    const holdFillStyle = useAnimatedStyle(() => ({
+    // Two-layer feedback: full-pill terracotta tint that fades in (no
+    // sharp vertical sweep edge) and a thin progress bar at the bottom for
+    // honest "how close am I to unlocking?" signal. Avoids the prior
+    // problem where a width-animated cream fill clipped the pill curve on
+    // the right and dropped contrast on the cream-on-cream text.
+    const holdTintStyle = useAnimatedStyle(() => ({
+      opacity: holdProgress.value * 0.35,
+    }));
+    const holdBarStyle = useAnimatedStyle(() => ({
       width: `${holdProgress.value * 100}%`,
     }));
 
@@ -263,9 +271,9 @@ function BlockSheet({
               <Animated.View
                 pointerEvents='none'
                 style={[
-                  styles.holdFill,
-                  { backgroundColor: CHIP_LIGHT },
-                  holdFillStyle,
+                  styles.holdTint,
+                  { backgroundColor: TERRACOTTA },
+                  holdTintStyle,
                 ]}
               />
               <View style={styles.holdContent} pointerEvents='none'>
@@ -279,6 +287,14 @@ function BlockSheet({
                   hold to unlock now
                 </Text>
               </View>
+              <Animated.View
+                pointerEvents='none'
+                style={[
+                  styles.holdBar,
+                  { backgroundColor: TERRACOTTA },
+                  holdBarStyle,
+                ]}
+              />
             </View>
           </Pressable>
         </BottomSheetView>
@@ -409,14 +425,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Fills the full pill width — `paddingHorizontal` lives on holdContent
-  // (the inner row), so this absolute fill is bounded by the border, not
-  // by the padding area, and the progress can sweep from edge to edge.
-  holdFill: {
+  // Subtle terracotta tint covering the whole pill — opacity, not width,
+  // animates so there's no sharp moving edge to clip on the rounded corners.
+  holdTint: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  // Thin progress bar pinned to the bottom — replaces the prior left→right
+  // sweep, gives an honest progress signal without obscuring the text.
+  holdBar: {
     position: 'absolute',
     left: 0,
-    top: 0,
     bottom: 0,
+    height: 2,
   },
   holdContent: {
     flexDirection: 'row',

@@ -13,7 +13,6 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { haptics } from '@/lib/haptics';
-import { sound } from '@/lib/sound';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Animated, {
   Easing,
@@ -1068,23 +1067,6 @@ export default function DoNothingScreen() {
               >
                 <Feather
                   name='flag'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  haptics.light();
-                  sound.blockStart();
-                }}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='volume-2'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}

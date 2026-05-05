@@ -21,6 +21,15 @@ import {
 const ALL_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
 /**
+ * Apple's `DeviceActivityCenter` accepts at most ~20 simultaneously
+ * monitored activities per app. We register one monitor per enabled
+ * scheduled block, so cap user-created blocks well below that ceiling
+ * to leave headroom for any internal/legacy names that might still be
+ * lingering in native state.
+ */
+export const MAX_BLOCKS = 15;
+
+/**
  * Compute the next future moment when a block should fire.
  *
  * @param weekdays iOS convention 1=Sun..7=Sat, or empty/all-7 for daily

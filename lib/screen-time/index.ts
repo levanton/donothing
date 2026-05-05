@@ -17,6 +17,7 @@ export {
   onBlockShieldRaised,
 } from './shield';
 export {
+  MAX_BLOCKS,
   forceUnblockAll,
   getActiveMonitors,
   reconcileBlocks,

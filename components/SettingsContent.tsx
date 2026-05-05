@@ -13,7 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { themes, palette, CARD_BORDER_WIDTH } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
 import { usePermissionBanners } from '@/hooks/usePermissionBanners';
-import { requestAuth, NEVER_BLOCK_SELECTION_ID } from '@/lib/screen-time';
+import { requestAuth, NEVER_BLOCK_SELECTION_ID, MAX_BLOCKS } from '@/lib/screen-time';
 import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
@@ -316,6 +316,16 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           size="small"
           onPress={() => {
             haptics.light();
+            if (scheduledBlocks.length >= MAX_BLOCKS) {
+              // Apple's DeviceActivity caps active monitors per app; once
+              // the user is near that limit refuse to add more rather than
+              // silently letting iOS drop a monitor that wouldn't fire.
+              Alert.alert(
+                'Block limit reached',
+                `You can have up to ${MAX_BLOCKS} blocks. Remove one before adding another.`,
+              );
+              return;
+            }
             setEditingBlock(null);
             blockSheetRef.current?.expand();
           }}
