@@ -101,6 +101,30 @@ export function formatTimeShort(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+/**
+ * For the hero duration — returns the value as a list of (number, unit)
+ * pairs so the renderer can style number and unit differently and render
+ * "2 hr 49 min" rather than "2:49 hr". Renderer should drop pairs with
+ * zero values (already filtered here).
+ */
+export function formatHeroDuration(seconds: number): Array<{ value: string; unit: string }> {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+
+  if (d > 0) {
+    const out = [{ value: String(d), unit: d === 1 ? 'day' : 'days' }];
+    if (h > 0) out.push({ value: String(h), unit: 'hr' });
+    return out;
+  }
+  if (h === 0) return [{ value: String(m), unit: 'min' }];
+  if (m === 0) return [{ value: String(h), unit: 'hr' }];
+  return [
+    { value: String(h), unit: 'hr' },
+    { value: String(m), unit: 'min' },
+  ];
+}
+
 /** For stats display — returns { value, unit } for split rendering */
 export function formatTimeStat(seconds: number): { value: string; unit: string } {
   const d = Math.floor(seconds / 86400);

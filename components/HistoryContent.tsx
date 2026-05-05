@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
-import { formatTimeStat } from '@/lib/format';
+import { formatTimeStat, formatHeroDuration } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import {
   getMonthDurations,
@@ -179,7 +179,7 @@ export default function HistoryContent({
 
   const monthAvgSession = monthSessions > 0 ? Math.round(monthDuration / monthSessions) : 0;
 
-  const monthDurationStat = formatTimeStat(monthDuration);
+  const monthDurationParts = formatHeroDuration(monthDuration);
   const longestStat = formatTimeStat(monthLongest);
   const avgSessionStat = formatTimeStat(monthAvgSession);
   const heroLabel = isCurrentMonth ? 'this month' : MONTH_NAMES_SHORT[viewMonth];
@@ -264,33 +264,39 @@ export default function HistoryContent({
           </Pressable>
         </View>
 
-        {/* Top row — two parallel headlines: "this month" duration
-            (big terracotta hero) on the left, lifetime "total time"
-            (medium hero) on the right, separated by a hairline. */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCellHero}>
-            <View style={styles.heroValueWrap}>
-              <Text style={[styles.heroValue, { color: palette.terracotta, fontFamily: Fonts.mono }]}>
-                {monthDurationStat.value}
-              </Text>
-              {monthDurationStat.unit ? (
-                <Text style={[styles.heroUnit, { color: palette.terracotta, fontFamily: Fonts.serif }]}>
-                  {monthDurationStat.unit}
+        {/* Hero row — the month's "do-nothing" duration takes the full
+            width as "X hr Y min", with the period label and a quiet
+            motivational caption stacked below. Earlier versions split
+            this row with a side-quote; we now give the number all the
+            space it needs so larger totals never wrap. */}
+        <View style={styles.heroBlock}>
+          <View
+            style={styles.heroValueWrap}
+            accessible
+            accessibilityLabel={monthDurationParts.map((p) => `${p.value} ${p.unit}`).join(' ')}
+          >
+            {monthDurationParts.map((part, i) => (
+              <View key={i} style={styles.heroPart}>
+                <Text
+                  style={[styles.heroValue, { color: palette.terracotta, fontFamily: Fonts.mono }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {part.value}
                 </Text>
-              ) : null}
-            </View>
-            <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif, marginTop: 6 }]}>
+                <Text style={[styles.heroUnit, { color: palette.terracotta, fontFamily: Fonts.serif }]}>
+                  {part.unit}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.heroLabelRow}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
               {heroLabel}
             </Text>
-          </View>
-
-          {/* Right side — a quiet motivational phrase instead of a
-              second metric. Echoes the app's "do nothing" tone: every
-              minute the user spends in stillness is meaningful, even
-              if the totals look small. */}
-          <View style={styles.statCellQuote}>
-            <Text style={[styles.quotePhrase, { color: theme.text, fontFamily: Fonts.serif }]}>
-              {'every minute\nmatters'}
+            <Text style={[styles.quotePhrase, { color: theme.textSecondary, fontFamily: Fonts.serif }]}>
+              every minute matters
             </Text>
           </View>
         </View>
@@ -513,30 +519,16 @@ const styles = StyleSheet.create({
     marginVertical: 18,
     opacity: 0.6,
   },
-  statCellHero: {
-    flex: 1,
-    paddingRight: 14,
-  },
-  // Quote cell — sits where the second metric used to be. Short
-  // italic serif phrase, centred both vertically (against the hero
-  // on the left) and horizontally within the cell. `alignSelf:
-  // stretch` overrides the row's flex-end alignment so the cell fills
-  // the row height; `justifyContent: center` then centres the quote
-  // vertically within that full height.
-  statCellQuote: {
-    flex: 1,
-    paddingHorizontal: 12,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  // Caption sitting on the same baseline as the period label, but
+  // pulled to the right end of the row. Small italic serif so it
+  // reads as a quiet aside rather than a second data point.
   quotePhrase: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '400',
     fontStyle: 'italic',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    lineHeight: 24,
+    letterSpacing: 0.2,
+    lineHeight: 18,
+    textAlign: 'right',
   },
   statCell: {
     flex: 1,
@@ -559,6 +551,14 @@ const styles = StyleSheet.create({
   heroValueWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    flexWrap: 'wrap',
+  },
+  // One (number + unit) pair. Right margin separates consecutive
+  // pairs like "2 hr" + "49 min".
+  heroPart: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginRight: 14,
   },
   heroValue: {
     fontSize: 72,
@@ -569,9 +569,9 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   heroUnit: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: '400',
-    marginLeft: 4,
+    marginLeft: 5,
     letterSpacing: 0.2,
   },
   statValueWrap: {
