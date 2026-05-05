@@ -97,7 +97,7 @@ async function restoreAllBlocksAfterRenewal(blocks: ScheduledBlock[]): Promise<v
     for (const b of blocks) {
       if (b.enabled) {
         unscheduleBlock(b.id);
-        await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays, b.unlockGoalMinutes);
+        await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays);
       }
     }
   } catch (e) {
@@ -427,7 +427,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           // before re-registering. Handles upgrades from older naming
           // conventions and keeps the native monitor set aligned with DB.
           unscheduleBlock(b.id);
-          await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays, b.unlockGoalMinutes);
+          await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays);
         }
       }
     } catch (e) {
@@ -860,7 +860,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
     try {
       const { scheduleBlock } = await import('./screen-time');
-      await scheduleBlock(block.id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
+      await scheduleBlock(block.id, hour, minute, durationMinutes, weekdays);
     } catch (e) {
       console.warn('Failed to schedule native block:', e);
     }
@@ -877,7 +877,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const { unscheduleBlock, scheduleBlock } = await import('./screen-time');
       unscheduleBlock(id);
-      await scheduleBlock(id, hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
+      await scheduleBlock(id, hour, minute, durationMinutes, weekdays);
     } catch (e) {
       console.error('[store.editScheduledBlock] native register failed:', e);
       // Rollback DB to the pre-edit values + best-effort restore native.
@@ -886,7 +886,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           dbUpdateScheduledBlock(id, prev.hour, prev.minute, prev.durationMinutes, prev.weekdays, prev.unlockGoalMinutes);
           set({ scheduledBlocks: getAllScheduledBlocks() });
           const { scheduleBlock } = await import('./screen-time');
-          await scheduleBlock(id, prev.hour, prev.minute, prev.durationMinutes, prev.weekdays, prev.unlockGoalMinutes);
+          await scheduleBlock(id, prev.hour, prev.minute, prev.durationMinutes, prev.weekdays);
         } catch (rollbackErr) {
           console.error('[store.editScheduledBlock] rollback failed:', rollbackErr);
         }
@@ -930,7 +930,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         if (nowEnabled) {
           const { scheduleBlock } = await import('./screen-time');
-          await scheduleBlock(id, block.hour, block.minute, block.durationMinutes, block.weekdays, block.unlockGoalMinutes);
+          await scheduleBlock(id, block.hour, block.minute, block.durationMinutes, block.weekdays);
         } else {
           // Toggling off: stop this block's monitor AND reconcile so
           // `enableBlockAllMode` is dropped if no other enabled blocks

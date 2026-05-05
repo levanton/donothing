@@ -1145,7 +1145,6 @@ export default function DoNothingScreen() {
                         block.minute,
                         block.durationMinutes,
                         block.weekdays,
-                        block.unlockGoalMinutes,
                       );
                     } catch (e: any) {
                       throwMsg = String(e?.message || e);
