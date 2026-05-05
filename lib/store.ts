@@ -897,16 +897,28 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeScheduledBlock: async (id) => {
     try {
-      const { unscheduleBlock } = await import('./screen-time');
+      const { unscheduleBlock, reconcileBlocks } = await import('./screen-time');
       unscheduleBlock(id);
+      // Drop the row first so reconcile sees an accurate "valid IDs" set —
+      // otherwise the deleted block's id is still in the DB, reconcile
+      // treats its lingering native state as legitimate, and shield-all
+      // mode never gets disabled.
+      clearNotificationIds('scheduledBlock', id);
+      dbDeleteScheduledBlock(id);
+      const remaining = getAllScheduledBlocks();
+      set({ scheduledBlocks: remaining });
+      const validIds = new Set(remaining.filter((b) => b.enabled).map((b) => b.id));
+      // Reconcile drops `enableBlockAllMode` + `resetBlocks` when no enabled
+      // blocks remain or the shield is stuck active. Without this, deleting
+      // the last active block left ManagedSettings shielding everything
+      // forever — the user couldn't escape the block by deleting it.
+      await reconcileBlocks(validIds);
     } catch (e) {
-      // Removal proceeds even if native unschedule fails — leftover
-      // native monitor without a DB row is reconciled on next init.
       console.error('[store.removeScheduledBlock] native unschedule failed:', e);
+      clearNotificationIds('scheduledBlock', id);
+      dbDeleteScheduledBlock(id);
+      set({ scheduledBlocks: getAllScheduledBlocks() });
     }
-    clearNotificationIds('scheduledBlock', id);
-    dbDeleteScheduledBlock(id);
-    set({ scheduledBlocks: getAllScheduledBlocks() });
   },
 
   toggleScheduledBlock: async (id) => {
@@ -920,8 +932,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           const { scheduleBlock } = await import('./screen-time');
           await scheduleBlock(id, block.hour, block.minute, block.durationMinutes, block.weekdays, block.unlockGoalMinutes);
         } else {
-          const { unscheduleBlock } = await import('./screen-time');
+          // Toggling off: stop this block's monitor AND reconcile so
+          // `enableBlockAllMode` is dropped if no other enabled blocks
+          // remain. Without reconcile the shield stays up after the
+          // user explicitly disabled the only thing pinning it.
+          const { unscheduleBlock, reconcileBlocks } = await import('./screen-time');
           unscheduleBlock(id);
+          const validIds = new Set(blocks.filter((b) => b.enabled).map((b) => b.id));
+          await reconcileBlocks(validIds);
         }
       } catch (e) {
         console.error('[store.toggleScheduledBlock] native sync failed:', e);

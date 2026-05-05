@@ -1,8 +1,8 @@
 import { Entypo, Feather } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -53,7 +53,12 @@ import { formatTimeStat, timerDisplay } from '@/lib/format';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'expo-crypto';
-import { forceUnblockAll, isBlockActive } from '@/lib/screen-time';
+import {
+  forceUnblockAll,
+  getActiveMonitors,
+  getAuth,
+  isBlockActive,
+} from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
@@ -1087,27 +1092,90 @@ export default function DoNothingScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => {
+                onPress={async () => {
                   haptics.light();
-                  Notifications.scheduleNotificationAsync({
-                    content: {
-                      title: 'Nothing',
-                      body: 'Test block notification.',
-                      sound: 'block_start.caf',
-                      data: { type: 'devTest' },
-                    },
-                    trigger: {
-                      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                      seconds: 2,
-                    },
-                  }).catch(() => {});
+                  const auth = await getAuth();
+                  const monitors = getActiveMonitors();
+                  const shieldOn = isBlockActive();
+                  const blocks = useAppStore.getState().scheduledBlocks;
+                  const enabledBlocks = blocks.filter((b) => b.enabled);
+                  const lines = [
+                    `auth: ${auth}`,
+                    `shield active: ${shieldOn}`,
+                    `monitors (${monitors.length}): ${monitors.join(', ') || '—'}`,
+                    `blocks in store: ${blocks.length} (enabled: ${enabledBlocks.length})`,
+                    ...enabledBlocks.map(
+                      (b) =>
+                        `  • ${b.id.slice(0, 8)} ${String(b.hour).padStart(2, '0')}:${String(b.minute).padStart(2, '0')} for ${b.durationMinutes}min, days [${b.weekdays.join(',')}]`,
+                    ),
+                  ];
+                  Alert.alert('Screen Time diagnostics', lines.join('\n'));
                 }}
                 disabled={started}
                 style={styles.devIconBtn}
                 hitSlop={12}
               >
                 <Feather
-                  name='bell'
+                  name='activity'
+                  size={18}
+                  color={theme.text}
+                  style={{ opacity: 0.9 }}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={async () => {
+                  haptics.light();
+                  try {
+                    const screenTime = await import('@/lib/screen-time');
+                    const block = useAppStore
+                      .getState()
+                      .scheduledBlocks.find((b) => b.enabled);
+                    if (!block) {
+                      Alert.alert('No block', 'Add an enabled block first');
+                      return;
+                    }
+                    const before = screenTime.getActiveMonitors();
+                    let throwMsg = '';
+                    try {
+                      screenTime.unscheduleBlock(block.id);
+                      await screenTime.scheduleBlock(
+                        block.id,
+                        block.hour,
+                        block.minute,
+                        block.durationMinutes,
+                        block.weekdays,
+                        block.unlockGoalMinutes,
+                      );
+                    } catch (e: any) {
+                      throwMsg = String(e?.message || e);
+                      if (e?.code) throwMsg = `[${e.code}] ${throwMsg}`;
+                    }
+                    const after = screenTime.getActiveMonitors();
+                    Alert.alert(
+                      'Real block test',
+                      [
+                        `Block ${block.id.slice(0, 8)} at ${block.hour}:${String(block.minute).padStart(2, '0')} for ${block.durationMinutes}min`,
+                        `weekdays [${block.weekdays.join(',')}]`,
+                        `before: [${before.join(', ') || '—'}]`,
+                        `after: [${after.join(', ') || '—'}]`,
+                        throwMsg ? `THROW: ${throwMsg}` : 'no throw',
+                      ].join('\n'),
+                    );
+                  } catch (e: any) {
+                    Alert.alert(
+                      'Test failed',
+                      String(e?.message || e) +
+                        (e?.code ? ` [${e.code}]` : ''),
+                    );
+                  }
+                }}
+                disabled={started}
+                style={styles.devIconBtn}
+                hitSlop={12}
+              >
+                <Feather
+                  name='zap'
                   size={18}
                   color={theme.text}
                   style={{ opacity: 0.9 }}

@@ -147,6 +147,40 @@ function blockActivityName(blockId: string, weekday: number): string {
   return `block-${blockId}-${weekday}`;
 }
 
+// Compute the next future moment when a block should fire, given hour/minute
+// and a weekday filter (1=Sun..7=Sat, or empty/all for daily). Returns null
+// when no day in the next week matches (only possible if weekdays is empty
+// AND somehow today's hour/minute is already past — caller should treat
+// null as "no first-fire shadow needed").
+function nextFireDate(hour: number, minute: number, weekdays: number[]): Date | null {
+  const now = new Date();
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hour,
+    minute,
+    0,
+    0,
+  );
+  for (let offset = 0; offset < 7; offset++) {
+    const candidate = new Date(today.getTime() + offset * 24 * 60 * 60 * 1000);
+    if (candidate.getTime() <= now.getTime() + 30 * 1000) continue; // need ≥30s lead
+    const candWeekday = candidate.getDay() + 1; // iOS convention
+    if (weekdays.length === 0 || weekdays.includes(candWeekday)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+// iOS DeviceActivity rejects any schedule whose [intervalStart, intervalEnd]
+// window is shorter than 15 minutes — `startMonitoring` throws "The activity's
+// schedule is too short" and silently fails to register. The UI lets users
+// pick durations like 5 or 10 min for product reasons, so we floor the
+// native window here while preserving the user-visible duration in the DB.
+const MIN_NATIVE_SCHEDULE_MINUTES = 15;
+
 export async function scheduleBlock(
   blockId: string,
   hour: number,
@@ -166,10 +200,12 @@ export async function scheduleBlock(
     return;
   }
 
+  const nativeDurationMinutes = Math.max(MIN_NATIVE_SCHEDULE_MINUTES, durationMinutes);
+
   // Calculate end time; durations may cross midnight, in which case the
   // intervalEnd weekday needs to roll forward by one.
   let endHour = hour;
-  let endMinute = minute + durationMinutes;
+  let endMinute = minute + nativeDurationMinutes;
   endHour += Math.floor(endMinute / 60);
   endMinute = endMinute % 60;
   const endsNextDay = endHour >= 24;
@@ -190,6 +226,14 @@ export async function scheduleBlock(
       payload: {
         title: 'Nothing',
         body: 'Time to do nothing.',
+        // The package's .d.ts narrows `sound` to system constants, but
+        // iOS accepts any bundled .caf filename via UNNotificationSound
+        // (see patches/react-native-device-activity+0.6.1.patch).
+        sound: 'block_start.caf' as 'default',
+        // 'timeSensitive' (real iOS UNNotificationInterruptionLevel) breaks
+        // through Focus / Do Not Disturb so the user hears the chime even
+        // when their phone is locked into a focus mode.
+        interruptionLevel: 'timeSensitive' as 'active',
       },
     },
   ];
@@ -197,76 +241,53 @@ export async function scheduleBlock(
   // Update shield appearance
   await updateShield(SHIELD_CONFIG, SHIELD_ACTIONS);
 
-  // Whether the block fires every day — in that case we can register a
-  // single daily monitor (no weekday constraint), saving 6 slots against
-  // iOS's ~20-monitor limit. Otherwise we need a separate monitor per
-  // selected weekday so iOS enforces the filter natively.
-  const daysSet = new Set(weekdays);
-  const isEveryDay = weekdays.length === 0 || daysSet.size === 7;
-
-  // The 15-minute [start, end] window is an iOS API requirement
-  // (DeviceActivitySchedule needs an intervalEnd), not user-facing —
-  // the user only chose a start time. If we register a monitor while
-  // the current time is inside that window on the same weekday, iOS
-  // fires intervalDidStart immediately. Skip just that occurrence so a
-  // user configuring a block at 14:05 for a 14:00 schedule doesn't get
-  // blocked as they finish tapping. Other weekdays register normally;
-  // the skipped occurrence gets registered the next time init() runs.
-  const now = new Date();
-  const todayWeekday = now.getDay() + 1; // iOS convention: 1=Sun..7=Sat
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const startMin = hour * 60 + minute;
-  const endMin = startMin + durationMinutes;
-  const nowInsideTodayWindow =
-    endMin <= 24 * 60
-      ? nowMin >= startMin && nowMin < endMin
-      : nowMin >= startMin || nowMin < endMin - 24 * 60;
-
-  type Schedule = { name: string; weekday: number | null };
-  const schedules: Schedule[] = isEveryDay
-    ? [{ name: `block-${blockId}`, weekday: null }]
-    : weekdays.map((w) => ({ name: blockActivityName(blockId, w), weekday: w }));
-
-  for (const { name, weekday } of schedules) {
-    // Actions are read from UserDefaults by the extension at fire time.
-    // Always configure them — even if we skip startMonitoring for today's
-    // insideWindow case, the next registration (on app relaunch) already
-    // has them keyed by this activityName.
-    configureActions({
-      activityName: name,
-      callbackName: 'intervalDidStart',
-      actions: startActions,
-    });
-
-    // "Today's occurrence" is either the every-day schedule (always today)
-    // or the weekday-specific monitor whose weekday matches today.
-    const isTodayOccurrence = weekday === null || weekday === todayWeekday;
-    if (isTodayOccurrence && nowInsideTodayWindow) {
-      console.log(
-        `[ScreenTime] Skip ${name} today — inside active window; will register on next app launch`,
-      );
-      continue;
-    }
-
-    const intervalStart: Record<string, number> = { hour, minute, second: 0 };
-    const intervalEnd: Record<string, number> = {
-      hour: endHour,
-      minute: endMinute,
-      second: 0,
-    };
-    if (weekday !== null) {
-      intervalStart.weekday = weekday;
-      intervalEnd.weekday = endsNextDay ? (weekday % 7) + 1 : weekday;
-    }
-
-    await startMonitoring(name, { intervalStart, intervalEnd, repeats: true }, []);
+  // One-shot monitor for the very next future occurrence, with FULL date
+  // components (year/month/day/hour/minute) and `repeats: false`. iOS
+  // honours an exact date+time + non-repeating reliably; `repeats: true`
+  // with only hour/minute is silently dropped when registered inside the
+  // current cycle (or even just before it). Re-registration happens on
+  // each app cold-start through the init flow, which picks the next valid
+  // date forward as `nextFireDate` walks weekdays.
+  const firstFire = nextFireDate(hour, minute, weekdays);
+  if (!firstFire) {
+    console.warn('[ScreenTime] No upcoming fire for block', blockId);
+    return;
   }
-
-  const active = getActivities();
-  console.log('[ScreenTime] Active monitors:', active);
-  console.log(
-    `[ScreenTime] Scheduled block ${blockId} at ${hour}:${String(minute).padStart(2, '0')} (${isEveryDay ? 'daily' : `weekdays [${weekdays.join(',')}]`})`,
+  const fireEnd = new Date(firstFire.getTime() + 16 * 60 * 1000);
+  const name = `block-${blockId}`;
+  configureActions({
+    activityName: name,
+    callbackName: 'intervalDidStart',
+    actions: startActions,
+  });
+  await startMonitoring(
+    name,
+    {
+      intervalStart: {
+        year: firstFire.getFullYear(),
+        month: firstFire.getMonth() + 1, // iOS uses 1-12
+        day: firstFire.getDate(),
+        hour: firstFire.getHours(),
+        minute: firstFire.getMinutes(),
+        second: 0,
+      },
+      intervalEnd: {
+        year: fireEnd.getFullYear(),
+        month: fireEnd.getMonth() + 1,
+        day: fireEnd.getDate(),
+        hour: fireEnd.getHours(),
+        minute: fireEnd.getMinutes(),
+        second: 0,
+      },
+      repeats: false,
+    },
+    [],
   );
+
+  console.log(
+    `[ScreenTime] Scheduled block ${blockId} for ${firstFire.toISOString()}`,
+  );
+  console.log('[ScreenTime] Active monitors:', getActivities());
 }
 
 export function getActiveMonitors(): string[] {
@@ -282,10 +303,14 @@ export function isBlockActive(): boolean {
 }
 
 export function unscheduleBlock(blockId: string): void {
+  // Cover every name shape we may have registered across upgrades:
+  //   block-{id}        — current (and legacy single-monitor)
+  //   block-{id}-1..7   — legacy per-weekday monitors
+  //   block-{id}-once   — legacy one-shot shadow used briefly during the
+  //                       recurring+shadow approach
   const names = ALL_WEEKDAYS.map((w) => blockActivityName(blockId, w));
-  // Also stop the legacy single-monitor name in case it was registered
-  // pre-upgrade and the old monitor is still active.
   names.push(`block-${blockId}`);
+  names.push(`block-${blockId}-once`);
   stopMonitoring(names);
 }
 
