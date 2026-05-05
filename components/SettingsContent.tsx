@@ -16,7 +16,8 @@ import { usePermissionBanners } from '@/hooks/usePermissionBanners';
 import { requestAuth, NEVER_BLOCK_SELECTION_ID, MAX_BLOCKS } from '@/lib/screen-time';
 import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
-import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import { WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import { formatClockTime } from '@/lib/format';
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
@@ -258,7 +259,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           >
             <View style={styles.cardContent}>
               <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
-                {formatTime12(b.hour, b.minute)}
+                {formatClockTime(b.hour, b.minute)}
               </Text>
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
                 <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
@@ -512,7 +513,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
-  cardTime: { fontSize: 28, fontWeight: '500' },
+  cardTime: { fontSize: 36, fontWeight: '500' },
   cardLabel: { fontSize: 14, fontWeight: '300' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 

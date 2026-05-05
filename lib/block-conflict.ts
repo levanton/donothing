@@ -1,5 +1,5 @@
 import type { ScheduledBlock } from '@/lib/db/types';
-import { formatTime12 } from '@/components/TimePicker';
+import { formatClockTime } from '@/lib/format';
 
 /**
  * Minimum wall-clock gap (in minutes) required between any two scheduled
@@ -35,7 +35,7 @@ export function findBlockConflict(
     const d = Math.abs(startMin - otherMin);
     const circular = Math.min(d, 24 * 60 - d);
     if (circular < MIN_BLOCK_GAP_MINUTES) {
-      return formatTime12(b.hour, b.minute);
+      return formatClockTime(b.hour, b.minute);
     }
   }
   return null;

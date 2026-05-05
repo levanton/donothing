@@ -4,19 +4,13 @@ import { haptics } from '@/lib/haptics';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import type { AppTheme } from '@/lib/theme';
-import { pad2 } from '@/lib/format';
+import { clockParts } from '@/lib/format';
 import { WEEKDAY_LABELS, WEEKDAY_SHORT, WEEKDAY_VALUES, ALL_DAYS } from '@/lib/weekdays';
 import PillButton from '@/components/PillButton';
 
 // Re-export so existing import paths (`@/components/TimePicker`) keep
 // working while we migrate consumers to `@/lib/weekdays` directly.
 export { WEEKDAY_LABELS, WEEKDAY_SHORT, WEEKDAY_VALUES, ALL_DAYS };
-
-export function formatTime12(hour: number, minute: number) {
-  const h = hour % 12 || 12;
-  const ampm = hour < 12 ? 'AM' : 'PM';
-  return `${h}:${pad2(minute)} ${ampm}`;
-}
 
 
 export function weekdaysLabel(days: number[]): string {
@@ -52,6 +46,8 @@ export default function TimePickerContent({
   const [minute, setMinute] = useState(initialMinute ?? 0);
   const [selectedDays, setSelectedDays] = useState<number[]>(initialDays ?? ALL_DAYS);
 
+  const parts = clockParts(hour, minute);
+
   const toggleDay = (day: number) => {
     haptics.select();
     setSelectedDays((prev) => {
@@ -67,6 +63,7 @@ export default function TimePickerContent({
   const decHour = () => { haptics.select(); setHour((h) => (h - 1 + 24) % 24); };
   const incMin = () => { haptics.select(); setMinute((m) => (m + 5) % 60); };
   const decMin = () => { haptics.select(); setMinute((m) => (m - 5 + 60) % 60); };
+  const toggleAmPm = () => { haptics.select(); setHour((h) => (h + 12) % 24); };
 
   return (
     <View style={styles.sheetContent}>
@@ -79,7 +76,7 @@ export default function TimePickerContent({
             <Feather name="chevron-up" size={24} color={theme.textSecondary} />
           </Pressable>
           <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad2(hour)}
+            {parts.hour}
           </Text>
           <Pressable onPress={decHour} hitSlop={12} style={styles.sheetArrow}>
             <Feather name="chevron-down" size={24} color={theme.textSecondary} />
@@ -91,12 +88,19 @@ export default function TimePickerContent({
             <Feather name="chevron-up" size={24} color={theme.textSecondary} />
           </Pressable>
           <Text style={[styles.sheetPickerValue, { color: theme.text, fontFamily: Fonts!.mono }]}>
-            {pad2(minute)}
+            {parts.minute}
           </Text>
           <Pressable onPress={decMin} hitSlop={12} style={styles.sheetArrow}>
             <Feather name="chevron-down" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
+        {parts.ampm && (
+          <Pressable onPress={toggleAmPm} hitSlop={12} style={styles.ampmToggle}>
+            <Text style={[styles.ampmLabel, { color: theme.text, fontFamily: Fonts!.mono, borderColor: theme.textTertiary }]}>
+              {parts.ampm}
+            </Text>
+          </Pressable>
+        )}
       </View>
       <View style={styles.dayRow}>
         {WEEKDAY_LABELS.map((label, i) => {
@@ -162,6 +166,19 @@ const styles = StyleSheet.create({
   sheetColon: {
     fontSize: 36,
     fontWeight: '200',
+  },
+  ampmToggle: {
+    marginLeft: 8,
+    alignSelf: 'center',
+  },
+  ampmLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    letterSpacing: 0.5,
   },
   sheetButtons: {
     flexDirection: 'row',

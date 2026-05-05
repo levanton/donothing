@@ -6,7 +6,7 @@ import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTim
 
 import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
-import { formatTimeShort } from '@/lib/format';
+import { formatTimeShort, formatClockTime } from '@/lib/format';
 import { getSessionsByDateRange } from '@/lib/db/sessions';
 import { getMoodColor } from '@/lib/mood';
 import type { Session } from '@/lib/db/types';
@@ -19,11 +19,7 @@ function dateKey(d: Date): string {
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+  return formatClockTime(d.getHours(), d.getMinutes());
 }
 
 interface ActivityCalendarProps {

@@ -1,6 +1,82 @@
+import { NativeModules, Platform } from 'react-native';
+
 /** Zero-pad a single integer to 2 digits ("5" → "05"). */
 export function pad2(n: number): string {
   return String(n).padStart(2, '0');
+}
+
+let _uses24HourCache: boolean | null = null;
+
+/**
+ * Whether the user's device prefers 24-hour clock display.
+ *
+ * On iOS we first honour the explicit Settings → General → Date & Time →
+ * 24-Hour Time toggle (exposed via NSUserDefaults as
+ * AppleICUForce24HourTime / AppleICUForce12HourTime). When the user hasn't
+ * overridden it, we fall back to the locale's default by sniffing how
+ * `toLocaleTimeString` renders 13:00 — locales that produce "AM"/"PM"
+ * count as 12-hour, everything else as 24-hour.
+ *
+ * Cached for the app lifetime; a setting change won't take effect until
+ * the next launch, which matches typical iOS app behaviour.
+ */
+export function uses24HourClock(): boolean {
+  if (_uses24HourCache !== null) return _uses24HourCache;
+
+  if (Platform.OS === 'ios') {
+    const s = NativeModules.SettingsManager?.settings;
+    const force24 = s?.AppleICUForce24HourTime;
+    const force12 = s?.AppleICUForce12HourTime;
+    if (force24 === 1 || force24 === true || force24 === '1') {
+      _uses24HourCache = true;
+      return true;
+    }
+    if (force12 === 1 || force12 === true || force12 === '1') {
+      _uses24HourCache = false;
+      return false;
+    }
+  }
+
+  try {
+    const sample = new Date(2000, 0, 1, 13, 0).toLocaleTimeString(undefined, { hour: 'numeric' });
+    _uses24HourCache = !/AM|PM/i.test(sample);
+  } catch {
+    _uses24HourCache = false;
+  }
+  return _uses24HourCache;
+}
+
+export interface ClockParts {
+  /** Already formatted: zero-padded "09" in 24h, "9" in 12h. */
+  hour: string;
+  /** Always zero-padded "05". */
+  minute: string;
+  /** "AM"/"PM" on 12h devices, null on 24h. */
+  ampm: 'AM' | 'PM' | null;
+}
+
+/**
+ * Single source of truth for splitting an internal 0–23 hour into the
+ * pieces that get displayed. Use this when you need the components
+ * separately (e.g. TimePicker columns); use {@link formatClockTime}
+ * for a one-shot string.
+ */
+export function clockParts(hour: number, minute: number): ClockParts {
+  const is24 = uses24HourClock();
+  return {
+    hour: is24 ? pad2(hour) : String(hour % 12 || 12),
+    minute: pad2(minute),
+    ampm: is24 ? null : hour < 12 ? 'AM' : 'PM',
+  };
+}
+
+/**
+ * Time-of-day in the user's preferred clock format.
+ * Returns "14:30" on 24-hour devices and "2:30 PM" on 12-hour devices.
+ */
+export function formatClockTime(hour: number, minute: number): string {
+  const p = clockParts(hour, minute);
+  return p.ampm ? `${p.hour}:${p.minute} ${p.ampm}` : `${p.hour}:${p.minute}`;
 }
 
 export function timerDisplay(seconds: number): string {

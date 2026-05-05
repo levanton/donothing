@@ -12,7 +12,8 @@ import PillButton from '@/components/PillButton';
 import PickerSheet from '@/components/PickerSheet';
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
-import { formatTime12, WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import { WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
+import { formatClockTime } from '@/lib/format';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
 
 interface Props {
@@ -143,7 +144,7 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
                     color: active ? palette.terracotta : screenTheme.text,
                     fontFamily: Fonts?.mono,
                   }]}>
-                    {formatTime12(b.hour, b.minute)}
+                    {formatClockTime(b.hour, b.minute)}
                   </Text>
                   <Text style={[styles.cardLabel, { color: screenTheme.text + 'B0' }]}>
                     <Text style={{ fontFamily: Fonts?.mono, fontWeight: '600', color: screenTheme.text }}>
