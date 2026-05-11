@@ -35,6 +35,40 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Testing
+
+Run the test suite before shipping any change that touches data, UI, or
+shared helpers:
+
+```bash
+npm test           # one-shot run
+npm run test:watch # re-run on save during development
+npm run test:coverage
+```
+
+The suite uses **Jest** with the `jest-expo` preset. Tests live under
+`test/` and mirror the source tree:
+
+- `test/lib/` — pure helpers (format, mood, weekdays, conflicts,
+  benefits, schemas, stats, milestones, journey-tags, paywall-config,
+  theme).
+- `test/db/` — DB layer (migrations, sessions, scheduled-blocks,
+  milestones, settings, notification state, wipe). These run against an
+  **in-memory `better-sqlite3`** that mocks `expo-sqlite`, so they
+  exercise real SQL, constraints, and triggers.
+- `test/components/` — React Native smoke tests via
+  `@testing-library/react-native`.
+
+When you add a new module:
+
+- **lib helper** → drop a sibling `*.test.ts` under `test/lib/`.
+- **DB write/read** → add a Zod schema in `lib/db/schemas.ts`, a test in
+  `test/lib/schemas.test.ts`, and an integration test in `test/db/`
+  using the `loadDbModules` / `resetDbState` helpers from
+  `test/db/helpers.ts`.
+- **Native module** → stub it in `test/jest.setup.ts` so component
+  tests don't blow up.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:
