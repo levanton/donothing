@@ -8,6 +8,7 @@ import { CopilotProvider } from 'react-native-copilot';
 import { APP_BG, themes } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
 import { TutorialTooltip } from '@/components/tutorial';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { roundedSvgMaskPath } from '@/lib/tutorial/svgMask';
 
 // Pin a comfortable tooltip width. Without this, the library auto-sizes
@@ -50,32 +51,37 @@ export default function RootLayout() {
     themeMode === 'dark' ? 'rgba(0,0,0,0.45)' : 'rgba(51,52,49,0.32)';
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: APP_BG }}>
-      <BottomSheetModalProvider>
-        <CopilotProvider
-          key={themeMode}
-          backdropColor={backdropColor}
-          overlay="svg"
-          animationDuration={300}
-          tooltipComponent={TutorialTooltip}
-          tooltipStyle={tooltipStyle}
-          stepNumberComponent={HiddenStepNumber}
-          svgMaskPath={roundedSvgMaskPath}
-          arrowColor={theme.accent}
-          arrowSize={0}
-          margin={8}
-          stopOnOutsideClick={false}
-        >
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: APP_BG } }}>
-            {/* Fade everywhere — slide-from-right was poking through when
-                returning from onboarding/paywall, breaking the sense of
-                "the home screen is just there". */}
-            <Stack.Screen name="index" options={{ animation: 'fade' }} />
-            <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="paywall" options={{ animation: 'fade', gestureEnabled: false }} />
-          </Stack>
-        </CopilotProvider>
-      </BottomSheetModalProvider>
-    </GestureHandlerRootView>
+    // ErrorBoundary lives at the very top so it catches render errors
+    // inside every provider below. When Sentry lands, wire it via the
+    // onError prop — keeps the boundary itself transport-agnostic.
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: APP_BG }}>
+        <BottomSheetModalProvider>
+          <CopilotProvider
+            key={themeMode}
+            backdropColor={backdropColor}
+            overlay="svg"
+            animationDuration={300}
+            tooltipComponent={TutorialTooltip}
+            tooltipStyle={tooltipStyle}
+            stepNumberComponent={HiddenStepNumber}
+            svgMaskPath={roundedSvgMaskPath}
+            arrowColor={theme.accent}
+            arrowSize={0}
+            margin={8}
+            stopOnOutsideClick={false}
+          >
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: APP_BG } }}>
+              {/* Fade everywhere — slide-from-right was poking through when
+                  returning from onboarding/paywall, breaking the sense of
+                  "the home screen is just there". */}
+              <Stack.Screen name="index" options={{ animation: 'fade' }} />
+              <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="paywall" options={{ animation: 'fade', gestureEnabled: false }} />
+            </Stack>
+          </CopilotProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
