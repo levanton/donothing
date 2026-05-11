@@ -42,7 +42,6 @@ const USER_DATA_TABLES = [
   'sessions',
   'scheduled_blocks',
   'milestones',
-  'weekly_checkins',
   'device_state',
   'settings',
 ] as const;

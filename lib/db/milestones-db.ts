@@ -14,9 +14,11 @@ export function getAchievedMilestones(): Map<string, number> {
 }
 
 export function insertMilestone(id: string): void {
+  // user_id is omitted so the column's DEFAULT 'local' applies — passing
+  // NULL would violate the NOT NULL constraint added in migration007.
   const db = getDb();
   db.runSync(
-    'INSERT OR IGNORE INTO milestones (id, user_id, achieved_at) VALUES (?, NULL, ?)',
+    'INSERT INTO milestones (id, achieved_at) VALUES (?, ?) ON CONFLICT(id) DO NOTHING',
     id,
     Date.now(),
   );

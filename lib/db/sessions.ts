@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { getDb } from './index';
-import { SessionInputSchema, SESSION_MIN_DURATION_S, SESSION_MAX_DURATION_S } from './schemas';
+import { SessionInputSchema, SESSION_MIN_DURATION_S, SESSION_MAX_DURATION_S, MoodSchema } from './schemas';
 import type { Session } from './types';
 
 function generateId(): string {
@@ -34,7 +34,10 @@ export const MIN_SAVABLE_DURATION = SESSION_MIN_DURATION_S;
 
 export function addSession(duration: number): Session | null {
   const parsed = SessionInputSchema.safeParse({ duration });
-  if (!parsed.success) return null;
+  if (!parsed.success) {
+    console.warn('addSession rejected invalid input', parsed.error.flatten());
+    return null;
+  }
   const db = getDb();
   const id = generateId();
   const timestamp = Date.now();
@@ -188,8 +191,18 @@ export function getActiveDaysCount(): number {
 }
 
 export function updateSessionMood(sessionId: string, mood: string): void {
+  const parsed = MoodSchema.safeParse(mood);
+  if (!parsed.success) {
+    console.warn('updateSessionMood rejected invalid mood', { mood, error: parsed.error.flatten() });
+    return;
+  }
   const db = getDb();
-  db.runSync('UPDATE sessions SET mood = ? WHERE id = ?', mood, sessionId);
+  // updated_at is refreshed by the AFTER UPDATE trigger from migration009.
+  db.runSync(
+    'UPDATE sessions SET mood = ? WHERE id = ?',
+    parsed.data,
+    sessionId,
+  );
 }
 
 export function getTotalDuration(): number {

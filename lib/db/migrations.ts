@@ -6,6 +6,7 @@ import { migration005 } from './migrations/005_unlock_goal';
 import { migration006 } from './migrations/006_drop_block_groups';
 import { migration007 } from './migrations/007_schema_hygiene';
 import { migration008 } from './migrations/008_drop_reminders';
+import { migration009 } from './migrations/009_hygiene_pass';
 
 export interface Migration {
   version: number;
@@ -17,7 +18,7 @@ export interface Migration {
  * Highest version present in this build. Tools and tests can compare
  * against `_migrations` to verify a DB is current.
  */
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 const syncMigrations: Migration[] = [
   migration001,
@@ -27,6 +28,7 @@ const syncMigrations: Migration[] = [
   migration006,
   migration007,
   migration008,
+  migration009,
 ];
 
 const asyncMigrations: Migration[] = [];

@@ -1,3 +1,4 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Migration } from '../migrations';
 
 /**
@@ -15,7 +16,34 @@ import type { Migration } from '../migrations';
  * SQLite can't ALTER constraints, so the rebuild dance is the only way:
  * CREATE _new, INSERT … SELECT, DROP, RENAME. Wrapped in the migration
  * runner's outer transaction so a partial failure rolls back cleanly.
+ *
+ * After every INSERT … SELECT we count both sides and throw if rows
+ * were silently dropped by the CHECK-filter WHERE clause. Without this
+ * guard, a row with `duration = 999999` (or similar) would vanish on
+ * upgrade with no error surfaced.
  */
+
+function copyAndVerify(
+  db: SQLiteDatabase,
+  fromTable: string,
+  insertSql: string,
+): void {
+  const before = db.getFirstSync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM ${fromTable}`,
+  );
+  const oldCount = before?.count ?? 0;
+  db.execSync(insertSql);
+  const after = db.getFirstSync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM ${fromTable}_new`,
+  );
+  const newCount = after?.count ?? 0;
+  if (oldCount !== newCount) {
+    throw new Error(
+      `migration007: ${fromTable} row count mismatch (was ${oldCount}, kept ${newCount}) — refusing to silently drop user data`,
+    );
+  }
+}
+
 export const migration007: Migration = {
   version: 7,
   name: 'schema_hygiene',
@@ -34,7 +62,7 @@ export const migration007: Migration = {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
-    db.execSync(`
+    copyAndVerify(db, 'sessions', `
       INSERT INTO sessions_new
         (id, user_id, timestamp, duration, mood, created_at, updated_at)
       SELECT
@@ -70,7 +98,7 @@ export const migration007: Migration = {
         updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
-    db.execSync(`
+    copyAndVerify(db, 'scheduled_blocks', `
       INSERT INTO scheduled_blocks_new
         (id, user_id, hour, minute, duration_minutes, weekdays, enabled,
          unlock_goal_minutes, created_at, updated_at)
@@ -99,7 +127,7 @@ export const migration007: Migration = {
         created_at  TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
-    db.execSync(`
+    copyAndVerify(db, 'milestones', `
       INSERT INTO milestones_new (id, user_id, achieved_at, created_at)
       SELECT id, COALESCE(user_id, 'local'), achieved_at, created_at
       FROM milestones;
@@ -108,43 +136,6 @@ export const migration007: Migration = {
     db.execSync('ALTER TABLE milestones_new RENAME TO milestones;');
     db.execSync('CREATE UNIQUE INDEX idx_milestones_id_user ON milestones(id, user_id);');
     db.execSync('CREATE INDEX idx_milestones_achieved_at ON milestones(achieved_at);');
-
-    // ── weekly_checkins ───────────────────────────────────────────────
-    db.execSync(`
-      CREATE TABLE weekly_checkins_new (
-        id         TEXT PRIMARY KEY,
-        user_id    TEXT NOT NULL DEFAULT 'local',
-        timestamp  INTEGER NOT NULL,
-        week_key   TEXT NOT NULL,
-        sleep      INTEGER NOT NULL CHECK (sleep BETWEEN 0 AND 10),
-        anxiety    INTEGER NOT NULL CHECK (anxiety BETWEEN 0 AND 10),
-        focus      INTEGER NOT NULL CHECK (focus BETWEEN 0 AND 10),
-        energy     INTEGER NOT NULL CHECK (energy BETWEEN 0 AND 10),
-        deleted_at TEXT,
-        version    INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-    `);
-    db.execSync(`
-      INSERT INTO weekly_checkins_new
-        (id, user_id, timestamp, week_key, sleep, anxiety, focus, energy,
-         created_at, updated_at)
-      SELECT
-        id, COALESCE(user_id, 'local'), timestamp, week_key,
-        sleep, anxiety, focus, energy,
-        created_at, updated_at
-      FROM weekly_checkins
-      WHERE sleep BETWEEN 0 AND 10
-        AND anxiety BETWEEN 0 AND 10
-        AND focus BETWEEN 0 AND 10
-        AND energy BETWEEN 0 AND 10;
-    `);
-    db.execSync('DROP TABLE weekly_checkins;');
-    db.execSync('ALTER TABLE weekly_checkins_new RENAME TO weekly_checkins;');
-    db.execSync(
-      'CREATE UNIQUE INDEX idx_checkins_week ON weekly_checkins(week_key, user_id);',
-    );
 
     // ── settings (only adds columns; no constraint changes) ───────────
     db.execSync('ALTER TABLE settings ADD COLUMN deleted_at TEXT;');

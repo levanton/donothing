@@ -13,25 +13,27 @@ interface BlockRow {
   unlock_goal_minutes: number;
 }
 
+function parseWeekdays(raw: string): number[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((d): d is number => typeof d === 'number') : [];
+  } catch {
+    return [];
+  }
+}
+
 function rowToBlock(row: BlockRow): ScheduledBlock {
-  // Run the row through the same schema we use on writes. Catches any
-  // legacy row that pre-dates the validation layer (e.g. weekdays
-  // stored as `[]` from before the normalize-on-write change).
-  const parsed = ScheduledBlockInputSchema.parse({
+  // "Normalize at write, trust at read" — every writer (insert/update)
+  // routes through ScheduledBlockInputSchema, so by the time a row hits
+  // SQLite it's already canonical. Read-path stays a plain mapper.
+  return {
+    id: row.id,
     hour: row.hour,
     minute: row.minute,
     durationMinutes: row.duration_minutes,
-    weekdays: JSON.parse(row.weekdays),
-    unlockGoalMinutes: row.unlock_goal_minutes,
-  });
-  return {
-    id: row.id,
-    hour: parsed.hour,
-    minute: parsed.minute,
-    durationMinutes: parsed.durationMinutes,
-    weekdays: parsed.weekdays,
+    weekdays: parseWeekdays(row.weekdays),
     enabled: row.enabled === 1,
-    unlockGoalMinutes: parsed.unlockGoalMinutes,
+    unlockGoalMinutes: row.unlock_goal_minutes,
   };
 }
 
@@ -99,8 +101,9 @@ export function updateScheduledBlock(
     hour, minute, durationMinutes, weekdays, unlockGoalMinutes,
   });
   const db = getDb();
+  // updated_at is refreshed by the AFTER UPDATE trigger from migration009.
   db.runSync(
-    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, unlock_goal_minutes = ?, updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE scheduled_blocks SET hour = ?, minute = ?, duration_minutes = ?, weekdays = ?, unlock_goal_minutes = ? WHERE id = ?`,
     valid.hour,
     valid.minute,
     valid.durationMinutes,
@@ -120,10 +123,10 @@ export function toggleScheduledBlock(id: string): boolean {
   // RETURNING avoids a second SELECT round-trip and removes the
   // read-after-write race the old code had (an interleaved write
   // could change enabled between the UPDATE and the SELECT).
+  // updated_at is refreshed by the AFTER UPDATE trigger from migration009.
   const row = db.getFirstSync<{ enabled: number }>(
     `UPDATE scheduled_blocks
-       SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END,
-           updated_at = datetime('now')
+       SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END
      WHERE id = ?
      RETURNING enabled`,
     id,

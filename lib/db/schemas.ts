@@ -15,6 +15,7 @@
  */
 
 import { z } from 'zod';
+import { MOODS } from '../mood';
 
 // ── ScheduledBlock ──────────────────────────────────────────────────
 //
@@ -72,3 +73,12 @@ export type SessionInput = z.infer<typeof SessionInputSchema>;
 
 export const BooleanFlagSchema = z.literal('1');
 export type BooleanFlag = z.infer<typeof BooleanFlagSchema>;
+
+// ── Mood ───────────────────────────────────────────────────────────
+// Sessions store a mood key chosen from the MoodDial. Anything outside
+// that set is rejected at the write boundary instead of being persisted
+// as an unknown string that the UI would then have to defensively
+// ignore. `null` clears the mood (Settings → reset, etc.).
+
+export const MoodSchema = z.enum(MOODS);
+export type MoodValue = z.infer<typeof MoodSchema>;
