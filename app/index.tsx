@@ -1,8 +1,10 @@
 import { Entypo, Feather } from '@expo/vector-icons';
+import * as Brightness from 'expo-brightness';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
   Dimensions,
   Platform,
   Pressable,
@@ -735,6 +737,86 @@ export default function DoNothingScreen() {
       easing: Easing.inOut(Easing.cubic),
     });
   }, [distractionFree]);
+
+  // Dim the physical screen while distraction-free is on. Brightness is
+  // animated in JS over BRIGHTNESS_FADE_MS to match the content fade —
+  // expo-brightness has no built-in easing. The override is app-scoped
+  // on iOS: iOS auto-restores system brightness on background, so we
+  // only need to restore on toggle-off and on unmount, and re-apply on
+  // foreground if the mode is still on.
+  const savedBrightness = useRef<number | null>(null);
+  const brightnessAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const animateBrightness = useCallback((from: number, to: number, durationMs: number) => {
+    if (brightnessAnimRef.current) {
+      clearInterval(brightnessAnimRef.current);
+      brightnessAnimRef.current = null;
+    }
+    const start = Date.now();
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / durationMs);
+      // inOut cubic — matches distractionFade easing
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const value = from + (to - from) * eased;
+      Brightness.setBrightnessAsync(value).catch(() => {});
+      if (t >= 1 && brightnessAnimRef.current) {
+        clearInterval(brightnessAnimRef.current);
+        brightnessAnimRef.current = null;
+      }
+    };
+    tick();
+    brightnessAnimRef.current = setInterval(tick, 32);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (distractionFree) {
+      (async () => {
+        try {
+          const current = await Brightness.getBrightnessAsync();
+          if (cancelled) return;
+          if (savedBrightness.current == null) savedBrightness.current = current;
+          animateBrightness(current, 0.05, 720);
+        } catch {}
+      })();
+    } else if (savedBrightness.current != null) {
+      const restore = savedBrightness.current;
+      savedBrightness.current = null;
+      (async () => {
+        try {
+          const current = await Brightness.getBrightnessAsync();
+          animateBrightness(current, restore, 720);
+        } catch {}
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [distractionFree, animateBrightness]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && distractionFree) {
+        Brightness.getBrightnessAsync()
+          .then((current) => animateBrightness(current, 0.05, 480))
+          .catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [distractionFree, animateBrightness]);
+
+  useEffect(() => {
+    return () => {
+      if (brightnessAnimRef.current) {
+        clearInterval(brightnessAnimRef.current);
+        brightnessAnimRef.current = null;
+      }
+      if (savedBrightness.current != null) {
+        Brightness.setBrightnessAsync(savedBrightness.current).catch(() => {});
+        savedBrightness.current = null;
+      }
+    };
+  }, []);
 
   // --- Promo offer modal (for users without subscription) ---
   // Lives in the store so the standalone paywall route can trigger it
