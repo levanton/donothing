@@ -64,7 +64,7 @@ function pageExit() {
   };
 }
 
-const __DEV_JUMP__ = __DEV__;
+const __DEV_JUMP__ = false && __DEV__;
 
 export default function OnboardingRoute() {
   const router = useRouter();

@@ -1028,7 +1028,7 @@ export default function DoNothingScreen() {
           </TutorialStepWrapper>
 
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
-          {__DEV__ && (
+          {false && __DEV__ && (
             <View
               style={[
                 styles.devCluster,
