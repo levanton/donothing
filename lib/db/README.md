@@ -55,7 +55,18 @@ See `copyAndVerify()` in `007_schema_hygiene.ts`.
 **`updated_at` lives in SQLite, not in code.** Triggers in
 migration009 refresh `updated_at` on every UPDATE. Don't set it
 manually from JS — the trigger always wins, and forgetting it in a
-new query would silently break sync semantics.
+new query would silently break sync semantics. The triggers use
+`AFTER UPDATE OF <cols>` to avoid recursion (the trigger's own
+`UPDATE … SET updated_at` doesn't re-fire) — when a new column is
+added to a table, append it to that OF list in a follow-up migration
+or that column's edits won't bump `updated_at`.
+
+**Serialized JSON columns get re-normalized on read.** Plain scalar
+columns are trusted at read, but `weekdays` (and any future JSON-blob
+column) goes through its Zod schema on the way out — see
+`parseWeekdays()` in `scheduled-blocks.ts`. Serialization is a lossy
+boundary; the empty-array-vs-every-day ambiguity has bitten this
+codebase before.
 
 ## How to add a new entity
 
@@ -103,6 +114,23 @@ constraint), use the rebuild dance from `007_schema_hygiene.ts`:
 
 The migration runs inside the outer `BEGIN TRANSACTION` from
 `runSyncMigrations`, so any thrown error rolls everything back.
+
+## Troubleshooting
+
+**`migration007 sessions row count mismatch` thrown at app launch.**
+The migration's `copyAndVerify` refused to silently drop rows that
+fail the new CHECK constraints (e.g. `duration = 999999`). Either:
+inspect the DB (`sqlite3 nothing.db 'SELECT * FROM sessions WHERE
+duration <= 0 OR duration > 86400;'`) and clean the offenders before
+relaunching, or — since this is a single-developer project with no
+real users — wipe the app from the simulator and reinstall to start
+from an empty schema.
+
+**Mood not saving / `updateSessionMood rejected invalid mood`
+warning.** The mood string is not in `MOODS` (lib/mood.ts). Either
+the caller passed something stale, or you added a new mood to the
+UI without updating `MOODS`. The DB layer parses through `MoodSchema`
+on every write specifically to catch this drift.
 
 ## Supabase debt (intentional)
 

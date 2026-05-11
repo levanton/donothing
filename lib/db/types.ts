@@ -1,8 +1,10 @@
+import type { MoodKey } from '../mood';
+
 export interface Session {
   id: string;
   timestamp: number;
   duration: number;
-  mood?: string;
+  mood?: MoodKey;
 }
 
 export interface ScheduledBlock {

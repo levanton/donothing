@@ -29,9 +29,13 @@ import { MOODS } from '../mood';
 // Downstream code can now safely write `weekdays.includes(day)` without
 // the `!weekdays?.length || ...` guard.
 
-const WEEKDAYS_FULL = [1, 2, 3, 4, 5, 6, 7] as const;
+export const WEEKDAYS_FULL: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
-const WeekdaysSchema = z
+// Exported so the scheduled-blocks read path can normalize the JSON
+// `weekdays` column using the same rules as the write path — keeps the
+// "empty array = every day" interpretation consistent across the
+// app/native-scheduler/UI boundary.
+export const WeekdaysSchema = z
   .array(z.number().int())
   .transform((days) => {
     const cleaned = Array.from(

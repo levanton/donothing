@@ -24,6 +24,7 @@ import {
   clearNotificationIds,
 } from './db/notification-state';
 import type { ScheduledBlock, Session } from './db/types';
+import type { MoodKey } from '@/lib/mood';
 import { getWeekStats, WeekDay } from './stats';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
@@ -299,7 +300,7 @@ export interface AppState {
   // ActivityCalendar's session-list memo re-runs and the new mood
   // shows up immediately (otherwise it only appeared after a cold
   // restart).
-  updateSessionMood: (id: string, mood: string) => void;
+  updateSessionMood: (id: string, mood: MoodKey) => void;
 
   // AppState
   handleBackground: () => Promise<void>;

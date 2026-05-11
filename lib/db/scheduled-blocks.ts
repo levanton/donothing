@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { getDb } from './index';
-import { ScheduledBlockInputSchema } from './schemas';
+import { ScheduledBlockInputSchema, WeekdaysSchema, WEEKDAYS_FULL } from './schemas';
 import type { ScheduledBlock } from './types';
 
 interface BlockRow {
@@ -13,12 +13,16 @@ interface BlockRow {
   unlock_goal_minutes: number;
 }
 
+// `weekdays` is the one serialized column on this table — JSON in
+// SQLite, structured array in TypeScript. Re-running the row through
+// WeekdaysSchema mirrors the same normalization the write path applies,
+// so an empty/legacy value can't drift between the UI (treats `[]` as
+// "no days") and the native scheduler (treats `[]` as "every day").
 function parseWeekdays(raw: string): number[] {
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((d): d is number => typeof d === 'number') : [];
+    return WeekdaysSchema.parse(JSON.parse(raw));
   } catch {
-    return [];
+    return [...WEEKDAYS_FULL];
   }
 }
 

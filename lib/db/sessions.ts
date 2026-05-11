@@ -2,6 +2,7 @@ import { randomUUID } from 'expo-crypto';
 import { getDb } from './index';
 import { SessionInputSchema, SESSION_MIN_DURATION_S, SESSION_MAX_DURATION_S, MoodSchema } from './schemas';
 import type { Session } from './types';
+import type { MoodKey } from '../mood';
 
 function generateId(): string {
   return randomUUID();
@@ -11,17 +12,24 @@ interface SessionRow {
   id: string;
   timestamp: number;
   duration: number;
+  // Raw `string` from SQLite — could be a legacy/renamed mood that's
+  // no longer in MOODS. rowToSession() validates before narrowing.
   mood: string | null;
 }
 
 const SESSION_COLS = 'id, timestamp, duration, mood';
 
 function rowToSession(row: SessionRow): Session {
+  let mood: MoodKey | undefined;
+  if (row.mood != null) {
+    const parsed = MoodSchema.safeParse(row.mood);
+    mood = parsed.success ? parsed.data : undefined;
+  }
   return {
     id: row.id,
     timestamp: row.timestamp,
     duration: row.duration,
-    mood: row.mood ?? undefined,
+    mood,
   };
 }
 
@@ -190,7 +198,10 @@ export function getActiveDaysCount(): number {
   return row?.count ?? 0;
 }
 
-export function updateSessionMood(sessionId: string, mood: string): void {
+export function updateSessionMood(sessionId: string, mood: MoodKey): void {
+  // Caller passes MoodKey via TS; safeParse is a runtime backstop for
+  // any code path that bypasses type-checking (raw JS, future RPC, etc.)
+  // so a malformed mood never reaches SQLite.
   const parsed = MoodSchema.safeParse(mood);
   if (!parsed.success) {
     console.warn('updateSessionMood rejected invalid mood', { mood, error: parsed.error.flatten() });

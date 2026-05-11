@@ -12,11 +12,13 @@ export function getSetting(key: string): string | null {
 }
 
 export function setSetting(key: string, value: string): void {
+  // updated_at: column default (datetime('now')) covers the INSERT path,
+  // and the AFTER UPDATE trigger from migration009 covers the ON CONFLICT
+  // → UPDATE path. No need to set it manually here.
   const db = getDb();
   db.runSync(
-    `INSERT INTO settings (key, user_id, value, updated_at)
-     VALUES (?, 'local', ?, datetime('now'))
-     ON CONFLICT(key, user_id) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    `INSERT INTO settings (key, user_id, value) VALUES (?, 'local', ?)
+     ON CONFLICT(key, user_id) DO UPDATE SET value = excluded.value`,
     key, value,
   );
 }
