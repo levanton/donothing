@@ -174,7 +174,7 @@ export default function GoalSliderBar({
   minMinutes = 0,
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
-  const color = accentColor ?? theme.textSecondary;
+  const color: string = accentColor ?? theme.textSecondary ?? theme.text;
   const sH = sliderHeight ?? SLIDER_H;
   const tR = thumbR ?? (isInteractive ? 8 : 7);
   const tDotR = thumbR ? thumbR * 0.3 : (isInteractive ? 2.5 : 2);
