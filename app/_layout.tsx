@@ -10,11 +10,11 @@ import { useAppStore } from '@/lib/store';
 import { TutorialTooltip } from '@/components/tutorial';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { roundedSvgMaskPath } from '@/lib/tutorial/svgMask';
-import { initSentry, captureError } from '@/lib/sentry';
+import { initSentry, captureError, wrap } from '@/lib/sentry';
 
 // Module-level call: runs once when the layout module is loaded
 // (i.e. at app launch, before the first render). No-op if no DSN is
-// configured. See lib/sentry.ts.
+// configured. See lib/sentry.ts for the full init config.
 initSentry();
 
 // Pin a comfortable tooltip width. Without this, the library auto-sizes
@@ -47,7 +47,7 @@ configureReanimatedLogger({
   strict: false,
 });
 
-export default function RootLayout() {
+export default wrap(function RootLayout() {
   // Theme-aware backdrop for the tutorial spotlight. Recomputed on theme
   // toggle — CopilotProvider re-mounts via the keyed wrapper below so
   // mid-tour theme switches don't show a stale dim color.
@@ -90,4 +90,4 @@ export default function RootLayout() {
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
-}
+});

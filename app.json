@@ -67,7 +67,14 @@
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-audio",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "nothing",
+          "organization": "33-apps"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -75,6 +82,7 @@
     },
     "extra": {
       "revenueCatIosKey": "appl_zdMtZwqdMxYPPzTeIWsHKycpvYv",
+      "sentryDsn": "https://13406b9ae6380915168a7d0ed2c5d503@o4510682360709120.ingest.de.sentry.io/4511371848777808",
       "router": {},
       "eas": {
         "build": {

@@ -61,6 +61,20 @@ describe('initSentry', () => {
     );
   });
 
+  it('init config locks down PII and disables Session Replay', () => {
+    // Regression guard: wizard re-runs love to flip sendDefaultPii to
+    // true and add replays. If they sneak back in we want a red test
+    // (and a privacy-label conversation) before they reach the store.
+    process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://example@sentry.io/1';
+    const { initSentry } = loadSentry();
+    initSentry();
+    const config = rcSentry().init.mock.calls[0][0];
+    expect(config.sendDefaultPii).toBe(false);
+    expect(config.replaysSessionSampleRate).toBeUndefined();
+    expect(config.replaysOnErrorSampleRate).toBeUndefined();
+    expect(config.integrations).toBeUndefined();
+  });
+
   it('is idempotent — second call is a no-op', () => {
     process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://example@sentry.io/1';
     const { initSentry } = loadSentry();

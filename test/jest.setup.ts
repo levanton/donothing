@@ -138,6 +138,10 @@ jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   captureException: jest.fn(),
   wrap: <T,>(component: T): T => component,
+  // Integrations are only referenced by wizard-style inline configs.
+  // Stubbed so any tree that imports the SDK directly still resolves.
+  mobileReplayIntegration: jest.fn(() => ({})),
+  feedbackIntegration: jest.fn(() => ({})),
 }));
 
 // react-native `Settings` is missing from the jest-expo mock surface.
