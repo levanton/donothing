@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Cancel in-progress runs on the same ref when a new commit lands —
+# saves CI minutes on rapid pushes / force-pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Match the developer-machine version pinned in CLAUDE/memory.
+          node-version: '22'
+          cache: 'npm'
+
+      # `npm ci` insists on a clean install matched to package-lock.json
+      # so the CI run can't drift away from the dev-machine resolution.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        # --ci → no snapshot writes, fail on missing snapshots.
+        # --maxWorkers=2 → matches the 2-vCPU GitHub-hosted runners
+        # better than the auto-detected count (which over-shards).
+        run: npm test -- --ci --maxWorkers=2

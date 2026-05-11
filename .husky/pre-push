@@ -1,0 +1,7 @@
+# Pre-push guard: run the full Jest suite + typecheck before letting a
+# push reach the remote. Fast (~1.5s for tests, ~3s typecheck) and
+# catches the "forgot to run tests" mistake. Override with --no-verify
+# for genuine emergencies (e.g. pushing a hotfix branch with a broken
+# unrelated test).
+
+npm run typecheck && npm test --silent

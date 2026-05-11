@@ -69,6 +69,18 @@ When you add a new module:
 - **Native module** → stub it in `test/jest.setup.ts` so component
   tests don't blow up.
 
+### Automated runs
+
+The suite runs in two places automatically:
+
+1. **GitHub Actions** (`.github/workflows/test.yml`) — on every push to
+   `master` and every PR. Runs `npm run typecheck` + `npm test --ci`.
+   If it goes red, fix it before merging.
+2. **Husky pre-push hook** (`.husky/pre-push`) — runs typecheck + tests
+   locally before any `git push`. Activated automatically after
+   `npm install` via the `prepare` script. Override for genuine
+   emergencies with `git push --no-verify`.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:
