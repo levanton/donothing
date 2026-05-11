@@ -1,49 +1,34 @@
-import { NativeModules, Platform } from 'react-native';
+import { Platform, Settings } from 'react-native';
 
 /** Zero-pad a single integer to 2 digits ("5" → "05"). */
 export function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-let _uses24HourCache: boolean | null = null;
-
 /**
  * Whether the user's device prefers 24-hour clock display.
  *
  * On iOS we first honour the explicit Settings → General → Date & Time →
  * 24-Hour Time toggle (exposed via NSUserDefaults as
- * AppleICUForce24HourTime / AppleICUForce12HourTime). When the user hasn't
- * overridden it, we fall back to the locale's default by sniffing how
- * `toLocaleTimeString` renders 13:00 — locales that produce "AM"/"PM"
- * count as 12-hour, everything else as 24-hour.
- *
- * Cached for the app lifetime; a setting change won't take effect until
- * the next launch, which matches typical iOS app behaviour.
+ * AppleICUForce24HourTime / AppleICUForce12HourTime). Read via `Settings.get`
+ * so a toggle change is picked up as soon as the user comes back to the app —
+ * no relaunch required. When the user hasn't overridden it, we fall back to
+ * the locale's default by sniffing how `toLocaleTimeString` renders 13:00.
  */
 export function uses24HourClock(): boolean {
-  if (_uses24HourCache !== null) return _uses24HourCache;
-
   if (Platform.OS === 'ios') {
-    const s = NativeModules.SettingsManager?.settings;
-    const force24 = s?.AppleICUForce24HourTime;
-    const force12 = s?.AppleICUForce12HourTime;
-    if (force24 === 1 || force24 === true || force24 === '1') {
-      _uses24HourCache = true;
-      return true;
-    }
-    if (force12 === 1 || force12 === true || force12 === '1') {
-      _uses24HourCache = false;
-      return false;
-    }
+    const force24 = Settings.get('AppleICUForce24HourTime');
+    const force12 = Settings.get('AppleICUForce12HourTime');
+    if (force24 === 1 || force24 === true || force24 === '1') return true;
+    if (force12 === 1 || force12 === true || force12 === '1') return false;
   }
 
   try {
     const sample = new Date(2000, 0, 1, 13, 0).toLocaleTimeString(undefined, { hour: 'numeric' });
-    _uses24HourCache = !/AM|PM/i.test(sample);
+    return !/AM|PM/i.test(sample);
   } catch {
-    _uses24HourCache = false;
+    return false;
   }
-  return _uses24HourCache;
 }
 
 export interface ClockParts {

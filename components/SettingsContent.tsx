@@ -17,7 +17,7 @@ import { requestAuth, NEVER_BLOCK_SELECTION_ID, MAX_BLOCKS } from '@/lib/screen-
 import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
 import { WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
-import { formatClockTime } from '@/lib/format';
+import { clockParts } from '@/lib/format';
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
@@ -258,9 +258,22 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
             }]}
           >
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTime, { color: active ? theme.accent : theme.text, fontFamily: Fonts!.mono }]}>
-                {formatClockTime(b.hour, b.minute)}
-              </Text>
+              {(() => {
+                const p = clockParts(b.hour, b.minute);
+                const color = active ? theme.accent : theme.text;
+                return (
+                  <View style={styles.cardTimeRow}>
+                    <Text style={[styles.cardTime, { color, fontFamily: Fonts!.mono }]}>
+                      {p.hour}:{p.minute}
+                    </Text>
+                    {p.ampm && (
+                      <Text style={[styles.cardAmPm, { color, fontFamily: Fonts!.mono }]}>
+                        {p.ampm}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
               <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
                 <Text style={{ fontFamily: Fonts!.mono, fontWeight: '600', fontStyle: 'normal', color: theme.text }}>
                   {b.unlockGoalMinutes} min
@@ -513,7 +526,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardContent: { gap: 4 },
+  cardTimeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   cardTime: { fontSize: 36, fontWeight: '500' },
+  cardAmPm: { fontSize: 18, fontWeight: '500', letterSpacing: 0.5 },
   cardLabel: { fontSize: 14, fontWeight: '300' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
