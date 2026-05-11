@@ -69,6 +69,27 @@ When you add a new module:
 - **Native module** → stub it in `test/jest.setup.ts` so component
   tests don't blow up.
 
+## Crash reporting (Sentry)
+
+Render-time errors are caught by the top-level `<ErrorBoundary>` in
+`app/_layout.tsx` and forwarded to Sentry via `lib/sentry.ts`. To wire
+your project:
+
+1. Create a project at https://sentry.io and copy the DSN.
+2. Set the DSN as an Expo public env var so it's inlined at build time:
+   ```bash
+   # .env (gitignored — do not commit)
+   EXPO_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
+   ```
+   Alternatively, drop the DSN into `app.json` under `expo.extra.sentryDsn`.
+3. The `@sentry/react-native` config plugin is already in `app.json`,
+   so `expo prebuild --clean` + a fresh native build pick up native
+   crash reporting on iOS.
+
+Without a DSN, both `initSentry()` and `captureError()` no-op silently
+(plus a one-line warning in dev), so the app builds and runs fine
+before Sentry is configured.
+
 ### Automated runs
 
 The suite runs in two places automatically:

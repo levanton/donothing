@@ -132,6 +132,14 @@ jest.mock('expo-haptics', () => ({
 // react-native-device-activity — internal native module, stub everything.
 jest.mock('react-native-device-activity', () => ({}));
 
+// @sentry/react-native — native module, can't load under jest. Provide
+// the surface lib/sentry.ts touches and nothing else.
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  captureException: jest.fn(),
+  wrap: <T,>(component: T): T => component,
+}));
+
 // react-native `Settings` is missing from the jest-expo mock surface.
 // uses24HourClock() reads it via `Settings.get` — without a stub the
 // app code blows up with "Cannot read properties of undefined".

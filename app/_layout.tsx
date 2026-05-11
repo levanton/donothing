@@ -10,6 +10,12 @@ import { useAppStore } from '@/lib/store';
 import { TutorialTooltip } from '@/components/tutorial';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { roundedSvgMaskPath } from '@/lib/tutorial/svgMask';
+import { initSentry, captureError } from '@/lib/sentry';
+
+// Module-level call: runs once when the layout module is loaded
+// (i.e. at app launch, before the first render). No-op if no DSN is
+// configured. See lib/sentry.ts.
+initSentry();
 
 // Pin a comfortable tooltip width. Without this, the library auto-sizes
 // against `target.x → screen edge`, which produces a tiny pill when the
@@ -52,9 +58,9 @@ export default function RootLayout() {
 
   return (
     // ErrorBoundary lives at the very top so it catches render errors
-    // inside every provider below. When Sentry lands, wire it via the
-    // onError prop — keeps the boundary itself transport-agnostic.
-    <ErrorBoundary>
+    // inside every provider below. Errors are forwarded to Sentry via
+    // captureError — boundary stays transport-agnostic.
+    <ErrorBoundary onError={captureError}>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: APP_BG }}>
         <BottomSheetModalProvider>
           <CopilotProvider

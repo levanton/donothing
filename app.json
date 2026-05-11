@@ -66,7 +66,8 @@
       "expo-asset",
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-audio"
+      "expo-audio",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,
