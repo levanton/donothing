@@ -1,8 +1,7 @@
-import { useCallback, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import Animated, { FadeIn, FadeOut, withTiming } from 'react-native-reanimated';
 import { EASE_IN_OUT } from '@/constants/animations';
@@ -10,28 +9,9 @@ import { Feather } from '@expo/vector-icons';
 
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
-import { saveOnboardingData } from '@/lib/onboarding-persistence';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
+import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import PillButton from '@/components/PillButton';
-
-// Screens
-import WelcomeScreen from '@/components/onboarding/screens/WelcomeScreen';
-import NostalgiaScreen from '@/components/onboarding/screens/NostalgiaScreen';
-import EvidenceScreen from '@/components/onboarding/screens/EvidenceScreen';
-import RushingScreen from '@/components/onboarding/screens/RushingScreen';
-import PhoneSymptomScreen from '@/components/onboarding/screens/PhoneSymptomScreen';
-import PainQuizScreen from '@/components/onboarding/screens/PainQuizScreen';
-import ScreenTimeQuizScreen from '@/components/onboarding/screens/ScreenTimeQuizScreen';
-import AgeQuizScreen from '@/components/onboarding/screens/AgeQuizScreen';
-import PermissionsScreen from '@/components/onboarding/screens/PermissionsScreen';
-import HowItWorksScreen from '@/components/onboarding/screens/HowItWorksScreen';
-import ScreenTimeStatsScreen from '@/components/onboarding/screens/ScreenTimeStatsScreen';
-import TryNothingScreen from '@/components/onboarding/screens/TryNothingScreen';
-import FirstMinuteDoneScreen from '@/components/onboarding/screens/FirstMinuteDoneScreen';
-import DailyBenefitsScreen from '@/components/onboarding/screens/DailyBenefitsScreen';
-import PersonalizedResultScreen from '@/components/onboarding/screens/PersonalizedResultScreen';
-import TestimonialsScreen from '@/components/onboarding/screens/TestimonialsScreen';
-import PaywallScreen from '@/components/onboarding/screens/PaywallScreen';
 
 // Custom "page-flip" enter/exit. Reanimated's stock SlideInRight starts
 // the entering view from the full screen-edge; we want a much smaller
@@ -67,7 +47,6 @@ function pageExit() {
 const __DEV_JUMP__ = false && __DEV__;
 
 export default function OnboardingRoute() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const flow = useOnboardingFlow();
   const [showJumper, setShowJumper] = useState(false);
@@ -79,51 +58,7 @@ export default function OnboardingRoute() {
     ? palette.cream
     : screenTheme.text;
 
-  const handleFinish = useCallback(async () => {
-    haptics.success();
-    try {
-      await saveOnboardingData({
-        painPoints: flow.painPoints,
-        screenTime: flow.screenTime,
-        router,
-      });
-    } catch (e) {
-      // Persistence failed (disk full, DB locked, etc.). Stay on this
-      // screen so the user can retry — marking onboarding complete now
-      // would lose their answers and skip the flow on next launch.
-      console.error('[onboarding] save failed:', e);
-      Alert.alert(
-        'Could not save',
-        'Something went wrong saving your answers. Please try again.',
-      );
-    }
-  }, [flow.painPoints, flow.screenTime, router]);
-
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;
-
-  const renderScreen = () => {
-    const props = { isActive: true, onNext: flow.goNext, theme: screenTheme };
-    switch (currentPage.id) {
-      case 'welcome':         return <WelcomeScreen {...props} />;
-      case 'nostalgia':       return <NostalgiaScreen {...props} />;
-      case 'rushing':         return <RushingScreen {...props} />;
-      case 'evidence':        return <EvidenceScreen {...props} />;
-      case 'phoneSymptom':    return <PhoneSymptomScreen {...props} />;
-      case 'painQuiz':        return <PainQuizScreen {...props} selected={flow.painPoints} onSelect={flow.setPainPoints} />;
-      case 'screenTimeQuiz':  return <ScreenTimeQuizScreen {...props} selected={flow.screenTime} onSelect={flow.setScreenTime} />;
-      case 'ageQuiz':         return <AgeQuizScreen {...props} selected={flow.age} onSelect={flow.setAge} />;
-      case 'screenTimeStats': return <ScreenTimeStatsScreen {...props} screenTimeAnswer={flow.screenTime[0] ?? ''} ageAnswer={flow.age[0] ?? ''} />;
-      case 'tryNothing':      return <TryNothingScreen {...props} onSkip={() => flow.jumpTo(currentIndex + 2)} />;
-      case 'firstMinuteDone': return <FirstMinuteDoneScreen {...props} />;
-      case 'dailyBenefits':   return <DailyBenefitsScreen {...props} />;
-      case 'testimonials':    return <TestimonialsScreen {...props} />;
-      case 'howItWorks':      return <HowItWorksScreen {...props} />;
-      case 'permissions':     return <PermissionsScreen {...props} />;
-      case 'personalResult':  return <PersonalizedResultScreen {...props} />;
-      case 'paywall':         return <PaywallScreen {...props} onFinish={handleFinish} />;
-      default:                return null;
-    }
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: currentPage.bg }]}>
@@ -149,7 +84,7 @@ export default function OnboardingRoute() {
         }
         style={styles.page}
       >
-        {renderScreen()}
+        {SCREEN_REGISTRY[currentPage.id](flow)}
       </Animated.View>
 
       {/* Bottom Continue button */}
@@ -159,8 +94,8 @@ export default function OnboardingRoute() {
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
           <PillButton
-            label={flow.isLastScreen ? 'Start' : 'Continue'}
-            onPress={flow.isLastScreen ? handleFinish : flow.goNext}
+            label={flow.isLastScreen ? 'start' : 'continue'}
+            onPress={flow.isLastScreen ? flow.finish : flow.goNext}
             color={flow.isLastScreen ? palette.terracotta : screenTheme.text}
             variant={flow.isLastScreen ? 'filled' : 'outline'}
           />

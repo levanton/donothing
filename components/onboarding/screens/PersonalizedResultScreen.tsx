@@ -211,7 +211,7 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
 
       <View style={[styles.continueWrap, { paddingBottom: insets.bottom + 24 }]}>
         <PillButton
-          label="Continue"
+          label="continue"
           color={palette.terracotta}
           variant="filled"
           onPress={onNext}

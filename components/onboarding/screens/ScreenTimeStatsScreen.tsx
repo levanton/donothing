@@ -148,7 +148,7 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
           <Pressable onPress={onNext} style={styles.ctaButton}>
             <Text style={styles.ctaText}>
-              Bring my minute back
+              bring my minute back
             </Text>
           </Pressable>
         </Animated.View>

@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react';
+import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 
 import { themes } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
 import type { OnboardingPage } from '@/lib/onboarding-data';
+import { saveOnboardingData } from '@/lib/onboarding-persistence';
 
 export interface OnboardingFlow {
   currentIndex: number;
@@ -16,6 +19,8 @@ export interface OnboardingFlow {
   goNext: () => void;
   goBack: () => void;
   jumpTo: (index: number) => void;
+  /** Persist answers + leave onboarding. Called by the final screen. */
+  finish: () => void;
 
   painPoints: string[];
   setPainPoints: (v: string[]) => void;
@@ -29,6 +34,7 @@ export interface OnboardingFlow {
 }
 
 export function useOnboardingFlow(): OnboardingFlow {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const [painPoints, setPainPoints] = useState<string[]>([]);
@@ -75,6 +81,22 @@ export function useOnboardingFlow(): OnboardingFlow {
     haptics.select();
   }, []);
 
+  const finish = useCallback(async () => {
+    haptics.success();
+    try {
+      await saveOnboardingData({ painPoints, screenTime, router });
+    } catch (e) {
+      // Persistence failed (disk full, DB locked, etc.). Stay on this
+      // screen so the user can retry — marking onboarding complete now
+      // would lose their answers and skip the flow on next launch.
+      console.error('[onboarding] save failed:', e);
+      Alert.alert(
+        'Could not save',
+        'Something went wrong saving your answers. Please try again.',
+      );
+    }
+  }, [painPoints, screenTime, router]);
+
   return {
     currentIndex,
     currentPage,
@@ -85,6 +107,7 @@ export function useOnboardingFlow(): OnboardingFlow {
     goNext,
     goBack,
     jumpTo,
+    finish,
     painPoints,
     setPainPoints,
     screenTime,

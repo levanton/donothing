@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-} from 'react-native-reanimated';
 import { EASE_IN_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
+import { useEffect } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const HEADING = 'Remember being a kid?';
+const HEADING = 'remember\nbeing a kid?';
 
 interface LineSpec {
   text: string;
@@ -44,7 +44,10 @@ export default function NostalgiaScreen({ isActive, theme }: Props) {
 
   useEffect(() => {
     if (!isActive) return;
-    enterOpacity.value = withDelay(ENTER_DELAY, withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }));
+    enterOpacity.value = withDelay(
+      ENTER_DELAY,
+      withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }),
+    );
   }, [isActive]);
 
   const enterStyle = useAnimatedStyle(() => ({
@@ -52,36 +55,39 @@ export default function NostalgiaScreen({ isActive, theme }: Props) {
   }));
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={styles.content}>
-        <View style={styles.centerStack}>
-          <Animated.View style={[styles.imageArea, enterStyle]}>
-            <Image source={grassImage} style={styles.image} fadeDuration={0} />
-          </Animated.View>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.bg,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+    >
+      <Animated.View style={[styles.content, enterStyle]}>
+        <Text style={[styles.heading, { color: theme.text }]}>{HEADING}</Text>
 
-          <Animated.View style={[styles.textArea, enterStyle]}>
-            <Text style={[styles.heading, { color: theme.text }]}>
-              {HEADING}
-            </Text>
-
-            <View style={styles.body}>
-              {LINES.map((spec, i) => (
-                <Text
-                  key={i}
-                  style={[
-                    styles.line,
-                    { color: theme.text },
-                    spec.bold && { fontWeight: '600' },
-                    spec.paragraph && { marginTop: 18 },
-                  ]}
-                >
-                  {spec.text}
-                </Text>
-              ))}
-            </View>
-          </Animated.View>
+        <View style={styles.imageArea}>
+          <Image source={grassImage} style={styles.image} fadeDuration={0} />
         </View>
-      </View>
+
+        <View style={styles.body}>
+          {LINES.map((spec, i) => (
+            <Text
+              key={i}
+              style={[
+                styles.line,
+                { color: theme.text },
+                spec.bold && { fontWeight: '600' },
+                spec.paragraph && { marginTop: 18 },
+              ]}
+            >
+              {spec.text}
+            </Text>
+          ))}
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -93,36 +99,31 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 32,
-    paddingBottom: 24,
-  },
-  centerStack: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingTop: 48,
+    paddingBottom: 96,
   },
   imageArea: {
     alignItems: 'center',
-    marginBottom: 56,
   },
   image: {
-    width: 270,
-    height: 270,
+    width: '100%',
+    maxWidth: 280,
+    aspectRatio: 608 / 592,
     resizeMode: 'contain',
   },
-  textArea: {},
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 28,
+    fontSize: 40,
     fontWeight: '500',
     textAlign: 'left',
-    lineHeight: 36,
-    marginBottom: 14,
+    lineHeight: 46,
   },
   body: {},
   line: {
     fontFamily: Fonts?.serif,
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 26,
+    lineHeight: 30,
   },
 });

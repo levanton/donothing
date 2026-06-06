@@ -60,7 +60,7 @@ export const SCREENS: OnboardingScreen[] = [
   {
     id: 'ageQuiz',
     type: 'quiz',
-    heading: 'How old are you? Roughly.',
+    heading: 'How old are you?',
     options: ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+'],
   },
   {
@@ -103,7 +103,7 @@ export interface OnboardingPage {
 }
 
 export const PAGES: OnboardingPage[] = [
-  { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
   { id: 'nostalgia',       bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
   { id: 'rushing',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: true  },
   { id: 'phoneSymptom',    bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: false, showBackButton: true  },

@@ -4,15 +4,11 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withDelay,
-  withSequence,
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 
 const FADE_IN_MS = 900;
-const HOLD_MS = 1400;
-const FADE_OUT_MS = 700;
 
 interface Props {
   isActive: boolean;
@@ -20,22 +16,17 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function WelcomeScreen({ isActive, onNext, theme }: Props) {
+export default function WelcomeScreen({ isActive, theme }: Props) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(8);
 
   useEffect(() => {
     if (!isActive) return;
 
-    opacity.value = withSequence(
-      withTiming(1, { duration: FADE_IN_MS, easing: EASE_OUT }),
-      withDelay(HOLD_MS, withTiming(0, { duration: FADE_OUT_MS, easing: EASE_OUT })),
-    );
+    // Fade in and stay — advancing is manual (circle-next arrow in the
+    // onboarding shell), so this is a real first page, not a splash.
+    opacity.value = withTiming(1, { duration: FADE_IN_MS, easing: EASE_OUT });
     translateY.value = withTiming(0, { duration: FADE_IN_MS, easing: EASE_OUT });
-
-    const total = FADE_IN_MS + HOLD_MS + FADE_OUT_MS;
-    const t = setTimeout(() => onNext(), total);
-    return () => clearTimeout(t);
   }, [isActive]);
 
   const textStyle = useAnimatedStyle(() => ({
@@ -47,7 +38,7 @@ export default function WelcomeScreen({ isActive, onNext, theme }: Props) {
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Animated.View style={textStyle}>
         <Text style={[styles.greeting, { color: theme.text, fontFamily: Fonts?.serif }]}>
-          {'Welcome\nto nothing'}
+          {'welcome\nto nothing'}
         </Text>
       </Animated.View>
     </View>
@@ -58,7 +49,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 32,
   },
   greeting: {
@@ -66,6 +57,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: -0.5,
     lineHeight: 46,
-    textAlign: 'center',
+    textAlign: 'left',
   },
 });
