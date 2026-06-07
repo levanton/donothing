@@ -21,12 +21,12 @@ interface LineSpec {
 }
 
 const LINES: LineSpec[] = [
-  { text: 'work. home. errands. repeat.' },
-  { text: 'in between — we scroll.' },
-  { text: 'not to feel something — but to feel nothing.' },
-  { text: 'and it never helps.' },
-  { text: 'we’re exhausted.', bold: true },
-  { text: 'days, months, years — gone in a blur.', bold: true },
+  { text: 'so much to do.' },
+  { text: 'so many things calling.' },
+  { text: 'so much pressure.' },
+  { text: 'it keeps us busy.', paragraph: true },
+  { text: 'but never really here.' },
+  { text: 'days, months, years — gone in a blur.', bold: true, paragraph: true },
 ];
 
 const ENTER_DELAY = 200;
