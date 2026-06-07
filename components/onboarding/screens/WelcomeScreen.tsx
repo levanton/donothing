@@ -48,7 +48,9 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
           to nothing
         </Text>
 
-        <View style={[styles.divider, { backgroundColor: palette.terracotta }]} />
+        <View
+          style={[styles.divider, { backgroundColor: palette.terracotta }]}
+        />
 
         <Text style={[styles.essence, { color: theme.text }]}>
           a quiet space to step out of the rush — and do absolutely nothing.
@@ -71,6 +73,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
     paddingHorizontal: 32,
+    paddingBottom: 100,
   },
   textBlock: {
     marginBottom: 140,
@@ -78,7 +81,7 @@ const styles = StyleSheet.create({
   image: {
     position: 'absolute',
     right: 0,
-    bottom: -100,
+    top: '25%',
     width: 250,
     aspectRatio: 577 / 800,
   },
