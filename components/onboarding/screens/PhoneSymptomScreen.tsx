@@ -1,14 +1,20 @@
-import { useEffect } from 'react';
-import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-} from 'react-native-reanimated';
 import { EASE_IN_OUT } from '@/constants/animations';
 import { palette } from '@/lib/theme';
+import { useEffect } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
 
 const whatIfImage = require('@/assets/images/what-if.png');
@@ -47,7 +53,10 @@ export default function PhoneSymptomScreen({ isActive, theme }: Props) {
 
   useEffect(() => {
     if (!isActive) return;
-    enterOpacity.value = withDelay(ENTER_DELAY, withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }));
+    enterOpacity.value = withDelay(
+      ENTER_DELAY,
+      withTiming(1, { duration: ENTER_DURATION, easing: EASE_IN_OUT }),
+    );
   }, [isActive]);
 
   const enterStyle = useAnimatedStyle(() => ({
@@ -56,9 +65,20 @@ export default function PhoneSymptomScreen({ isActive, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.content,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom },
+        ]}
+      >
         <Animated.View style={[styles.textArea, enterStyle]}>
-          <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
+          <Text
+            style={[
+              onboardingText.heading,
+              styles.heading,
+              { color: theme.text },
+            ]}
+          >
             {HEADING}
           </Text>
 
@@ -107,6 +127,9 @@ const styles = StyleSheet.create({
   },
   image: {
     resizeMode: 'contain',
+    aspectRatio: 939 / 739,
+
+    maxWidth: 360,
   },
   textArea: {},
   heading: {

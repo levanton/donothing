@@ -162,9 +162,8 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
             {FACTS.map((f, i) => {
               const cardTheme = CARD_THEMES[i % CARD_THEMES.length];
               return (
-                <Pressable
+                <View
                   key={i}
-                  onPress={() => Linking.openURL(f.url)}
                   style={[
                     styles.card,
                     {
@@ -178,11 +177,16 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
                   <Text style={[styles.line, { color: cardTheme.textColor }]}>{f.line}</Text>
                   <View style={styles.cardBottom}>
                     <Text style={[styles.body, { color: cardTheme.accentColor }]}>{f.body}</Text>
-                    <View style={[styles.srcChip, { borderColor: cardTheme.accentColor }]}>
+                    <Pressable
+                      onPress={() => Linking.openURL(f.url)}
+                      hitSlop={8}
+                      style={[styles.srcChip, { borderColor: cardTheme.accentColor }]}
+                    >
+                      <Feather name="link" size={11} color={cardTheme.accentColor} />
                       <Text style={[styles.src, { color: cardTheme.accentColor }]}>{f.src}</Text>
-                    </View>
+                    </Pressable>
                   </View>
-                </Pressable>
+                </View>
               );
             })}
           </ScrollView>
@@ -258,6 +262,9 @@ const styles = StyleSheet.create({
   },
   srcChip: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 10,
