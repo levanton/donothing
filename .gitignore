@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 !.env.example
 
 # typescript
@@ -42,4 +44,7 @@ app-example
 /ios
 /android
 
-config.bat
+.env.local
+
+# Build artifacts
+*.ipa

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -13,7 +13,7 @@ import { palette } from '@/lib/theme';
 
 const whatIfImage = require('@/assets/images/what-if.png');
 
-const HEADING = 'What if…';
+const HEADING = 'what if…';
 
 interface LineSpec {
   text: string;
@@ -24,8 +24,8 @@ interface LineSpec {
 
 const LINES: LineSpec[] = [
   { text: 'you just stopped?' },
-  { text: 'Did nothing. Like you used to.' },
-  { text: 'Even one minute a day', paragraph: true },
+  { text: 'did nothing. like you used to.' },
+  { text: 'even one minute a day', paragraph: true },
   { text: 'can change everything.', bold: true, accent: true },
 ];
 
@@ -40,6 +40,8 @@ interface Props {
 
 export default function PhoneSymptomScreen({ isActive, theme }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const imageSize = Math.min(width * 0.82, 330);
 
   const enterOpacity = useSharedValue(0);
 
@@ -54,34 +56,36 @@ export default function PhoneSymptomScreen({ isActive, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <View style={styles.centerStack}>
-          <Animated.View style={[styles.imageArea, enterStyle]}>
-            <Image source={whatIfImage} style={styles.image} fadeDuration={0} />
-          </Animated.View>
+      <View style={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom }]}>
+        <Animated.View style={[styles.textArea, enterStyle]}>
+          <Text style={[styles.heading, { color: theme.text }]}>
+            {HEADING}
+          </Text>
 
-          <Animated.View style={[styles.textArea, enterStyle]}>
-            <Text style={[styles.heading, { color: palette.terracotta }]}>
-              {HEADING}
-            </Text>
+          <View style={styles.body}>
+            {LINES.map((spec, i) => (
+              <Text
+                key={i}
+                style={[
+                  styles.line,
+                  { color: spec.accent ? palette.terracotta : theme.text },
+                  spec.bold && { fontWeight: '600' },
+                  spec.paragraph && { marginTop: 18 },
+                ]}
+              >
+                {spec.text}
+              </Text>
+            ))}
+          </View>
+        </Animated.View>
 
-            <View style={styles.body}>
-              {LINES.map((spec, i) => (
-                <Text
-                  key={i}
-                  style={[
-                    styles.line,
-                    { color: spec.accent ? palette.terracotta : theme.text },
-                    spec.bold && { fontWeight: '600' },
-                    spec.paragraph && { marginTop: 18 },
-                  ]}
-                >
-                  {spec.text}
-                </Text>
-              ))}
-            </View>
-          </Animated.View>
-        </View>
+        <Animated.View style={[styles.imageArea, enterStyle]}>
+          <Image
+            source={whatIfImage}
+            style={[styles.image, { width: imageSize, height: imageSize }]}
+            fadeDuration={0}
+          />
+        </Animated.View>
       </View>
     </View>
   );
@@ -95,35 +99,30 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 32,
     paddingBottom: 24,
-  },
-  centerStack: {
-    flex: 1,
     justifyContent: 'center',
   },
   imageArea: {
     alignItems: 'center',
-    marginBottom: 56,
+    marginTop: 40,
   },
   image: {
-    width: 270,
-    height: 270,
     resizeMode: 'contain',
   },
   textArea: {},
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 28,
-    fontWeight: '500',
+    fontSize: 40,
+    fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 36,
+    lineHeight: 46,
     marginBottom: 14,
   },
   body: {},
   line: {
     fontFamily: Fonts?.serif,
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 26,
+    lineHeight: 27,
   },
 });

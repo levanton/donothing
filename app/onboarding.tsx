@@ -3,8 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
-import Animated, { FadeIn, FadeOut, withTiming } from 'react-native-reanimated';
-import { EASE_IN_OUT } from '@/constants/animations';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
 import { palette, getStatusBarStyle } from '@/lib/theme';
@@ -12,37 +11,6 @@ import { PAGES } from '@/lib/onboarding-data';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import PillButton from '@/components/PillButton';
-
-// Custom "page-flip" enter/exit. Reanimated's stock SlideInRight starts
-// the entering view from the full screen-edge; we want a much smaller
-// drift (~60px) so the next page softly emerges into view rather than
-// flying in from off-screen. Exit is a touch faster than enter so the
-// outgoing page clears before the new one fully settles.
-const PAGE_SLIDE_OFFSET = 60;
-const PAGE_ENTER_MS = 1300;
-const PAGE_EXIT_MS = 800;
-
-function pageEnter() {
-  'worklet';
-  return {
-    initialValues: { transform: [{ translateX: PAGE_SLIDE_OFFSET }], opacity: 0 },
-    animations: {
-      transform: [{ translateX: withTiming(0, { duration: PAGE_ENTER_MS, easing: EASE_IN_OUT }) }],
-      opacity: withTiming(1, { duration: PAGE_ENTER_MS, easing: EASE_IN_OUT }),
-    },
-  };
-}
-
-function pageExit() {
-  'worklet';
-  return {
-    initialValues: { transform: [{ translateX: 0 }], opacity: 1 },
-    animations: {
-      transform: [{ translateX: withTiming(-PAGE_SLIDE_OFFSET, { duration: PAGE_EXIT_MS, easing: EASE_IN_OUT }) }],
-      opacity: withTiming(0, { duration: PAGE_EXIT_MS, easing: EASE_IN_OUT }),
-    },
-  };
-}
 
 const __DEV_JUMP__ = false && __DEV__;
 
@@ -59,6 +27,7 @@ export default function OnboardingRoute() {
     : screenTheme.text;
 
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;
+  const screen = SCREEN_REGISTRY[currentPage.id];
 
   return (
     <View style={[styles.container, { backgroundColor: currentPage.bg }]}>
@@ -66,25 +35,11 @@ export default function OnboardingRoute() {
 
       <Animated.View
         key={currentIndex}
-        entering={
-          // Slide-from-right only on the story-screen sequence (rushing,
-          // phoneSymptom). Welcome/nostalgia fade in; everything past
-          // phoneSymptom (quizzes, etc.) uses the default fade.
-          currentPage.id === 'rushing' || currentPage.id === 'phoneSymptom'
-            ? pageEnter
-            : FadeIn.duration(800)
-        }
-        exiting={
-          // Slide-out only when leaving INTO another story screen, i.e.
-          // when this page is nostalgia or rushing. Welcome and
-          // phoneSymptom (which leads into the quiz) fade out.
-          currentPage.id === 'nostalgia' || currentPage.id === 'rushing'
-            ? pageExit
-            : FadeOut.duration(800)
-        }
+        entering={screen.enter as never}
+        exiting={screen.exit as never}
         style={styles.page}
       >
-        {SCREEN_REGISTRY[currentPage.id](flow)}
+        {screen.render(flow)}
       </Animated.View>
 
       {/* Bottom Continue button */}

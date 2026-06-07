@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { PageId } from '@/lib/onboarding-data';
 import type { OnboardingFlow } from '@/hooks/useOnboardingFlow';
+import { fadeEnter, fadeExit, slideEnter, slideExit } from '../transitions';
 
 import WelcomeScreen from './WelcomeScreen';
 import NostalgiaScreen from './NostalgiaScreen';
@@ -29,34 +30,38 @@ const base = (flow: OnboardingFlow) => ({
   theme: flow.screenTheme,
 });
 
+interface ScreenEntry {
+  render: (flow: OnboardingFlow) => ReactNode;
+  /** Page-mount animation. */
+  enter: unknown;
+  /** Page-unmount animation. */
+  exit: unknown;
+}
+
 /**
- * Single source of truth: page id → how to render it.
+ * Single source of truth: page id → how to render it AND how it animates
+ * in/out. The route reads `enter`/`exit` straight from here, so there is no
+ * animation logic in app/onboarding.tsx anymore.
  *
- * To add a screen:
- *   1. create its file in this folder
- *   2. add one entry here
- *   3. add it to PAGES in lib/onboarding-data.ts
- *
- * Because this is `Record<PageId, …>`, TypeScript fails the build if a page
- * is registered in PAGES but missing here (or vice versa) — no silent gaps,
- * no switch statement to keep in sync.
+ * To add a screen: create its file, add one entry here, add it to PAGES.
+ * `Record<PageId, …>` makes TypeScript fail the build on any gap.
  */
-export const SCREEN_REGISTRY: Record<PageId, (flow: OnboardingFlow) => ReactNode> = {
-  welcome:         (f) => <WelcomeScreen {...base(f)} />,
-  nostalgia:       (f) => <NostalgiaScreen {...base(f)} />,
-  rushing:         (f) => <RushingScreen {...base(f)} />,
-  evidence:        (f) => <EvidenceScreen {...base(f)} />,
-  phoneSymptom:    (f) => <PhoneSymptomScreen {...base(f)} />,
-  painQuiz:        (f) => <PainQuizScreen {...base(f)} selected={f.painPoints} onSelect={f.setPainPoints} />,
-  screenTimeQuiz:  (f) => <ScreenTimeQuizScreen {...base(f)} selected={f.screenTime} onSelect={f.setScreenTime} />,
-  ageQuiz:         (f) => <AgeQuizScreen {...base(f)} selected={f.age} onSelect={f.setAge} />,
-  screenTimeStats: (f) => <ScreenTimeStatsScreen {...base(f)} screenTimeAnswer={f.screenTime[0] ?? ''} ageAnswer={f.age[0] ?? ''} />,
-  tryNothing:      (f) => <TryNothingScreen {...base(f)} onSkip={() => f.jumpTo(f.currentIndex + 2)} />,
-  firstMinuteDone: (f) => <FirstMinuteDoneScreen {...base(f)} />,
-  dailyBenefits:   (f) => <DailyBenefitsScreen {...base(f)} />,
-  testimonials:    (f) => <TestimonialsScreen {...base(f)} />,
-  howItWorks:      (f) => <HowItWorksScreen {...base(f)} />,
-  permissions:     (f) => <PermissionsScreen {...base(f)} />,
-  personalResult:  (f) => <PersonalizedResultScreen {...base(f)} />,
-  paywall:         (f) => <PaywallScreen {...base(f)} onFinish={f.finish} />,
+export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
+  welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
+  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: fadeEnter,  exit: slideExit },
+  rushing:         { render: (f) => <RushingScreen {...base(f)} />,        enter: slideEnter, exit: slideExit },
+  evidence:        { render: (f) => <EvidenceScreen {...base(f)} />,       enter: fadeEnter,  exit: fadeExit },
+  phoneSymptom:    { render: (f) => <PhoneSymptomScreen {...base(f)} />,   enter: slideEnter, exit: fadeExit },
+  painQuiz:        { render: (f) => <PainQuizScreen {...base(f)} selected={f.painPoints} onSelect={f.setPainPoints} />, enter: fadeEnter, exit: fadeExit },
+  screenTimeQuiz:  { render: (f) => <ScreenTimeQuizScreen {...base(f)} selected={f.screenTime} onSelect={f.setScreenTime} />, enter: fadeEnter, exit: fadeExit },
+  ageQuiz:         { render: (f) => <AgeQuizScreen {...base(f)} selected={f.age} onSelect={f.setAge} />, enter: fadeEnter, exit: fadeExit },
+  screenTimeStats: { render: (f) => <ScreenTimeStatsScreen {...base(f)} screenTimeAnswer={f.screenTime[0] ?? ''} ageAnswer={f.age[0] ?? ''} />, enter: fadeEnter, exit: fadeExit },
+  tryNothing:      { render: (f) => <TryNothingScreen {...base(f)} onSkip={() => f.jumpTo(f.currentIndex + 2)} />, enter: fadeEnter, exit: fadeExit },
+  firstMinuteDone: { render: (f) => <FirstMinuteDoneScreen {...base(f)} />, enter: fadeEnter, exit: fadeExit },
+  dailyBenefits:   { render: (f) => <DailyBenefitsScreen {...base(f)} />,   enter: fadeEnter, exit: fadeExit },
+  testimonials:    { render: (f) => <TestimonialsScreen {...base(f)} />,    enter: fadeEnter, exit: fadeExit },
+  howItWorks:      { render: (f) => <HowItWorksScreen {...base(f)} />,      enter: fadeEnter, exit: fadeExit },
+  permissions:     { render: (f) => <PermissionsScreen {...base(f)} />,     enter: fadeEnter, exit: fadeExit },
+  personalResult:  { render: (f) => <PersonalizedResultScreen {...base(f)} />, enter: fadeEnter, exit: fadeExit },
+  paywall:         { render: (f) => <PaywallScreen {...base(f)} onFinish={f.finish} />, enter: fadeEnter, exit: fadeExit },
 };

@@ -1,14 +1,17 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
+import { palette } from '@/lib/theme';
+import { useEffect } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 const FADE_IN_MS = 900;
+
+const welcomeImage = require('@/assets/images/visuals/circle-welcome.png');
 
 interface Props {
   isActive: boolean;
@@ -26,7 +29,10 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
     // Fade in and stay — advancing is manual (circle-next arrow in the
     // onboarding shell), so this is a real first page, not a splash.
     opacity.value = withTiming(1, { duration: FADE_IN_MS, easing: EASE_OUT });
-    translateY.value = withTiming(0, { duration: FADE_IN_MS, easing: EASE_OUT });
+    translateY.value = withTiming(0, {
+      duration: FADE_IN_MS,
+      easing: EASE_OUT,
+    });
   }, [isActive]);
 
   const textStyle = useAnimatedStyle(() => ({
@@ -36,11 +42,19 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Animated.View style={textStyle}>
-        <Text style={[styles.greeting, { color: theme.text, fontFamily: Fonts?.serif }]}>
-          {'welcome\nto nothing'}
+      <Animated.View style={[styles.textBlock, textStyle]}>
+        <Text style={[styles.welcome, { color: theme.text }]}>welcome</Text>
+        <Text style={[styles.welcome, { color: palette.terracotta }]}>
+          to nothing
         </Text>
       </Animated.View>
+
+      <Image
+        source={welcomeImage}
+        style={styles.image}
+        resizeMode='contain'
+        fadeDuration={0}
+      />
     </View>
   );
 }
@@ -52,11 +66,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: 32,
   },
-  greeting: {
-    fontSize: 38,
-    fontWeight: '500',
-    letterSpacing: -0.5,
-    lineHeight: 46,
+  textBlock: {
+    marginBottom: 140,
+  },
+  image: {
+    position: 'absolute',
+    right: 0,
+    bottom: -100,
+    width: 250,
+    aspectRatio: 577 / 800,
+  },
+  welcome: {
+    fontFamily: Fonts?.serif,
+    fontSize: 48,
+    fontWeight: '400',
+    letterSpacing: 0.4,
+    lineHeight: 50,
     textAlign: 'left',
   },
 });

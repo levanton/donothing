@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -12,7 +12,7 @@ import { Fonts } from '@/constants/theme';
 
 const rushImage = require('@/assets/images/rush.png');
 
-const HEADING = 'Now.';
+const HEADING = 'now.';
 
 interface LineSpec {
   text: string;
@@ -21,12 +21,12 @@ interface LineSpec {
 }
 
 const LINES: LineSpec[] = [
-  { text: 'Work. Home. Errands. Repeat.' },
-  { text: 'In between — we scroll.' },
-  { text: 'Not to feel something — but to feel nothing.' },
-  { text: 'And it never helps.' },
-  { text: 'We’re exhausted.', bold: true },
-  { text: 'Days, months, years — gone in a blur.', bold: true },
+  { text: 'work. home. errands. repeat.' },
+  { text: 'in between — we scroll.' },
+  { text: 'not to feel something — but to feel nothing.' },
+  { text: 'and it never helps.' },
+  { text: 'we’re exhausted.', bold: true },
+  { text: 'days, months, years — gone in a blur.', bold: true },
 ];
 
 const ENTER_DELAY = 200;
@@ -40,6 +40,8 @@ interface Props {
 
 export default function RushingScreen({ isActive, theme }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const imageSize = Math.min(width * 0.82, 330);
 
   const enterOpacity = useSharedValue(0);
 
@@ -54,34 +56,36 @@ export default function RushingScreen({ isActive, theme }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <View style={styles.centerStack}>
-          <Animated.View style={[styles.imageArea, enterStyle]}>
-            <Image source={rushImage} style={styles.image} fadeDuration={0} />
-          </Animated.View>
+      <View style={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom }]}>
+        <Animated.View style={[styles.textArea, enterStyle]}>
+          <Text style={[styles.heading, { color: theme.text }]}>
+            {HEADING}
+          </Text>
 
-          <Animated.View style={[styles.textArea, enterStyle]}>
-            <Text style={[styles.heading, { color: theme.text }]}>
-              {HEADING}
-            </Text>
+          <View style={styles.body}>
+            {LINES.map((spec, i) => (
+              <Text
+                key={i}
+                style={[
+                  styles.line,
+                  { color: theme.text },
+                  spec.bold && { fontWeight: '600' },
+                  spec.paragraph && { marginTop: 18 },
+                ]}
+              >
+                {spec.text}
+              </Text>
+            ))}
+          </View>
+        </Animated.View>
 
-            <View style={styles.body}>
-              {LINES.map((spec, i) => (
-                <Text
-                  key={i}
-                  style={[
-                    styles.line,
-                    { color: theme.text },
-                    spec.bold && { fontWeight: '600' },
-                    spec.paragraph && { marginTop: 18 },
-                  ]}
-                >
-                  {spec.text}
-                </Text>
-              ))}
-            </View>
-          </Animated.View>
-        </View>
+        <Animated.View style={[styles.imageArea, enterStyle]}>
+          <Image
+            source={rushImage}
+            style={[styles.image, { width: imageSize, height: imageSize }]}
+            fadeDuration={0}
+          />
+        </Animated.View>
       </View>
     </View>
   );
@@ -95,35 +99,30 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 32,
     paddingBottom: 24,
-  },
-  centerStack: {
-    flex: 1,
     justifyContent: 'center',
   },
   imageArea: {
     alignItems: 'center',
-    marginBottom: 56,
+    marginTop: 40,
   },
   image: {
-    width: 270,
-    height: 270,
     resizeMode: 'contain',
   },
   textArea: {},
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 28,
+    fontSize: 40,
     fontWeight: '500',
     textAlign: 'left',
-    lineHeight: 36,
+    lineHeight: 46,
     marginBottom: 14,
   },
   body: {},
   line: {
     fontFamily: Fonts?.serif,
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '400',
     textAlign: 'left',
-    lineHeight: 26,
+    lineHeight: 27,
   },
 });
