@@ -47,6 +47,12 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
         <Text style={[styles.welcome, { color: palette.terracotta }]}>
           to nothing
         </Text>
+
+        <View style={[styles.divider, { backgroundColor: palette.terracotta }]} />
+
+        <Text style={[styles.essence, { color: theme.text }]}>
+          a quiet space to step out of the rush — and do absolutely nothing.
+        </Text>
       </Animated.View>
 
       <Image
@@ -83,5 +89,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     lineHeight: 50,
     textAlign: 'left',
+  },
+  divider: {
+    width: 44,
+    height: 2,
+    borderRadius: 1,
+    marginTop: 28,
+    marginBottom: 22,
+  },
+  essence: {
+    fontFamily: Fonts?.serif,
+    fontSize: 18,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    lineHeight: 27,
+    maxWidth: 300,
   },
 });
