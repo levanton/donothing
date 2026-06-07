@@ -17,11 +17,11 @@ interface LineSpec {
 }
 
 const LINES: LineSpec[] = [
-  { text: 'Lying in the grass.' },
-  { text: 'Staring at clouds.' },
-  { text: 'Dreaming about nothing.' },
-  { text: 'Time just was.' },
-  { text: 'Time just… stopped.', bold: true },
+  { text: 'lying in the grass.' },
+  { text: 'staring at clouds.' },
+  { text: 'dreaming about nothing.' },
+  { text: 'time just was.' },
+  { text: 'time just… stopped.', bold: true },
 ];
 
 const grassImage = require('@/assets/images/child.png');

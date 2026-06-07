@@ -21,9 +21,9 @@ export const onboardingText = StyleSheet.create({
   },
   line: {
     fontFamily: Fonts?.serif,
-    fontSize: 19,
+    fontSize: 21,
     fontWeight: '400',
-    lineHeight: 27,
+    lineHeight: 30,
     textAlign: 'left',
   },
 });
