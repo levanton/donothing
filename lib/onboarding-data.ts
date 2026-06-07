@@ -86,9 +86,9 @@ export type PageId =
   | 'welcome'
   | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
   | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
-  | 'screenTimeStats' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
+  | 'screenTimeStats' | 'goodNews' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
   | 'testimonials' | 'howItWorks' | 'permissions' | 'personalResult'
-  | 'paywall';
+  | 'paywall' | 'allSet';
 
 export interface OnboardingPage {
   id: PageId;
@@ -111,6 +111,7 @@ export const PAGES: OnboardingPage[] = [
   { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'ageQuiz',         bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeStats', bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
+  { id: 'goodNews',        bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'tryNothing',      bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'firstMinuteDone', bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
   { id: 'evidence',        bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: true  },
@@ -118,4 +119,5 @@ export const PAGES: OnboardingPage[] = [
   { id: 'permissions',     bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
   { id: 'paywall',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'allSet',          bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];

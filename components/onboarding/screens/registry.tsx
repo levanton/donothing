@@ -13,6 +13,7 @@ import PainQuizScreen from './PainQuizScreen';
 import ScreenTimeQuizScreen from './ScreenTimeQuizScreen';
 import AgeQuizScreen from './AgeQuizScreen';
 import ScreenTimeStatsScreen from './ScreenTimeStatsScreen';
+import GoodNewsScreen from './GoodNewsScreen';
 import TryNothingScreen from './TryNothingScreen';
 import FirstMinuteDoneScreen from './FirstMinuteDoneScreen';
 import DailyBenefitsScreen from './DailyBenefitsScreen';
@@ -21,6 +22,7 @@ import HowItWorksScreen from './HowItWorksScreen';
 import PermissionsScreen from './PermissionsScreen';
 import PersonalizedResultScreen from './PersonalizedResultScreen';
 import PaywallScreen from './PaywallScreen';
+import AllSetScreen from './AllSetScreen';
 
 // Props every screen receives. Screens with extra needs (quiz answers,
 // skip/finish callbacks) pull them straight from `flow` in their entry below.
@@ -47,8 +49,8 @@ interface ScreenEntry {
  * `Record<PageId, …>` makes TypeScript fail the build on any gap.
  */
 export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
-  welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
-  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: fadeEnter,  exit: slideExit },
+  welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: slideExit },
+  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: slideEnter, exit: slideExit },
   rushing:         { render: (f) => <RushingScreen {...base(f)} />,        enter: slideEnter, exit: slideExit },
   evidence:        { render: (f) => <EvidenceScreen {...base(f)} />,       enter: fadeEnter,  exit: fadeExit },
   phoneSymptom:    { render: (f) => <PhoneSymptomScreen {...base(f)} />,   enter: slideEnter, exit: fadeExit },
@@ -56,6 +58,7 @@ export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
   screenTimeQuiz:  { render: (f) => <ScreenTimeQuizScreen {...base(f)} selected={f.screenTime} onSelect={f.setScreenTime} />, enter: fadeEnter, exit: fadeExit },
   ageQuiz:         { render: (f) => <AgeQuizScreen {...base(f)} selected={f.age} onSelect={f.setAge} />, enter: fadeEnter, exit: fadeExit },
   screenTimeStats: { render: (f) => <ScreenTimeStatsScreen {...base(f)} screenTimeAnswer={f.screenTime[0] ?? ''} ageAnswer={f.age[0] ?? ''} />, enter: fadeEnter, exit: fadeExit },
+  goodNews:        { render: (f) => <GoodNewsScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
   tryNothing:      { render: (f) => <TryNothingScreen {...base(f)} onSkip={() => f.jumpTo(f.currentIndex + 2)} />, enter: fadeEnter, exit: fadeExit },
   firstMinuteDone: { render: (f) => <FirstMinuteDoneScreen {...base(f)} />, enter: fadeEnter, exit: fadeExit },
   dailyBenefits:   { render: (f) => <DailyBenefitsScreen {...base(f)} />,   enter: fadeEnter, exit: fadeExit },
@@ -63,5 +66,6 @@ export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
   howItWorks:      { render: (f) => <HowItWorksScreen {...base(f)} />,      enter: fadeEnter, exit: fadeExit },
   permissions:     { render: (f) => <PermissionsScreen {...base(f)} />,     enter: fadeEnter, exit: fadeExit },
   personalResult:  { render: (f) => <PersonalizedResultScreen {...base(f)} />, enter: fadeEnter, exit: fadeExit },
-  paywall:         { render: (f) => <PaywallScreen {...base(f)} onFinish={f.finish} />, enter: fadeEnter, exit: fadeExit },
+  paywall:         { render: (f) => <PaywallScreen {...base(f)} onFinish={f.goNext} />, enter: fadeEnter, exit: fadeExit },
+  allSet:          { render: (f) => <AllSetScreen {...base(f)} onFinish={f.finish} />, enter: fadeEnter, exit: fadeExit },
 };
