@@ -12,16 +12,22 @@ import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
 const HEADING = 'remember?';
 
 interface LineSpec {
-  text: string;
-  bold?: boolean;
+  /** Plain line. */
+  text?: string;
+  /** Normal-weight lead + a bolder keyword, e.g. "no " + "rush." */
+  lead?: string;
+  strong?: string;
+  /** Extra space above this line, on top of the list gap. */
+  paragraph?: boolean;
 }
 
 const LINES: LineSpec[] = [
   { text: 'lying in the grass.' },
   { text: 'staring at clouds.' },
   { text: 'dreaming about nothing.' },
-  { text: 'time just was.' },
-  { text: 'time just… stopped.', bold: true },
+  { lead: 'no ', strong: 'rush.', paragraph: true },
+  { lead: 'no ', strong: 'goals.' },
+  { lead: 'no ', strong: 'phone.' },
 ];
 
 const grassImage = require('@/assets/images/child.png');
@@ -67,10 +73,17 @@ export default function NostalgiaScreen({ theme }: Props) {
             style={[
               onboardingText.line,
               { color: theme.text },
-              spec.bold && ONBOARDING_BODY_BOLD,
+              spec.paragraph && styles.paragraph,
             ]}
           >
-            {spec.text}
+            {spec.strong ? (
+              <>
+                {spec.lead}
+                <Text style={ONBOARDING_BODY_BOLD}>{spec.strong}</Text>
+              </>
+            ) : (
+              spec.text
+            )}
           </Text>
         ))}
       </View>
@@ -87,5 +100,8 @@ const styles = StyleSheet.create({
   },
   image: {
     alignSelf: 'center',
+  },
+  paragraph: {
+    marginTop: 20,
   },
 });
