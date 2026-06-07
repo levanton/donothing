@@ -1,8 +1,15 @@
-import { Fonts } from '@/constants/theme';
-import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const HEADING = 'remember\nbeing a kid?';
+import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
+
+const HEADING = 'remember?';
 
 interface LineSpec {
   text: string;
@@ -42,12 +49,14 @@ export default function NostalgiaScreen({ theme }: Props) {
         },
       ]}
     >
-      <Text style={[styles.heading, { color: theme.text }]}>{HEADING}</Text>
+      <Text style={[onboardingText.heading, { color: theme.text }]}>
+        {HEADING}
+      </Text>
 
       <Image
         source={grassImage}
         style={[styles.image, { width: imageSize, height: imageSize }]}
-        resizeMode="contain"
+        resizeMode='contain'
         fadeDuration={0}
       />
 
@@ -55,7 +64,11 @@ export default function NostalgiaScreen({ theme }: Props) {
         {LINES.map((spec, i) => (
           <Text
             key={i}
-            style={[styles.line, { color: theme.text }, spec.bold && { fontWeight: '600' }]}
+            style={[
+              onboardingText.line,
+              { color: theme.text },
+              spec.bold && ONBOARDING_BODY_BOLD,
+            ]}
           >
             {spec.text}
           </Text>
@@ -74,17 +87,5 @@ const styles = StyleSheet.create({
   },
   image: {
     alignSelf: 'center',
-  },
-  heading: {
-    fontFamily: Fonts?.serif,
-    fontSize: 40,
-    fontWeight: '400',
-    lineHeight: 46,
-  },
-  line: {
-    fontFamily: Fonts?.serif,
-    fontSize: 19,
-    fontWeight: '400',
-    lineHeight: 27,
   },
 });

@@ -11,9 +11,9 @@ import type { ErrorInfo } from 'react';
  *   1. `EXPO_PUBLIC_SENTRY_DSN` env var (build-time inlined by Expo)
  *   2. `expoConfig.extra.sentryDsn` from app.json
  *
- * If no DSN is configured we no-op silently in production and warn
- * once in __DEV__ so a forgotten setup is loud during dev but doesn't
- * crash builds where Sentry isn't wanted.
+ * Sentry is disabled entirely in development (`__DEV__`) — see
+ * `initSentry`. In production, if no DSN is configured we no-op
+ * silently so builds without Sentry don't crash.
  *
  * --- Privacy / cost choices ---
  *
@@ -47,15 +47,14 @@ function readDsn(): string | undefined {
 
 export function initSentry(): void {
   if (inited) return;
+  // Disabled in development: crash reporting is a production concern.
+  // Skipping init keeps the dev console quiet and avoids polluting the
+  // issue stream with errors thrown while iterating locally.
+  if (__DEV__) return;
   const dsn = readDsn();
-  if (!dsn) {
-    if (__DEV__) {
-      console.warn(
-        '[sentry] DSN not configured — set EXPO_PUBLIC_SENTRY_DSN to enable crash reporting',
-      );
-    }
-    return;
-  }
+  // No DSN in a production build: no-op silently so builds that ship
+  // without Sentry configured don't crash.
+  if (!dsn) return;
   Sentry.init({
     dsn,
     sendDefaultPii: false,

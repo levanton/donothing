@@ -19,15 +19,24 @@ function rcSentry() {
 }
 
 const ORIGINAL_DSN_ENV = process.env.EXPO_PUBLIC_SENTRY_DSN;
+const ORIGINAL_DEV = (global as { __DEV__?: boolean }).__DEV__;
+
+function setDev(value: boolean) {
+  (global as { __DEV__?: boolean }).__DEV__ = value;
+}
 
 beforeEach(() => {
   rcSentry().init.mockReset();
   rcSentry().captureException.mockReset();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
+  // Sentry only initialises in production builds, so the default for
+  // these tests is __DEV__ = false. The dev-disable case flips it.
+  setDev(false);
 });
 
 afterEach(() => {
   jest.restoreAllMocks();
+  setDev(ORIGINAL_DEV ?? false);
   if (ORIGINAL_DSN_ENV === undefined) {
     delete process.env.EXPO_PUBLIC_SENTRY_DSN;
   } else {
@@ -43,13 +52,12 @@ describe('initSentry', () => {
     expect(rcSentry().init).not.toHaveBeenCalled();
   });
 
-  it('warns in __DEV__ when DSN is missing', () => {
-    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+  it('is disabled entirely in __DEV__, even with a DSN set', () => {
+    setDev(true);
+    process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://example@sentry.io/1';
     const { initSentry } = loadSentry();
     initSentry();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('DSN not configured'),
-    );
+    expect(rcSentry().init).not.toHaveBeenCalled();
   });
 
   it('calls Sentry.init with the env DSN', () => {

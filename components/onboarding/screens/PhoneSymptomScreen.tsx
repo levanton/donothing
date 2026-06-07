@@ -8,8 +8,8 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { EASE_IN_OUT } from '@/constants/animations';
-import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
+import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
 
 const whatIfImage = require('@/assets/images/what-if.png');
 
@@ -58,7 +58,7 @@ export default function PhoneSymptomScreen({ isActive, theme }: Props) {
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom }]}>
         <Animated.View style={[styles.textArea, enterStyle]}>
-          <Text style={[styles.heading, { color: theme.text }]}>
+          <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
             {HEADING}
           </Text>
 
@@ -67,9 +67,9 @@ export default function PhoneSymptomScreen({ isActive, theme }: Props) {
               <Text
                 key={i}
                 style={[
-                  styles.line,
+                  onboardingText.line,
                   { color: spec.accent ? palette.terracotta : theme.text },
-                  spec.bold && { fontWeight: '600' },
+                  spec.bold && ONBOARDING_BODY_BOLD,
                   spec.paragraph && { marginTop: 18 },
                 ]}
               >
@@ -110,19 +110,7 @@ const styles = StyleSheet.create({
   },
   textArea: {},
   heading: {
-    fontFamily: Fonts?.serif,
-    fontSize: 40,
-    fontWeight: '400',
-    textAlign: 'left',
-    lineHeight: 46,
     marginBottom: 14,
   },
   body: {},
-  line: {
-    fontFamily: Fonts?.serif,
-    fontSize: 19,
-    fontWeight: '400',
-    textAlign: 'left',
-    lineHeight: 27,
-  },
 });
