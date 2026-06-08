@@ -16,7 +16,8 @@ const LINES: LineSpec[] = [
   { text: 'so much pressure.' },
   { text: 'it keeps us busy.', paragraph: true },
   { text: 'but never really here.' },
-  { text: 'days, months, years — gone in a blur.', bold: true, paragraph: true },
+  // Non-breaking spaces keep "gone in a blur" together on one line.
+  { text: 'days, months, years — gone in a blur.', bold: true, paragraph: true },
 ];
 
 interface Props {

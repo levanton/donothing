@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
+import { onboardingText } from '../textStyles';
 
 const sitImage = require('@/assets/images/good-news.png');
 
@@ -72,10 +73,12 @@ export default function GoodNewsScreen({ isActive, onNext, theme }: Props) {
         </View>
 
         <Animated.View style={[styles.textArea, contentStyle]}>
-          <Text style={[styles.heading, { color: theme.text }]}>{HEADING}</Text>
+          <Text style={[onboardingText.heading, { color: theme.text }]}>{HEADING}</Text>
           <View style={[styles.divider, { backgroundColor: palette.terracotta }]} />
 
-          <Text style={[styles.subtitle, { color: theme.text }]}>{SUBTITLE}</Text>
+          <Text style={[onboardingText.line, styles.subtitle, { color: theme.text }]}>
+            {SUBTITLE}
+          </Text>
 
           <View style={styles.list}>
             {NOTHINGS.map((item, i) => (
@@ -122,12 +125,6 @@ const styles = StyleSheet.create({
   spacer: {
     flex: 1,
   },
-  heading: {
-    fontFamily: Fonts?.serif,
-    fontSize: 40,
-    fontWeight: '500',
-    lineHeight: 46,
-  },
   divider: {
     width: 44,
     height: 2,
@@ -136,10 +133,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   subtitle: {
-    fontFamily: Fonts?.serif,
-    fontSize: 21,
-    fontWeight: '400',
-    lineHeight: 28,
     marginBottom: 18,
   },
   list: {
