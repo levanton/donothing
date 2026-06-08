@@ -105,7 +105,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
       <Animated.View style={[styles.content, entryStyle]}>
         <Animated.View style={headerStyle}>
           <Text style={[styles.headerText, { fontFamily: Fonts?.serif }]}>
-            Ready to Do nothing?
+            Ready to Try nothing?
           </Text>
         </Animated.View>
 

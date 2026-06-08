@@ -5,6 +5,7 @@ import Animated, {
   Easing,
   Extrapolation,
   interpolate,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -18,6 +19,10 @@ import { palette } from '@/lib/theme';
 
 // One full, barely-perceptible orbit of the whole dot field (ms).
 const ORBIT_PERIOD_MS = 200000;
+
+// Central circle in the chaotic state: a muted, washed-out terracotta. As the
+// rings form it resolves to the full, vivid circle colour.
+const MURKY_CIRCLE = '#B68D78';
 
 /**
  * RadialDots — a field of small dots that morphs between two states driven by
@@ -96,7 +101,8 @@ function buildDots({ size, circleRadius, count, rings, seed }: BuildArgs): Dot[]
   // Innermost ring sits a bit further from the centre; the rest are spread with
   // an equal gap out to the edge, so the spacing between rings is uniform.
   const innerR = circleRadius + size * 0.09;
-  const outerR = maxR - size * 0.015;
+  // Pull the outer ring inward a touch so the gap between rings is a bit tighter.
+  const outerR = maxR - size * 0.035;
 
   for (let r = 0; r < rings; r++) {
     const t = rings === 1 ? 0 : r / (rings - 1);
@@ -284,7 +290,7 @@ export default function RadialDots({
   style,
   dotColor = palette.brown,
   circleColor = palette.terracotta,
-  circleRatio = 0.3,
+  circleRatio = 0.24,
   dotCount = 160,
   rings = 4,
   seed = 7,
@@ -313,9 +319,17 @@ export default function RadialDots({
     reveal.value = withDelay(120, withTiming(1, { duration: 1400, easing: EASE_OUT }));
   }, []);
 
-  const circleStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(reveal.value, [0, 0.35], [0, 1], Extrapolation.CLAMP),
-  }));
+  // Chaos → order: the circle goes from a muted, dim, slightly-bloated blob to
+  // a vivid, crisp, full-opacity circle as `progress` drives 0 → 1.
+  const circleStyle = useAnimatedStyle(() => {
+    const revealFade = interpolate(reveal.value, [0, 0.35], [0, 1], Extrapolation.CLAMP);
+    const p = progress.value;
+    return {
+      opacity: revealFade * (0.55 + 0.45 * p),
+      backgroundColor: interpolateColor(p, [0, 1], [MURKY_CIRCLE, circleColor]),
+      transform: [{ scale: 1.06 - 0.06 * p }],
+    };
+  });
 
   return (
     <View style={[{ width: size, height: size }, style]} pointerEvents="none">
@@ -344,7 +358,6 @@ export default function RadialDots({
             borderRadius: circleRadius,
             marginLeft: -circleRadius,
             marginTop: -circleRadius,
-            backgroundColor: circleColor,
           },
           circleStyle,
         ]}

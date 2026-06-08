@@ -16,17 +16,9 @@
     {
       "layers": [
         {
-          "glass-specializations": [
-            {
-              "value": false
-            },
-            {
-              "appearance": "tinted",
-              "value": false
-            }
-          ],
-          "image-name": "logo-app.png",
-          "name": "logo-app"
+          "glass": false,
+          "image-name": "app-logo.jpg",
+          "name": "app-logo"
         }
       ],
       "shadow": {
