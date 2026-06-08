@@ -13,7 +13,7 @@ import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const sitImage = require('@/assets/images/what-if-sit.png');
+const sitImage = require('@/assets/images/good-news.png');
 
 const HEADING = 'good news.';
 const SUBTITLE = 'you don’t have to do anything.';

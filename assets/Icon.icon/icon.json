@@ -1,38 +1,100 @@
 {
-  "fill-specializations": [
+  "fill-specializations" : [
     {
-      "value": {
-        "solid": "display-p3:1.00000,0.94386,0.85437,1.00000"
+      "value" : {
+        "solid" : "display-p3:1.00000,0.94386,0.85437,1.00000"
       }
     },
     {
-      "appearance": "dark",
-      "value": {
-        "solid": "srgb:0.26667,0.26667,0.26667,1.00000"
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.26667,0.26667,0.26667,1.00000"
       }
     }
   ],
-  "groups": [
+  "groups" : [
     {
-      "layers": [
+      "layers" : [
         {
-          "glass": false,
-          "image-name": "app-logo.jpg",
-          "name": "app-logo"
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "app-logo.jpg",
+          "name" : "app-logo",
+          "position" : {
+            "scale" : 0.93,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
       },
-      "translucency": {
-        "enabled": true,
-        "value": 0.5
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "blur-material" : null,
+      "layers" : [
+        {
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "app-loo.jpg",
+          "name" : "app-loo",
+          "position" : {
+            "scale" : 0.93,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "lighting" : "individual",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "app-loo 2.jpg",
+          "name" : "app-loo 2",
+          "position" : {
+            "scale" : 0.93,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
       }
     }
   ],
-  "supported-platforms": {
-    "circles": ["watchOS"],
-    "squares": "shared"
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
   }
 }
