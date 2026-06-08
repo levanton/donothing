@@ -1,10 +1,4 @@
-import {
-  Image,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
@@ -55,9 +49,7 @@ export default function NostalgiaScreen({ theme }: Props) {
         },
       ]}
     >
-      <Text style={[onboardingText.heading, { color: theme.text }]}>
-        {HEADING}
-      </Text>
+      <Text style={[onboardingText.heading, { color: theme.text }]}>{HEADING}</Text>
 
       <Image
         source={grassImage}

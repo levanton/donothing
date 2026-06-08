@@ -1,25 +1,66 @@
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
+import { EASE_IN_OUT } from '@/constants/animations';
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { PAGES } from '@/lib/onboarding-data';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
+import RadialDots from '@/components/onboarding/RadialDots';
 import PillButton from '@/components/PillButton';
+
+// Pages that share the persistent RadialDots layer. Kept adjacent in PAGES so
+// the dot field never unmounts between them — it morphs scatter → rings.
+const DOT_SCATTER_PAGE = 'rushing'; // "now."   → progress 0
+const DOT_RINGS_PAGE = 'phoneSymptom'; // "what if…" → progress 1
+// Dot morph duration — kept in sync with morphFade{Enter,Exit} (transitions.ts)
+// so the dots reorganise exactly as the screens cross-fade.
+const DOT_MORPH_MS = 1200;
 
 const __DEV_JUMP__ = false && __DEV__;
 
 export default function OnboardingRoute() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const flow = useOnboardingFlow();
   const [showJumper, setShowJumper] = useState(false);
 
   const { currentPage, currentIndex, screenTheme, isDark } = flow;
+
+  // ── Shared dot field ────────────────────────────────────────────────────
+  // One RadialDots instance lives across the "now." ↔ "what if…" pair. It is
+  // rendered as a sibling of the swapping page (not inside the keyed view) so
+  // it survives the transition and morphs instead of remounting.
+  const isDotScreen =
+    currentPage.id === DOT_SCATTER_PAGE || currentPage.id === DOT_RINGS_PAGE;
+  const dotProgress = useSharedValue(currentPage.id === DOT_RINGS_PAGE ? 1 : 0);
+  const dotFieldSize = Math.min(width * 0.9, height * 0.44, 350);
+
+  useEffect(() => {
+    if (currentPage.id === DOT_SCATTER_PAGE) {
+      dotProgress.value = withTiming(0, { duration: DOT_MORPH_MS, easing: EASE_IN_OUT });
+    } else if (currentPage.id === DOT_RINGS_PAGE) {
+      dotProgress.value = withTiming(1, { duration: DOT_MORPH_MS, easing: EASE_IN_OUT });
+    }
+  }, [currentPage.id]);
 
   // Back button uses cream on dark/terracotta backgrounds
   const backColor = currentPage.bg === palette.terracotta || isDark
@@ -41,6 +82,31 @@ export default function OnboardingRoute() {
       >
         {screen.render(flow)}
       </Animated.View>
+
+      {/* Persistent dot field shared by the "now." ↔ "what if…" screens. Sits
+          in the lower band above the page bg; the text lives above it and the
+          buttons below, so nothing overlaps. */}
+      {isDotScreen && (
+        <Animated.View
+          exiting={FadeOut.duration(300)}
+          pointerEvents="none"
+          style={[
+            styles.dotLayer,
+            {
+              left: (width - dotFieldSize) / 2,
+              top: height * 0.66 - dotFieldSize / 2,
+              width: dotFieldSize,
+              height: dotFieldSize,
+            },
+          ]}
+        >
+          <RadialDots
+            progress={dotProgress}
+            size={dotFieldSize}
+            orbiting={currentPage.id === DOT_RINGS_PAGE}
+          />
+        </Animated.View>
+      )}
 
       {/* Bottom Continue button */}
       {showBottomButton && (
@@ -136,6 +202,9 @@ const styles = StyleSheet.create({
   },
   page: {
     flex: 1,
+  },
+  dotLayer: {
+    position: 'absolute',
   },
   bottomButton: {
     position: 'absolute',

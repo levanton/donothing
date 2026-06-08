@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { PageId } from '@/lib/onboarding-data';
 import type { OnboardingFlow } from '@/hooks/useOnboardingFlow';
-import { fadeEnter, fadeExit, slideEnter, slideExit } from '../transitions';
+import { fadeEnter, fadeExit } from '../transitions';
 
 import WelcomeScreen from './WelcomeScreen';
 import NostalgiaScreen from './NostalgiaScreen';
@@ -49,11 +49,13 @@ interface ScreenEntry {
  * `Record<PageId, …>` makes TypeScript fail the build on any gap.
  */
 export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
-  welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: slideExit },
-  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: slideEnter, exit: slideExit },
-  rushing:         { render: (f) => <RushingScreen {...base(f)} />,        enter: slideEnter, exit: slideExit },
+  welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
+  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: fadeEnter,  exit: fadeExit },
+  // 'now.' → 'what if…' share the persistent RadialDots layer: pages cross-fade
+  // while the dots stay put and morph beneath.
+  rushing:         { render: (f) => <RushingScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
   evidence:        { render: (f) => <EvidenceScreen {...base(f)} />,       enter: fadeEnter,  exit: fadeExit },
-  phoneSymptom:    { render: (f) => <PhoneSymptomScreen {...base(f)} />,   enter: slideEnter, exit: fadeExit },
+  phoneSymptom:    { render: (f) => <PhoneSymptomScreen {...base(f)} />,   enter: fadeEnter,  exit: fadeExit },
   painQuiz:        { render: (f) => <PainQuizScreen {...base(f)} selected={f.painPoints} onSelect={f.setPainPoints} />, enter: fadeEnter, exit: fadeExit },
   screenTimeQuiz:  { render: (f) => <ScreenTimeQuizScreen {...base(f)} selected={f.screenTime} onSelect={f.setScreenTime} />, enter: fadeEnter, exit: fadeExit },
   ageQuiz:         { render: (f) => <AgeQuizScreen {...base(f)} selected={f.age} onSelect={f.setAge} />, enter: fadeEnter, exit: fadeExit },
