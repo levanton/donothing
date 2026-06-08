@@ -87,6 +87,8 @@ export default function GoodNewsScreen({ isActive, onNext, theme }: Props) {
           </View>
         </Animated.View>
 
+        <View style={styles.spacer} />
+
         <Animated.View style={[styles.buttonArea, buttonStyle]}>
           <Pressable onPress={onNext} style={styles.ctaButton}>
             <Text style={styles.ctaText}>try nothing</Text>
@@ -108,15 +110,17 @@ const styles = StyleSheet.create({
   imageArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 8,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   image: {
-    width: 190,
-    height: 190,
+    width: 340,
+    height: 260,
+    alignSelf: 'center',
   },
-  textArea: {
+  textArea: {},
+  spacer: {
     flex: 1,
-    justifyContent: 'center',
   },
   heading: {
     fontFamily: Fonts?.serif,
