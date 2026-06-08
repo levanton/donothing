@@ -1,107 +1,46 @@
 {
-  "fill-specializations" : [
+  "fill-specializations": [
     {
-      "value" : {
-        "solid" : "display-p3:1.00000,0.94386,0.85437,1.00000"
+      "value": {
+        "solid": "display-p3:1.00000,0.94386,0.85437,1.00000"
       }
     },
     {
-      "appearance" : "dark",
-      "value" : {
-        "solid" : "srgb:0.26667,0.26667,0.26667,1.00000"
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.26667,0.26667,0.26667,1.00000"
       }
     }
   ],
-  "groups" : [
+  "groups": [
     {
-      "blur-material" : null,
-      "hidden" : true,
-      "layers" : [
+      "layers": [
         {
-          "blend-mode" : "normal",
-          "fill-specializations" : [
+          "glass-specializations": [
             {
-              "value" : {
-                "solid" : "srgb:0.98431,0.94902,0.87059,1.00000"
-              }
+              "value": false
             },
             {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.98431,0.94902,0.87059,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
-              }
+              "appearance": "tinted",
+              "value": false
             }
           ],
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "enso_D8522E_transparent.png",
-          "name" : "enso_D8522E_transparent",
-          "position" : {
-            "scale" : 0.5,
-            "translation-in-points" : [
-              0,
-              -9.5625
-            ]
-          }
+          "image-name": "logo-app.png",
+          "name": "logo-app"
         }
       ],
-      "shadow" : {
-        "kind" : "layer-color",
-        "opacity" : 0.5
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
-          "blend-mode" : "overlay",
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "display-p3:0.63299,0.35571,0.24789,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "display-p3:0.66414,0.37580,0.26079,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "extended-gray:1.00000,1.00000"
-              }
-            }
-          ],
-          "glass" : false,
-          "image-name" : "4476DAAC-A211-48B6-9736-3F4962704D25.png",
-          "name" : "4476DAAC-A211-48B6-9736-3F4962704D25"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
       }
     }
   ],
-  "supported-platforms" : {
-    "circles" : [
-      "watchOS"
-    ],
-    "squares" : "shared"
+  "supported-platforms": {
+    "circles": ["watchOS"],
+    "squares": "shared"
   }
 }
