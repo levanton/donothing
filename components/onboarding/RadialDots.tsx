@@ -82,7 +82,13 @@ interface BuildArgs {
   seed: number;
 }
 
-function buildDots({ size, circleRadius, count, rings, seed }: BuildArgs): Dot[] {
+function buildDots({
+  size,
+  circleRadius,
+  count,
+  rings,
+  seed,
+}: BuildArgs): Dot[] {
   const rand = mulberry32(seed);
   const cx = size / 2;
   const cy = size / 2;
@@ -208,7 +214,9 @@ function DotView({
     };
   });
 
-  return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
+  return (
+    <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />
+  );
 }
 
 // ── One ring's worth of dots, on its own slow orbit ───────────────────────
@@ -238,7 +246,10 @@ function RingGroup({
     if (orbiting) {
       orbit.value = 0;
       orbit.value = withRepeat(
-        withTiming(360 * direction, { duration: period, easing: Easing.linear }),
+        withTiming(360 * direction, {
+          duration: period,
+          easing: Easing.linear,
+        }),
         -1,
         false,
       );
@@ -255,7 +266,13 @@ function RingGroup({
   return (
     <Animated.View style={[StyleSheet.absoluteFill, style]}>
       {dots.map((dot, i) => (
-        <DotView key={i} dot={dot} progress={progress} reveal={reveal} color={color} />
+        <DotView
+          key={i}
+          dot={dot}
+          progress={progress}
+          reveal={reveal}
+          color={color}
+        />
       ))}
     </Animated.View>
   );
@@ -316,13 +333,21 @@ export default function RadialDots({
   // dots fade in. The central circle fades in just ahead.
   const reveal = useSharedValue(0);
   useEffect(() => {
-    reveal.value = withDelay(120, withTiming(1, { duration: 1400, easing: EASE_OUT }));
+    reveal.value = withDelay(
+      120,
+      withTiming(1, { duration: 1400, easing: EASE_OUT }),
+    );
   }, []);
 
   // Chaos → order: the circle goes from a muted, dim, slightly-bloated blob to
   // a vivid, crisp, full-opacity circle as `progress` drives 0 → 1.
   const circleStyle = useAnimatedStyle(() => {
-    const revealFade = interpolate(reveal.value, [0, 0.35], [0, 1], Extrapolation.CLAMP);
+    const revealFade = interpolate(
+      reveal.value,
+      [0, 0.35],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
     const p = progress.value;
     return {
       opacity: revealFade * (0.55 + 0.45 * p),
@@ -332,7 +357,7 @@ export default function RadialDots({
   });
 
   return (
-    <View style={[{ width: size, height: size }, style]} pointerEvents="none">
+    <View style={[{ width: size, height: size }, style]} pointerEvents='none'>
       {ringGroups.map((groupDots, ring) => {
         const speed = RING_SPEED[ring % RING_SPEED.length];
         return (

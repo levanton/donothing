@@ -63,8 +63,8 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
         />
 
         <Text style={[styles.essence, { color: theme.text }]}>
-          a quiet space to step out of the rush — and do{' '}
-          <Text style={styles.essenceStrong}>absolutely nothing</Text>.
+          a space to step out of the rush — and do{' '}
+          <Text style={styles.essenceStrong}>nothing</Text>.
         </Text>
 
         <View style={styles.features}>
