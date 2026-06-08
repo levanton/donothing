@@ -49,14 +49,14 @@ export default function NostalgiaScreen({ theme }: Props) {
         },
       ]}
     >
-      <Text style={[onboardingText.heading, { color: theme.text }]}>{HEADING}</Text>
-
       <Image
         source={grassImage}
         style={[styles.image, { width: imageSize, height: imageSize }]}
         resizeMode='contain'
         fadeDuration={0}
       />
+
+      <Text style={[onboardingText.heading, { color: theme.text }]}>{HEADING}</Text>
 
       <View>
         {LINES.map((spec, i) => (

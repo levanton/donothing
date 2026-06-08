@@ -14,16 +14,16 @@ import { Fonts } from '@/constants/theme';
 export const onboardingText = StyleSheet.create({
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 40,
+    fontSize: 37,
     fontWeight: '400',
-    lineHeight: 46,
+    lineHeight: 43,
     textAlign: 'left',
   },
   line: {
     fontFamily: Fonts?.serif,
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '400',
-    lineHeight: 30,
+    lineHeight: 28,
     textAlign: 'left',
   },
 });
