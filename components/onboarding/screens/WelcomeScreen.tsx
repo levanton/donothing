@@ -63,7 +63,7 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
         />
 
         <Text style={[styles.essence, { color: theme.text }]}>
-          a space to step out of the rush — and do{' '}
+          a space to step out of the rush — and{'\n'}do{' '}
           <Text style={styles.essenceStrong}>nothing</Text>.
         </Text>
 

@@ -12,13 +12,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
 import Animated, {
-  Extrapolation,
   FadeIn,
   FadeOut,
-  interpolate,
-  useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -29,9 +25,8 @@ import { PAGES } from '@/lib/onboarding-data';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import RadialDots from '@/components/onboarding/RadialDots';
+import { getDotFieldLayout } from '@/components/onboarding/dotFieldLayout';
 import PillButton from '@/components/PillButton';
-
-const busyImage = require('@/assets/images/busy.png');
 
 // Pages that share the persistent RadialDots layer. Kept adjacent in PAGES so
 // the dot field never unmounts between them — it morphs scatter → rings.
@@ -58,30 +53,16 @@ export default function OnboardingRoute() {
   const isDotScreen =
     currentPage.id === DOT_SCATTER_PAGE || currentPage.id === DOT_RINGS_PAGE;
   const dotProgress = useSharedValue(currentPage.id === DOT_RINGS_PAGE ? 1 : 0);
-  const dotFieldSize = Math.min(width * 0.9, height * 0.44, 350) * 0.9;
-
-  // Fades the busy overlay in when the dot screen first appears.
-  const busyReveal = useSharedValue(0);
+  const dotField = getDotFieldLayout(width, height);
+  const dotFieldSize = dotField.size;
 
   useEffect(() => {
     if (currentPage.id === DOT_SCATTER_PAGE) {
       dotProgress.value = withTiming(0, { duration: DOT_MORPH_MS, easing: EASE_IN_OUT });
-      // Let the dots reveal first; the busy overlay fades in ~halfway through.
-      busyReveal.value = 0;
-      busyReveal.value = withDelay(750, withTiming(1, { duration: 800, easing: EASE_IN_OUT }));
     } else if (currentPage.id === DOT_RINGS_PAGE) {
       dotProgress.value = withTiming(1, { duration: DOT_MORPH_MS, easing: EASE_IN_OUT });
     }
   }, [currentPage.id]);
-
-  // "busy" overlay sits over the dot field on "now." (chaos) and fades out as
-  // we move to "what if…", revealing the ordered rings beneath. `busyReveal`
-  // gives it a gentle fade-in on arrival instead of popping in.
-  const busyStyle = useAnimatedStyle(() => ({
-    opacity:
-      busyReveal.value *
-      interpolate(dotProgress.value, [0, 0.55], [0.85, 0], Extrapolation.CLAMP),
-  }));
 
   // Back button uses cream on dark/terracotta backgrounds
   const backColor = currentPage.bg === palette.terracotta || isDark
@@ -114,8 +95,8 @@ export default function OnboardingRoute() {
           style={[
             styles.dotLayer,
             {
-              left: (width - dotFieldSize) / 2,
-              top: height * 0.67 - dotFieldSize / 2,
+              left: dotField.left,
+              top: dotField.top,
               width: dotFieldSize,
               height: dotFieldSize,
             },
@@ -125,20 +106,6 @@ export default function OnboardingRoute() {
             progress={dotProgress}
             size={dotFieldSize}
             orbiting={currentPage.id === DOT_RINGS_PAGE}
-          />
-          <Animated.Image
-            source={busyImage}
-            resizeMode="contain"
-            style={[
-              {
-                position: 'absolute',
-                width: 400,
-                height: 400,
-                left: (dotFieldSize - 400) / 2,
-                top: (dotFieldSize - 400) / 2,
-              },
-              busyStyle,
-            ]}
           />
         </Animated.View>
       )}

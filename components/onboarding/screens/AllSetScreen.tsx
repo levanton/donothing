@@ -10,16 +10,17 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 
 import PillButton from '@/components/PillButton';
+import DriftingDots from '@/components/DriftingDots';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const HEADING = 'you’re all set.';
+const HEADING = 'your space to do nothing is ready.';
 
 const LINES = [
-  'your space to do nothing is ready.',
-  'open it anytime. breathe.',
-  'and let the rush go quiet.',
+  'open it when you need it.',
+  'plan your nothing.',
+  'stay in the moment — before it all blurs by.',
 ];
 
 interface Props {
@@ -72,6 +73,8 @@ export default function AllSetScreen({ isActive, onFinish }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.terracotta }]}>
+      <DriftingDots active={isActive} />
+
       <View
         style={[
           styles.content,

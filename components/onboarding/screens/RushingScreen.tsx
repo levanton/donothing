@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
+import { getDotFieldLayout } from '../dotFieldLayout';
 
 const HEADING = 'now.';
 
@@ -28,10 +29,17 @@ interface Props {
 
 export default function RushingScreen({ theme }: Props) {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const fieldTop = getDotFieldLayout(width, height).top;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.content,
+          { paddingTop: insets.top + 72, height: fieldTop },
+        ]}
+      >
         <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
           {HEADING}
         </Text>
@@ -61,10 +69,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 32,
-    paddingBottom: 24,
-    justifyContent: 'flex-start',
+    paddingBottom: 44,
+    justifyContent: 'flex-end',
   },
   heading: {
     marginBottom: 14,

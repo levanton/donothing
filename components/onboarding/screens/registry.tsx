@@ -68,6 +68,7 @@ export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
   howItWorks:      { render: (f) => <HowItWorksScreen {...base(f)} />,      enter: fadeEnter, exit: fadeExit },
   permissions:     { render: (f) => <PermissionsScreen {...base(f)} />,     enter: fadeEnter, exit: fadeExit },
   personalResult:  { render: (f) => <PersonalizedResultScreen {...base(f)} />, enter: fadeEnter, exit: fadeExit },
-  paywall:         { render: (f) => <PaywallScreen {...base(f)} onFinish={f.goNext} />, enter: fadeEnter, exit: fadeExit },
-  allSet:          { render: (f) => <AllSetScreen {...base(f)} onFinish={f.finish} />, enter: fadeEnter, exit: fadeExit },
+  // 'allSet' now leads INTO the paywall (the final step), which calls finish.
+  allSet:          { render: (f) => <AllSetScreen {...base(f)} onFinish={f.goNext} />, enter: fadeEnter, exit: fadeExit },
+  paywall:         { render: (f) => <PaywallScreen {...base(f)} onFinish={f.finish} />, enter: fadeEnter, exit: fadeExit },
 };

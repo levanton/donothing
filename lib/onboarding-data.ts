@@ -118,6 +118,6 @@ export const PAGES: OnboardingPage[] = [
   { id: 'howItWorks',      bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: false, showBackButton: true  },
   { id: 'permissions',     bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'personalResult',  bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: true,  showBackButton: true  },
-  { id: 'paywall',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   { id: 'allSet',          bg: palette.terracotta, theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
+  { id: 'paywall',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
 ];
