@@ -23,6 +23,7 @@ const NOTHINGS = [
   'no reading a book.',
   'no learning a language.',
   'no journaling.',
+  'no meditating.',
   'no fixing yourself.',
 ];
 
@@ -84,21 +85,11 @@ export default function GoodNewsScreen({ isActive, onNext, theme }: Props) {
               </View>
             ))}
           </View>
-
-          <View
-            style={[styles.divider, styles.footerDivider, { backgroundColor: palette.terracotta }]}
-          />
-          <Text style={[styles.footer, { color: theme.text }]}>
-            just one quiet minute.
-          </Text>
-          <Text style={[styles.footer, { color: palette.terracotta }]}>
-            that’s all.
-          </Text>
         </Animated.View>
 
         <Animated.View style={[styles.buttonArea, buttonStyle]}>
           <Pressable onPress={onNext} style={styles.ctaButton}>
-            <Text style={styles.ctaText}>start my minute</Text>
+            <Text style={styles.ctaText}>try nothing</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -161,18 +152,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 26,
   },
-  footerDivider: {
-    marginTop: 22,
-  },
-  footer: {
-    fontFamily: Fonts?.serif,
-    fontSize: 19,
-    fontWeight: '400',
-    lineHeight: 27,
-  },
   buttonArea: {
     alignItems: 'center',
     paddingBottom: 24,
+    gap: 18,
   },
   ctaButton: {
     backgroundColor: palette.terracotta,

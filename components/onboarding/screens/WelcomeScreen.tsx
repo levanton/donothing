@@ -55,7 +55,7 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
       <Animated.View style={[styles.textBlock, textStyle]}>
         <Text style={[styles.welcome, { color: theme.text }]}>Welcome</Text>
         <Text style={[styles.welcome, { color: palette.terracotta }]}>
-          to nothing
+          to Nothing
         </Text>
 
         <View

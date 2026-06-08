@@ -127,9 +127,12 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
           </Animated.View>
         </View>
 
-        <Animated.View style={hintStyle} pointerEvents="none">
-          <Text style={[styles.hintText, { fontFamily: Fonts?.serif }]}>
-            that's all you have to do.
+        <Animated.View style={[styles.footerGroup, hintStyle]} pointerEvents="none">
+          <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
+            just look around. be here.
+          </Text>
+          <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
+            and do nothing.
           </Text>
         </Animated.View>
       </Animated.View>
@@ -170,12 +173,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hintText: {
-    fontSize: 17,
+  footerGroup: {
+    alignItems: 'center',
+  },
+  footer: {
+    fontSize: 18,
     fontWeight: '400',
-    letterSpacing: 0.3,
+    lineHeight: 26,
     color: palette.cream,
     textAlign: 'center',
+  },
+  footerStrong: {
+    fontWeight: '600',
   },
   yesButton: {
     width: YES_BUTTON_SIZE,
