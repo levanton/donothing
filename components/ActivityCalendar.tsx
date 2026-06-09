@@ -1,15 +1,14 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { memo, useEffect, useState, useMemo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
-import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import { formatTimeShort, formatClockTime } from '@/lib/format';
 import { getSessionsByDateRange } from '@/lib/db/sessions';
 import { getMoodColor } from '@/lib/mood';
-import type { Session } from '@/lib/db/types';
 import { useAppStore } from '@/lib/store';
 import { WEEKDAY_LABELS } from '@/lib/weekdays';
 
@@ -21,6 +20,66 @@ function formatTime(ts: number): string {
   const d = new Date(ts);
   return formatClockTime(d.getHours(), d.getMinutes());
 }
+
+// One day square. Memoized so tapping a day only re-renders the two cells
+// whose selection changed, not the whole 35-cell grid. All props are
+// primitives plus the stable `theme` object and a stable `onSelect`.
+const DayCell = memo(function DayCell({
+  day,
+  dayKey,
+  duration,
+  isSelected,
+  isFuture,
+  intensity,
+  theme,
+  onSelect,
+}: {
+  day: number;
+  dayKey: string;
+  duration: number;
+  isSelected: boolean;
+  isFuture: boolean;
+  intensity: number;
+  theme: AppTheme;
+  onSelect: (key: string, isFuture: boolean) => void;
+}) {
+  const bubble = Math.max(24, 8 + intensity * 28);
+  return (
+    <Pressable style={styles.cell} onPress={() => onSelect(dayKey, isFuture)}>
+      <View
+        style={[
+          styles.dayCircle,
+          isSelected && { borderWidth: 1, borderColor: theme.text },
+        ]}
+      >
+        {duration > 0 && (
+          <View
+            style={[
+              styles.activityBubble,
+              {
+                width: bubble,
+                height: bubble,
+                borderRadius: bubble / 2,
+                backgroundColor: theme.accent,
+              },
+            ]}
+          />
+        )}
+        <Text
+          style={[
+            styles.dayNumber,
+            {
+              color: isFuture ? theme.border : duration > 0 ? palette.white : theme.text,
+              fontFamily: Fonts!.serif,
+            },
+          ]}
+        >
+          {day}
+        </Text>
+      </View>
+    </Pressable>
+  );
+});
 
 interface ActivityCalendarProps {
   theme: AppTheme;
@@ -97,48 +156,14 @@ export default function ActivityCalendar({
     deleteSession(id);
   }, [deleteSession]);
 
-  // ── Render a day cell ───────────────────────────────────────────────
-  const renderDayCell = (cell: { day: number; key: string } | null, i: number) => {
-    if (!cell) return <View key={`empty-${i}`} style={styles.cell} />;
-
-    const duration = durationMap.get(cell.key) || 0;
-    const isToday = cell.key === todayKey;
-    const isSelected = cell.key === selectedDate;
-    const isFuture = cell.key > todayKey;
-    const intensity = duration > 0 ? 0.2 + 0.8 * (duration / maxDuration) : 0;
-
-    return (
-      <Pressable
-        key={cell.key}
-        style={styles.cell}
-        onPress={() => {
-          if (isFuture) return;
-          haptics.select();
-          setSelectedDate(isSelected ? null : cell.key);
-        }}
-      >
-        <View style={[
-          styles.dayCircle,
-          isSelected && { borderWidth: 1, borderColor: theme.text },
-        ]}>
-          {duration > 0 && (
-            <View style={[styles.activityBubble, {
-              width: Math.max(24, 8 + intensity * 28),
-              height: Math.max(24, 8 + intensity * 28),
-              borderRadius: Math.max(24, 8 + intensity * 28) / 2,
-              backgroundColor: theme.accent,
-            }]} />
-          )}
-          <Text style={[styles.dayNumber, {
-            color: isFuture ? theme.border : duration > 0 ? palette.white : theme.text,
-            fontFamily: Fonts!.serif,
-          }]}>
-            {cell.day}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  };
+  // Stable across renders (functional toggle, no selectedDate closure) so the
+  // memoized DayCells don't all re-render when the selection changes — only
+  // the cell that gained/lost selection does.
+  const handleSelect = useCallback((key: string, isFuture: boolean) => {
+    if (isFuture) return;
+    haptics.select();
+    setSelectedDate((prev) => (prev === key ? null : key));
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -150,7 +175,23 @@ export default function ActivityCalendar({
       </View>
 
       <View style={styles.grid}>
-        {calendarDays.map((cell, i) => renderDayCell(cell, i))}
+        {calendarDays.map((cell, i) => {
+          if (!cell) return <View key={`empty-${i}`} style={styles.cell} />;
+          const duration = durationMap.get(cell.key) || 0;
+          return (
+            <DayCell
+              key={cell.key}
+              day={cell.day}
+              dayKey={cell.key}
+              duration={duration}
+              isSelected={cell.key === selectedDate}
+              isFuture={cell.key > todayKey}
+              intensity={duration > 0 ? 0.2 + 0.8 * (duration / maxDuration) : 0}
+              theme={theme}
+              onSelect={handleSelect}
+            />
+          );
+        })}
       </View>
 
 
