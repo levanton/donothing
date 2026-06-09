@@ -27,10 +27,19 @@ export function useAppLifecycle(
 ): void {
   const isActiveRef = useRef(true);
 
-  // --- Init: hydrate store, then poll for an active block ---
+  // --- Init: register the RC listener, hydrate store, then poll ---
   useEffect(() => {
     const cancelledRef = { current: false };
     initRevenueCat();
+    // Attach the entitlement listener BEFORE the first getCurrentStatus()
+    // poll below. RC can push a customerInfo update at any moment; if we
+    // polled first and subscribed after, an update landing in that gap
+    // would be dropped until the next foreground. Listener-first means we
+    // never miss one — the poll just seeds the initial value, and the
+    // listener reconciles anything that arrives concurrently.
+    const unsub = addStatusListener((status) => {
+      useAppStore.getState().setSubscriptionStatus(status);
+    });
     useAppStore
       .getState()
       .init()
@@ -44,18 +53,9 @@ export function useAppLifecycle(
       });
     return () => {
       cancelledRef.current = true;
-    };
-  }, [pollBlockUnlock]);
-
-  // --- RevenueCat: react to entitlement changes pushed by RC ---
-  useEffect(() => {
-    const unsub = addStatusListener((status) => {
-      useAppStore.getState().setSubscriptionStatus(status);
-    });
-    return () => {
       try { unsub(); } catch (e) { console.error('[lifecycle] RC unsub failed:', e); }
     };
-  }, []);
+  }, [pollBlockUnlock]);
 
   // --- expo-notifications: scheduled block alerts ---
   useEffect(() => {

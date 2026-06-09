@@ -34,6 +34,25 @@ import {
   cancelNotification,
 } from './notifications';
 import type { SubscriptionStatus } from './subscription';
+import { captureError } from './sentry';
+
+// Persist a finished session, retrying once on a transient SQLite failure
+// (a momentary lock/contention usually clears on the second try). A finished
+// session is the user's achievement, so the completion UI never blocks on the
+// write — but a persistent failure is real data loss, so we surface it to
+// Sentry instead of swallowing it in a console.error nobody sees in prod.
+function saveSessionWithRetry(duration: number): Session | null {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return dbAddSession(duration);
+    } catch (e) {
+      if (attempt === 0) continue;
+      console.error('[store] session save failed after retry:', e);
+      captureError(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+  return null;
+}
 
 // Module-level refs (not state, not serializable)
 let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -520,14 +539,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     // so paused sessions save the frozen value, not real-time-since-
     // start (which would over-count by the pause duration).
     const duration = get().elapsed;
-    let session = null;
-    try {
-      session = dbAddSession(duration);
-    } catch (e) {
-      // Don't let a write failure leave the UI in a "stopped but still
-      // started" zombie state — log and reset the timer state anyway.
-      console.error('[store.stopSession] dbAddSession failed:', e);
-    }
+    // A write failure must not leave the UI in a "stopped but still started"
+    // zombie state — saveSessionWithRetry returns null and we reset anyway.
+    const session = saveSessionWithRetry(duration);
     set({
       started: false,
       paused: false,
@@ -659,12 +673,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return;
     }
-    let session = null;
-    try {
-      session = dbAddSession(duration);
-    } catch (e) {
-      console.error('[store.completeSession] dbAddSession failed:', e);
-    }
+    const session = saveSessionWithRetry(duration);
     haptics.success();
     sound.complete();
     set({
