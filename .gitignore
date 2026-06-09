@@ -48,3 +48,6 @@ app-example
 
 # Build artifacts
 *.ipa
+
+# MCP server config (local)
+.mcp.json
