@@ -15,12 +15,12 @@ import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const HEADING = 'your space\nto do nothing\nis ready.';
+const HEADING = 'your space\nis ready.';
 
 const LINES = [
-  'open it when you need it.',
+  'open it whenever you need.',
   'plan your nothing.',
-  'stay in the moment — before it all blurs by.',
+  'just be.',
 ];
 
 interface Props {
@@ -102,7 +102,7 @@ export default function AllSetScreen({ isActive, onFinish }: Props) {
 
         <Animated.View style={[styles.buttonArea, buttonStyle]}>
           <PillButton
-            label="start"
+            label="done"
             onPress={onFinish}
             variant="filled"
             size="large"
