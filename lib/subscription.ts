@@ -42,6 +42,22 @@ export function initRevenueCat(): void {
   configured = true;
 }
 
+/**
+ * RevenueCat's stable app-user id for the current install. Anonymous (looks
+ * like `$RCAnonymousID:…` until/unless we ever call logIn), so it carries no
+ * real-world identity — we only use it to stitch analytics events to purchase
+ * outcomes. Returns null until RC is configured.
+ */
+export async function getAppUserId(): Promise<string | null> {
+  if (!configured) return null;
+  try {
+    return await Purchases.getAppUserID();
+  } catch (e) {
+    console.warn('[subscription] getAppUserID failed:', e);
+    return null;
+  }
+}
+
 export async function getCurrentStatus(): Promise<'active' | 'inactive'> {
   if (!configured) return 'inactive';
   try {

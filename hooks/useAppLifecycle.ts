@@ -8,8 +8,10 @@ import { getAuth, isBlockActive, onBlockShieldRaised } from '@/lib/screen-time';
 import {
   initRevenueCat,
   getCurrentStatus,
+  getAppUserId,
   addStatusListener,
 } from '@/lib/subscription';
+import { identifyUser } from '@/lib/analytics';
 
 /**
  * Wires the home screen to platform/native lifecycle events:
@@ -40,6 +42,12 @@ export function useAppLifecycle(
     const unsub = addStatusListener((status) => {
       useAppStore.getState().setSubscriptionStatus(status);
     });
+    // Stitch PostHog's anonymous events to RC's stable (anonymous) app-user
+    // id so the onboarding funnel can be joined with real purchase outcomes.
+    // Fire-and-forget — analytics linkage must never block startup.
+    getAppUserId()
+      .then((id) => { if (id) identifyUser(id); })
+      .catch((e) => console.error('[lifecycle] analytics identify failed:', e));
     useAppStore
       .getState()
       .init()
