@@ -30,6 +30,17 @@ const AnimatedLine = Animated.createAnimatedComponent(SvgLine);
 const SLIDER_H = 24;
 export const SLIDER_PAD = 10;
 
+// When `allowInfinity` is on, the ∞ stop is folded into the slider itself as
+// the last stop. The value range (1..max) is compressed into the left
+// `MAIN_FRAC` of the track; the empty span up to `INF_FRAC` is the breathing
+// gap between the last number and ∞, which sits at `INF_FRAC` of the track.
+const MAIN_FRAC = 0.88;
+const INF_FRAC = 1;
+// Value reported (via value / onChange) when the ∞ stop is selected. Outside
+// the interactive [minMinutes, max] range, so it never collides with a real
+// snap point. Consumers map this to their own open-ended behaviour.
+export const OPEN_ENDED = 0;
+
 // Non-linear snap points: 0–10 by 1, then 15,20,25,30, then by 10 to 60, then by 15 to 120
 const SNAP_POINTS = [
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -92,11 +103,13 @@ interface AnimatedTickProps {
   activeColor: string;
   inactiveColor: string;
   lastSnap: SharedValue<number>;
+  /** When 1 the whole track reads as filled (∞ selected), so every tick is active. */
+  infinityActive: SharedValue<number>;
 }
 
-function AnimatedTick({ tx, cy, threshold, activeColor, inactiveColor, lastSnap }: AnimatedTickProps) {
+function AnimatedTick({ tx, cy, threshold, activeColor, inactiveColor, lastSnap, infinityActive }: AnimatedTickProps) {
   const animatedProps = useAnimatedProps(() => ({
-    stroke: lastSnap.value >= threshold ? activeColor : inactiveColor,
+    stroke: infinityActive.value || lastSnap.value >= threshold ? activeColor : inactiveColor,
   }));
   return (
     <AnimatedLine
@@ -150,6 +163,11 @@ interface GoalSliderBarProps {
   onRelease?: (minutes: number) => void;
   /** Lower bound for interactive snapping (default 0) */
   minMinutes?: number;
+  /** Opt-in: render a separated ∞ stop to the right of the scale. Dragging
+   *  the thumb into it reports `OPEN_ENDED` (0); the main track shows fully
+   *  filled and the ∞ marker becomes the active knob. Off for callers that
+   *  don't want an open-ended option (e.g. BlockPicker). */
+  allowInfinity?: boolean;
 }
 
 export default function GoalSliderBar({
@@ -172,6 +190,7 @@ export default function GoalSliderBar({
   onChange,
   onRelease,
   minMinutes = 0,
+  allowInfinity = false,
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
   const color: string = accentColor ?? theme.textSecondary ?? theme.text;
@@ -187,6 +206,9 @@ export default function GoalSliderBar({
   const internalProgress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const lastSnap = useSharedValue(value ?? 0);
+  // UI-thread flag: 1 while the ∞ stop is selected. Drives the "fully filled
+  // track + thumb parked on ∞" look without round-tripping through JS.
+  const infinityActive = useSharedValue(allowInfinity && value === OPEN_ENDED ? 1 : 0);
   // While true, prop-driven sync is suppressed. Without this, the
   // gesture worklet advances `lastSnap` faster than the store-roundtrip
   // can echo `value` back, so the sync effect repeatedly snaps the
@@ -198,6 +220,10 @@ export default function GoalSliderBar({
   const pad = Math.max(SLIDER_PAD, tR + 2);
   const cy = sH / 2;
   const tw = width - pad * 2;
+  // Fraction of the track the value range occupies (rest is the ∞ gap + stop).
+  const mainFrac = allowInfinity ? MAIN_FRAC : 1;
+  // ∞ stop x — the last stop on the slider, after the gap past the "60" end.
+  const infStopX = pad + INF_FRAC * tw;
 
   // --- Interactive gesture ---
   // Called only when the snapped minute value actually changes — the
@@ -216,7 +242,20 @@ export default function GoalSliderBar({
     'worklet';
     const twVal = trackW.value;
     if (twVal === 0) return;
-    const x = Math.max(0, Math.min(1, (eventX - pad) / twVal));
+    const xfull = Math.max(0, Math.min(1, (eventX - pad) / twVal));
+    // Dragged past the value range into the gap → snap to ∞ (the last stop).
+    if (allowInfinity && xfull >= (MAIN_FRAC + INF_FRAC) / 2) {
+      infinityActive.value = 1;
+      internalProgress.value = 1;
+      if (lastSnap.value !== OPEN_ENDED) {
+        lastSnap.value = OPEN_ENDED;
+        runOnJS(handleDisplayUpdate)(OPEN_ENDED);
+      }
+      return;
+    }
+    infinityActive.value = 0;
+    // Map the touch back through the compressed value range.
+    const x = Math.max(0, Math.min(1, xfull / mainFrac));
     const raw = posToValue(x, maxMinutes, bp);
     let snapped = snapToNearest(raw);
     if (snapped < minMinutes) snapped = minMinutes;
@@ -260,10 +299,16 @@ export default function GoalSliderBar({
     requestAnimationFrame(() => {
       trackW.value = t;
       if (value !== undefined) {
-        internalProgress.value = valueToPos(value, maxMinutes, bp);
+        if (allowInfinity && value === OPEN_ENDED) {
+          infinityActive.value = 1;
+          internalProgress.value = 1;
+        } else {
+          infinityActive.value = 0;
+          internalProgress.value = valueToPos(value, maxMinutes, bp);
+        }
       }
     });
-  }, [value, maxMinutes]);
+  }, [value, maxMinutes, allowInfinity]);
 
   // Sync external value changes (interactive mode)
   useEffect(() => {
@@ -271,7 +316,13 @@ export default function GoalSliderBar({
     requestAnimationFrame(() => {
       if (isDragging.value) return;
       if (lastSnap.value !== value) {
-        internalProgress.value = valueToPos(value!, maxMinutes, bp);
+        if (allowInfinity && value === OPEN_ENDED) {
+          infinityActive.value = 1;
+          internalProgress.value = 1;
+        } else {
+          infinityActive.value = 0;
+          internalProgress.value = valueToPos(value!, maxMinutes, bp);
+        }
         lastSnap.value = value!;
         setDisplayMins(value!);
       }
@@ -279,17 +330,22 @@ export default function GoalSliderBar({
   }, [value, width]);
 
   // --- Animated props (UI thread) ---
-  const fillProps = useAnimatedProps(() => ({
-    x2: pad + progress.value * (fixedWidth ? fixedWidth - pad * 2 : trackW.value),
-  }));
+  // Value progress is compressed into `mainFrac` of the track; ∞ parks the
+  // thumb on the last stop at `infStopX` and runs the fill out to meet it.
+  const fillProps = useAnimatedProps(() => {
+    const vtw = fixedWidth ? fixedWidth - pad * 2 : trackW.value;
+    return { x2: infinityActive.value ? infStopX : pad + progress.value * mainFrac * vtw };
+  });
 
-  const thumbProps = useAnimatedProps(() => ({
-    cx: pad + progress.value * (fixedWidth ? fixedWidth - pad * 2 : trackW.value),
-  }));
+  const thumbProps = useAnimatedProps(() => {
+    const vtw = fixedWidth ? fixedWidth - pad * 2 : trackW.value;
+    return { cx: infinityActive.value ? infStopX : pad + progress.value * mainFrac * vtw };
+  });
 
-  const thumbDotProps = useAnimatedProps(() => ({
-    cx: pad + progress.value * (fixedWidth ? fixedWidth - pad * 2 : trackW.value),
-  }));
+  const thumbDotProps = useAnimatedProps(() => {
+    const vtw = fixedWidth ? fixedWidth - pad * 2 : trackW.value;
+    return { cx: infinityActive.value ? infStopX : pad + progress.value * mainFrac * vtw };
+  });
 
   // Wait for layout in interactive mode
   if (isInteractive && width === 0) {
@@ -317,7 +373,8 @@ export default function GoalSliderBar({
         </View>
       )}
       <Svg width={width} height={sH}>
-        {/* Track */}
+        {/* Track — one continuous line; the empty span between the last number
+            and ∞ is the gap, ∞ being the final stop near the right end. */}
         <SvgLine
           x1={pad} y1={cy} x2={width - pad} y2={cy}
           stroke={trackBgColor ?? theme.textTertiary}
@@ -328,7 +385,7 @@ export default function GoalSliderBar({
             `lastSnap` so fill updates land on the same frame as the
             thumb, without waiting for the store roundtrip. */}
         {ticks.map((m) => {
-          const tx = pad + (isInteractive ? valueToPos(m, maxMinutes, bp) : m / maxMinutes) * tw;
+          const tx = pad + (isInteractive ? valueToPos(m, maxMinutes, bp) * mainFrac : m / maxMinutes) * tw;
           if (!isInteractive) {
             return (
               <SvgLine
@@ -348,6 +405,7 @@ export default function GoalSliderBar({
               activeColor={color}
               inactiveColor={trackBgColor ?? theme.textTertiary ?? color}
               lastSnap={lastSnap}
+              infinityActive={infinityActive}
             />
           );
         })}
@@ -383,7 +441,7 @@ export default function GoalSliderBar({
                 key={i}
                 style={{
                   position: 'absolute',
-                  left: pad + pos * tw,
+                  left: pad + pos * mainFrac * tw,
                   alignItems: 'center',
                   transform: [{ translateX: -20 }],
                   width: 40,
@@ -395,6 +453,31 @@ export default function GoalSliderBar({
               </View>
             );
           })}
+          {/* ∞ sits in the scale row, aligned with the numbers, above its stop. */}
+          {allowInfinity && (
+            <View
+              style={{
+                position: 'absolute',
+                left: infStopX,
+                top: -3, // nudge the taller ∞ glyph to sit level with the numbers
+                alignItems: 'center',
+                transform: [{ translateX: -14 }],
+                width: 28,
+              }}
+            >
+              <Text
+                style={[
+                  styles.scaleLabel,
+                  { color: theme.textTertiary },
+                  scaleLabelStyle,
+                  { fontSize: 22, lineHeight: 22, fontWeight: '300' },
+                  displayMins === OPEN_ENDED && { color },
+                ]}
+              >
+                ∞
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         <View style={[styles.scaleRow, { width, paddingHorizontal: pad - 4 }]}>
