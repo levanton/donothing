@@ -18,4 +18,4 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
     plugins: isTest ? ['babel-plugin-dynamic-import-node'] : [],
   };
-
+};
