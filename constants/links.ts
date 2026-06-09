@@ -7,7 +7,7 @@ export const DOMAIN = 'trynothing.app';
 export const SITE_URL = `https://${DOMAIN}`;
 export const TERMS_URL = `${SITE_URL}/terms`;
 export const PRIVACY_URL = `${SITE_URL}/privacy`;
-export const SUPPORT_EMAIL_ADDRESS = `support@${DOMAIN}`;
+export const SUPPORT_EMAIL_ADDRESS = `hi@${DOMAIN}`;
 export const SUPPORT_EMAIL = `mailto:${SUPPORT_EMAIL_ADDRESS}`;
 
 // Apple-side URLs (not on our domain) kept here so all external links live
