@@ -4,6 +4,7 @@
 // the JSX layer.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
 
 import { haptics } from '@/lib/haptics';
@@ -174,15 +175,34 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     }
   }, [onClose, packagesByPlan, purchasing, selectedPlan]);
 
+  const [restoring, setRestoring] = useState(false);
+
   const restore = useCallback(async () => {
+    if (restoring) return;
     haptics.light();
-    const status = await restorePurchases();
-    if (status === 'active') {
-      haptics.success();
-      await useAppStore.getState().setSubscriptionStatus('active');
-      onClose();
+    setRestoring(true);
+    try {
+      const status = await restorePurchases();
+      if (status === 'active') {
+        haptics.success();
+        await useAppStore.getState().setSubscriptionStatus('active');
+        onClose();
+      } else {
+        // No active entitlement found (or a network/StoreKit error swallowed
+        // inside restorePurchases). Either way the user tapped Restore and
+        // got nothing — tell them so it doesn't feel broken. This path is
+        // common on reinstall / new device, and silent failure is an App
+        // Review flag.
+        haptics.error();
+        Alert.alert(
+          'Nothing to restore',
+          "We couldn't find any previous purchases on this Apple ID. If you subscribed before, make sure you're signed in to the same Apple ID and try again.",
+        );
+      }
+    } finally {
+      setRestoring(false);
     }
-  }, [onClose]);
+  }, [onClose, restoring]);
 
   return {
     selectedPlan,
@@ -192,6 +212,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     skip,
     purchase,
     restore,
+    restoring,
     // Win-back promo (rendered on top of the paywall)
     promoVisible,
     closePromo,
