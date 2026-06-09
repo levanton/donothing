@@ -15,7 +15,7 @@ import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
-const HEADING = 'your space to do nothing is ready.';
+const HEADING = 'your space\nto do nothing\nis ready.';
 
 const LINES = [
   'open it when you need it.',
@@ -139,9 +139,9 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontFamily: Fonts?.serif,
-    fontSize: 40,
+    fontSize: 34,
     fontWeight: '500',
-    lineHeight: 46,
+    lineHeight: 40,
     textAlign: 'center',
   },
   lines: {

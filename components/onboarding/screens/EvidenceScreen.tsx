@@ -33,13 +33,6 @@ const CARD_THEMES: CardTheme[] = [
 
 const FACTS: Fact[] = [
   {
-    stat: '5h 16m',
-    line: 'per day on your phone',
-    body: 'More than double what doctors recommend. A 14% increase from last year — before counting tablets or TV.',
-    src: 'harmonyhit.com · 2025',
-    url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
-  },
-  {
     stat: 'Rest',
     line: '= better ideas',
     body: 'J.K. Rowling dreamed up Harry Potter during 4 boring hours on a train. Your brain does its best work when you stop.',
@@ -66,6 +59,13 @@ const FACTS: Fact[] = [
     body: 'Every 10 minutes. Silencing it makes it worse — anxiety of missing something makes you check even more.',
     src: 'slicktext.com · 2026',
     url: 'https://www.slicktext.com/blog/smartphone-addiction-statistics/',
+  },
+  {
+    stat: '5h 16m',
+    line: 'per day on your phone',
+    body: 'More than double what doctors recommend. A 14% increase from last year — before counting tablets or TV.',
+    src: 'harmonyhit.com · 2025',
+    url: 'https://www.harmonyhit.com/phone-screen-time-statistics/',
   },
   {
     stat: '70',

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -9,13 +10,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
 import { haptics } from '@/lib/haptics';
+import { sound } from '@/lib/sound';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
+import { useSessionScreen } from '@/hooks/useSessionScreen';
 
 const SESSION_DURATION = 60;
 const YES_BUTTON_SIZE = 140;
+// Slower auto-dim than the real timer (default 5.5s) — this onboarding
+// minute eases into darkness more gently.
+const DIM_DURATION_MS = 15000;
 
 interface Props {
   isActive: boolean;
@@ -28,7 +34,13 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const insets = useSafeAreaInsets();
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [distractionFree, setDistractionFree] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const toggleDistractionFree = useCallback(() => {
+    haptics.light();
+    setDistractionFree((v) => !v);
+  }, []);
 
   const handleSkip = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -42,6 +54,16 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const yesOpacity = useSharedValue(1);
   const headerOpacity = useSharedValue(1);
   const hintOpacity = useSharedValue(1);
+
+  // Same screen-dimming behaviour as the real session timer: once started,
+  // the brightness + timer fade to black; a tap anywhere then wakes it. The
+  // eye toggle dims instantly (distraction-free) like the real running UI.
+  const { contentStyle, fullyDark, wake } = useSessionScreen({
+    active: started,
+    suppressed: false,
+    distractionFree,
+    dimDurationMs: DIM_DURATION_MS,
+  });
 
   useEffect(() => {
     if (!isActive) return;
@@ -66,7 +88,10 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
           // screen stats aren't empty on first launch. recordSession also
           // refreshes weekStats and checks milestones in one shot.
           useAppStore.getState().recordSession(SESSION_DURATION);
-          haptics.success();
+          // Same end-of-timer feel as the real session: the Opal-style
+          // haptic swell + the soft completion sound.
+          haptics.celebrate();
+          sound.complete();
           onNext();
           return SESSION_DURATION;
         }
@@ -105,15 +130,17 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
       <Animated.View style={[styles.content, entryStyle]}>
         <Animated.View style={headerStyle}>
           <Text style={[styles.headerText, { fontFamily: Fonts?.serif }]}>
-            Ready to Try nothing?
+            Ready to try nothing?
           </Text>
         </Animated.View>
 
-        <AnimatedTimerDisplay
-          seconds={remaining}
-          color={palette.cream}
-          fontSize={96}
-        />
+        <Animated.View style={contentStyle}>
+          <AnimatedTimerDisplay
+            seconds={remaining}
+            color={palette.cream}
+            fontSize={96}
+          />
+        </Animated.View>
 
         <View style={styles.yesWrap}>
           <Animated.View style={yesStyle} pointerEvents={started ? 'none' : 'auto'}>
@@ -137,13 +164,53 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
         </Animated.View>
       </Animated.View>
 
-      <Pressable
-        onPress={handleSkip}
-        style={[styles.skipButton, { bottom: insets.bottom + 28 }]}
-        hitSlop={16}
-      >
-        <Text style={[styles.skipLabel, { fontFamily: Fonts?.serif }]}>skip</Text>
-      </Pressable>
+      {/* Skip is only offered before the minute starts. */}
+      {!started && (
+        <Pressable
+          onPress={handleSkip}
+          style={[styles.skipButton, { bottom: insets.bottom + 28 }]}
+          hitSlop={16}
+        >
+          <Text style={[styles.skipLabel, { fontFamily: Fonts?.serif }]}>skip</Text>
+        </Pressable>
+      )}
+
+      {/* Eye toggle — tap to turn the screen off instantly (distraction-free),
+          same as the real running UI. Fades out with the content as it dims. */}
+      {started && (
+        <Animated.View
+          style={[styles.runHideStack, { bottom: insets.bottom + 40 }, contentStyle]}
+          pointerEvents={distractionFree ? 'none' : 'box-none'}
+        >
+          <Pressable
+            onPress={toggleDistractionFree}
+            style={styles.runHideIconBtn}
+            hitSlop={16}
+          >
+            <Feather name="eye-off" size={18} color={palette.cream} style={{ opacity: 0.78 }} />
+          </Pressable>
+          <Text style={[styles.runHideHint, { fontFamily: Fonts?.serif }]}>
+            tap so nothing distracts
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* In distraction-free mode a tap anywhere brings the screen back. */}
+      {distractionFree && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
+          onPress={toggleDistractionFree}
+        />
+      )}
+
+      {/* Once the auto-dim has faded fully black, a tap anywhere wakes it —
+          same as the real session timer. */}
+      {fullyDark && !distractionFree && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
+          onPress={wake}
+        />
+      )}
     </View>
   );
 }
@@ -207,10 +274,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
   },
+  wakeCatcher: {
+    zIndex: 100,
+  },
   skipLabel: {
     fontSize: 16,
     fontWeight: '400',
     letterSpacing: 0.5,
     color: palette.cream,
+  },
+  runHideStack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  runHideIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 242, 224, 0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runHideHint: {
+    color: palette.cream,
+    fontSize: 11,
+    letterSpacing: 0.3,
+    opacity: 0.55,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
