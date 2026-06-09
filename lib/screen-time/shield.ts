@@ -54,7 +54,7 @@ export const SHIELD_ACTIONS: ShieldActions = {
 export async function copyShieldIcon(): Promise<void> {
   try {
     const [asset] = await Asset.loadAsync(
-      require('@/assets/Icon.icon/Assets/enso_D8522E_transparent.png'),
+      require('@/assets/images/shield-icon.png'),
     );
     const appGroupDir = getAppGroupFileDirectory();
     if (asset.localUri && appGroupDir) {

@@ -20,7 +20,6 @@ import { EASE_OUT } from '@/constants/animations';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
-import EyebrowChip from '@/components/EyebrowChip';
 import Starscape from '@/components/Starscape';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -153,12 +152,6 @@ function SessionEndedSheet({
     // stopwatch mode the number is just elapsed time — the PAUSED
     // eyebrow already gives the context, no caption needed.
     const heroLabel = hasGoal ? 'left to do nothing' : null;
-    // Eyebrow is the context badge ("you're on a pause"); the caption
-    // under the big number is the label of the number itself ("this is
-    // what's left"). Keeping eyebrow="paused" for both modes avoids the
-    // earlier dupe where "still to go" + "left to do nothing" said the
-    // same thing twice.
-    const eyebrow = 'paused';
     const progressPct = hasGoal
       ? Math.min(100, Math.max(0, (elapsed / goalSeconds) * 100))
       : 0;
@@ -192,12 +185,6 @@ function SessionEndedSheet({
         <BottomSheetView
           style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
         >
-          {/* Eyebrow pill — uppercase serif on warm sand chip,
-              matching BlockSheet's eyebrow. */}
-          <View style={styles.eyebrowRow}>
-            <EyebrowChip text={eyebrow} />
-          </View>
-
           {/* Hero — big mono number with a soft caption underneath.
               Goal mode: shows time remaining; free mode: shows what
               they've done so far. Same scattered-dot starscape as
@@ -368,11 +355,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingTop: 28,
     alignItems: 'center',
-  },
-  eyebrowRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 8,
   },
   starscape: {
     alignSelf: 'stretch',

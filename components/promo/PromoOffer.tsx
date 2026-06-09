@@ -36,6 +36,8 @@ interface Props {
   // because Apple uses per-region pricing tiers (USD/EUR/AUD/etc.)
   priceString?: string;
   introPriceString?: string;
+  // Real discount %, computed live from the prices (not hardcoded).
+  discountPct?: number;
 }
 
 function PromoOffer({
@@ -44,6 +46,7 @@ function PromoOffer({
   onPurchase,
   priceString,
   introPriceString,
+  discountPct,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -133,7 +136,10 @@ function PromoOffer({
             {/* Headline */}
             <Text style={[styles.headline, { fontFamily: Fonts!.serif }]}>
               What if your first year{'\n'}was{' '}
-              <Text style={styles.headlineBold}>HALF OFF</Text>?
+              <Text style={styles.headlineBold}>
+                {discountPct ? `${discountPct}% OFF` : 'on us'}
+              </Text>
+              ?
             </Text>
 
             {/* Bullet list */}

@@ -17,15 +17,12 @@ export const RC_PACKAGE_BY_PLAN: Record<PlanId, string[]> = {
   lifetime: ['$rc_lifetime'],
 };
 
-// `nothing_yearly` lives in ASC purely so we can render a struck-through
-// anchor price on the yearly card. Intentionally not in any RC offering
-// — never buyable. Replace this ID if you ever want to swap the anchor.
-export const ANCHOR_PRODUCT_ID = 'nothing_yearly';
-
-// Win-back modal package — shown after dismissal of the main paywall.
-// Custom RC identifier (not `$rc_*`) so we can wire it without colliding
-// with the standard yearly slot. Maps to `nothing_first_year_50_off`.
-export const WINBACK_PACKAGE_ID = 'winback_yearly';
+// Win-back product — the discounted annual shown in the promo modal after the
+// user dismisses the main paywall. Matched by STORE PRODUCT id (not the RC
+// package identifier) so the wiring doesn't depend on what the discount package
+// is named in the dashboard. Its first-year price comes from an introductory
+// offer on this product; the discount % is computed live from the real prices.
+export const WINBACK_PRODUCT_ID = 'yearly_40_discount';
 
 // Builds the CTA button label using Apple-localized prices from RC.
 // Yearly stays static because it's a free-trial CTA, not a price CTA.

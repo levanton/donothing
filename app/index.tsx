@@ -1,7 +1,7 @@
 import { Entypo, Feather } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
 import { StatusBar } from 'expo-status-bar';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -37,7 +37,7 @@ import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import DriftingDots from '@/components/DriftingDots';
 import PaywallGate from '@/components/PaywallGate';
 import PromoOffer from '@/components/promo/PromoOffer';
-import { WINBACK_PACKAGE_ID } from '@/lib/paywall-config';
+import { WINBACK_PRODUCT_ID } from '@/lib/paywall-config';
 import {
   getOfferings,
   purchasePackage,
@@ -61,6 +61,7 @@ import {
   isBlockActive,
 } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
+import { useSessionBrightness } from '@/hooks/useSessionBrightness';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
 import { getStats, getWeekStats } from '@/lib/stats';
@@ -493,6 +494,9 @@ export default function DoNothingScreen() {
   // app/index.tsx stays focused on the home-screen UI. See useAppLifecycle.
   useAppLifecycle(pollBlockUnlock);
 
+  // Screen dims while a session runs, eases back up when it ends.
+  useSessionBrightness(started);
+
   // When a session ends (started: true → false), check the native shield.
   // The lifecycle listeners suppress BlockSheet during sessions to avoid
   // popping over the running UI / pause sheet, so this is the moment we
@@ -835,8 +839,10 @@ export default function DoNothingScreen() {
     let cancelled = false;
     getOfferings().then((offering) => {
       if (cancelled || !offering) return;
+      // Match by store product id — robust to whatever the discount package is
+      // named in the RC dashboard.
       const pkg = offering.availablePackages.find(
-        (p) => p.identifier === WINBACK_PACKAGE_ID,
+        (p) => p.product.identifier === WINBACK_PRODUCT_ID,
       );
       if (pkg) setWinbackPkg(pkg);
     });
@@ -844,10 +850,20 @@ export default function DoNothingScreen() {
       cancelled = true;
     };
   }, []);
+
+  // Real discount % computed live from the win-back product's intro vs full
+  // price — never hardcoded, since the actual deal may not be exactly 40%.
+  const winbackDiscountPct = useMemo(() => {
+    const product = winbackPkg?.product;
+    const full = product?.price;
+    const intro = product?.introPrice?.price;
+    if (full == null || intro == null || full <= 0) return undefined;
+    return Math.round((1 - intro / full) * 100);
+  }, [winbackPkg]);
   const handlePromoPurchase = useCallback(async () => {
     if (promoPurchasing) return;
     if (!winbackPkg) {
-      console.warn(`[promo] ${WINBACK_PACKAGE_ID} package not loaded`);
+      console.warn(`[promo] ${WINBACK_PRODUCT_ID} package not loaded`);
       handleClosePromo();
       return;
     }
@@ -1108,6 +1124,113 @@ export default function DoNothingScreen() {
               />
             </Pressable>
           </TutorialStepWrapper>
+
+          {/* Dev: re-run onboarding from the home screen */}
+          {__DEV__ && (
+            <Pressable
+              onPress={() => {
+                haptics.select();
+                router.push('/onboarding');
+              }}
+              disabled={started}
+              style={[
+                styles.devOnboardingHomeBtn,
+                {
+                  top: insets.top + 12,
+                  borderColor: theme.text + '40',
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Feather name='play' size={12} color={theme.text} />
+              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
+                onboarding
+              </Text>
+            </Pressable>
+          )}
+
+          {/* Dev: log the live RC offering (real prices + intro offers) */}
+          {__DEV__ && (
+            <Pressable
+              onPress={async () => {
+                haptics.select();
+                const offering = await getOfferings();
+                if (!offering) {
+                  Alert.alert('Offerings', 'No current offering (RC empty / not configured).');
+                  return;
+                }
+                const lines = offering.availablePackages.map((p) => {
+                  const pr = p.product;
+                  const intro = pr.introPrice
+                    ? ` · intro ${pr.introPrice.priceString}`
+                    : ' · NO intro';
+                  return `${p.identifier} → ${pr.identifier}\n  ${pr.priceString}${intro}`;
+                });
+                Alert.alert(
+                  `Offering: ${offering.identifier}`,
+                  lines.join('\n\n') || 'No packages',
+                );
+              }}
+              disabled={started}
+              style={[
+                styles.devOnboardingHomeBtn,
+                {
+                  top: insets.top + 50,
+                  borderColor: theme.text + '40',
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Feather name='dollar-sign' size={12} color={theme.text} />
+              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
+                offerings
+              </Text>
+            </Pressable>
+          )}
+
+          {/* Dev: block diagnostics — subscription + Screen Time + monitors */}
+          {__DEV__ && (
+            <Pressable
+              onPress={async () => {
+                haptics.select();
+                const sub = useAppStore.getState().subscriptionStatus;
+                const auth = await getAuth();
+                const monitors = getActiveMonitors();
+                const shieldOn = isBlockActive();
+                const blocks = useAppStore.getState().scheduledBlocks;
+                const enabled = blocks.filter((b) => b.enabled);
+                const lines = [
+                  `subscription: ${sub}`,
+                  `screen-time auth: ${auth}`,
+                  `shield active: ${shieldOn}`,
+                  `native monitors (${monitors.length}): ${monitors.join(', ') || '—'}`,
+                  `blocks: ${blocks.length} (enabled: ${enabled.length})`,
+                  ...enabled.map(
+                    (b) =>
+                      `  • ${String(b.hour).padStart(2, '0')}:${String(b.minute).padStart(2, '0')} ${b.durationMinutes}min days[${b.weekdays.join(',')}]`,
+                  ),
+                ];
+                Alert.alert('Block diagnostics', lines.join('\n'));
+              }}
+              disabled={started}
+              style={[
+                styles.devOnboardingHomeBtn,
+                {
+                  top: insets.top + 88,
+                  borderColor: theme.text + '40',
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Feather name='activity' size={12} color={theme.text} />
+              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
+                diag
+              </Text>
+            </Pressable>
+          )}
 
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
           {false && __DEV__ && (
@@ -1881,6 +2004,7 @@ export default function DoNothingScreen() {
         onPurchase={handlePromoPurchase}
         priceString={winbackPkg?.product.priceString}
         introPriceString={winbackPkg?.product.introPrice?.priceString}
+        discountPct={winbackDiscountPct}
       />
 
       {/* Countdown completion screen */}
@@ -2126,6 +2250,22 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  devOnboardingHomeBtn: {
+    position: 'absolute',
+    left: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  devOnboardingHomeText: {
+    fontSize: 11,
+    letterSpacing: 0.5,
+    fontFamily: Fonts?.mono,
   },
   nothingLabel: {
     fontSize: 22,

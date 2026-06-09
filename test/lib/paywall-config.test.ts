@@ -1,7 +1,6 @@
 import {
   RC_PACKAGE_BY_PLAN,
-  ANCHOR_PRODUCT_ID,
-  WINBACK_PACKAGE_ID,
+  WINBACK_PRODUCT_ID,
   ctaLabel,
   type PackagesByPlan,
 } from '@/lib/paywall-config';
@@ -17,9 +16,8 @@ describe('RC identifiers', () => {
     expect(RC_PACKAGE_BY_PLAN.lifetime).toContain('$rc_lifetime');
   });
 
-  it('keeps the anchor and win-back IDs stable', () => {
-    expect(ANCHOR_PRODUCT_ID).toBe('nothing_yearly');
-    expect(WINBACK_PACKAGE_ID).toBe('winback_yearly');
+  it('keeps the win-back product ID stable', () => {
+    expect(WINBACK_PRODUCT_ID).toBe('yearly_40_discount');
   });
 });
 

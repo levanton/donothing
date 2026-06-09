@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
@@ -48,7 +47,6 @@ interface SettingsContentProps {
 }
 
 export default function SettingsContent({ onClose, insets, onOpenAccount }: SettingsContentProps) {
-  const router = useRouter();
   const themeMode = useAppStore((s) => s.themeMode);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
   const theme = themes[themeMode];
@@ -144,23 +142,6 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           <Text style={[styles.closeText, { color: theme.textSecondary }]}>{'\u2715'}</Text>
         </Pressable>
       </View>
-
-      {/* Dev-only: replay the onboarding flow. Hidden in production builds. */}
-      {__DEV__ && (
-        <Pressable
-          onPress={() => {
-            haptics.select();
-            onClose();
-            router.push('/onboarding');
-          }}
-          style={[styles.devOnboardingBtn, { borderColor: theme.accent }]}
-        >
-          <Feather name="play" size={14} color={theme.accent} />
-          <Text style={[styles.devOnboardingText, { color: theme.accent, fontFamily: Fonts!.mono }]}>
-            DEV \u00b7 open onboarding
-          </Text>
-        </Pressable>
-      )}
 
       {/* Notification permission banner — shown first so it's impossible to miss.
           Banner is its own warm chip regardless of theme: saturated peach/amber
@@ -497,18 +478,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '400', letterSpacing: 0.5 },
   closeButton: { padding: 4 },
   closeText: { fontSize: 20, fontWeight: '300' },
-  devOnboardingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginBottom: 20,
-  },
-  devOnboardingText: { fontSize: 12, letterSpacing: 0.5 },
 
   notifBanner: {
     flexDirection: 'row',

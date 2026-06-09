@@ -7,7 +7,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { haptics } from '@/lib/haptics';
 import {
-  ANCHOR_PRODUCT_ID,
   type PackagesByPlan,
   type PlanId,
   RC_PACKAGE_BY_PLAN,
@@ -15,7 +14,6 @@ import {
 import { useAppStore } from '@/lib/store';
 import {
   getOfferings,
-  getProductPriceString,
   purchasePackage,
   restorePurchases,
 } from '@/lib/subscription';
@@ -34,7 +32,6 @@ interface Options {
 export function usePaywall({ onClose, enabled = true }: Options) {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
   const [packagesByPlan, setPackagesByPlan] = useState<PackagesByPlan>({});
-  const [anchorYearly, setAnchorYearly] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const subscriptionStatus = useAppStore((s) => s.subscriptionStatus);
 
@@ -45,8 +42,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     if (enabled && subscriptionStatus === 'active') onClose();
   }, [enabled, subscriptionStatus, onClose]);
 
-  // Load packages + anchor price once on mount. The anchor lives outside
-  // any RC offering, so it needs its own getProducts call.
+  // Load packages once on mount.
   useEffect(() => {
     let cancelled = false;
     getOfferings().then((offering) => {
@@ -60,10 +56,6 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         if (pkg) map[plan] = pkg;
       }
       setPackagesByPlan(map);
-    });
-    getProductPriceString(ANCHOR_PRODUCT_ID).then((price) => {
-      if (cancelled || !price) return;
-      setAnchorYearly(price);
     });
     return () => {
       cancelled = true;
@@ -118,7 +110,6 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     selectedPlan,
     setSelectedPlan,
     packagesByPlan,
-    anchorYearly,
     purchasing,
     skip,
     purchase,
