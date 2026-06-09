@@ -1131,28 +1131,6 @@ export default function DoNothingScreen() {
             </Pressable>
           )}
 
-          {/* Dev: play the end-of-timer "celebrate" haptic */}
-          {__DEV__ && (
-            <Pressable
-              onPress={() => haptics.celebrate()}
-              disabled={started}
-              style={[
-                styles.devOnboardingHomeBtn,
-                {
-                  top: insets.top + 126,
-                  borderColor: theme.text + '40',
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              hitSlop={10}
-            >
-              <Feather name='zap' size={12} color={theme.text} />
-              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
-                buzz
-              </Text>
-            </Pressable>
-          )}
-
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
           {false && __DEV__ && (
             <View
@@ -2369,7 +2347,7 @@ const RestingTimerText = memo(function RestingTimerText({
         { color, fontFamily: Fonts!.mono, textAlign: 'center' },
       ]}
     >
-      {sliderMinutes === 0 ? '∞' : `${String(sliderMinutes).padStart(2, '0')}:00`}
+      {`${String(sliderMinutes).padStart(2, '0')}:00`}
     </Animated.Text>
   );
 });
