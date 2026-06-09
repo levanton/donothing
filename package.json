@@ -30,7 +30,7 @@
       "/.expo/"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@gorhom/.*|react-native-purchases|react-native-reanimated|react-native-device-activity|app-labels))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@gorhom/.*|react-native-purchases|react-native-reanimated|react-native-device-activity|app-labels|core-haptics))"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
@@ -45,6 +45,7 @@
     "@react-navigation/native": "^7.1.8",
     "@sentry/react-native": "~7.2.0",
     "app-labels": "file:./modules/app-labels",
+    "core-haptics": "file:./modules/core-haptics",
     "expo": "~54.0.33",
     "expo-asset": "~12.0.12",
     "expo-audio": "~1.1.1",

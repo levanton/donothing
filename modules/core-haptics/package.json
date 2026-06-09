@@ -1,0 +1,8 @@
+{
+  "name": "core-haptics",
+  "version": "0.1.0",
+  "description": "Local Expo module that plays continuous Core Haptics patterns (CHHapticEngine) — a smooth swelling vibration, the kind expo-haptics can't produce.",
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "private": true
+}

@@ -1131,6 +1131,28 @@ export default function DoNothingScreen() {
             </Pressable>
           )}
 
+          {/* Dev: play the end-of-timer "celebrate" haptic */}
+          {__DEV__ && (
+            <Pressable
+              onPress={() => haptics.celebrate()}
+              disabled={started}
+              style={[
+                styles.devOnboardingHomeBtn,
+                {
+                  top: insets.top + 126,
+                  borderColor: theme.text + '40',
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Feather name='zap' size={12} color={theme.text} />
+              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
+                buzz
+              </Text>
+            </Pressable>
+          )}
+
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
           {false && __DEV__ && (
             <View
@@ -2347,7 +2369,7 @@ const RestingTimerText = memo(function RestingTimerText({
         { color, fontFamily: Fonts!.mono, textAlign: 'center' },
       ]}
     >
-      {`${String(sliderMinutes).padStart(2, '0')}:00`}
+      {sliderMinutes === 0 ? '∞' : `${String(sliderMinutes).padStart(2, '0')}:00`}
     </Animated.Text>
   );
 });
@@ -2374,9 +2396,10 @@ const RestingSliderWrap = memo(function RestingSliderWrap({
       onRelease={onRelease}
       width={width}
       maxMinutes={60}
-      minMinutes={0}
+      minMinutes={1}
+      allowInfinity
       ticks={[5, 10, 15, 30, 45]}
-      scaleLabels={['0', '5', '10', '15', '30', '45', '60']}
+      scaleLabels={['1', '5', '10', '15', '30', '45', '60']}
       breakpoints={{ b1Val: 15, b1Pos: 1 / 2, b2Val: 30, b2Pos: 2 / 3, b3Val: 45, b3Pos: 5 / 6 }}
       accentColor={theme.accent}
       trackBgColor={theme.text}
