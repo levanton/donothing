@@ -9,13 +9,13 @@ import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import PickerSheet from '@/components/PickerSheet';
 
-// TODO: replace with real URLs before App Store submission
-const TERMS_URL = 'https://nothing.app/terms';
-const PRIVACY_URL = 'https://nothing.app/privacy';
-const SUPPORT_EMAIL = 'mailto:support@nothing.app';
-const IOS_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
-// TODO: drop in the real App Store ID once it's minted
-const APP_STORE_WRITE_REVIEW = 'itms-apps://apps.apple.com/app/id0000000000?action=write-review';
+import {
+  TERMS_URL,
+  PRIVACY_URL,
+  SUPPORT_EMAIL,
+  IOS_SUBSCRIPTIONS_URL,
+  APP_STORE_WRITE_REVIEW,
+} from '@/constants/links';
 
 interface Props {
   theme: AppTheme;

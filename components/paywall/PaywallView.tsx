@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -19,6 +19,7 @@ import { Fonts } from '@/constants/theme';
 import { usePaywall } from '@/hooks/usePaywall';
 import { ctaLabel, type PlanId } from '@/lib/paywall-config';
 import { palette } from '@/lib/theme';
+import { PRIVACY_URL, TERMS_URL } from '@/constants/links';
 
 // Dark-green CTA/card colour for the Lifetime plan.
 const LIFETIME_COLOR = '#2C4A3E';
@@ -183,11 +184,11 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
           entering={FadeInUp.delay(1100).duration(500)}
           style={styles.footer}
         >
-          <Pressable hitSlop={8}>
+          <Pressable hitSlop={8} onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}>
             <Text style={styles.footerLink}>Privacy Policy</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
-          <Pressable hitSlop={8}>
+          <Pressable hitSlop={8} onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}>
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Text style={styles.footerDot}>|</Text>
