@@ -18,10 +18,6 @@ function readApiKey(): string | undefined {
   return extra?.revenueCatIosKey;
 }
 
-function isDevForceSubscribed(): boolean {
-  return __DEV__ && process.env.EXPO_PUBLIC_FORCE_SUBSCRIBED === '1';
-}
-
 function statusFromCustomerInfo(info: CustomerInfo): 'active' | 'inactive' {
   if (info.entitlements.active[PRO_ENTITLEMENT_ID]) return 'active';
   // Fallback: any active entitlement (handles entitlement ID drift in RC)
@@ -47,7 +43,6 @@ export function initRevenueCat(): void {
 }
 
 export async function getCurrentStatus(): Promise<'active' | 'inactive'> {
-  if (isDevForceSubscribed()) return 'active';
   if (!configured) return 'inactive';
   try {
     const info = await Purchases.getCustomerInfo();

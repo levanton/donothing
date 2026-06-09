@@ -53,7 +53,7 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <Animated.View style={[styles.textBlock, textStyle]}>
-        <Text style={[styles.welcome, { color: theme.text }]}>Welcome</Text>
+        <Text style={[styles.welcome, { color: theme.text }]}>welcome</Text>
         <Text style={[styles.welcome, { color: palette.terracotta }]}>
           to Nothing
         </Text>
@@ -63,7 +63,7 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
         />
 
         <Text style={[styles.essence, { color: theme.text }]}>
-          a space to step out of the rush — and{'\n'}do{' '}
+          a space to step out of the rush — and do{' '}
           <Text style={styles.essenceStrong}>nothing</Text>.
         </Text>
 
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.2,
     lineHeight: 27,
-    maxWidth: 300,
+    maxWidth: 270,
   },
   essenceStrong: {
     fontWeight: '600',

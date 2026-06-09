@@ -185,16 +185,6 @@ export interface AppState {
   subscriptionStatus: SubscriptionStatus;
   isSubscribed: boolean;
 
-  // Win-back promo offer shown after the user closes the main paywall
-  promoOfferVisible: boolean;
-  showPromoOffer: () => void;
-  hidePromoOffer: () => void;
-  // Set when paywall is dismissed without purchase — home screen
-  // consumes this once its launch splash settles, so the modal doesn't
-  // animate in on top of the still-running splash.
-  pendingPromoOnHome: boolean;
-  setPendingPromoOnHome: (v: boolean) => void;
-
   // Goal
   goalSeconds: number;
   sliderMinutes: number;
@@ -774,12 +764,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('[store.setSubscriptionStatus] transition failed:', e);
     }
   },
-
-  promoOfferVisible: false,
-  showPromoOffer: () => set({ promoOfferVisible: true }),
-  hidePromoOffer: () => set({ promoOfferVisible: false }),
-  pendingPromoOnHome: false,
-  setPendingPromoOnHome: (v: boolean) => set({ pendingPromoOnHome: v }),
 
   // --- Goal ---
   setSliderMinutes: (m) => set({ sliderMinutes: m }),

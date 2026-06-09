@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import FeatureCarousel from '@/components/paywall/FeatureCarousel';
 import PlanCard from '@/components/paywall/PlanCard';
 import PurchasingOverlay from '@/components/paywall/PurchasingOverlay';
+import PromoOffer from '@/components/promo/PromoOffer';
 import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 import { usePaywall } from '@/hooks/usePaywall';
@@ -93,6 +94,11 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
     skip,
     purchase,
     restore,
+    promoVisible,
+    closePromo,
+    promoPurchase,
+    winbackPkg,
+    winbackDiscountPct,
   } = usePaywall({ onClose, enabled });
 
   const scrollY = useSharedValue(0);
@@ -199,6 +205,16 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
       </Animated.ScrollView>
 
       <PurchasingOverlay visible={purchasing} />
+
+      {/* Win-back promo — overlays the paywall when the user taps the X */}
+      <PromoOffer
+        visible={promoVisible}
+        onClose={closePromo}
+        onPurchase={promoPurchase}
+        priceString={winbackPkg?.product.priceString}
+        introPriceString={winbackPkg?.product.introPrice?.priceString}
+        discountPct={winbackDiscountPct}
+      />
     </View>
   );
 }

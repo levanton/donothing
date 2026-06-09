@@ -1,10 +1,8 @@
 import { Entypo, Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Dimensions,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,7 +11,6 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { haptics } from '@/lib/haptics';
-import { sound } from '@/lib/sound';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Animated, {
   Easing,
@@ -35,13 +32,6 @@ import HistoryContent from '@/components/HistoryContent';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import DriftingDots from '@/components/DriftingDots';
 import PaywallGate from '@/components/PaywallGate';
-import PromoOffer from '@/components/promo/PromoOffer';
-import { WINBACK_PRODUCT_ID } from '@/lib/paywall-config';
-import {
-  getOfferings,
-  purchasePackage,
-} from '@/lib/subscription';
-import type { PurchasesPackage } from 'react-native-purchases';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
 import SettingsContent from '@/components/SettingsContent';
@@ -51,19 +41,15 @@ import { Fonts } from '@/constants/theme';
 import type { ScheduledBlock } from '@/lib/db/types';
 import { formatTimeStat, timerDisplay } from '@/lib/format';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
-import { getDb } from '@/lib/db';
-import { randomUUID } from 'expo-crypto';
 import {
   forceUnblockAll,
-  getActiveMonitors,
-  getAuth,
   isBlockActive,
 } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useSessionScreen } from '@/hooks/useSessionScreen';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
-import { getStats, getWeekStats } from '@/lib/stats';
+import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
@@ -621,17 +607,6 @@ export default function DoNothingScreen() {
     );
   }, [ready, splashDone, yesBtnRect]);
 
-  // Drain the post-paywall promo flag once the launch splash has
-  // settled. The paywall arms `pendingPromoOnHome` instead of opening
-  // the modal directly so the win-back doesn't animate in on top of
-  // the still-running splash circle.
-  useEffect(() => {
-    if (!splashDone) return;
-    if (!useAppStore.getState().pendingPromoOnHome) return;
-    useAppStore.getState().setPendingPromoOnHome(false);
-    useAppStore.getState().showPromoOffer();
-  }, [splashDone]);
-
   const splashStyle = useAnimatedStyle(() => {
     const size =
       splashInitialSize.value + splashProgress.value * (YES_SIZE - splashInitialSize.value);
@@ -722,67 +697,6 @@ export default function DoNothingScreen() {
     distractionFree,
   });
 
-  // --- Promo offer modal (for users without subscription) ---
-  // Lives in the store so the standalone paywall route can trigger it
-  // when the user dismisses without buying.
-  const promoVisible = useAppStore((s) => s.promoOfferVisible);
-  const handleClosePromo = useCallback(() => {
-    useAppStore.getState().hidePromoOffer();
-  }, []);
-
-  // Win-back package loaded on mount so the modal can show Apple-localized
-  // prices (per-region tiers, not hardcoded USD). Identifier comes from
-  // paywall-config — change it there if you ever rename the RC package.
-  const [winbackPkg, setWinbackPkg] = useState<PurchasesPackage | null>(null);
-  const [promoPurchasing, setPromoPurchasing] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    getOfferings().then((offering) => {
-      if (cancelled || !offering) return;
-      // Match by store product id — robust to whatever the discount package is
-      // named in the RC dashboard.
-      const pkg = offering.availablePackages.find(
-        (p) => p.product.identifier === WINBACK_PRODUCT_ID,
-      );
-      if (pkg) setWinbackPkg(pkg);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Real discount % computed live from the win-back product's intro vs full
-  // price — never hardcoded, since the actual deal may not be exactly 40%.
-  const winbackDiscountPct = useMemo(() => {
-    const product = winbackPkg?.product;
-    const full = product?.price;
-    const intro = product?.introPrice?.price;
-    if (full == null || intro == null || full <= 0) return undefined;
-    return Math.round((1 - intro / full) * 100);
-  }, [winbackPkg]);
-  const handlePromoPurchase = useCallback(async () => {
-    if (promoPurchasing) return;
-    if (!winbackPkg) {
-      console.warn(`[promo] ${WINBACK_PRODUCT_ID} package not loaded`);
-      handleClosePromo();
-      return;
-    }
-    setPromoPurchasing(true);
-    try {
-      const result = await purchasePackage(winbackPkg);
-      if (result === 'active') {
-        haptics.success();
-        await useAppStore.getState().setSubscriptionStatus('active');
-        handleClosePromo();
-      } else if (result !== 'cancelled') {
-        // User dismissed the system sheet → leave modal open so they
-        // can retry. Anything else (network/storekit error) → error haptic.
-        haptics.error();
-      }
-    } finally {
-      setPromoPurchasing(false);
-    }
-  }, [handleClosePromo, promoPurchasing, winbackPkg]);
   const toggleDistractionFree = useCallback(() => {
     haptics.light();
     setDistractionFree((v) => !v);
@@ -918,63 +832,6 @@ export default function DoNothingScreen() {
     historySlide.value = withTiming(1, { duration: 500 });
   }, []);
 
-  // Dev-only: seed ~18 fake sessions across ~8 distinct days in the
-  // past month so the history calendar looks lived-in for App Store
-  // screenshots. Durations 1–50 min with one 30+ min "longest", and
-  // a session today + a couple this week so today/week are non-zero.
-  const handleSeedFakeData = useCallback(() => {
-    haptics.light();
-    const db = getDb();
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    // Pick 8 distinct day offsets in [0, 29]. Always include 0 (today)
-    // and 1, 2 (recent week) so both stats are populated.
-    const dayOffsets = new Set<number>([0, 1, 2]);
-    while (dayOffsets.size < 8) {
-      dayOffsets.add(3 + Math.floor(Math.random() * 27));
-    }
-
-    // Per-day session count distribution — total ≈ 18.
-    const offsets = [...dayOffsets];
-    const sessionsPerDay = offsets.map((_, i) =>
-      i === 0 ? 2 : i < 3 ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3),
-    );
-
-    db.withTransactionSync(() => {
-      let placedLongest = false;
-      offsets.forEach((daysAgo, idx) => {
-        const dayStart = today.getTime() - daysAgo * 86_400_000;
-        const count = sessionsPerDay[idx];
-        for (let s = 0; s < count; s++) {
-          // Spread sessions across the day (8:00–22:00) so the
-          // timestamps look realistic instead of stacked at midnight.
-          const hour = 8 + Math.floor(Math.random() * 14);
-          const minute = Math.floor(Math.random() * 60);
-          const ts = dayStart + hour * 3_600_000 + minute * 60_000;
-
-          let durationMin: number;
-          if (!placedLongest && idx >= 2) {
-            durationMin = 30 + Math.floor(Math.random() * 21); // 30–50
-            placedLongest = true;
-          } else {
-            // Bias toward 3–20 min, occasional 25+
-            durationMin = Math.random() < 0.85
-              ? 1 + Math.floor(Math.random() * 22)
-              : 22 + Math.floor(Math.random() * 12);
-          }
-          db.runSync(
-            'INSERT INTO sessions (id, timestamp, duration) VALUES (?, ?, ?)',
-            randomUUID(), ts, durationMin * 60,
-          );
-        }
-      });
-    });
-
-    useAppStore.setState({ weekStats: getWeekStats() });
-    useAppStore.getState().checkMilestones();
-  }, []);
-
   if (!ready) {
     // Match the launch splash colour so there is no dark flash between the
     // native splash hiding and the JS splash overlay mounting.
@@ -1048,262 +905,6 @@ export default function DoNothingScreen() {
                 onboarding
               </Text>
             </Pressable>
-          )}
-
-          {/* Dev: log the live RC offering (real prices + intro offers) */}
-          {__DEV__ && (
-            <Pressable
-              onPress={async () => {
-                haptics.select();
-                const offering = await getOfferings();
-                if (!offering) {
-                  Alert.alert('Offerings', 'No current offering (RC empty / not configured).');
-                  return;
-                }
-                const lines = offering.availablePackages.map((p) => {
-                  const pr = p.product;
-                  const intro = pr.introPrice
-                    ? ` · intro ${pr.introPrice.priceString}`
-                    : ' · NO intro';
-                  return `${p.identifier} → ${pr.identifier}\n  ${pr.priceString}${intro}`;
-                });
-                Alert.alert(
-                  `Offering: ${offering.identifier}`,
-                  lines.join('\n\n') || 'No packages',
-                );
-              }}
-              disabled={started}
-              style={[
-                styles.devOnboardingHomeBtn,
-                {
-                  top: insets.top + 50,
-                  borderColor: theme.text + '40',
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              hitSlop={10}
-            >
-              <Feather name='dollar-sign' size={12} color={theme.text} />
-              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
-                offerings
-              </Text>
-            </Pressable>
-          )}
-
-          {/* Dev: block diagnostics — subscription + Screen Time + monitors */}
-          {__DEV__ && (
-            <Pressable
-              onPress={async () => {
-                haptics.select();
-                const sub = useAppStore.getState().subscriptionStatus;
-                const auth = await getAuth();
-                const monitors = getActiveMonitors();
-                const shieldOn = isBlockActive();
-                const blocks = useAppStore.getState().scheduledBlocks;
-                const enabled = blocks.filter((b) => b.enabled);
-                const lines = [
-                  `subscription: ${sub}`,
-                  `screen-time auth: ${auth}`,
-                  `shield active: ${shieldOn}`,
-                  `native monitors (${monitors.length}): ${monitors.join(', ') || '—'}`,
-                  `blocks: ${blocks.length} (enabled: ${enabled.length})`,
-                  ...enabled.map(
-                    (b) =>
-                      `  • ${String(b.hour).padStart(2, '0')}:${String(b.minute).padStart(2, '0')} ${b.durationMinutes}min days[${b.weekdays.join(',')}]`,
-                  ),
-                ];
-                Alert.alert('Block diagnostics', lines.join('\n'));
-              }}
-              disabled={started}
-              style={[
-                styles.devOnboardingHomeBtn,
-                {
-                  top: insets.top + 88,
-                  borderColor: theme.text + '40',
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              hitSlop={10}
-            >
-              <Feather name='activity' size={12} color={theme.text} />
-              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
-                diag
-              </Text>
-            </Pressable>
-          )}
-
-          {/* Dev: play the end-of-timer sound */}
-          {__DEV__ && (
-            <Pressable
-              onPress={() => sound.complete()}
-              disabled={started}
-              style={[
-                styles.devOnboardingHomeBtn,
-                {
-                  top: insets.top + 126,
-                  borderColor: theme.text + '40',
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              hitSlop={10}
-            >
-              <Feather name='volume-2' size={12} color={theme.text} />
-              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
-                play
-              </Text>
-            </Pressable>
-          )}
-
-          {/* Dev tools cluster — only in dev builds, hidden while session is active */}
-          {false && __DEV__ && (
-            <View
-              style={[
-                styles.devCluster,
-                {
-                  top: insets.top + 12,
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              pointerEvents={started ? 'none' : 'auto'}
-            >
-              <Pressable
-                onPress={() => router.push('/onboarding')}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='play'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={() =>
-                  useAppStore.setState({
-                    completionVisible: true,
-                    lastSessionId: 'dev-preview',
-                    lastSessionDuration: 50 * 60,
-                  })
-                }
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='flag'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={async () => {
-                  haptics.light();
-                  const auth = await getAuth();
-                  const monitors = getActiveMonitors();
-                  const shieldOn = isBlockActive();
-                  const blocks = useAppStore.getState().scheduledBlocks;
-                  const enabledBlocks = blocks.filter((b) => b.enabled);
-                  const lines = [
-                    `auth: ${auth}`,
-                    `shield active: ${shieldOn}`,
-                    `monitors (${monitors.length}): ${monitors.join(', ') || '—'}`,
-                    `blocks in store: ${blocks.length} (enabled: ${enabledBlocks.length})`,
-                    ...enabledBlocks.map(
-                      (b) =>
-                        `  • ${b.id.slice(0, 8)} ${String(b.hour).padStart(2, '0')}:${String(b.minute).padStart(2, '0')} for ${b.durationMinutes}min, days [${b.weekdays.join(',')}]`,
-                    ),
-                  ];
-                  Alert.alert('Screen Time diagnostics', lines.join('\n'));
-                }}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='activity'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={async () => {
-                  haptics.light();
-                  try {
-                    const screenTime = await import('@/lib/screen-time');
-                    const block = useAppStore
-                      .getState()
-                      .scheduledBlocks.find((b) => b.enabled);
-                    if (!block) {
-                      Alert.alert('No block', 'Add an enabled block first');
-                      return;
-                    }
-                    const before = screenTime.getActiveMonitors();
-                    let throwMsg = '';
-                    try {
-                      screenTime.unscheduleBlock(block.id);
-                      await screenTime.scheduleBlock(
-                        block.id,
-                        block.hour,
-                        block.minute,
-                        block.durationMinutes,
-                        block.weekdays,
-                      );
-                    } catch (e: any) {
-                      throwMsg = String(e?.message || e);
-                      if (e?.code) throwMsg = `[${e.code}] ${throwMsg}`;
-                    }
-                    const after = screenTime.getActiveMonitors();
-                    Alert.alert(
-                      'Real block test',
-                      [
-                        `Block ${block.id.slice(0, 8)} at ${block.hour}:${String(block.minute).padStart(2, '0')} for ${block.durationMinutes}min`,
-                        `weekdays [${block.weekdays.join(',')}]`,
-                        `before: [${before.join(', ') || '—'}]`,
-                        `after: [${after.join(', ') || '—'}]`,
-                        throwMsg ? `THROW: ${throwMsg}` : 'no throw',
-                      ].join('\n'),
-                    );
-                  } catch (e: any) {
-                    Alert.alert(
-                      'Test failed',
-                      String(e?.message || e) +
-                        (e?.code ? ` [${e.code}]` : ''),
-                    );
-                  }
-                }}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='zap'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={handleSeedFakeData}
-                disabled={started}
-                style={styles.devIconBtn}
-                hitSlop={12}
-              >
-                <Feather
-                  name='database'
-                  size={18}
-                  color={theme.text}
-                  style={{ opacity: 0.9 }}
-                />
-              </Pressable>
-            </View>
           )}
 
           {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
@@ -1921,16 +1522,6 @@ export default function DoNothingScreen() {
         </Animated.Text>
       )}
 
-      {/* Promo offer — shown to users without an active subscription */}
-      <PromoOffer
-        visible={promoVisible}
-        onClose={handleClosePromo}
-        onPurchase={handlePromoPurchase}
-        priceString={winbackPkg?.product.priceString}
-        introPriceString={winbackPkg?.product.introPrice?.priceString}
-        discountPct={winbackDiscountPct}
-      />
-
       {/* Countdown completion screen */}
       <SessionCompleteScreen
         visible={completionVisible}
@@ -2025,6 +1616,22 @@ const styles = StyleSheet.create({
   lockButton: {
     position: 'absolute',
     left: 24,
+  },
+  devOnboardingHomeBtn: {
+    position: 'absolute',
+    left: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  devOnboardingHomeText: {
+    fontSize: 11,
+    letterSpacing: 0.5,
+    fontFamily: Fonts?.mono,
   },
   themeToggle: {
     position: 'absolute',
@@ -2172,35 +1779,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-  },
-  devCluster: {
-    position: 'absolute',
-    right: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-  },
-  devIconBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  devOnboardingHomeBtn: {
-    position: 'absolute',
-    left: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  devOnboardingHomeText: {
-    fontSize: 11,
-    letterSpacing: 0.5,
-    fontFamily: Fonts?.mono,
   },
   wakeCatcher: {
     zIndex: 100,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useAnimatedStyle,
@@ -13,8 +13,6 @@ import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { onboardingText } from '../textStyles';
-
-const sitImage = require('@/assets/images/good-news.png');
 
 const HEADING = 'good news.';
 const SUBTITLE = 'you don’t have to do anything.';
@@ -68,9 +66,7 @@ export default function GoodNewsScreen({ isActive, onNext, theme }: Props) {
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom },
         ]}
       >
-        <View style={styles.imageArea}>
-          <Image source={sitImage} style={styles.image} resizeMode="contain" />
-        </View>
+        <View style={styles.spacer} />
 
         <Animated.View style={[styles.textArea, contentStyle]}>
           <Text style={[onboardingText.heading, { color: theme.text }]}>{HEADING}</Text>
@@ -109,17 +105,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 32,
-  },
-  imageArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  image: {
-    width: 340,
-    height: 260,
-    alignSelf: 'center',
   },
   textArea: {},
   spacer: {

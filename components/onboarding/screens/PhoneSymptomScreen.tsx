@@ -14,10 +14,12 @@ interface LineSpec {
 }
 
 const LINES: LineSpec[] = [
-  { text: 'you just stopped?' },
-  { text: 'did nothing. like you used to.' },
+  { text: 'for one minute,' },
+  { text: 'you stopped.' },
+  { text: 'put the world on pause.', paragraph: true },
+  { text: 'and just be.' },
   { text: 'even one minute a day', paragraph: true },
-  { text: 'can change everything.', bold: true, accent: true },
+  { text: 'can change your life.', bold: true, accent: true },
 ];
 
 interface Props {

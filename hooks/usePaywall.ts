@@ -3,13 +3,16 @@
 // read state from this hook and call its handlers, no RC plumbing in
 // the JSX layer.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 import { haptics } from '@/lib/haptics';
+import { getDeviceState, setDeviceState } from '@/lib/db/settings';
 import {
   type PackagesByPlan,
   type PlanId,
   RC_PACKAGE_BY_PLAN,
+  WINBACK_PRODUCT_ID,
 } from '@/lib/paywall-config';
 import { useAppStore } from '@/lib/store';
 import {
@@ -17,6 +20,11 @@ import {
   purchasePackage,
   restorePurchases,
 } from '@/lib/subscription';
+
+// Device-local tally of how many times the user has dismissed the paywall.
+// Used to surface the win-back promo only on every second dismissal rather
+// than every time. Never synced — it's pure local UX pacing.
+const PAYWALL_SKIP_COUNT_KEY = 'paywallSkipCount';
 
 interface Options {
   // Fired when the paywall should close — after a successful purchase,
@@ -35,6 +43,12 @@ export function usePaywall({ onClose, enabled = true }: Options) {
   const [purchasing, setPurchasing] = useState(false);
   const subscriptionStatus = useAppStore((s) => s.subscriptionStatus);
 
+  // Win-back promo — shown ON TOP of the paywall when the user taps the X,
+  // instead of closing first and surfacing it later on the home screen.
+  const [winbackPkg, setWinbackPkg] = useState<PurchasesPackage | null>(null);
+  const [promoVisible, setPromoVisible] = useState(false);
+  const [promoPurchasing, setPromoPurchasing] = useState(false);
+
   // Auto-close once the store flips to 'active'. RC's customerInfo
   // listener can resolve before/after our purchasePackage() returns —
   // we trust the store as source of truth, not the local Promise.
@@ -42,7 +56,8 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     if (enabled && subscriptionStatus === 'active') onClose();
   }, [enabled, subscriptionStatus, onClose]);
 
-  // Load packages once on mount.
+  // Load packages once on mount — both the plan cards and the win-back
+  // promo product come from the same offering, so one fetch covers both.
   useEffect(() => {
     let cancelled = false;
     getOfferings().then((offering) => {
@@ -56,20 +71,83 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         if (pkg) map[plan] = pkg;
       }
       setPackagesByPlan(map);
+      // Match by store product id — robust to whatever the discount package
+      // is named in the RC dashboard.
+      const winback = offering.availablePackages.find(
+        (p) => p.product.identifier === WINBACK_PRODUCT_ID,
+      );
+      if (winback) setWinbackPkg(winback);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // Real discount % computed live from the win-back product's intro vs full
+  // price — never hardcoded, since the actual deal may not be exactly 40%.
+  const winbackDiscountPct = useMemo(() => {
+    const product = winbackPkg?.product;
+    const full = product?.price;
+    const intro = product?.introPrice?.price;
+    if (full == null || intro == null || full <= 0) return undefined;
+    return Math.round((1 - intro / full) * 100);
+  }, [winbackPkg]);
+
   const skip = useCallback(() => {
     haptics.light();
-    // Arm the win-back promo. The home screen unwraps `pendingPromoOnHome`
-    // once its launch splash settles — otherwise the modal would animate
-    // in on top of the still-running splash circle.
-    useAppStore.getState().setPendingPromoOnHome(true);
+    // Count every dismissal and only surface the win-back on every SECOND
+    // one — showing it each time was too pushy. The tally is persisted so
+    // the alternation survives app restarts.
+    let count = 0;
+    try {
+      const prev = parseInt(getDeviceState(PAYWALL_SKIP_COUNT_KEY) ?? '0', 10);
+      count = (Number.isFinite(prev) ? prev : 0) + 1;
+      setDeviceState(PAYWALL_SKIP_COUNT_KEY, String(count));
+    } catch (e) {
+      console.warn('[paywall] skip-count read/write failed:', e);
+    }
+    // Surface the promo on top of the paywall every second dismissal, but
+    // only if the win-back package actually loaded. Otherwise just leave.
+    if (winbackPkg && count % 2 === 0) {
+      setPromoVisible(true);
+    } else {
+      onClose();
+    }
+  }, [onClose, winbackPkg]);
+
+  // Dismissing the promo means the user has now declined twice — leave the
+  // paywall the same way the bare X used to.
+  const closePromo = useCallback(() => {
+    setPromoVisible(false);
     onClose();
   }, [onClose]);
+
+  const promoPurchase = useCallback(async () => {
+    if (promoPurchasing) return;
+    if (!winbackPkg) {
+      setPromoVisible(false);
+      onClose();
+      return;
+    }
+    setPromoPurchasing(true);
+    try {
+      const result = await purchasePackage(winbackPkg);
+      if (result === 'active') {
+        haptics.success();
+        // Optimistic — the auto-close watcher above also fires on 'active',
+        // but we update + close now so there's no flicker.
+        await useAppStore.getState().setSubscriptionStatus('active');
+        setPromoVisible(false);
+        onClose();
+      } else if (result !== 'cancelled') {
+        // System sheet dismissed → leave the promo open to retry; any other
+        // failure (network/storekit) → error haptic.
+        haptics.error();
+      }
+    } finally {
+      setPromoPurchasing(false);
+    }
+  }, [onClose, promoPurchasing, winbackPkg]);
 
   const purchase = useCallback(async () => {
     if (purchasing) return;
@@ -114,5 +192,11 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     skip,
     purchase,
     restore,
+    // Win-back promo (rendered on top of the paywall)
+    promoVisible,
+    closePromo,
+    promoPurchase,
+    winbackPkg,
+    winbackDiscountPct,
   };
 }

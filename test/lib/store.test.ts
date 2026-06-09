@@ -94,22 +94,6 @@ describe('simple setters', () => {
     expect(store.useAppStore.getState().settingsOpen).toBe(false);
   });
 
-  it('showPromoOffer / hidePromoOffer toggle the flag', () => {
-    const { store } = loadStore();
-    store.useAppStore.getState().showPromoOffer();
-    expect(store.useAppStore.getState().promoOfferVisible).toBe(true);
-    store.useAppStore.getState().hidePromoOffer();
-    expect(store.useAppStore.getState().promoOfferVisible).toBe(false);
-  });
-
-  it('setPendingPromoOnHome flips the bool', () => {
-    const { store } = loadStore();
-    store.useAppStore.getState().setPendingPromoOnHome(true);
-    expect(store.useAppStore.getState().pendingPromoOnHome).toBe(true);
-    store.useAppStore.getState().setPendingPromoOnHome(false);
-    expect(store.useAppStore.getState().pendingPromoOnHome).toBe(false);
-  });
-
   it('setTutorialPending flips the bool', () => {
     const { store } = loadStore();
     store.useAppStore.getState().setTutorialPending(true);

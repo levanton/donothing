@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -21,7 +17,6 @@ import { Feather } from '@expo/vector-icons';
 
 import { EASE_IN_OUT } from '@/constants/animations';
 import { palette, getStatusBarStyle } from '@/lib/theme';
-import { PAGES } from '@/lib/onboarding-data';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import RadialDots from '@/components/onboarding/RadialDots';
@@ -36,13 +31,10 @@ const DOT_RINGS_PAGE = 'phoneSymptom'; // "what if…" → progress 1
 // so the dots reorganise exactly as the screens cross-fade.
 const DOT_MORPH_MS = 1200;
 
-const __DEV_JUMP__ = false && __DEV__;
-
 export default function OnboardingRoute() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const flow = useOnboardingFlow();
-  const [showJumper, setShowJumper] = useState(false);
 
   const { currentPage, currentIndex, screenTheme, isDark } = flow;
 
@@ -162,38 +154,6 @@ export default function OnboardingRoute() {
           )}
         </View>
       )}
-
-      {/* DEV: Page jumper */}
-      {__DEV_JUMP__ && (
-        <Pressable
-          onPress={() => { haptics.heavy(); setShowJumper(true); }}
-          style={[styles.jumperButton, { bottom: insets.bottom + 8 }]}
-        >
-          <Text style={styles.jumperButtonText}>{currentIndex}</Text>
-        </Pressable>
-      )}
-      {__DEV_JUMP__ && (
-        <Modal visible={showJumper} animationType="fade" transparent onRequestClose={() => setShowJumper(false)}>
-          <Pressable style={styles.jumperOverlay} onPress={() => setShowJumper(false)}>
-            <Pressable style={[styles.jumperSheet, { paddingBottom: insets.bottom + 16 }]}>
-              <Text style={styles.jumperTitle}>Jump to page</Text>
-              <ScrollView style={styles.jumperScroll} bounces={false}>
-                {PAGES.map((page, i) => (
-                  <Pressable
-                    key={page.id}
-                    onPress={() => { flow.jumpTo(i); setShowJumper(false); }}
-                    style={[styles.jumperRow, currentIndex === i && styles.jumperRowActive]}
-                  >
-                    <Text style={[styles.jumperText, currentIndex === i && styles.jumperTextActive]}>
-                      {i} {page.id}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
     </View>
   );
 }
@@ -248,59 +208,5 @@ const styles = StyleSheet.create({
   progressFill: {
     height: 5,
     borderRadius: 5,
-  },
-  jumperButton: {
-    position: 'absolute',
-    left: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  jumperButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: palette.brown,
-  },
-  jumperOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  jumperSheet: {
-    backgroundColor: palette.cream,
-    borderRadius: 20,
-    paddingTop: 20,
-    width: '80%',
-    maxHeight: '70%',
-  },
-  jumperTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 12,
-    color: palette.brown,
-  },
-  jumperScroll: {
-    paddingHorizontal: 8,
-  },
-  jumperRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-  },
-  jumperRowActive: {
-    backgroundColor: palette.terracotta + '20',
-  },
-  jumperText: {
-    fontSize: 14,
-    color: palette.brown,
-  },
-  jumperTextActive: {
-    color: palette.terracotta,
-    fontWeight: '600',
   },
 });
