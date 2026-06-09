@@ -24,11 +24,7 @@ export async function saveOnboardingData(params: {
   }
 
   useAppStore.getState().setOnboardingComplete();
-  // Arm the spotlight tour for the next mount of the home screen.
-  // The TutorialController consumes `tutorialPending` and calls
-  // copilot's `start()` once the home is ready.
-  if (!useAppStore.getState().tutorialCompleted) {
-    useAppStore.getState().setTutorialPending(true);
-  }
+  // The tour is not auto-started. The home screen shows a "how it works"
+  // button (while `tutorialCompleted` is false) that the user taps when ready.
   params.router.replace('/');
 }

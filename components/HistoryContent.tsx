@@ -19,6 +19,7 @@ import ActivityCalendar from './ActivityCalendar';
 import MembershipBanner from './MembershipBanner';
 import LockedRegion from './LockedRegion';
 import { useAppStore } from '@/lib/store';
+import { track } from '@/lib/analytics';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -66,6 +67,7 @@ export default function HistoryContent({
   // month nav and calendar lock (dimmed + inert) until the user subscribes.
   const openPaywall = () => {
     haptics.light();
+    track('membership_banner_tapped', { source: 'journey' });
     router.push('/paywall');
   };
 

@@ -8,6 +8,7 @@ import { Alert } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
 
 import { haptics } from '@/lib/haptics';
+import { track } from '@/lib/analytics';
 import { getDeviceState, setDeviceState } from '@/lib/db/settings';
 import {
   type PackagesByPlan,
@@ -57,6 +58,11 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     if (enabled && subscriptionStatus === 'active') onClose();
   }, [enabled, subscriptionStatus, onClose]);
 
+  // Top of the conversion funnel.
+  useEffect(() => {
+    track('paywall_viewed');
+  }, []);
+
   // Load packages once on mount — both the plan cards and the win-back
   // promo product come from the same offering, so one fetch covers both.
   useEffect(() => {
@@ -96,6 +102,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
 
   const skip = useCallback(() => {
     haptics.light();
+    track('paywall_skipped');
     // Count every dismissal and only surface the win-back on every SECOND
     // one — showing it each time was too pushy. The tally is persisted so
     // the alternation survives app restarts.
@@ -135,6 +142,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
       const result = await purchasePackage(winbackPkg);
       if (result === 'active') {
         haptics.success();
+        track('purchase_completed', { plan: 'winback' });
         // Optimistic — the auto-close watcher above also fires on 'active',
         // but we update + close now so there's no flicker.
         await useAppStore.getState().setSubscriptionStatus('active');
@@ -163,6 +171,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
       const result = await purchasePackage(pkg);
       if (result === 'active') {
         haptics.success();
+        track('purchase_completed', { plan: selectedPlan });
         // Optimistic — RC's listener will push the same status, but we
         // update now so the home screen unwraps without waiting on it.
         await useAppStore.getState().setSubscriptionStatus('active');
@@ -185,6 +194,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
       const status = await restorePurchases();
       if (status === 'active') {
         haptics.success();
+        track('restore_completed');
         await useAppStore.getState().setSubscriptionStatus('active');
         onClose();
       } else {

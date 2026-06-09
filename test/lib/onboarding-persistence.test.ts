@@ -1,8 +1,9 @@
 /**
  * saveOnboardingData is the seam between the onboarding flow and
- * persistence — it decides which answers to write, flips the
- * onboarding-complete flag, and arms the tutorial. Mock the store
- * + DB so we can assert on those side effects independently.
+ * persistence — it decides which answers to write and flips the
+ * onboarding-complete flag. The tutorial is NOT auto-armed here; the
+ * home screen's "how it works" button starts it on demand. Mock the
+ * store + DB so we can assert on those side effects independently.
  */
 
 jest.mock('@/lib/store', () => ({
@@ -80,7 +81,7 @@ describe('saveOnboardingData', () => {
     );
   });
 
-  it('marks the onboarding flag and arms the tutorial when not yet completed', async () => {
+  it('marks the onboarding flag but does not arm the tutorial', async () => {
     const store = storeWith(false);
     getStateMock.mockReturnValue(store as any);
     await saveOnboardingData({
@@ -89,18 +90,8 @@ describe('saveOnboardingData', () => {
       router: makeRouter(),
     });
     expect(store.setOnboardingComplete).toHaveBeenCalledTimes(1);
-    expect(store.setTutorialPending).toHaveBeenCalledWith(true);
-  });
-
-  it('skips arming the tutorial when it was already completed', async () => {
-    const store = storeWith(true);
-    getStateMock.mockReturnValue(store as any);
-    await saveOnboardingData({
-      painPoints: [],
-      screenTime: [],
-      router: makeRouter(),
-    });
-    expect(store.setOnboardingComplete).toHaveBeenCalledTimes(1);
+    // The tour is started on demand by the home "how it works" button,
+    // never auto-armed here.
     expect(store.setTutorialPending).not.toHaveBeenCalled();
   });
 

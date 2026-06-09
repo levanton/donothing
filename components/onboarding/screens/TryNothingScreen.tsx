@@ -11,6 +11,7 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
+import { track } from '@/lib/analytics';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -45,6 +46,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const handleSkip = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     haptics.light();
+    track('onboarding_session_skipped');
     (onSkip ?? onNext)();
   }, [onNext, onSkip]);
 
@@ -73,6 +75,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
 
   const startSession = useCallback(() => {
     haptics.medium();
+    track('onboarding_session_started');
     setStarted(true);
 
     yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
@@ -88,6 +91,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
           // screen stats aren't empty on first launch. recordSession also
           // refreshes weekStats and checks milestones in one shot.
           useAppStore.getState().recordSession(SESSION_DURATION);
+          track('onboarding_session_completed', { durationSec: SESSION_DURATION });
           // Same end-of-timer feel as the real session: the Opal-style
           // haptic swell + the soft completion sound.
           haptics.celebrate();

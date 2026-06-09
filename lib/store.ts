@@ -18,7 +18,7 @@ import {
   deleteScheduledBlock as dbDeleteScheduledBlock,
   toggleScheduledBlock as dbToggleScheduledBlock,
 } from './db/scheduled-blocks';
-import { getSetting, setSetting, deleteSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
+import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
 import { BooleanFlagSchema } from './db/schemas';
 import {
   clearNotificationIds,
@@ -35,6 +35,7 @@ import {
 } from './notifications';
 import type { SubscriptionStatus } from './subscription';
 import { captureError } from './sentry';
+import { track } from './analytics';
 
 // Persist a finished session, retrying once on a transient SQLite failure
 // (a momentary lock/contention usually clears on the second try). A finished
@@ -248,9 +249,6 @@ export interface AppState {
   // copilot's `start()` once on the next mount, then cleared.
   tutorialPending: boolean;
   setTutorialPending: (next: boolean) => void;
-  // Clear the persisted "seen" flag so the spotlight tour fires again on
-  // the next home mount. Used by the dev re-run button (and data wipe).
-  resetTutorial: () => void;
 
   // Completion actions
   completeSession: () => Promise<void>;
@@ -379,10 +377,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tutorialCompleted: true, tutorialPending: false });
   },
   setTutorialPending: (next) => set({ tutorialPending: next }),
-  resetTutorial: () => {
-    deleteSetting('tutorialCompleted');
-    set({ tutorialCompleted: false, tutorialPending: false });
-  },
 
   // --- Init ---
   init: async () => {
@@ -511,6 +505,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   startSession: (opts) => {
     sessionStartTime = Date.now();
     const goalSeconds = get().goalSeconds;
+    track('session_started', {
+      goalSec: goalSeconds,
+      origin: opts?.fromBlock ? 'block' : 'normal',
+    });
     set({
       started: true,
       elapsed: 0,
@@ -546,6 +544,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // so paused sessions save the frozen value, not real-time-since-
     // start (which would over-count by the pause duration).
     const duration = get().elapsed;
+    track('session_stopped', { durationSec: duration, origin: get().sessionOrigin });
     // A write failure must not leave the UI in a "stopped but still started"
     // zombie state — saveSessionWithRetry returns null and we reset anyway.
     const session = saveSessionWithRetry(duration);
@@ -681,6 +680,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     const session = saveSessionWithRetry(duration);
+    track('session_completed', { durationSec: duration, origin: get().sessionOrigin });
     haptics.success();
     sound.complete();
     set({
@@ -827,6 +827,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addScheduledBlock: async (hour, minute, durationMinutes, weekdays, unlockGoalMinutes) => {
     const block = insertScheduledBlock(hour, minute, durationMinutes, weekdays, unlockGoalMinutes);
+    track('block_created', { unlockGoalMinutes, durationMinutes, days: weekdays.length });
     try {
       const { scheduleBlock } = await import('./screen-time');
       await scheduleBlock(block.id, hour, minute, durationMinutes, weekdays);
@@ -865,6 +866,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeScheduledBlock: async (id) => {
+    track('block_removed');
     try {
       const { unscheduleBlock, reconcileBlocks } = await import('./screen-time');
       unscheduleBlock(id);
@@ -892,6 +894,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleScheduledBlock: async (id) => {
     const nowEnabled = dbToggleScheduledBlock(id);
+    track('block_toggled', { enabled: nowEnabled });
     const blocks = getAllScheduledBlocks();
     set({ scheduledBlocks: blocks });
     const block = blocks.find(b => b.id === id);

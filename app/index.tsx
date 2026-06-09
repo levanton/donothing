@@ -52,6 +52,7 @@ import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
+import { Redirect } from 'expo-router';
 
 // Yes-button + orbit slot — kept at 140px so the launch-splash math
 // (which lands the splash circle exactly on the measured yes button)
@@ -106,6 +107,8 @@ export default function DoNothingScreen() {
   // subscribing components below, so JS work stays local.
   const focusStep = useAppStore((s) => s.focusStep);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
+  const onboardingComplete = useAppStore((s) => s.onboardingComplete);
+  const tutorialCompleted = useAppStore((s) => s.tutorialCompleted);
 
   const accountSheetRef = useRef<BottomSheet>(null);
   // BlockSheet and SessionEndedSheet are now driven by a `visible` prop
@@ -836,6 +839,16 @@ export default function DoNothingScreen() {
     );
   }
 
+  // First launch only: send the user through onboarding until they finish it.
+  // `onboardingComplete` is a persisted setting (hydrated into the store on
+  // init), so this redirect fires exactly once per install — it's cleared
+  // only by a data wipe or reinstall. Once onboarding calls
+  // `setOnboardingComplete()` and navigates back to '/', this is false and
+  // the home screen renders (then the spotlight tour fires once).
+  if (!onboardingComplete) {
+    return <Redirect href="/onboarding" />;
+  }
+
   // =========================================================================
   // Main screen — session-ended state shows as a bottom sheet over
   // the resting main UI, not as a full-screen replacement.
@@ -877,6 +890,31 @@ export default function DoNothingScreen() {
               />
             </Pressable>
           </TutorialStepWrapper>
+
+          {/* One-time "how it works" button — top center. Shown only until the
+              spotlight tour is completed (tutorialCompleted persists '1' on
+              finish/skip), then it's gone for good. Hidden during a session.
+              box-none wrapper so taps outside the pill still reach the screen. */}
+          {!tutorialCompleted && !started && (
+            <View
+              style={[styles.tourButtonWrap, { top: insets.top + 12 }]}
+              pointerEvents="box-none"
+            >
+              <Pressable
+                onPress={() => {
+                  haptics.light();
+                  useAppStore.getState().setTutorialPending(true);
+                }}
+                style={[styles.tourButton, { borderColor: theme.text + '40' }]}
+                hitSlop={10}
+              >
+                <Feather name="compass" size={13} color={theme.text} />
+                <Text style={[styles.tourButtonText, { color: theme.text, fontFamily: Fonts!.serif }]}>
+                  how it works
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
           <View
@@ -1570,6 +1608,25 @@ const styles = StyleSheet.create({
   lockButton: {
     position: 'absolute',
     left: 24,
+  },
+  tourButtonWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  tourButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  tourButtonText: {
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
   themeToggle: {
     position: 'absolute',

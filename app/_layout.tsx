@@ -11,11 +11,13 @@ import { TutorialTooltip } from '@/components/tutorial';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { roundedSvgMaskPath } from '@/lib/tutorial/svgMask';
 import { initSentry, captureError, wrap } from '@/lib/sentry';
+import { initAnalytics } from '@/lib/analytics';
 
-// Module-level call: runs once when the layout module is loaded
-// (i.e. at app launch, before the first render). No-op if no DSN is
-// configured. See lib/sentry.ts for the full init config.
+// Module-level calls: run once when the layout module is loaded
+// (i.e. at app launch, before the first render). Each no-ops if its key
+// isn't configured. See lib/sentry.ts / lib/analytics.ts for the configs.
 initSentry();
+initAnalytics();
 
 // Pin a comfortable tooltip width. Without this, the library auto-sizes
 // against `target.x → screen edge`, which produces a tiny pill when the

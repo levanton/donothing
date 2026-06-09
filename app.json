@@ -70,7 +70,8 @@
           "project": "nothing",
           "organization": "33-apps"
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

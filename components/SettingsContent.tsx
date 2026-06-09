@@ -7,6 +7,7 @@ import PickerSheet from '@/components/PickerSheet';
 import { activitySelectionMetadata } from 'react-native-device-activity';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
+import { track } from '@/lib/analytics';
 import AppLabelsView from 'app-labels';
 import AppPickerSheet from '@/components/AppPickerSheet';
 
@@ -57,6 +58,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
 
   const openPaywall = () => {
     haptics.light();
+    track('membership_banner_tapped', { source: 'settings' });
     router.push('/paywall');
   };
 
