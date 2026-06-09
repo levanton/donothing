@@ -76,6 +76,7 @@ function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
     <Animated.View
       entering={FadeIn.delay(100).duration(800)}
       style={styles.heroContainer}
+      pointerEvents="none"
     >
       <Animated.Image
         source={require('@/assets/images/paywall-image.png')}
@@ -249,6 +250,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingHorizontal: 20,
     paddingVertical: 0,
+    zIndex: 10,
   },
   closeButton: {
     width: 36,

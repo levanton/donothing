@@ -11,6 +11,7 @@ import Animated, {
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
+import { haptics } from '@/lib/haptics';
 
 
 const HOURS_MAP: Record<string, number> = {
@@ -66,6 +67,11 @@ function Word({ text, delay, bold, accent }: { text: string; delay: number; bold
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: 700, easing: EASE_OUT }));
     translateY.value = withDelay(delay, withTiming(0, { duration: 700, easing: EASE_OUT }));
+    // Tactile "typewriter" pulse synced to each word's reveal — a subtle
+    // selection tick for plain words, a slightly firmer light tap on the
+    // coloured stats so the numbers land with emphasis.
+    const t = setTimeout(() => (accent ? haptics.light() : haptics.select()), delay);
+    return () => clearTimeout(t);
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
