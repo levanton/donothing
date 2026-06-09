@@ -50,6 +50,23 @@ const PLANS: {
   },
 ];
 
+// Marketing "was" price: the live price marked up, formatted by reusing the
+// store's own priceString as a template — so the currency symbol, decimal
+// separator and placement always match the locale. Not a real Apple tier;
+// it's only ever shown struck through next to the actual price.
+const ANCHOR_MARKUP = 1.2;
+
+function anchorPrice(product: { price: number; priceString: string }): string | undefined {
+  const { price, priceString } = product;
+  if (!price || price <= 0 || !priceString) return undefined;
+  const token = priceString.match(/\d[\d.,]*/)?.[0];
+  if (!token) return undefined;
+  const sep = /,\d{1,2}$/.test(token) ? ',' : '.';
+  const decimals = token.includes(sep) ? token.split(sep)[1].length : 0;
+  const value = (price * ANCHOR_MARKUP).toFixed(decimals).replace('.', sep);
+  return priceString.replace(token, value);
+}
+
 function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
   const parallaxStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: scrollY.value * 0.5 }],
@@ -61,7 +78,7 @@ function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
       style={styles.heroContainer}
     >
       <Animated.Image
-        source={require('@/assets/images/grass-old.png')}
+        source={require('@/assets/images/paywall-image.png')}
         style={[styles.heroImage, parallaxStyle]}
         resizeMode="contain"
       />
@@ -144,11 +161,14 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
             const price = basePrice
               ? `${basePrice}${plan.periodSuffix ?? ''}`
               : '';
+            const oldPrice =
+              plan.id === 'yearly' && pkg ? anchorPrice(pkg.product) : undefined;
             return (
               <PlanCard
                 key={plan.id}
                 name={plan.name}
                 price={price}
+                oldPrice={oldPrice}
                 subtitle={plan.subtitle}
                 badge={plan.badge}
                 variant={plan.id === 'lifetime' ? 'dark' : 'default'}
@@ -228,7 +248,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   closeButton: {
     width: 36,
@@ -239,12 +259,13 @@ const styles = StyleSheet.create({
   scroll: {},
   heroContainer: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    // Pull the image up under the close row (with a little breathing room).
+    marginTop: -24,
+    marginBottom: -10,
   },
   heroImage: {
-    width: 280,
-    height: 160,
+    width: 285,
+    height: 200,
   },
   plans: {
     marginTop: 28,
