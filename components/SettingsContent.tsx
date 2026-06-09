@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import PickerSheet from '@/components/PickerSheet';
 import { activitySelectionMetadata } from 'react-native-device-activity';
@@ -19,6 +20,7 @@ import PillButton from '@/components/PillButton';
 import { WEEKDAY_VALUES, WEEKDAY_SHORT } from '@/components/TimePicker';
 import { clockParts } from '@/lib/format';
 import BlockPickerContent from '@/components/BlockPicker';
+import MembershipBanner from '@/components/MembershipBanner';
 import AlertModal from '@/components/AlertModal';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
 import { TutorialStepWrapper } from '@/components/tutorial';
@@ -49,8 +51,15 @@ interface SettingsContentProps {
 export default function SettingsContent({ onClose, insets, onOpenAccount }: SettingsContentProps) {
   const themeMode = useAppStore((s) => s.themeMode);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
+  const isSubscribed = useAppStore((s) => s.isSubscribed);
   const theme = themes[themeMode];
   const isDark = themeMode === 'dark';
+  const router = useRouter();
+
+  const openPaywall = () => {
+    haptics.light();
+    router.push('/paywall');
+  };
 
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [showNeverBlockPicker, setShowNeverBlockPicker] = useState(false);
@@ -63,6 +72,13 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
     handleNotifTap,
     handleScreenTimeBannerTap,
   } = usePermissionBanners();
+
+  // The block section is locked — visually dimmed and non-interactive, exactly
+  // like the permission-gated state — whenever the user can't actually use it:
+  // no membership, or a missing iOS permission.
+  const permMissing =
+    Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted');
+  const isLocked = !isSubscribed || permMissing;
 
   const readCount = (id: string) => {
     if (Platform.OS !== 'ios') return 0;
@@ -143,10 +159,18 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
         </Pressable>
       </View>
 
-      {/* Notification permission banner — shown first so it's impossible to miss.
-          Banner is its own warm chip regardless of theme: saturated peach/amber
-          background with dark text so it stays readable on cream AND charcoal. */}
-      {Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
+      {/* Membership banner — blocks are a paid feature. */}
+      {!isSubscribed && (
+        <MembershipBanner
+          title="Unlock scheduled blocks"
+          subtitle="Join to schedule blocks and lock distracting apps."
+          onPress={openPaywall}
+        />
+      )}
+
+      {/* Notification permission banner — only once subscribed (blocks are
+          locked otherwise). Saturated peach chip with dark text. */}
+      {isSubscribed && Platform.OS === 'ios' && (notifStatus === 'denied' || notifStatus === 'undetermined') && (
         <Animated.View style={notifBannerStyle}>
           <Pressable
             onPress={handleNotifTap}
@@ -177,7 +201,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
       )}
 
       {/* Screen Time permission banner — amber-tinted to differ from notif salmon */}
-      {Platform.OS === 'ios' && (authStatus === 'denied' || authStatus === 'notDetermined') && (
+      {isSubscribed && Platform.OS === 'ios' && (authStatus === 'denied' || authStatus === 'notDetermined') && (
         <Animated.View style={stBannerStyle}>
           <Pressable
             onPress={handleScreenTimeBannerTap}
@@ -209,17 +233,8 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
           reads as inactive and rejects touches until the banners above are
           dismissed by granting access. */}
       <View
-        pointerEvents={
-          Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
-            ? 'none'
-            : 'auto'
-        }
-        style={{
-          opacity:
-            Platform.OS === 'ios' && (authStatus !== 'approved' || notifStatus !== 'granted')
-              ? 0.4
-              : 1,
-        }}
+        pointerEvents={isLocked ? 'none' : 'auto'}
+        style={{ opacity: isLocked ? 0.4 : 1 }}
       >
       {/* Screen block */}
       <View style={styles.sectionHeader}>
@@ -488,6 +503,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     gap: 14,
   },
+
   notifIconWrap: {
     width: 40,
     height: 40,

@@ -31,7 +31,6 @@ import BlockSheet from '@/components/BlockSheet';
 import HistoryContent from '@/components/HistoryContent';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import DriftingDots from '@/components/DriftingDots';
-import PaywallGate from '@/components/PaywallGate';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
 import SettingsContent from '@/components/SettingsContent';
@@ -109,7 +108,6 @@ export default function DoNothingScreen() {
   // subscribing components below, so JS work stays local.
   const focusStep = useAppStore((s) => s.focusStep);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
-  const isSubscribed = useAppStore((s) => s.isSubscribed);
 
   const accountSheetRef = useRef<BottomSheet>(null);
   // BlockSheet and SessionEndedSheet are now driven by a `visible` prop
@@ -1248,14 +1246,6 @@ export default function DoNothingScreen() {
             onHeadingLayout={handleHeadingLayout}
             historySlide={historySlide}
           />
-          <PaywallGate
-            visible={!isSubscribed}
-            themeMode={themeMode}
-            insets={insets}
-            onClose={handleHistoryClose}
-            title='unlock your journey'
-            body="Every minute you've reclaimed, at a glance. Join to open Journey and keep the thread of your practice."
-          />
         </Animated.View>
       </GestureDetector>
 
@@ -1272,15 +1262,6 @@ export default function DoNothingScreen() {
             onClose={handleSettingsClose}
             insets={insets}
             onOpenAccount={handleOpenAccount}
-          />
-          <PaywallGate
-            visible={!isSubscribed}
-            themeMode={themeMode}
-            insets={insets}
-            onClose={handleSettingsClose}
-            onOpenAccount={handleOpenAccount}
-            title='unlock Nothing'
-            body='Settings, scheduled blocks and Journey open with a membership. Your account stays reachable either way.'
           />
         </Animated.View>
       </GestureDetector>

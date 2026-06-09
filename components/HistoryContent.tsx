@@ -4,6 +4,7 @@ import Animated, { FadeIn, interpolate, runOnJS, useAnimatedReaction, useAnimate
 import { GestureDetector } from 'react-native-gesture-handler';
 import type { GestureType } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { Fonts } from '@/constants/theme';
 import { themes, palette } from '@/lib/theme';
@@ -15,6 +16,8 @@ import {
   getMonthLongestSession,
 } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
+import MembershipBanner from './MembershipBanner';
+import LockedRegion from './LockedRegion';
 import { useAppStore } from '@/lib/store';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -29,6 +32,11 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+// When Journey is locked we keep the exact layout but mask the real numbers
+// with this placeholder, and feed the calendar an empty map (no activity dots).
+const STAT_MASK = '•••';
+const EMPTY_DURATIONS = new Map<string, number>();
 
 // ── Main component ────────────────────────────────────────────────────
 interface HistoryContentProps {
@@ -50,7 +58,16 @@ export default function HistoryContent({
 }: HistoryContentProps) {
   const weekStats = useAppStore((s) => s.weekStats);
   const themeMode = useAppStore((s) => s.themeMode);
+  const isSubscribed = useAppStore((s) => s.isSubscribed);
   const theme = themes[themeMode];
+  const router = useRouter();
+
+  // Journey is a membership feature: stats + heading stay visible, but the
+  // month nav and calendar lock (dimmed + inert) until the user subscribes.
+  const openPaywall = () => {
+    haptics.light();
+    router.push('/paywall');
+  };
 
   // Theme-aware card tint. Light: palette.sand — slightly darker tan
   // than the warmCream page bg, so the card still reads as a distinct
@@ -180,6 +197,7 @@ export default function HistoryContent({
   const monthAvgSession = monthSessions > 0 ? Math.round(monthDuration / monthSessions) : 0;
 
   const monthDurationParts = formatHeroDuration(monthDuration);
+  const heroParts = isSubscribed ? monthDurationParts : [{ value: STAT_MASK, unit: '' }];
   const longestStat = formatTimeStat(monthLongest);
   const avgSessionStat = formatTimeStat(monthAvgSession);
   const heroLabel = isCurrentMonth ? 'this month' : MONTH_NAMES_SHORT[viewMonth];
@@ -264,6 +282,17 @@ export default function HistoryContent({
           </Pressable>
         </View>
 
+        {/* Membership banner — directly under the My Journey heading; the
+            stats + calendar below stay visible but locked until subscribed. */}
+        {!isSubscribed && (
+          <MembershipBanner
+            title="Unlock your Journey"
+            subtitle="Join to see every minute you've reclaimed."
+            onPress={openPaywall}
+          />
+        )}
+
+        <LockedRegion locked={!isSubscribed}>
         {/* Hero row — the month's "do-nothing" duration takes the full
             width as "X hr Y min", with the period label and a quiet
             motivational caption stacked below. Earlier versions split
@@ -273,9 +302,9 @@ export default function HistoryContent({
           <View
             style={styles.heroValueWrap}
             accessible
-            accessibilityLabel={monthDurationParts.map((p) => `${p.value} ${p.unit}`).join(' ')}
+            accessibilityLabel={heroParts.map((p) => `${p.value} ${p.unit}`).join(' ')}
           >
-            {monthDurationParts.map((part, i) => (
+            {heroParts.map((part, i) => (
               <View key={i} style={styles.heroPart}>
                 <Text
                   style={[styles.heroValue, { color: palette.terracotta, fontFamily: Fonts.mono }]}
@@ -306,7 +335,7 @@ export default function HistoryContent({
         <View style={styles.statsRow}>
           <View style={styles.statCellSecondary}>
             <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-              {monthSessions}
+              {isSubscribed ? monthSessions : STAT_MASK}
             </Text>
             <View style={styles.statLabelRow}>
               <Feather name="hash" size={10} color={palette.terracotta} />
@@ -321,9 +350,9 @@ export default function HistoryContent({
           <View style={styles.statCellSecondary}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {avgSessionStat.value}
+                {isSubscribed ? avgSessionStat.value : STAT_MASK}
               </Text>
-              {avgSessionStat.unit ? (
+              {isSubscribed && avgSessionStat.unit ? (
                 <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
                   {avgSessionStat.unit}
                 </Text>
@@ -342,9 +371,9 @@ export default function HistoryContent({
           <View style={styles.statCellSecondary}>
             <View style={styles.statValueWrap}>
               <Text style={[styles.statValueSm, { color: theme.text, fontFamily: Fonts.mono }]}>
-                {longestStat.value}
+                {isSubscribed ? longestStat.value : STAT_MASK}
               </Text>
-              {longestStat.unit ? (
+              {isSubscribed && longestStat.unit ? (
                 <Text style={[styles.statUnitSm, { color: theme.text, fontFamily: Fonts.serif }]}>
                   {longestStat.unit}
                 </Text>
@@ -358,8 +387,10 @@ export default function HistoryContent({
             </View>
           </View>
         </View>
+        </LockedRegion>
       </Animated.View>
 
+      <LockedRegion locked={!isSubscribed}>
       {/* Month switcher — sits flush under the card as a narrow pill
           with the same warm-cream fill, so it reads as part of the
           same panel (a tab hanging out from the bottom). Top corners
@@ -404,10 +435,11 @@ export default function HistoryContent({
           theme={theme}
           viewYear={viewYear}
           viewMonth={viewMonth}
-          durationMap={monthDurationMap}
+          durationMap={isSubscribed ? monthDurationMap : EMPTY_DURATIONS}
         />
 
       </View>
+      </LockedRegion>
       </Animated.ScrollView>
     </View>
   );
