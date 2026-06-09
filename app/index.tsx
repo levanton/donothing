@@ -1132,6 +1132,28 @@ export default function DoNothingScreen() {
             </Pressable>
           )}
 
+          {/* Dev: play the end-of-timer sound */}
+          {__DEV__ && (
+            <Pressable
+              onPress={() => sound.complete()}
+              disabled={started}
+              style={[
+                styles.devOnboardingHomeBtn,
+                {
+                  top: insets.top + 126,
+                  borderColor: theme.text + '40',
+                  opacity: started ? 0 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Feather name='volume-2' size={12} color={theme.text} />
+              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
+                play
+              </Text>
+            </Pressable>
+          )}
+
           {/* Dev tools cluster — only in dev builds, hidden while session is active */}
           {false && __DEV__ && (
             <View

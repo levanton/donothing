@@ -1,6 +1,6 @@
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
-const completePlayer = createAudioPlayer(require('../assets/sounds/timer_end.caf'));
+const completePlayer = createAudioPlayer(require('../assets/sounds/timer_end-soft.mp3'));
 
 setAudioModeAsync({
   playsInSilentMode: false,
