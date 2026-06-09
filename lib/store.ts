@@ -18,7 +18,7 @@ import {
   deleteScheduledBlock as dbDeleteScheduledBlock,
   toggleScheduledBlock as dbToggleScheduledBlock,
 } from './db/scheduled-blocks';
-import { getSetting, setSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
+import { getSetting, setSetting, deleteSetting, getDeviceState, setDeviceState, deleteDeviceState } from './db/settings';
 import { BooleanFlagSchema } from './db/schemas';
 import {
   clearNotificationIds,
@@ -248,6 +248,9 @@ export interface AppState {
   // copilot's `start()` once on the next mount, then cleared.
   tutorialPending: boolean;
   setTutorialPending: (next: boolean) => void;
+  // Clear the persisted "seen" flag so the spotlight tour fires again on
+  // the next home mount. Used by the dev re-run button (and data wipe).
+  resetTutorial: () => void;
 
   // Completion actions
   completeSession: () => Promise<void>;
@@ -376,6 +379,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tutorialCompleted: true, tutorialPending: false });
   },
   setTutorialPending: (next) => set({ tutorialPending: next }),
+  resetTutorial: () => {
+    deleteSetting('tutorialCompleted');
+    set({ tutorialCompleted: false, tutorialPending: false });
+  },
 
   // --- Init ---
   init: async () => {

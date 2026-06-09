@@ -22,7 +22,6 @@ interface Props {
 //   3) mark the tour complete + close panels on stop/finish
 export function TutorialController({ showHome, showSettings, showHistory, settleMs = 450 }: Props) {
   const { start, stop, copilotEvents, currentStep } = useCopilot();
-  const tutorialPending = useAppStore((s) => s.tutorialPending);
   const tutorialCompleted = useAppStore((s) => s.tutorialCompleted);
   const ready = useAppStore((s) => s.ready);
   const setTutorialCompleted = useAppStore((s) => s.setTutorialCompleted);
@@ -30,15 +29,18 @@ export function TutorialController({ showHome, showSettings, showHistory, settle
   const lastScreenRef = useRef<TutorialScreen | null>(null);
   const startedRef = useRef(false);
 
-  // Auto-start once the home screen is fully ready and onboarding has
-  // marked the tour as pending. Guard against double-start on re-render.
+  // Auto-start once on the first home mount where the tour hasn't been
+  // completed yet. Decoupled from onboarding — `tutorialCompleted` (a
+  // persisted setting) is the single gate, so every fresh install sees
+  // the tour exactly once regardless of how it reached the home screen.
+  // Guard against double-start on re-render.
   useEffect(() => {
-    if (!ready || tutorialCompleted || !tutorialPending || startedRef.current) return;
+    if (!ready || tutorialCompleted || startedRef.current) return;
     startedRef.current = true;
     // Small delay so the home screen settles before we measure the first target.
     const t = setTimeout(() => { void start(); }, 300);
     return () => clearTimeout(t);
-  }, [ready, tutorialCompleted, tutorialPending, start]);
+  }, [ready, tutorialCompleted, start]);
 
   // Drive the panels based on current step's screen.
   useEffect(() => {

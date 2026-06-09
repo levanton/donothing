@@ -23,7 +23,6 @@ import BlockPickerContent from '@/components/BlockPicker';
 import MembershipBanner from '@/components/MembershipBanner';
 import AlertModal from '@/components/AlertModal';
 import { findBlockConflict, MIN_BLOCK_GAP_LABEL } from '@/lib/block-conflict';
-import { TutorialStepWrapper } from '@/components/tutorial';
 
 interface PendingBlockParams {
   hour: number;
@@ -389,8 +388,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
               </Pressable>
             )}
           </View>
-          <TutorialStepWrapper name="settings.allowed">
-            {neverBlockCount > 0 ? (
+          {neverBlockCount > 0 ? (
               <View
                 style={{
                   height: 240,
@@ -430,8 +428,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
                   </Text>
                 </View>
               </Pressable>
-            )}
-          </TutorialStepWrapper>
+          )}
         </>
       )}
       </View>

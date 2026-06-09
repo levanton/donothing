@@ -52,7 +52,6 @@ import { getStats } from '@/lib/stats';
 import { useAppStore } from '@/lib/store';
 import { palette, themes, getStatusBarStyle, type AppTheme } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
-import { useRouter } from 'expo-router';
 
 // Yes-button + orbit slot — kept at 140px so the launch-splash math
 // (which lands the splash circle exactly on the measured yes button)
@@ -94,7 +93,6 @@ function findActiveBlock(
 // ===========================================================================
 export default function DoNothingScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   const elapsed = useAppStore((s) => s.elapsed);
   const themeMode = useAppStore((s) => s.themeMode);
@@ -880,31 +878,6 @@ export default function DoNothingScreen() {
             </Pressable>
           </TutorialStepWrapper>
 
-          {/* Dev: re-run onboarding from the home screen */}
-          {__DEV__ && (
-            <Pressable
-              onPress={() => {
-                haptics.select();
-                router.push('/onboarding');
-              }}
-              disabled={started}
-              style={[
-                styles.devOnboardingHomeBtn,
-                {
-                  top: insets.top + 12,
-                  borderColor: theme.text + '40',
-                  opacity: started ? 0 : 1,
-                },
-              ]}
-              hitSlop={10}
-            >
-              <Feather name='play' size={12} color={theme.text} />
-              <Text style={[styles.devOnboardingHomeText, { color: theme.text }]}>
-                onboarding
-              </Text>
-            </Pressable>
-          )}
-
           {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
           <View
             style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]}
@@ -1597,22 +1570,6 @@ const styles = StyleSheet.create({
   lockButton: {
     position: 'absolute',
     left: 24,
-  },
-  devOnboardingHomeBtn: {
-    position: 'absolute',
-    left: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  devOnboardingHomeText: {
-    fontSize: 11,
-    letterSpacing: 0.5,
-    fontFamily: Fonts?.mono,
   },
   themeToggle: {
     position: 'absolute',

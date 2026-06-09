@@ -61,11 +61,11 @@ export default function BlockPickerContent({
   initialDays,
   initialUnlockGoal,
 }: BlockPickerProps) {
-  // For new blocks, default to 2 hours from now (rounded to 5 min) so the
-  // schedule is safely in the future and doesn't trigger the too-close alert.
+  // For new blocks, default the time to right now (rounded to the nearest
+  // 5 min) so the picker opens on the current time of day.
   const defaultStart = (() => {
     const now = new Date();
-    const m = snap((now.getHours() * 60 + now.getMinutes()) + 120);
+    const m = snap(now.getHours() * 60 + now.getMinutes());
     return m % MINUTES_PER_DAY;
   })();
   const initStart = initialHour !== undefined

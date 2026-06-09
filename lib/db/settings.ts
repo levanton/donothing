@@ -23,6 +23,11 @@ export function setSetting(key: string, value: string): void {
   );
 }
 
+export function deleteSetting(key: string): void {
+  const db = getDb();
+  db.runSync("DELETE FROM settings WHERE key = ? AND user_id = 'local'", key);
+}
+
 // --- Device-local state (never synced) ---
 
 export function getDeviceState(key: string): string | null {
