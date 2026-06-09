@@ -1,10 +1,8 @@
 import { Entypo, Feather } from '@expo/vector-icons';
-import * as Brightness from 'expo-brightness';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
   Dimensions,
   Platform,
   Pressable,
@@ -61,7 +59,7 @@ import {
   isBlockActive,
 } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
-import { useSessionBrightness } from '@/hooks/useSessionBrightness';
+import { useSessionScreen } from '@/hooks/useSessionScreen';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
 import { getStats, getWeekStats } from '@/lib/stats';
@@ -218,6 +216,8 @@ export default function DoNothingScreen() {
   // --- Countdown complete: auto-end session when timer reaches 00:00 ---
   useEffect(() => {
     if (started && goalSeconds > 0 && elapsed >= goalSeconds) {
+      // A long, warm haptic marks the end — no notification.
+      haptics.celebrate();
       deactivateKeepAwake('session');
       setDistractionFree(false);
       // If a scheduled block is still enforcing a shield, the user has earned
@@ -494,8 +494,6 @@ export default function DoNothingScreen() {
   // app/index.tsx stays focused on the home-screen UI. See useAppLifecycle.
   useAppLifecycle(pollBlockUnlock);
 
-  // Screen dims while a session runs, eases back up when it ends.
-  useSessionBrightness(started);
 
   // When a session ends (started: true → false), check the native shield.
   // The lifecycle listeners suppress BlockSheet during sessions to avoid
@@ -706,121 +704,22 @@ export default function DoNothingScreen() {
     opacity: Math.max(0, Math.min(1, (runExpand.value - 0.6) / 0.35)),
   }));
 
-  // Distraction-free fade — declared early so its shared value is
-  // ready before any animated style closes over it. The actual
-  // useEffect that drives it lives below the distractionFree state.
-  const distractionFade = useSharedValue(1);
-  const distractionStyle = useAnimatedStyle(() => ({
-    opacity: distractionFade.value,
-  }));
-
-  // Pause fade — drops the running-screen timer (and only the
-  // timer, not the camera or drifting dots) to zero opacity while
-  // the manual pause sheet is up, so the user doesn't see the same
-  // MM:SS twice (once on the running screen, once on the sheet).
-  const pausedTimerFade = useSharedValue(1);
-  const pausedTimerStyle = useAnimatedStyle(() => ({
-    opacity: pausedTimerFade.value,
-  }));
-  useEffect(() => {
-    pausedTimerFade.value = withTiming(paused ? 0 : 1, {
-      duration: 280,
-      easing: Easing.inOut(Easing.cubic),
-    });
-  }, [paused]);
-
-  // --- Distraction-free mode: hide timer & button while running ---
+  // --- Distraction-free mode: manual "hide everything + go dark" toggle ---
   const [distractionFree, setDistractionFree] = useState(false);
 
-  // Drive the distraction-fade shared value declared above, now that
-  // distractionFree is in scope. Smooth tween instead of an instant
-  // opacity flip.
-  useEffect(() => {
-    distractionFade.value = withTiming(distractionFree ? 0 : 1, {
-      duration: 720,
-      easing: Easing.inOut(Easing.cubic),
-    });
-  }, [distractionFree]);
+  // Paused / interrupt sheet up (incl. lock-triggered): the running timers are
+  // not rendered and the screen is never dimmed in this state.
+  const suppressed = paused || sessionEndedVisible;
 
-  // Dim the physical screen while distraction-free is on. Brightness is
-  // animated in JS over BRIGHTNESS_FADE_MS to match the content fade —
-  // expo-brightness has no built-in easing. The override is app-scoped
-  // on iOS: iOS auto-restores system brightness on background, so we
-  // only need to restore on toggle-off and on unmount, and re-apply on
-  // foreground if the mode is still on.
-  const savedBrightness = useRef<number | null>(null);
-  const brightnessAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const animateBrightness = useCallback((from: number, to: number, durationMs: number) => {
-    if (brightnessAnimRef.current) {
-      clearInterval(brightnessAnimRef.current);
-      brightnessAnimRef.current = null;
-    }
-    const start = Date.now();
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / durationMs);
-      // inOut cubic — matches distractionFade easing
-      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      const value = from + (to - from) * eased;
-      Brightness.setBrightnessAsync(value).catch(() => {});
-      if (t >= 1 && brightnessAnimRef.current) {
-        clearInterval(brightnessAnimRef.current);
-        brightnessAnimRef.current = null;
-      }
-    };
-    tick();
-    brightnessAnimRef.current = setInterval(tick, 32);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (distractionFree) {
-      (async () => {
-        try {
-          const current = await Brightness.getBrightnessAsync();
-          if (cancelled) return;
-          if (savedBrightness.current == null) savedBrightness.current = current;
-          animateBrightness(current, 0.05, 720);
-        } catch {}
-      })();
-    } else if (savedBrightness.current != null) {
-      const restore = savedBrightness.current;
-      savedBrightness.current = null;
-      (async () => {
-        try {
-          const current = await Brightness.getBrightnessAsync();
-          animateBrightness(current, restore, 720);
-        } catch {}
-      })();
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [distractionFree, animateBrightness]);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && distractionFree) {
-        Brightness.getBrightnessAsync()
-          .then((current) => animateBrightness(current, 0.05, 480))
-          .catch(() => {});
-      }
-    });
-    return () => sub.remove();
-  }, [distractionFree, animateBrightness]);
-
-  useEffect(() => {
-    return () => {
-      if (brightnessAnimRef.current) {
-        clearInterval(brightnessAnimRef.current);
-        brightnessAnimRef.current = null;
-      }
-      if (savedBrightness.current != null) {
-        Brightness.setBrightnessAsync(savedBrightness.current).catch(() => {});
-        savedBrightness.current = null;
-      }
-    };
-  }, []);
+  // Screen-dimming controller — owns brightness, the content fade and the
+  // tap-to-wake state. See hooks/useSessionScreen. While it's still fading
+  // (`!fullyDark`) the UI is untouched so the pause button stays tappable;
+  // once fully black, `fullyDark` turns on and we put up a tap-catcher.
+  const { contentStyle, fullyDark, wake } = useSessionScreen({
+    active: started,
+    suppressed,
+    distractionFree,
+  });
 
   // --- Promo offer modal (for users without subscription) ---
   // Lives in the store so the standalone paywall route can trigger it
@@ -1463,10 +1362,12 @@ export default function DoNothingScreen() {
               spotlight so the tutorial reads as "this is the do-nothing
               control" instead of three separate rings stacked vertically. */}
           <TutorialStepWrapper name="home.timer" style={styles.heroGroup}>
-            {/* Timer */}
+            {/* Timer — also hidden while the interrupt sheet is up (paused /
+                lock-triggered sessionEndedVisible) so it doesn't peek out from
+                under the fading camera and duplicate the sheet's MM:SS. */}
             <View
-              style={{ opacity: distractionFree ? 0 : 1 }}
-              pointerEvents={distractionFree ? 'none' : 'auto'}
+              style={{ opacity: distractionFree || suppressed ? 0 : 1 }}
+              pointerEvents={distractionFree || suppressed ? 'none' : 'auto'}
             >
               <Animated.View style={[timerEntryStyle, styles.centerContent]}>
                 {!started ? (
@@ -1795,7 +1696,7 @@ export default function DoNothingScreen() {
               while paused so the room feels stilled by the user's
               interruption. */}
           <Animated.View
-            style={[StyleSheet.absoluteFill, distractionStyle]}
+            style={[StyleSheet.absoluteFill, contentStyle]}
             pointerEvents="none"
           >
             <DriftingDots
@@ -1804,25 +1705,25 @@ export default function DoNothingScreen() {
             />
           </Animated.View>
 
-          {/* Big cream timer at vertical centre. Each digit slides
-              and fades as it ticks; the whole block fades smoothly
-              with the hide-toggle, and drops to zero while the
-              manual pause sheet is up so the same MM:SS isn't
-              duplicated above and below the sheet. */}
-          <Animated.View
-            style={[styles.runCenter, distractionStyle, pausedTimerStyle]}
-            pointerEvents="none"
-          >
-            <AnimatedTimerDisplay
-              seconds={
-                goalSeconds > 0
-                  ? Math.max(0, goalSeconds - elapsed)
-                  : elapsed
-              }
-              color={palette.cream}
-              fontSize={96}
-            />
-          </Animated.View>
+          {/* Big cream timer at vertical centre. NOT rendered at all while the
+              interrupt sheet is up (paused / lock) so it can never duplicate the
+              sheet's MM:SS — the paused state always wins. */}
+          {!suppressed && (
+            <Animated.View
+              style={[styles.runCenter, contentStyle]}
+              pointerEvents="none"
+            >
+              <AnimatedTimerDisplay
+                seconds={
+                  goalSeconds > 0
+                    ? Math.max(0, goalSeconds - elapsed)
+                    : elapsed
+                }
+                color={palette.cream}
+                fontSize={96}
+              />
+            </Animated.View>
+          )}
 
           {/* Running controls — interrupt + hide. Hidden when paused
               so they don't peek through the SessionEndedSheet
@@ -1833,7 +1734,7 @@ export default function DoNothingScreen() {
                 style={[
                   styles.runStopWrap,
                   { bottom: insets.bottom + 30 },
-                  distractionStyle,
+                  contentStyle,
                 ]}
                 pointerEvents={distractionFree ? 'none' : 'auto'}
               >
@@ -1896,7 +1797,7 @@ export default function DoNothingScreen() {
                 style={[
                   styles.runHideStack,
                   { bottom: insets.bottom + 110 },
-                  distractionStyle,
+                  contentStyle,
                 ]}
                 pointerEvents={distractionFree ? 'none' : 'box-none'}
               >
@@ -2048,6 +1949,17 @@ export default function DoNothingScreen() {
             </Animated.View>
           </Animated.View>
         </Animated.View>
+      )}
+
+      {/* Once the session has faded the screen fully black, a tap anywhere
+          wakes it. Only when fullyDark (so the pause button stays tappable
+          while fading) and not in the manual distraction-free toggle (which
+          has its own exit). */}
+      {fullyDark && !distractionFree && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
+          onPress={wake}
+        />
       )}
     </View>
   );
@@ -2266,6 +2178,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.5,
     fontFamily: Fonts?.mono,
+  },
+  wakeCatcher: {
+    zIndex: 100,
   },
   nothingLabel: {
     fontSize: 22,

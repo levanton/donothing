@@ -147,11 +147,6 @@ function SessionEndedSheet({
     const hasGoal = goalSeconds > 0;
     const remaining = hasGoal ? Math.max(0, goalSeconds - elapsed) : 0;
     const heroSeconds = hasGoal ? remaining : elapsed;
-    // Only the countdown side needs a caption ("left to do nothing")
-    // because the number alone is ambiguous (remaining vs elapsed). In
-    // stopwatch mode the number is just elapsed time — the PAUSED
-    // eyebrow already gives the context, no caption needed.
-    const heroLabel = hasGoal ? 'left to do nothing' : null;
     const progressPct = hasGoal
       ? Math.min(100, Math.max(0, (elapsed / goalSeconds) * 100))
       : 0;
@@ -208,16 +203,6 @@ function SessionEndedSheet({
             >
               {timerDisplay(heroSeconds)}
             </Text>
-            {heroLabel && (
-              <Text
-                style={[
-                  styles.heroCaption,
-                  { color: theme.text, fontFamily: Fonts!.serif },
-                ]}
-              >
-                {heroLabel}
-              </Text>
-            )}
           </View>
 
           {/* Progress visual — a row of "sand grains" in tune with the
@@ -379,12 +364,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     alignSelf: 'stretch',
     textAlign: 'center',
-  },
-  heroCaption: {
-    fontSize: 13,
-    fontWeight: '400',
-    letterSpacing: 0.4,
-    marginTop: 8,
   },
   // Sand track + terracotta fill — the visual answer to "how far did
   // I get". Done/goal labels under the bar give the exact numbers

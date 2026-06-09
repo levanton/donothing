@@ -31,7 +31,6 @@ import { getAchievedMilestones } from './db/milestones-db';
 import { evaluateAndSaveNewMilestones } from './milestones';
 import {
   configureNotifications,
-  scheduleSessionCompleteNotification,
   cancelNotification,
 } from './notifications';
 import type { SubscriptionStatus } from './subscription';
@@ -506,24 +505,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
     trackInterval(timerInterval);
-    // Schedule completion notification only for countdown sessions.
+    // No end-of-timer notification — completion is signalled by a long, warm
+    // haptic in-app (haptics.celebrate). Still persist the pending session so a
+    // relaunch can recover it.
     sessionNotificationId = null;
-    if (goalSeconds > 0) {
-      scheduleSessionCompleteNotification(goalSeconds, Math.round(goalSeconds / 60))
-        .then((id) => {
-          sessionNotificationId = id;
-          writePendingSession({
-            startedAt: sessionStartTime,
-            goalSeconds,
-            notificationId: id,
-          });
-        })
-        .catch(() => {
-          writePendingSession({ startedAt: sessionStartTime, goalSeconds, notificationId: null });
-        });
-    } else {
-      writePendingSession({ startedAt: sessionStartTime, goalSeconds: 0, notificationId: null });
-    }
+    writePendingSession({
+      startedAt: sessionStartTime,
+      goalSeconds,
+      notificationId: null,
+    });
   },
 
   stopSession: async () => {
@@ -600,36 +590,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }, 1000);
     trackInterval(timerInterval);
     set({ paused: false });
-    // Re-schedule the completion notification for the remaining time
-    // (countdown sessions only). Without this, a paused-then-resumed
-    // session would silently complete in-app with no system alert.
+    // No completion notification (replaced by an in-app haptic) — just persist
+    // the pending session for crash/relaunch recovery.
     const goalSeconds = get().goalSeconds;
-    if (goalSeconds > 0) {
-      const remaining = Math.max(1, goalSeconds - elapsed);
-      const remainingMin = Math.max(1, Math.round(remaining / 60));
-      scheduleSessionCompleteNotification(remaining, remainingMin)
-        .then((id) => {
-          sessionNotificationId = id;
-          writePendingSession({
-            startedAt: sessionStartTime,
-            goalSeconds,
-            notificationId: id,
-          });
-        })
-        .catch(() => {
-          writePendingSession({
-            startedAt: sessionStartTime,
-            goalSeconds,
-            notificationId: null,
-          });
-        });
-    } else {
-      writePendingSession({
-        startedAt: sessionStartTime,
-        goalSeconds: 0,
-        notificationId: null,
-      });
-    }
+    writePendingSession({
+      startedAt: sessionStartTime,
+      goalSeconds,
+      notificationId: null,
+    });
   },
 
   restartSession: () => {
