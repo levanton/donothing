@@ -84,9 +84,9 @@ export async function getOfferings(): Promise<PurchasesOffering | null> {
   }
 }
 
-// Fetch a single product by its store identifier — used for the "old
-// price" anchor on the yearly plan, since `nothing_yearly` isn't in any
-// RC package (it's not buyable, just a strikethrough reference price).
+// Fetch a single product's localized price by its store identifier, outside of
+// any RC offering. Generic helper (the old strikethrough-anchor caller was
+// removed when nothing_yearly became the real buyable yearly product).
 export async function getProductPriceString(
   productId: string,
 ): Promise<string | null> {
