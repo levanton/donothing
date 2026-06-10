@@ -12,6 +12,7 @@ import {
   addStatusListener,
 } from '@/lib/subscription';
 import { identifyUser } from '@/lib/analytics';
+import { captureError } from '@/lib/sentry';
 
 /**
  * Wires the home screen to platform/native lifecycle events:
@@ -58,6 +59,14 @@ export function useAppLifecycle(
         const status = await getCurrentStatus();
         await useAppStore.getState().setSubscriptionStatus(status);
         pollBlockUnlock(cancelledRef);
+      })
+      .catch((e) => {
+        // Without this, an init() failure (e.g. a migration throwing) is
+        // an unhandled rejection: `ready` stays false and the app sits on
+        // a dead home screen with zero diagnostics. Capture it so the
+        // crash-loop class of bugs is at least visible in Sentry.
+        console.error('[lifecycle] store init failed:', e);
+        captureError(e instanceof Error ? e : new Error(String(e)));
       });
     return () => {
       cancelledRef.current = true;
