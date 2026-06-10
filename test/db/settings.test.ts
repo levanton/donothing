@@ -56,4 +56,18 @@ describe('notification-state', () => {
     settings.setDeviceState('notification_ids:block:b1', 'not-json');
     expect(notifState.getNotificationIds('block', 'b1')).toEqual([]);
   });
+
+  it('returns [] when the stored value is valid JSON but not an array', () => {
+    const { settings, notifState } = loadDbModules();
+    settings.setDeviceState('notification_ids:block:b1', '123');
+    expect(notifState.getNotificationIds('block', 'b1')).toEqual([]);
+    settings.setDeviceState('notification_ids:block:b1', '{"a":1}');
+    expect(notifState.getNotificationIds('block', 'b1')).toEqual([]);
+  });
+
+  it('drops non-string entries from a stored array', () => {
+    const { settings, notifState } = loadDbModules();
+    settings.setDeviceState('notification_ids:block:b1', '["n1", 5, null, "n2"]');
+    expect(notifState.getNotificationIds('block', 'b1')).toEqual(['n1', 'n2']);
+  });
 });

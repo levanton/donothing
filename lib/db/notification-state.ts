@@ -8,7 +8,12 @@ export function getNotificationIds(entityType: string, entityId: string): string
   const raw = getDeviceState(stateKey(entityType, entityId));
   if (!raw) return [];
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Corrupt-but-valid JSON (a number, an object) must not leak out as
+    // string[] — callers iterate and pass entries to the notifications
+    // API. Non-string entries are dropped for the same reason.
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
   } catch {
     return [];
   }
