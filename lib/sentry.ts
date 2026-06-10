@@ -60,9 +60,12 @@ export function initSentry(): void {
     sendDefaultPii: false,
     tracesSampleRate: 0,
     debug: __DEV__,
-    // Captures console.log/warn/error as breadcrumbs on each event —
-    // gives the issue page useful context without enabling full logs.
-    enableLogs: true,
+    // Sentry Logs (continuous console.log/warn/error shipping) stays
+    // OFF: the privacy manifest + policy declare crash data and minimal
+    // diagnostics only, and app console logs can reference user state.
+    // Crash events still carry breadcrumbs — this flag is a separate,
+    // always-on log stream, not the breadcrumb capture.
+    enableLogs: false,
   });
   inited = true;
 }
