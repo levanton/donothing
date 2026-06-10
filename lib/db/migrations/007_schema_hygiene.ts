@@ -17,11 +17,32 @@ import type { Migration } from '../migrations';
  * CREATE _new, INSERT … SELECT, DROP, RENAME. Wrapped in the migration
  * runner's outer transaction so a partial failure rolls back cleanly.
  *
- * After every INSERT … SELECT we count both sides and throw if rows
- * were silently dropped by the CHECK-filter WHERE clause. Without this
- * guard, a row with `duration = 999999` (or similar) would vanish on
- * upgrade with no error surfaced.
+ * Rows that violate the new CHECK constraints are deleted *explicitly*
+ * (and logged) before the copy. They are corrupt by definition — but a
+ * migration that throws on them would re-run and re-throw on every
+ * launch, bricking the app for that user forever. Dropping a corrupt
+ * row beats a permanent crash-loop. After the copy we still count both
+ * sides and throw on mismatch, so any *unexpected* row loss (a filter
+ * drifting out of sync with the pre-delete) fails loudly inside the
+ * runner's transaction instead of vanishing silently.
  */
+
+function dropInvalidRows(
+  db: SQLiteDatabase,
+  table: string,
+  whereInvalid: string,
+): void {
+  const row = db.getFirstSync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM ${table} WHERE ${whereInvalid}`,
+  );
+  const n = row?.count ?? 0;
+  if (n > 0) {
+    db.execSync(`DELETE FROM ${table} WHERE ${whereInvalid};`);
+    console.warn(
+      `[migration007] dropped ${n} corrupt ${table} row(s) violating new constraints`,
+    );
+  }
+}
 
 function copyAndVerify(
   db: SQLiteDatabase,
@@ -62,6 +83,7 @@ export const migration007: Migration = {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    dropInvalidRows(db, 'sessions', 'NOT (duration > 0 AND duration <= 86400)');
     copyAndVerify(db, 'sessions', `
       INSERT INTO sessions_new
         (id, user_id, timestamp, duration, mood, created_at, updated_at)
@@ -98,6 +120,16 @@ export const migration007: Migration = {
         updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    // The predicate must cover EVERY CHECK on the new table — a row that
+    // slips past the pre-delete but violates a CHECK aborts the INSERT
+    // (and therefore the whole migration) on every subsequent launch.
+    dropInvalidRows(db, 'scheduled_blocks', `NOT (
+      hour >= 0 AND hour < 24
+      AND minute >= 0 AND minute < 60
+      AND duration_minutes > 0 AND duration_minutes <= 1440
+      AND enabled IN (0, 1)
+      AND unlock_goal_minutes >= 0
+    )`);
     copyAndVerify(db, 'scheduled_blocks', `
       INSERT INTO scheduled_blocks_new
         (id, user_id, hour, minute, duration_minutes, weekdays, enabled,
@@ -110,7 +142,9 @@ export const migration007: Migration = {
       FROM scheduled_blocks
       WHERE hour >= 0 AND hour < 24
         AND minute >= 0 AND minute < 60
-        AND duration_minutes > 0 AND duration_minutes <= 1440;
+        AND duration_minutes > 0 AND duration_minutes <= 1440
+        AND enabled IN (0, 1)
+        AND unlock_goal_minutes >= 0;
     `);
     db.execSync('DROP TABLE scheduled_blocks;');
     db.execSync('ALTER TABLE scheduled_blocks_new RENAME TO scheduled_blocks;');
