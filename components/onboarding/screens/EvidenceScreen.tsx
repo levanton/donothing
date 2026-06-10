@@ -1,8 +1,9 @@
 import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { Easing, FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInRight, useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { EASE_OUT } from '@/constants/animations';
+import { haptics } from '@/lib/haptics';
 import { Feather } from '@expo/vector-icons';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
@@ -111,6 +112,13 @@ const FACTS: Fact[] = [
   },
 ];
 
+// Cards cascade in from the right, one after another. Only the first few are
+// on screen at this card width, so the stagger caps there — off-screen cards
+// would otherwise animate unseen and delay nothing.
+const CARD_BASE_DELAY_MS = 1000;
+const CARD_STAGGER_MS = 150;
+const CARD_STAGGER_CAP = 3;
+
 interface Props {
   isActive: boolean;
   onNext: () => void;
@@ -125,6 +133,15 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
 
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
+  const lastSnapIndex = React.useRef(0);
+
+  const handleScrollEnd = React.useCallback((e: any) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / (cardWidth + 12));
+    if (index !== lastSnapIndex.current) {
+      lastSnapIndex.current = index;
+      haptics.light();
+    }
+  }, [cardWidth]);
 
   React.useEffect(() => {
     if (!isActive) return;
@@ -150,7 +167,7 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
             What we lose by never stopping — and what we could gain by doing nothing
           </Text>
         </Animated.View>
-        <Animated.View entering={FadeIn.duration(1100).delay(1000)} style={{ height: cardHeight }}>
+        <View style={{ height: cardHeight }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -158,12 +175,17 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
             contentContainerStyle={styles.sliderContent}
             decelerationRate="fast"
             snapToInterval={cardWidth + 12}
+            onMomentumScrollEnd={handleScrollEnd}
           >
             {FACTS.map((f, i) => {
               const cardTheme = CARD_THEMES[i % CARD_THEMES.length];
               return (
-                <View
+                <Animated.View
                   key={i}
+                  entering={FadeInRight
+                    .delay(CARD_BASE_DELAY_MS + Math.min(i, CARD_STAGGER_CAP) * CARD_STAGGER_MS)
+                    .duration(600)
+                    .easing(EASE_OUT.factory())}
                   style={[
                     styles.card,
                     {
@@ -186,11 +208,11 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
                       <Text style={[styles.src, { color: cardTheme.accentColor }]}>{f.src}</Text>
                     </Pressable>
                   </View>
-                </View>
+                </Animated.View>
               );
             })}
           </ScrollView>
-        </Animated.View>
+        </View>
       </View>
 
       <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
