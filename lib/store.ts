@@ -673,7 +673,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionNotificationId = null;
     }
     clearPendingSession();
-    const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    // Same rule as stopSession: use the displayed elapsed, not
+    // (Date.now() - sessionStartTime). resumeSession re-anchors the
+    // start time so the two normally agree, but if this ever runs
+    // while paused (external caller, future feature) the wall-clock
+    // formula would over-count by the pause duration.
+    const duration = get().elapsed;
     // Below the threshold this isn't a session — UI guards prevent it,
     // but if anything calls completeSession through a different path
     // (background AppState, future feature) we still must NOT write a
