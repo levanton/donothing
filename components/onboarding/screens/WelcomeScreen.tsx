@@ -1,4 +1,3 @@
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -14,14 +13,6 @@ import { palette } from '@/lib/theme';
 const FADE_IN_MS = 900;
 
 const welcomeImage = require('@/assets/images/visuals/circle-welcome.png');
-
-type Feature = { icon: string; label: string; mci?: boolean };
-
-const FEATURES: Feature[] = [
-  { icon: 'leaf', label: 'pause', mci: true },
-  { icon: 'cloud', label: 'breathe' },
-  { icon: 'disc', label: 'be here' },
-];
 
 interface Props {
   isActive: boolean;
@@ -67,31 +58,6 @@ export default function WelcomeScreen({ isActive, theme }: Props) {
           <Text style={styles.essenceStrong}>nothing</Text>.
         </Text>
 
-        <View style={styles.features}>
-          {FEATURES.map((f, i) => (
-            <View
-              key={f.label}
-              style={[styles.feature, i > 0 && styles.featureWithSep]}
-            >
-              {f.mci ? (
-                <MaterialCommunityIcons
-                  name={f.icon as never}
-                  size={22}
-                  color={palette.terracotta}
-                />
-              ) : (
-                <Feather
-                  name={f.icon as never}
-                  size={22}
-                  color={palette.terracotta}
-                />
-              )}
-              <Text style={[styles.featureLabel, { color: theme.text }]}>
-                {f.label}
-              </Text>
-            </View>
-          ))}
-        </View>
       </Animated.View>
 
       <Image
@@ -147,26 +113,5 @@ const styles = StyleSheet.create({
   },
   essenceStrong: {
     fontWeight: '600',
-  },
-  features: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 36,
-  },
-  feature: {
-    alignItems: 'center',
-    gap: 7,
-    paddingRight: 18,
-  },
-  featureWithSep: {
-    paddingLeft: 18,
-    borderLeftWidth: 1,
-    borderLeftColor: palette.terracotta + '33',
-  },
-  featureLabel: {
-    fontFamily: Fonts?.serif,
-    fontSize: 13,
-    fontWeight: '400',
-    letterSpacing: 0.3,
   },
 });
