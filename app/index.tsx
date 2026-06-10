@@ -1,6 +1,6 @@
 import { Entypo, Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -159,7 +159,13 @@ export default function DoNothingScreen() {
   const unlockMin = activeBlock?.unlockGoalMinutes ?? 15;
 
   const theme = themes[themeMode];
-  const stats = getStats();
+  // 3 synchronous SQLite aggregates — must not run on every render:
+  // during a session this component re-renders every second via
+  // `elapsed`. weekStats doubles as the store's "sessions changed"
+  // trigger (bumped on every save/delete/mood edit), so it's the
+  // exact invalidation key; the live-session delta is added in the
+  // stats row as `stats.today + elapsed` without touching the DB.
+  const stats = useMemo(() => getStats(), [weekStats]);
 
   // --- Theme animation ---
   const themeProgress = useSharedValue(0);
