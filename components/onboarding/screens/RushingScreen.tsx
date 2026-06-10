@@ -1,24 +1,46 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
+
+import { onboardingText } from '../textStyles';
 import { getDotFieldLayout } from '../dotFieldLayout';
+import { buildSchedule, Word, type Cadence, type WordLine } from '../WordReveal';
 
 const HEADING = 'now.';
 
-interface LineSpec {
-  text: string;
-  bold?: boolean;
-  paragraph?: boolean;
-}
+// The rush, embodied: words snap in fast and relentless — the opposite of
+// the nostalgia screen's lazy melt. The rapid trail of selection ticks under
+// the fingers IS the restlessness the copy describes.
+const CADENCE: Cadence = {
+  startMs: 800,
+  wordStepMs: 130,
+  linePauseMs: 200,
+  paragraphPauseMs: 500,
+  fadeMs: 350,
+  settleScale: 1.03,
+};
+const HEADING_DELAY_MS = 300;
+// The final line breaks the tempo: after all the hurry, "days, months,
+// years — gone in a blur." lands slow and heavy, every word a thud.
+const FINAL_LINE_STEP_MS = 320;
 
-const LINES: LineSpec[] = [
-  { text: 'so much to do.' },
-  { text: 'so many things calling.' },
-  { text: 'so much pressure.' },
-  { text: 'it keeps us busy.', paragraph: true },
-  { text: 'but never really here.' },
-  // Non-breaking spaces keep "gone in a blur" together on one line.
-  { text: 'days, months, years — gone in a blur.', bold: true, paragraph: true },
+const LINES: WordLine[] = [
+  { words: [{ text: 'so' }, { text: 'much' }, { text: 'to' }, { text: 'do.' }] },
+  { words: [{ text: 'so' }, { text: 'many' }, { text: 'things' }, { text: 'calling.' }] },
+  { words: [{ text: 'so' }, { text: 'much' }, { text: 'pressure.' }] },
+  { words: [{ text: 'it' }, { text: 'keeps' }, { text: 'us' }, { text: 'busy.' }], paragraph: true },
+  { words: [{ text: 'but' }, { text: 'never' }, { text: 'really' }, { text: 'here.' }] },
+  {
+    words: [
+      { text: 'days,', strong: true },
+      { text: 'months,', strong: true },
+      { text: 'years —', strong: true },
+      // The payoff arrives as one piece — a blur doesn't come word by word.
+      { text: 'gone in a blur.', strong: true },
+    ],
+    paragraph: true,
+    stepMs: FINAL_LINE_STEP_MS,
+  },
 ];
 
 interface Props {
@@ -32,6 +54,8 @@ export default function RushingScreen({ theme }: Props) {
   const { width, height } = useWindowDimensions();
   const fieldTop = getDotFieldLayout(width, height).lowTop;
 
+  const schedule = useMemo(() => buildSchedule(LINES, CADENCE), []);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View
@@ -41,21 +65,22 @@ export default function RushingScreen({ theme }: Props) {
         ]}
       >
         <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
-          {HEADING}
+          <Word text={HEADING} delay={HEADING_DELAY_MS} cadence={CADENCE} />
         </Text>
 
         <View style={styles.body}>
-          {LINES.map((spec, i) => (
+          {LINES.map((line, li) => (
             <Text
-              key={i}
+              key={li}
               style={[
                 onboardingText.line,
                 { color: theme.text },
-                spec.bold && ONBOARDING_BODY_BOLD,
-                spec.paragraph && { marginTop: 18 },
+                line.paragraph && styles.paragraph,
               ]}
             >
-              {spec.text}
+              {line.words.map((w, wi) => (
+                <Word key={wi} text={w.text} delay={schedule[li][wi]} cadence={CADENCE} strong={w.strong} />
+              ))}
             </Text>
           ))}
         </View>
@@ -77,4 +102,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   body: {},
+  paragraph: {
+    marginTop: 18,
+  },
 });
