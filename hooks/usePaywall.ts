@@ -148,10 +148,13 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         await useAppStore.getState().setSubscriptionStatus('active');
         setPromoVisible(false);
         onClose();
-      } else if (result !== 'cancelled') {
-        // System sheet dismissed → leave the promo open to retry; any other
-        // failure (network/storekit) → error haptic.
+      } else if (result === 'cancelled') {
+        // System sheet dismissed → leave the promo open to retry.
+        track('purchase_cancelled', { plan: 'winback' });
+      } else {
+        // Any other failure (network/storekit) → error haptic.
         haptics.error();
+        track('purchase_failed', { plan: 'winback' });
       }
     } finally {
       setPromoPurchasing(false);
@@ -176,8 +179,11 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         // update now so the home screen unwraps without waiting on it.
         await useAppStore.getState().setSubscriptionStatus('active');
         onClose();
-      } else if (result !== 'cancelled') {
+      } else if (result === 'cancelled') {
+        track('purchase_cancelled', { plan: selectedPlan });
+      } else {
         haptics.error();
+        track('purchase_failed', { plan: selectedPlan });
       }
     } finally {
       setPurchasing(false);
@@ -204,6 +210,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         // common on reinstall / new device, and silent failure is an App
         // Review flag.
         haptics.error();
+        track('restore_failed');
         Alert.alert(
           'Nothing to restore',
           "We couldn't find any previous purchases on this Apple ID. If you subscribed before, make sure you're signed in to the same Apple ID and try again.",
