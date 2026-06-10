@@ -137,6 +137,14 @@ export default function DoNothingScreen() {
   // exact invalidation key; the live-session delta is added in the
   // stats row as `stats.today + elapsed` without touching the DB.
   const stats = useMemo(() => getStats(), [weekStats]);
+  // Formatted once per render instead of inline in the JSX — the stats
+  // row reads .value and .unit separately, which would double the calls.
+  const todayStat = formatTimeStat(stats.today + elapsed);
+  const weekStat = formatTimeStat(stats.week + elapsed);
+  // Week-dot scale — previously recomputed inside the .map() callback,
+  // i.e. O(n²) per render (and this screen re-renders every second
+  // during a session).
+  const maxDur = Math.max(...weekStats.map((d) => d.duration), 1);
 
   // --- Theme animation ---
   const themeProgress = useSharedValue(0);
@@ -260,13 +268,16 @@ export default function DoNothingScreen() {
 
   // BlockSheet visibility is now a prop — no imperative ref needed.
 
+  // Read once per render — the splash seeding below and both slide
+  // styles share it. Kept inside the component (not module-level) so
+  // iPad split-view / rotation still picks up fresh values on re-render.
+  const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
   // --- History slide ---
-  const SCREEN_H = Dimensions.get('window').height;
   const historySlide = useSharedValue(0); // 0 = main visible, 1 = history visible
   const historyScrollY = useSharedValue(0);
 
   // --- Settings slide (from left) ---
-  const SCREEN_W = Dimensions.get('window').width;
   const settingsSlide = useSharedValue(0); // 0 = hidden, 1 = visible
   const settingsSlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: (settingsSlide.value - 1) * SCREEN_W }],
@@ -541,15 +552,14 @@ export default function DoNothingScreen() {
   const yesButtonRef = useRef<View>(null);
   const { rect: yesBtnRect, measure: measureYesButton } = useMeasureRect(yesButtonRef);
 
-  const { width: SCREEN_W_INIT, height: SCREEN_H_INIT } = Dimensions.get('window');
   const YES_SIZE = 140;
   // Shared values drive the animated style — seeded with safe "cover the
   // screen" defaults so the splash is opaque from the very first frame
   // even before the yes button is measured.
   const splashProgress = useSharedValue(0);
-  const splashCenterX = useSharedValue(SCREEN_W_INIT / 2);
-  const splashCenterY = useSharedValue(SCREEN_H_INIT / 2);
-  const splashInitialSize = useSharedValue(Math.max(SCREEN_W_INIT, SCREEN_H_INIT) * 2.5);
+  const splashCenterX = useSharedValue(SCREEN_W / 2);
+  const splashCenterY = useSharedValue(SCREEN_H / 2);
+  const splashInitialSize = useSharedValue(Math.max(SCREEN_W, SCREEN_H) * 2.5);
 
   // Recompute the splash's anchor + cover size once the yes button has been
   // measured. For a circle centred at (cx, cy) to cover the screen we need
@@ -561,9 +571,9 @@ export default function DoNothingScreen() {
     const cy = yesBtnRect.y + yesBtnRect.h / 2;
     const maxDist = Math.max(
       Math.hypot(cx, cy),
-      Math.hypot(SCREEN_W_INIT - cx, cy),
-      Math.hypot(cx, SCREEN_H_INIT - cy),
-      Math.hypot(SCREEN_W_INIT - cx, SCREEN_H_INIT - cy),
+      Math.hypot(SCREEN_W - cx, cy),
+      Math.hypot(cx, SCREEN_H - cy),
+      Math.hypot(SCREEN_W - cx, SCREEN_H - cy),
     );
     splashCenterX.value = cx;
     splashCenterY.value = cy;
@@ -1082,12 +1092,12 @@ export default function DoNothingScreen() {
                       { color: theme.text, fontFamily: Fonts!.mono },
                     ]}
                   >
-                    {formatTimeStat(stats.today + elapsed).value}
+                    {todayStat.value}
                   </Text>
                   <Text
                     style={[styles.statRowUnit, { color: theme.textTertiary }]}
                   >
-                    {formatTimeStat(stats.today + elapsed).unit}
+                    {todayStat.unit}
                   </Text>
                 </View>
               </View>
@@ -1110,12 +1120,12 @@ export default function DoNothingScreen() {
                       { color: theme.text, fontFamily: Fonts!.mono },
                     ]}
                   >
-                    {formatTimeStat(stats.week + elapsed).value}
+                    {weekStat.value}
                   </Text>
                   <Text
                     style={[styles.statRowUnit, { color: theme.textTertiary }]}
                   >
-                    {formatTimeStat(stats.week + elapsed).unit}
+                    {weekStat.unit}
                   </Text>
                 </View>
               </View>
@@ -1132,10 +1142,6 @@ export default function DoNothingScreen() {
             >
               <View style={styles.weekGrid}>
                 {weekStats.map((day) => {
-                  const maxDur = Math.max(
-                    ...weekStats.map((d) => d.duration),
-                    1,
-                  );
                   const size =
                     day.duration > 0 ? 10 + (day.duration / maxDur) * 20 : 4;
                   return (
