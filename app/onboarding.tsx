@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
   FadeOut,
+  useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
@@ -20,16 +21,17 @@ import { palette, getStatusBarStyle } from '@/lib/theme';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import RadialDots from '@/components/onboarding/RadialDots';
-import { getDotFieldLayout } from '@/components/onboarding/dotFieldLayout';
+import {
+  DOT_MORPH_MS,
+  getDotFieldLayout,
+} from '@/components/onboarding/dotFieldLayout';
 import PillButton from '@/components/PillButton';
 
 // Pages that share the persistent RadialDots layer. Kept adjacent in PAGES so
-// the dot field never unmounts between them — it morphs scatter → rings.
-const DOT_SCATTER_PAGE = 'rushing'; // "now."   → progress 0
-const DOT_RINGS_PAGE = 'phoneSymptom'; // "what if…" → progress 1
-// Dot morph duration — kept in sync with morphFade{Enter,Exit} (transitions.ts)
-// so the dots reorganise exactly as the screens cross-fade.
-const DOT_MORPH_MS = 1200;
+// the dot field never unmounts between them — it morphs scatter → rings while
+// gliding from the lower band ("now.") to the upper band ("what if…").
+const DOT_SCATTER_PAGE = 'rushing'; // "now."   → progress 0, lower band
+const DOT_RINGS_PAGE = 'phoneSymptom'; // "what if…" → progress 1, upper band
 
 export default function OnboardingRoute() {
   const insets = useSafeAreaInsets();
@@ -47,6 +49,14 @@ export default function OnboardingRoute() {
   const dotProgress = useSharedValue(currentPage.id === DOT_RINGS_PAGE ? 1 : 0);
   const dotField = getDotFieldLayout(width, height);
   const dotFieldSize = dotField.size;
+
+  // The field travels between the bands as the morph progresses: progress 0
+  // keeps it in the lower band ("now."), progress 1 lifts it to the upper
+  // band ("what if…") — one timing drives both the morph and the journey.
+  const dotTravel = dotField.highTop - dotField.lowTop;
+  const dotLayerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: dotProgress.value * dotTravel }],
+  }));
 
   useEffect(() => {
     if (currentPage.id === DOT_SCATTER_PAGE) {
@@ -77,9 +87,9 @@ export default function OnboardingRoute() {
         {screen.render(flow)}
       </Animated.View>
 
-      {/* Persistent dot field shared by the "now." ↔ "what if…" screens. Sits
-          in the lower band above the page bg; the text lives above it and the
-          buttons below, so nothing overlaps. */}
+      {/* Persistent dot field shared by the "now." ↔ "what if…" screens. It
+          starts in the lower band (text above it), then glides to the upper
+          band on "what if…" (text below it) while morphing scatter → rings. */}
       {isDotScreen && (
         <Animated.View
           exiting={FadeOut.duration(300)}
@@ -88,10 +98,11 @@ export default function OnboardingRoute() {
             styles.dotLayer,
             {
               left: dotField.left,
-              top: dotField.top,
+              top: dotField.lowTop,
               width: dotFieldSize,
               height: dotFieldSize,
             },
+            dotLayerStyle,
           ]}
         >
           <RadialDots
@@ -102,10 +113,15 @@ export default function OnboardingRoute() {
         </Animated.View>
       )}
 
-      {/* Bottom Continue button */}
+      {/* Bottom Continue button. On "what if…" it waits for the ride-up
+          hand-off to finish before fading in. */}
       {showBottomButton && (
         <Animated.View
-          entering={FadeIn.duration(400)}
+          entering={
+            currentPage.id === DOT_RINGS_PAGE
+              ? FadeIn.duration(400).delay(DOT_MORPH_MS)
+              : FadeIn.duration(400)
+          }
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
           <PillButton

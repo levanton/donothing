@@ -31,14 +31,22 @@ interface Props {
 export default function PhoneSymptomScreen({ theme }: Props) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const fieldTop = getDotFieldLayout(width, height).top;
+  const field = getDotFieldLayout(width, height);
 
+  // No own background: the route container already paints the page bg. An
+  // opaque sheet here would ride up with the page and cover the outgoing
+  // "now." text during the hand-off.
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={styles.container}>
+      {/* The dot field sits in the upper band here, so the text fills the
+          space below it, clear of the bottom continue pill. */}
       <View
         style={[
           styles.content,
-          { paddingTop: insets.top + 72, height: fieldTop },
+          {
+            top: field.highTop + field.size,
+            paddingBottom: insets.bottom + 104,
+          },
         ]}
       >
         <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
@@ -70,9 +78,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 32,
-    paddingBottom: 44,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
   heading: {
     marginBottom: 14,

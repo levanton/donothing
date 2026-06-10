@@ -30,7 +30,7 @@ interface Props {
 export default function RushingScreen({ theme }: Props) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const fieldTop = getDotFieldLayout(width, height).top;
+  const fieldTop = getDotFieldLayout(width, height).lowTop;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
