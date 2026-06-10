@@ -18,13 +18,18 @@ import PostHog from 'posthog-react-native';
  *  - `enableSessionReplay: false` — no screen recording. Adds bundle weight and
  *    is a privacy red flag for a "do nothing" app where the user stares at a
  *    timer.
- *  - Every event is tagged with an `environment` super property so dev sessions
- *    can be filtered out of production dashboards.
+ *  - Dev builds never talk to PostHog at all — the client is simply not
+ *    created under `__DEV__`, and track() logs to the console instead so
+ *    funnels stay debuggable without polluting production data.
  */
 
 let client: PostHog | null = null;
 
 export function initAnalytics(): void {
+  // Dev sessions must never reach PostHog — they'd skew every dashboard
+  // and cost events. No client → every function below no-ops (track()
+  // still console-logs in dev, see below).
+  if (__DEV__) return;
   if (client) return;
   const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY;
   if (!apiKey) return;
@@ -34,8 +39,9 @@ export function initAnalytics(): void {
     captureAppLifecycleEvents: true,
     enableSessionReplay: false,
   });
-  // Persisted super property on every event — lets dashboards exclude dev data.
-  void client.register({ environment: __DEV__ ? 'development' : 'production' });
+  // Kept even though dev never sends: existing dashboards filter on
+  // `environment = production`, so the property must stay on events.
+  void client.register({ environment: 'production' });
 }
 
 // PostHog's property maps only accept JSON values; cast our ergonomic
@@ -44,6 +50,11 @@ type EventProps = Parameters<PostHog['capture']>[1];
 
 /** Capture a product event. No-ops until initAnalytics() has run with a key. */
 export function track(event: string, properties?: Record<string, unknown>): void {
+  if (__DEV__) {
+    // Dev: keep the event visible for debugging, but never send it.
+    console.log('[analytics:dev]', event, properties ?? '');
+    return;
+  }
   client?.capture(event, properties as EventProps);
 }
 
