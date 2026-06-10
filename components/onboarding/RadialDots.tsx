@@ -20,6 +20,13 @@ import { palette } from '@/lib/theme';
 // One full, barely-perceptible orbit of the whole dot field (ms).
 const ORBIT_PERIOD_MS = 200000;
 
+// Restless wander in the scatter state: every dot drifts around its spot on
+// its own little loop, so the chaos visibly fidgets ("now."). The amplitude
+// is scaled by (1 - morph progress), so the unrest dies out exactly as the
+// rings form — chaos literally settles into order.
+const WANDER_PERIOD_MS = 6000;
+const TWO_PI = Math.PI * 2;
+
 // Central circle in the chaotic state: a muted, washed-out terracotta. As the
 // rings form it resolves to the full, vivid circle colour.
 const MURKY_CIRCLE = '#B68D78';
@@ -72,6 +79,12 @@ interface Dot {
    *  fades in at its own speed, after the central circle. */
   revStart: number;
   revWindow: number;
+  // Scatter-state wander: phase offset, pixel amplitude, and integer x/y
+  // frequencies (integers keep the loop seamless when the clock wraps).
+  wPhase: number;
+  wAmp: number;
+  wfx: number;
+  wfy: number;
 }
 
 interface BuildArgs {
@@ -167,6 +180,10 @@ function buildDots({
       // Dots begin after the circle (>=0.18) and each fades at its own speed.
       revStart: 0.18 + rand() * 0.32,
       revWindow: 0.3 + rand() * 0.32,
+      wPhase: rand() * TWO_PI,
+      wAmp: size * (0.008 + rand() * 0.012),
+      wfx: 1 + Math.round(rand()),
+      wfy: 1 + Math.round(rand()),
     };
   });
 }
@@ -176,11 +193,13 @@ function DotView({
   dot,
   progress,
   reveal,
+  wander,
   color,
 }: {
   dot: Dot;
   progress: SharedValue<number>;
   reveal: SharedValue<number>;
+  wander: SharedValue<number>;
   color: string;
 }) {
   const style = useAnimatedStyle(() => {
@@ -193,8 +212,14 @@ function DotView({
       [0, 1],
       Extrapolation.CLAMP,
     );
-    const x = dot.sx + (dot.rx - dot.sx) * local;
-    const y = dot.sy + (dot.ry - dot.sy) * local;
+    // Restless drift, fading out as the dot reaches its ring position.
+    const wob = dot.wAmp * (1 - local);
+    const x =
+      dot.sx + (dot.rx - dot.sx) * local +
+      Math.sin(wander.value * dot.wfx + dot.wPhase) * wob;
+    const y =
+      dot.sy + (dot.ry - dot.sy) * local +
+      Math.cos(wander.value * dot.wfy + dot.wPhase * 1.7) * wob;
     const size = dot.sSize + (dot.rSize - dot.sSize) * local;
 
     // Reveal: pure opacity fade-in, each dot at its own start + speed.
@@ -227,6 +252,7 @@ function RingGroup({
   dots,
   progress,
   reveal,
+  wander,
   color,
   orbiting,
   period,
@@ -235,6 +261,7 @@ function RingGroup({
   dots: Dot[];
   progress: SharedValue<number>;
   reveal: SharedValue<number>;
+  wander: SharedValue<number>;
   color: string;
   orbiting: boolean;
   period: number;
@@ -271,6 +298,7 @@ function RingGroup({
           dot={dot}
           progress={progress}
           reveal={reveal}
+          wander={wander}
           color={color}
         />
       ))}
@@ -339,6 +367,18 @@ export default function RadialDots({
     );
   }, []);
 
+  // One shared clock drives every dot's wander (and the circle's breath).
+  // Linear 0→2π so integer per-dot frequencies wrap without a seam.
+  const wander = useSharedValue(0);
+  useEffect(() => {
+    wander.value = withRepeat(
+      withTiming(TWO_PI, { duration: WANDER_PERIOD_MS, easing: Easing.linear }),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(wander);
+  }, []);
+
   // Chaos → order: the circle goes from a muted, dim, slightly-bloated blob to
   // a vivid, crisp, full-opacity circle as `progress` drives 0 → 1.
   const circleStyle = useAnimatedStyle(() => {
@@ -349,10 +389,12 @@ export default function RadialDots({
       Extrapolation.CLAMP,
     );
     const p = progress.value;
+    // An uneasy breath while murky; settles still as the rings form.
+    const breath = Math.sin(wander.value) * 0.015 * (1 - p);
     return {
       opacity: revealFade * (0.55 + 0.45 * p),
       backgroundColor: interpolateColor(p, [0, 1], [MURKY_CIRCLE, circleColor]),
-      transform: [{ scale: 1.06 - 0.06 * p }],
+      transform: [{ scale: 1.06 - 0.06 * p + breath }],
     };
   });
 
@@ -366,6 +408,7 @@ export default function RadialDots({
             dots={groupDots}
             progress={progress}
             reveal={reveal}
+            wander={wander}
             color={dotColor}
             orbiting={orbiting}
             period={ORBIT_PERIOD_MS / Math.abs(speed)}
