@@ -625,16 +625,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       cancelNotification(sessionNotificationId).catch(() => {});
       sessionNotificationId = null;
     }
-    // Save what they did so far so it's not lost from history.
+    // Save what they did so far so it's not lost from history. Same
+    // retry + Sentry path as completion — a persistent failure is real
+    // data loss, but the restart itself proceeds either way (returns
+    // null on failure; losing one segment beats blocking a fresh start).
     const prevElapsed = get().elapsed;
     if (prevElapsed > 0) {
-      try {
-        dbAddSession(prevElapsed);
-      } catch (e) {
-        // Restart proceeds even if save fails — losing one segment is
-        // better than blocking the user from starting a fresh session.
-        console.error('[store.restartSession] dbAddSession failed:', e);
-      }
+      saveSessionWithRetry(prevElapsed);
     }
     // Reset and (re)start the timer.
     sessionStartTime = Date.now();
@@ -648,6 +645,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       paused: false,
       weekStats: getWeekStats(),
     });
+    // The saved segment counts toward totals — a milestone threshold
+    // crossed by it should land now, not on the next unrelated save.
+    if (prevElapsed > 0) {
+      get().checkMilestones();
+    }
     // Re-write pendingSession with fresh start time.
     const goalSeconds = get().goalSeconds;
     writePendingSession({
