@@ -2,6 +2,7 @@ import { Entypo, Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Pressable,
   StyleSheet,
@@ -802,7 +803,14 @@ export default function DoNothingScreen() {
     try {
       await useAppStore.getState().deleteLocalAccount();
     } catch (e) {
+      // deleteLocalAccount rethrows when the SQLite wipe fails — the
+      // data is still on disk, so don't pretend it's gone: tell the
+      // user the deletion didn't happen and let them retry.
       console.error('[handleDeleteAccount] failed:', e);
+      Alert.alert(
+        'Deletion failed',
+        'Your data could not be deleted. Please try again, or reinstall the app to remove everything.',
+      );
     }
   }, [settingsSlide, historySlide]);
 

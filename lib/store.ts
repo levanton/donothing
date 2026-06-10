@@ -1009,10 +1009,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Drop every row from user-data tables. Schema is preserved so
     // the next write hits ready tables instead of re-running DDL.
+    // This one is NOT catch-and-continue: if the wipe throws, the data
+    // is still on disk — resetting the UI to first-launch defaults
+    // would tell the user "deleted" while SQLite still holds everything
+    // (the Privacy Policy promises deletion). Rethrow and let the
+    // caller surface the failure instead.
     try {
       wipeUserData();
     } catch (e) {
       console.error('[store.deleteLocalAccount] wipeUserData failed:', e);
+      throw e;
     }
 
     // Reset Zustand back to first-launch defaults. Mirrors the
