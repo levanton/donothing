@@ -38,7 +38,7 @@ import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
 import { TutorialController, TutorialStepWrapper } from '@/components/tutorial';
 import { Fonts } from '@/constants/theme';
-import type { ScheduledBlock } from '@/lib/db/types';
+import { findActiveBlock } from '@/lib/active-block';
 import { formatTimeStat, timerDisplay } from '@/lib/format';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import {
@@ -60,35 +60,6 @@ import { Redirect } from 'expo-router';
 // stays consistent. The orbit ring itself was removed; this is just
 // the diameter of the static cream→terracotta yes pill at rest.
 const YES_BUTTON_SIZE = 140;
-
-// Pick the block that most recently fired today so the unlock view
-// surfaces the unlockGoalMinutes the user configured for it. The shield
-// persists until the user unlocks, so "most recent start ≤ now today"
-// is the right heuristic — durationMinutes is only an iOS API window,
-// not an actual block length.
-function findActiveBlock(
-  blocks: ScheduledBlock[],
-  now: Date,
-): ScheduledBlock | null {
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  // iOS/Expo weekday convention: 1=Sun … 7=Sat. JS Date.getDay() is 0=Sun,
-  // so we offset by 1 to match what block.weekdays stores.
-  const today = now.getDay() + 1;
-
-  let best: ScheduledBlock | null = null;
-  let bestStart = -1;
-  for (const b of blocks) {
-    if (!b.enabled) continue;
-    if (b.weekdays.length > 0 && !b.weekdays.includes(today)) continue;
-    const start = b.hour * 60 + b.minute;
-    if (start > nowMinutes) continue;
-    if (start > bestStart) {
-      best = b;
-      bestStart = start;
-    }
-  }
-  return best;
-}
 
 // ===========================================================================
 // Main Screen
