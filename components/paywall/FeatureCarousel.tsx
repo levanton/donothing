@@ -15,7 +15,7 @@ const FEATURES = [
   // umber + gold instead of shouting over them.
   { id: 'lock', label: 'Unlimited\nLocks', bg: '#3C514C', fg: palette.cream },
   // Dark umber.
-  { id: 'dim', label: 'Distraction\nFree', bg: palette.umber, fg: palette.cream },
+  { id: 'schedule', label: 'Scheduled\nBlocks', bg: palette.umber, fg: palette.cream },
   // Muted gold — a touch deeper so cream reads cleanly.
   { id: 'calendar', label: 'Your\nJourney', bg: '#AD8240', fg: palette.cream },
 ] as const;
@@ -43,13 +43,20 @@ function FeatureIllustration({ id, color }: { id: string; color: string }) {
           <Rect x={60} y={7} width={20} height={4} rx={2} fill={o4} />
         </Svg>
       );
-    case 'dim':
+    case 'schedule':
       return (
         <Svg width={w} height={h} viewBox="0 0 140 110">
-          {/* an orb (the screen) fading from lit to dark — the dim */}
+          {/* a clock — blocks that raise themselves on schedule */}
           <Circle cx={70} cy={55} r={40} fill={o2} />
-          <Path d="M70 15 A40 40 0 0 0 70 95 Z" fill={color} />
-          <Circle cx={70} cy={55} r={40} fill="none" stroke={o4} strokeWidth={2} />
+          <Circle cx={70} cy={55} r={32} fill={o4} />
+          <Circle cx={70} cy={55} r={32} fill="none" stroke={o6} strokeWidth={2} />
+          <Rect x={68} y={27} width={4} height={8} rx={2} fill={o6} />
+          <Rect x={68} y={75} width={4} height={8} rx={2} fill={o6} />
+          <Rect x={42} y={53} width={8} height={4} rx={2} fill={o6} />
+          <Rect x={90} y={53} width={8} height={4} rx={2} fill={o6} />
+          <Path d="M70 55 L70 36" stroke={color} strokeWidth={4} strokeLinecap="round" />
+          <Path d="M70 55 L84 63" stroke={color} strokeWidth={4} strokeLinecap="round" />
+          <Circle cx={70} cy={55} r={4} fill={color} />
           {/* calm specks */}
           <Circle cx={22} cy={24} r={3.5} fill={o4} />
           <Circle cx={120} cy={32} r={4} fill={o2} />
