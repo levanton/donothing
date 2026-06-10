@@ -61,6 +61,13 @@ let focusInterval: ReturnType<typeof setInterval> | null = null;
 let sessionStartTime = 0;
 let focusEndTime = 0;
 let sessionNotificationId: string | null = null;
+// Subscription transition side-effects run on this chain so two
+// concurrent setSubscriptionStatus calls (RC push listener + foreground
+// poll) can't interleave their native pause/restore calls. Tracks the
+// status whose effects have actually been APPLIED — distinct from the
+// `subscriptionStatus` state field, which updates immediately.
+let subEffectsChain: Promise<void> = Promise.resolve();
+let subEffectsApplied: SubscriptionStatus = 'unknown';
 
 // Hot-reload safety: in dev, FastRefresh re-evaluates this module
 // and the old intervals stay alive in the global runtime, ticking
@@ -751,34 +758,51 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSubscriptionStatus: async (next: SubscriptionStatus) => {
-    const prev = get().subscriptionStatus;
-    if (prev === next) return;
-    set({ subscriptionStatus: next, isSubscribed: next === 'active' });
+    if (get().subscriptionStatus !== next) {
+      set({ subscriptionStatus: next, isSubscribed: next === 'active' });
+    }
+
+    // Side-effects wait for hydration: the RC push listener can fire
+    // before init() finishes, and init() reconciles native monitors
+    // from DB intent itself — running forceUnblockAll/restore
+    // concurrently with that loop leaves monitors nondeterministic.
+    // The post-init poll re-calls us with the resolved status, and
+    // `subEffectsApplied` (not the state field) decides whether the
+    // transition still owes its effects.
+    if (!get().ready) return;
+    if (subEffectsApplied === next) return;
 
     // Transition side-effects: keep native DeviceActivity monitors aligned
     // with entitlement state so a lapsed subscription doesn't keep firing
-    // shields, and a renewal restores everything the user had.
-    try {
-      if (prev === 'active' && next === 'inactive') {
-        await pauseAllBlocksForExpiry(get().scheduledBlocks);
-      } else if (next === 'active') {
-        // unknown→active or inactive→active. Either way, native side may
-        // have stopped monitors (StoreKit-guard self-cleanup during a
-        // lapsed period), so re-register from DB intent.
-        await restoreAllBlocksAfterRenewal(get().scheduledBlocks);
-      } else if (prev === 'unknown' && next === 'inactive') {
-        // Defensive cleanup on cold start for non-subscribed users —
-        // catches legacy / pre-gating monitors that may still exist.
-        try {
-          const { forceUnblockAll } = await import('./screen-time');
-          await forceUnblockAll();
-        } catch (e) {
-          console.error('[store.setSubscriptionStatus] forceUnblockAll failed:', e);
+    // shields, and a renewal restores everything the user had. Queued on
+    // the chain so transitions apply one at a time, in call order.
+    subEffectsChain = subEffectsChain.then(async () => {
+      const from = subEffectsApplied;
+      if (from === next) return;
+      subEffectsApplied = next;
+      try {
+        if (from === 'active' && next === 'inactive') {
+          await pauseAllBlocksForExpiry(get().scheduledBlocks);
+        } else if (next === 'active') {
+          // unknown→active or inactive→active. Either way, native side may
+          // have stopped monitors (StoreKit-guard self-cleanup during a
+          // lapsed period), so re-register from DB intent.
+          await restoreAllBlocksAfterRenewal(get().scheduledBlocks);
+        } else if (from === 'unknown' && next === 'inactive') {
+          // Defensive cleanup on cold start for non-subscribed users —
+          // catches legacy / pre-gating monitors that may still exist.
+          try {
+            const { forceUnblockAll } = await import('./screen-time');
+            await forceUnblockAll();
+          } catch (e) {
+            console.error('[store.setSubscriptionStatus] forceUnblockAll failed:', e);
+          }
         }
+      } catch (e) {
+        console.error('[store.setSubscriptionStatus] transition failed:', e);
       }
-    } catch (e) {
-      console.error('[store.setSubscriptionStatus] transition failed:', e);
-    }
+    });
+    await subEffectsChain;
   },
 
   // --- Goal ---

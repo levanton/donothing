@@ -54,6 +54,10 @@ function loadStore(): StoreBundle {
 afterEach(() => {
   resetDbState();
   jest.restoreAllMocks();
+  // The screen-time/notifications mock instances are shared across the
+  // whole file (module registry), so call history leaks between tests
+  // without an explicit clear.
+  jest.clearAllMocks();
 });
 
 describe('initial state', () => {
@@ -177,9 +181,14 @@ describe('deleteSession', () => {
 });
 
 describe('setSubscriptionStatus', () => {
+  // Side-effects are gated on `ready` (init() reconciles native monitors
+  // itself; effects running concurrently with that loop are a race), so
+  // every test that expects effects must hydrate the flag first.
+
   it('is a no-op when status does not change', async () => {
     const { store } = loadStore();
     const { forceUnblockAll } = require('@/lib/screen-time');
+    store.useAppStore.setState({ ready: true });
     await store.useAppStore.getState().setSubscriptionStatus('unknown');
     expect(forceUnblockAll).not.toHaveBeenCalled();
   });
@@ -188,12 +197,15 @@ describe('setSubscriptionStatus', () => {
     const { store } = loadStore();
     const { unscheduleBlock, forceUnblockAll } = require('@/lib/screen-time');
     store.useAppStore.setState({
-      subscriptionStatus: 'active',
+      ready: true,
       scheduledBlocks: [
         { id: 'b1', hour: 9, minute: 0, durationMinutes: 30, weekdays: [1], enabled: true, unlockGoalMinutes: 5 },
         { id: 'b2', hour: 10, minute: 0, durationMinutes: 30, weekdays: [1], enabled: false, unlockGoalMinutes: 5 },
       ],
     });
+    // Walk the applied-effects tracker to 'active' through the real API
+    // (it's module-internal, deliberately not reachable via setState).
+    await store.useAppStore.getState().setSubscriptionStatus('active');
     await store.useAppStore.getState().setSubscriptionStatus('inactive');
     expect(unscheduleBlock).toHaveBeenCalledWith('b1');
     expect(unscheduleBlock).not.toHaveBeenCalledWith('b2');
@@ -206,11 +218,12 @@ describe('setSubscriptionStatus', () => {
     const { store } = loadStore();
     const { reconcileBlocks, scheduleBlock } = require('@/lib/screen-time');
     store.useAppStore.setState({
-      subscriptionStatus: 'inactive',
+      ready: true,
       scheduledBlocks: [
         { id: 'b1', hour: 9, minute: 0, durationMinutes: 30, weekdays: [1], enabled: true, unlockGoalMinutes: 5 },
       ],
     });
+    await store.useAppStore.getState().setSubscriptionStatus('inactive');
     await store.useAppStore.getState().setSubscriptionStatus('active');
     expect(reconcileBlocks).toHaveBeenCalled();
     expect(scheduleBlock).toHaveBeenCalledWith('b1', 9, 0, 30, [1]);
@@ -220,7 +233,38 @@ describe('setSubscriptionStatus', () => {
   it('on unknown → inactive it sweeps stale monitors', async () => {
     const { store } = loadStore();
     const { forceUnblockAll } = require('@/lib/screen-time');
+    store.useAppStore.setState({ ready: true });
     await store.useAppStore.getState().setSubscriptionStatus('inactive');
     expect(forceUnblockAll).toHaveBeenCalled();
+  });
+
+  it('defers side-effects until ready, then applies them on the next call', async () => {
+    const { store } = loadStore();
+    const { forceUnblockAll } = require('@/lib/screen-time');
+    // RC push listener fires before init() finished: status updates,
+    // but no native calls happen while init's reconcile may be running.
+    await store.useAppStore.getState().setSubscriptionStatus('inactive');
+    expect(store.useAppStore.getState().subscriptionStatus).toBe('inactive');
+    expect(forceUnblockAll).not.toHaveBeenCalled();
+    // Post-init poll re-resolves the same status — the owed unknown→inactive
+    // effects must run now even though the state field didn't change.
+    store.useAppStore.setState({ ready: true });
+    await store.useAppStore.getState().setSubscriptionStatus('inactive');
+    expect(forceUnblockAll).toHaveBeenCalled();
+  });
+
+  it('serializes concurrent transitions in call order', async () => {
+    const { store } = loadStore();
+    const { forceUnblockAll, reconcileBlocks } = require('@/lib/screen-time');
+    store.useAppStore.setState({ ready: true });
+    // Fire both without awaiting — listener + foreground poll racing.
+    const p1 = store.useAppStore.getState().setSubscriptionStatus('inactive');
+    const p2 = store.useAppStore.getState().setSubscriptionStatus('active');
+    await Promise.all([p1, p2]);
+    // unknown→inactive sweep ran fully before inactive→active restore.
+    const sweepOrder = (forceUnblockAll as jest.Mock).mock.invocationCallOrder[0];
+    const restoreOrder = (reconcileBlocks as jest.Mock).mock.invocationCallOrder[0];
+    expect(sweepOrder).toBeLessThan(restoreOrder);
+    expect(store.useAppStore.getState().subscriptionStatus).toBe('active');
   });
 });
