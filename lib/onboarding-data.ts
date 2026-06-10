@@ -84,7 +84,7 @@ export const SCREENS: OnboardingScreen[] = [
 
 export type PageId =
   | 'welcome'
-  | 'nostalgia' | 'rushing' | 'evidence' | 'phoneSymptom'
+  | 'story' | 'evidence'
   | 'painQuiz' | 'screenTimeQuiz' | 'ageQuiz'
   | 'screenTimeStats' | 'goodNews' | 'tryNothing' | 'firstMinuteDone' | 'dailyBenefits'
   | 'testimonials' | 'howItWorks' | 'permissions' | 'personalResult'
@@ -104,9 +104,9 @@ export interface OnboardingPage {
 
 export const PAGES: OnboardingPage[] = [
   { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
-  { id: 'nostalgia',       bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
-  { id: 'rushing',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: true  },
-  { id: 'phoneSymptom',    bg: APP_BG,             theme: 'light', hasOwnButton: false, showProgress: false, showBackButton: true  },
+  // The three-act story ("remember?" → "now." → "what if…") lives on ONE
+  // page — StoryScreen advances its own acts and owns its arrow/back.
+  { id: 'story',           bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   { id: 'painQuiz',        bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'screenTimeQuiz',  bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },
   { id: 'ageQuiz',         bg: palette.charcoal,   theme: 'dark',  hasOwnButton: false, showProgress: true,  showBackButton: true  },

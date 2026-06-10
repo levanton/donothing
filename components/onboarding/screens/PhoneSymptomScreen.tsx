@@ -14,12 +14,12 @@ interface LineSpec {
 }
 
 const LINES: LineSpec[] = [
-  { text: 'for one minute,' },
-  { text: 'you stopped.' },
-  { text: 'put the world on pause.', paragraph: true },
-  { text: 'and just be.' },
+  { text: 'you could stop time again?' },
+  { text: 'one minute.', paragraph: true },
+  { text: 'no phone. no plans.' },
+  { text: 'just you.' },
   { text: 'even one minute a day', paragraph: true },
-  { text: 'can change your life.', bold: true, accent: true },
+  { text: 'can change everything.', bold: true, accent: true },
 ];
 
 interface Props {
@@ -49,7 +49,8 @@ export default function PhoneSymptomScreen({ theme }: Props) {
           },
         ]}
       >
-        <Text style={[onboardingText.heading, styles.heading, { color: theme.text }]}>
+        {/* Same size as the body — one uniform text block, no title tier. */}
+        <Text style={[onboardingText.story, styles.heading, { color: theme.text }]}>
           {HEADING}
         </Text>
 
@@ -58,7 +59,7 @@ export default function PhoneSymptomScreen({ theme }: Props) {
             <Text
               key={i}
               style={[
-                onboardingText.line,
+                onboardingText.story,
                 { color: spec.accent ? palette.terracotta : theme.text },
                 spec.bold && ONBOARDING_BODY_BOLD,
                 spec.paragraph && { marginTop: 18 },

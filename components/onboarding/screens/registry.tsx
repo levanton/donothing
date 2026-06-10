@@ -2,18 +2,11 @@ import type { ReactNode } from 'react';
 
 import type { PageId } from '@/lib/onboarding-data';
 import type { OnboardingFlow } from '@/hooks/useOnboardingFlow';
-import {
-  fadeEnter,
-  fadeExit,
-  rideWithDotsEnter,
-  rideWithDotsExit,
-} from '../transitions';
+import { fadeEnter, fadeExit } from '../transitions';
 
 import WelcomeScreen from './WelcomeScreen';
-import NostalgiaScreen from './NostalgiaScreen';
-import RushingScreen from './RushingScreen';
+import StoryScreen from './StoryScreen';
 import EvidenceScreen from './EvidenceScreen';
-import PhoneSymptomScreen from './PhoneSymptomScreen';
 import PainQuizScreen from './PainQuizScreen';
 import ScreenTimeQuizScreen from './ScreenTimeQuizScreen';
 import AgeQuizScreen from './AgeQuizScreen';
@@ -55,13 +48,10 @@ interface ScreenEntry {
  */
 export const SCREEN_REGISTRY: Record<PageId, ScreenEntry> = {
   welcome:         { render: (f) => <WelcomeScreen {...base(f)} />,        enter: fadeEnter,  exit: fadeExit },
-  nostalgia:       { render: (f) => <NostalgiaScreen {...base(f)} />,      enter: fadeEnter,  exit: fadeExit },
-  // 'now.' → 'what if…': one upward stream — the "now." text, the RadialDots
-  // field and the "what if…" text all travel up together; the old text
-  // dissolves out the top, the new one emerges below the dots (transitions.ts).
-  rushing:         { render: (f) => <RushingScreen {...base(f)} />,        enter: fadeEnter,  exit: rideWithDotsExit },
+  // The whole 'remember?' → 'now.' → 'what if…' tale plays on this single
+  // screen — StoryScreen drives its own acts on one fixed stage.
+  story:           { render: (f) => <StoryScreen {...base(f)} />,          enter: fadeEnter,  exit: fadeExit },
   evidence:        { render: (f) => <EvidenceScreen {...base(f)} />,       enter: fadeEnter,  exit: fadeExit },
-  phoneSymptom:    { render: (f) => <PhoneSymptomScreen {...base(f)} />,   enter: rideWithDotsEnter, exit: fadeExit },
   painQuiz:        { render: (f) => <PainQuizScreen {...base(f)} selected={f.painPoints} onSelect={f.setPainPoints} />, enter: fadeEnter, exit: fadeExit },
   screenTimeQuiz:  { render: (f) => <ScreenTimeQuizScreen {...base(f)} selected={f.screenTime} onSelect={f.setScreenTime} />, enter: fadeEnter, exit: fadeExit },
   ageQuiz:         { render: (f) => <AgeQuizScreen {...base(f)} selected={f.age} onSelect={f.setAge} />, enter: fadeEnter, exit: fadeExit },

@@ -13,12 +13,12 @@ import { DOT_MORPH_MS, DOT_TRAVEL_FRACTION } from './dotFieldLayout';
 export const fadeEnter = FadeIn.duration(1200);
 export const fadeExit = FadeOut.duration(1200);
 
-// ── "now." → "what if…" hand-off ─────────────────────────────────────────
-// One stream: the "now." text, the dot field and the "what if…" text all
+// ── Story act hand-off ────────────────────────────────────────────────────
+// One stream: the old act's text, the dot field and the new act's text all
 // travel upward together — same distance, same timing, same easing. The dot
-// field is driven by dotProgress in app/onboarding.tsx; the two pages below
-// ride along with it. The old text dissolves as it exits through the top,
-// the new text emerges from the bottom glued right below the dots.
+// field is driven by dotProgress in StoryScreen; the two acts below ride
+// along with it. The old text dissolves as it exits through the top, the
+// new text emerges from the bottom glued right below the dots.
 export const rideWithDotsEnter: EntryExitAnimationFunction = (
   values: EntryAnimationsValues,
 ) => {

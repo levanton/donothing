@@ -7,7 +7,7 @@
  * The field lives in the lower band on "now." (text above it) and glides up
  * to the upper band on "what if…" (text below it).
  */
-const LOW_CENTER_FRACTION = 0.67;
+const LOW_CENTER_FRACTION = 0.62;
 const HIGH_CENTER_FRACTION = 0.33;
 
 /** How far the field travels between the bands, as a fraction of height. */

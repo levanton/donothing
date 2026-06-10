@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { Fonts } from '@/constants/theme';
 
 /**
- * Shared typography for the narrative onboarding screens
+ * Shared typography for the narrative onboarding story acts
  * (nostalgia, rushing, phoneSymptom). One source of truth so the
  * heading + body voice stays consistent across the story.
  *
@@ -24,6 +24,14 @@ export const onboardingText = StyleSheet.create({
     fontSize: 20,
     fontWeight: '400',
     lineHeight: 28,
+    textAlign: 'left',
+  },
+  /** The narrative screens' single uniform text size — no title tier. */
+  story: {
+    fontFamily: Fonts?.serif,
+    fontSize: 24,
+    fontWeight: '400',
+    lineHeight: 34,
     textAlign: 'left',
   },
 });

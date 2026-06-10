@@ -177,9 +177,10 @@ function buildDots({
       rSize: tg.size,
       opacity,
       delay: rand(),
-      // Dots begin after the circle (>=0.18) and each fades at its own speed.
-      revStart: 0.18 + rand() * 0.32,
-      revWindow: 0.3 + rand() * 0.32,
+      // Dots begin after the circle and each fades at its own speed — wide
+      // start spread so the field trickles in dot by dot, not as one wave.
+      revStart: 0.05 + rand() * 0.55,
+      revWindow: 0.25 + rand() * 0.4,
       wPhase: rand() * TWO_PI,
       wAmp: size * (0.008 + rand() * 0.012),
       wfx: 1 + Math.round(rand()),
@@ -358,12 +359,13 @@ export default function RadialDots({
   }, [dots, rings]);
 
   // Plays once on mount (and on every remount when the layer reappears): the
-  // dots fade in. The central circle fades in just ahead.
+  // dots trickle in gradually — a slow clock over each dot's own reveal
+  // window. The central circle fades in just ahead.
   const reveal = useSharedValue(0);
   useEffect(() => {
     reveal.value = withDelay(
       120,
-      withTiming(1, { duration: 1400, easing: EASE_OUT }),
+      withTiming(1, { duration: 3200, easing: EASE_OUT }),
     );
   }, []);
 

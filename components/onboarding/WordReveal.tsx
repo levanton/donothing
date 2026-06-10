@@ -10,7 +10,7 @@ import { EASE_OUT } from '@/constants/animations';
 import { haptics } from '@/lib/haptics';
 import { ONBOARDING_BODY_BOLD } from './textStyles';
 
-// Word-by-word text reveal shared by the narrative onboarding screens
+// Word-by-word text reveal shared by the narrative onboarding story acts
 // (nostalgia, rushing). Each word condenses into focus where it stands —
 // opacity up while a slight oversize settles to 1 — so nothing slides in
 // from anywhere. A selection tick lands with every word; `strong` words
