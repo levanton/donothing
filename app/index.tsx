@@ -876,6 +876,8 @@ export default function DoNothingScreen() {
               onPress={handleSettingsPress}
               disabled={started}
               hitSlop={16}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
               <Feather
                 name='sliders'
@@ -902,6 +904,8 @@ export default function DoNothingScreen() {
                 }}
                 style={[styles.tourButton, { borderColor: theme.text + '40' }]}
                 hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="How it works"
               >
                 <Feather name="compass" size={13} color={theme.text} />
                 <Text style={[styles.tourButtonText, { color: theme.text, fontFamily: Fonts!.serif }]}>
@@ -969,6 +973,10 @@ export default function DoNothingScreen() {
           <Pressable
             onPress={toggleTheme}
             disabled={started}
+            accessibilityRole="button"
+            accessibilityLabel={
+              themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+            }
             style={[
               styles.themeToggle,
               {
@@ -1027,6 +1035,8 @@ export default function DoNothingScreen() {
                     onLayout={measureYesButton}
                     onPress={handleStart}
                     disabled={started}
+                    accessibilityRole="button"
+                    accessibilityLabel="Yes, start doing nothing"
                   >
                     <View
                       style={[
@@ -1074,6 +1084,9 @@ export default function DoNothingScreen() {
             onPress={handleHistory}
             disabled={started}
             style={{ opacity: started ? 0 : 1 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Today ${todayStat.value} ${todayStat.unit}, this week ${weekStat.value} ${weekStat.unit}`}
+            accessibilityHint="Opens your journey"
           >
             <View style={styles.statsColumn}>
               <View style={styles.statRow}>
@@ -1188,6 +1201,8 @@ export default function DoNothingScreen() {
                   onPress={handleHistory}
                   hitSlop={16}
                   style={styles.journeyBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="My Journey"
                 >
                   <View
                     ref={journeyBtnRef}
@@ -1350,6 +1365,8 @@ export default function DoNothingScreen() {
                     onPress={handleStop}
                     style={styles.runStopPill}
                     hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel="Pause session"
                   >
                     <Text
                       style={[
@@ -1375,6 +1392,9 @@ export default function DoNothingScreen() {
                           !canSave && styles.runFinishPillDisabled,
                         ]}
                         hitSlop={12}
+                        accessibilityRole="button"
+                        accessibilityLabel="Finish session"
+                        accessibilityState={{ disabled: !canSave }}
                       >
                         <Text
                           style={[
@@ -1412,6 +1432,8 @@ export default function DoNothingScreen() {
                   onPress={toggleDistractionFree}
                   style={styles.runHideIconBtn}
                   hitSlop={16}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hide everything"
                 >
                   <Feather
                     name="eye-off"
@@ -1440,6 +1462,8 @@ export default function DoNothingScreen() {
             <Pressable
               onPress={toggleDistractionFree}
               style={StyleSheet.absoluteFillObject}
+              accessibilityRole="button"
+              accessibilityLabel="Show controls"
             />
           )}
           </Animated.View>
@@ -1966,6 +1990,7 @@ const RestingSliderWrap = memo(function RestingSliderWrap({
       ticks={[1, 5, 10, 15, 30, 45, 60]}
       scaleLabels={['1', '5', '10', '15', '30', '45', '60']}
       breakpoints={{ b1Val: 15, b1Pos: 1 / 2, b2Val: 30, b2Pos: 2 / 3, b3Val: 45, b3Pos: 5 / 6 }}
+      accessibilityLabel="Session goal"
       accentColor={theme.accent}
       trackBgColor={theme.text}
       trackStrokeWidth={3.5}

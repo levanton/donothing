@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, TextStyle, View } from 'react-native';
+import {
+  AccessibilityActionEvent,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TextStyle,
+  View,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -168,6 +175,8 @@ interface GoalSliderBarProps {
    *  filled and the ∞ marker becomes the active knob. Off for callers that
    *  don't want an open-ended option (e.g. BlockPicker). */
   allowInfinity?: boolean;
+  /** VoiceOver name for the slider (interactive mode only). */
+  accessibilityLabel?: string;
 }
 
 export default function GoalSliderBar({
@@ -191,6 +200,7 @@ export default function GoalSliderBar({
   onRelease,
   minMinutes = 0,
   allowInfinity = false,
+  accessibilityLabel = 'Duration',
 }: GoalSliderBarProps) {
   const isInteractive = value !== undefined && onChange !== undefined;
   const color: string = accentColor ?? theme.textSecondary ?? theme.text;
@@ -292,6 +302,43 @@ export default function GoalSliderBar({
       }
     });
 
+  // --- VoiceOver adjustable support ---
+  // The pan gesture is unusable with VoiceOver running, so increment/
+  // decrement walk the same snap points the thumb would visit, with ∞
+  // as the final stop past max when enabled. Commits via onRelease too —
+  // a VoiceOver adjustment is a deliberate, final change.
+  const onAccessibilityAction = (e: AccessibilityActionEvent) => {
+    const dir =
+      e.nativeEvent.actionName === 'increment'
+        ? 1
+        : e.nativeEvent.actionName === 'decrement'
+          ? -1
+          : 0;
+    if (dir === 0) return;
+    const stops = SNAP_POINTS.filter(
+      (m) => m !== OPEN_ENDED && m >= minMinutes && m <= maxMinutes,
+    );
+    if (allowInfinity) stops.push(OPEN_ENDED);
+    let idx =
+      displayMins === OPEN_ENDED && allowInfinity
+        ? stops.length - 1
+        : stops.indexOf(displayMins);
+    if (idx === -1) idx = 0;
+    const next = stops[Math.max(0, Math.min(stops.length - 1, idx + dir))];
+    if (next === displayMins) return;
+    lastSnap.value = next;
+    if (allowInfinity && next === OPEN_ENDED) {
+      infinityActive.value = 1;
+      internalProgress.value = 1;
+    } else {
+      infinityActive.value = 0;
+      internalProgress.value = valueToPos(next, maxMinutes, bp);
+    }
+    setDisplayMins(next);
+    onChange?.(next);
+    onRelease?.(next);
+  };
+
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
     setMeasuredWidth(w);
@@ -353,7 +400,29 @@ export default function GoalSliderBar({
   }
 
   const slider = (
-    <View style={{ width: fixedWidth, alignItems: isInteractive ? undefined : 'center' }} onLayout={isInteractive ? onLayout : undefined}>
+    <View
+      style={{ width: fixedWidth, alignItems: isInteractive ? undefined : 'center' }}
+      onLayout={isInteractive ? onLayout : undefined}
+      accessible={isInteractive}
+      accessibilityRole={isInteractive ? 'adjustable' : undefined}
+      accessibilityLabel={isInteractive ? accessibilityLabel : undefined}
+      accessibilityValue={
+        isInteractive
+          ? {
+              text:
+                allowInfinity && displayMins === OPEN_ENDED
+                  ? 'no limit'
+                  : `${displayMins} minutes`,
+            }
+          : undefined
+      }
+      accessibilityActions={
+        isInteractive
+          ? [{ name: 'increment' }, { name: 'decrement' }]
+          : undefined
+      }
+      onAccessibilityAction={isInteractive ? onAccessibilityAction : undefined}
+    >
       {isInteractive && !hideLabel && (
         <View style={styles.labelRow}>
           {displayMins === 0 ? (
