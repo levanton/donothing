@@ -22,7 +22,10 @@ import {
 // pause button stays directly tappable. Only once fully black does the caller
 // put up a tap-catcher.
 
-const FULL_DARK = 0; // brightness floor (as dark as iOS allows)
+// Brightness floor — dimmed, but the backlight stays visibly on. At 0 the
+// screen reads as "locked/off", which users mistake for the phone dying
+// mid-session; the content itself is already hidden via opacity.
+const DIM_FLOOR = 0.25;
 const RESTORE_MS = 480;
 const CONTENT_RESTORE_MS = 500;
 const MANUAL_FADE_MS = 720; // distraction-free toggle is snappy
@@ -109,7 +112,9 @@ export function useSessionScreen({
       Brightness.getBrightnessAsync()
         .then((cur) => {
           if (savedRef.current == null) savedRef.current = cur;
-          animateBrightness(FULL_DARK, fadeMs);
+          // Never *raise* brightness to reach the floor — someone already
+          // below it (night use) stays where they are.
+          animateBrightness(Math.min(cur, DIM_FLOOR), fadeMs);
         })
         .catch(() => {});
       fullyDarkTimer.current = setTimeout(() => setFullyDark(true), fadeMs);
@@ -134,7 +139,8 @@ export function useSessionScreen({
       if (state !== 'active') return;
       contentFade.value = dark ? 0 : 1;
       if (dark) {
-        animateBrightness(FULL_DARK, RESTORE_MS);
+        const saved = savedRef.current;
+        animateBrightness(saved != null ? Math.min(saved, DIM_FLOOR) : DIM_FLOOR, RESTORE_MS);
       } else if (savedRef.current != null) {
         const restore = savedRef.current;
         savedRef.current = null;
