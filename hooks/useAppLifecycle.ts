@@ -186,6 +186,15 @@ export function useAppLifecycle(
           try { await bgInFlight; } catch {}
         }
         useAppStore.getState().handleForeground();
+        // Re-arm the session keep-awake dropped on the way out. The session
+        // survives a background trip (paused + interrupt sheet), but without
+        // this the resumed timer runs with the idle timer live — the phone
+        // auto-locks 30–60s into the very stillness the app asks for. The
+        // end paths (sheet end/unlock, stop, countdown complete) all
+        // deactivate, so this can't leak past the session.
+        if (useAppStore.getState().started) {
+          activateKeepAwakeAsync('session');
+        }
         // Refresh subscription on every foreground in case RC didn't
         // push an update while we were backgrounded (renewal, refund,
         // sandbox-expired). Don't await — UI shouldn't block on this.

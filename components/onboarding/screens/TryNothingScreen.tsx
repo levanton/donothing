@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -76,6 +77,9 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const startSession = useCallback(() => {
     haptics.medium();
     track('onboarding_session_started');
+    // The minute dims to black while the phone lies untouched — without
+    // keep-awake the system auto-lock (30–60s) kills the demo mid-way.
+    activateKeepAwakeAsync('onboarding-session');
     setStarted(true);
 
     yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
@@ -87,6 +91,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
       setElapsed(prev => {
         if (prev >= SESSION_DURATION - 1) {
           clearInterval(intervalRef.current);
+          deactivateKeepAwake('onboarding-session');
           // Persist the onboarding minute as a real session so the home
           // screen stats aren't empty on first launch. recordSession also
           // refreshes weekStats and checks milestones in one shot.
@@ -107,6 +112,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      deactivateKeepAwake('onboarding-session');
     };
   }, []);
 
