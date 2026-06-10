@@ -30,7 +30,6 @@ import { Fonts } from '@/constants/theme';
 import { palette, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 import EyebrowChip from '@/components/EyebrowChip';
-import Starscape from '@/components/Starscape';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -176,10 +175,8 @@ function BlockSheet({
             <EyebrowChip text="your apps are locked" />
           </View>
 
-          {/* Starscape hero — scattered dots around the number, poetic */}
-          <View style={styles.starscape}>
-            <Starscape textColor={theme.text} pattern="block" />
-
+          {/* Hero — the unlock number and what it asks for */}
+          <View style={styles.hero}>
             <Text style={[styles.bigNumber, { color: theme.text }]}>
               {unlockMin}
               <Text style={[styles.bigUnit, { fontFamily: Fonts!.serif }]}> min</Text>
@@ -191,14 +188,6 @@ function BlockSheet({
               ]}
             >
               of doing nothing
-            </Text>
-            <Text
-              style={[
-                styles.heroSub,
-                { color: theme.textTertiary, fontFamily: Fonts!.serif },
-              ]}
-            >
-              to unlock your apps
             </Text>
           </View>
 
@@ -334,13 +323,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  starscape: {
+  hero: {
     alignSelf: 'stretch',
     alignItems: 'center',
     paddingTop: 24,
     paddingBottom: 0,
     paddingHorizontal: 8,
-    position: 'relative',
   },
   bigNumber: {
     fontSize: 84,
@@ -360,12 +348,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     letterSpacing: 0.4,
-    marginTop: 4,
-  },
-  heroSub: {
-    fontSize: 13,
-    fontWeight: '400',
-    letterSpacing: 0.3,
     marginTop: 4,
   },
   heroSubRule: {
