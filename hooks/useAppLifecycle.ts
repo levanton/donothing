@@ -89,10 +89,10 @@ export function useAppLifecycle(
       if (state.started || state.paused) {
         return;
       }
-      // Don't surface unlock UI for users without an active entitlement.
-      // Native StoreKit-guard suppresses block actions, but the notification
-      // payload may still slip through for in-flight schedules.
-      if (state.subscriptionStatus !== 'active') return;
+      // No subscription gate: this notification only exists because the
+      // native extension fired a block (its gate passed), so the shield is
+      // up — the unlock UI must be reachable regardless of what RC says
+      // right now, or the user is stranded behind a blocked phone.
       // Block can only act if Screen Time access is approved AND notifications
       // are granted. If either was revoked after the block was scheduled,
       // skip silently — the gated Settings UI will surface the missing perm.
@@ -142,10 +142,9 @@ export function useAppLifecycle(
       // surfaces after the session ends.
       if (state.started || state.paused) return;
       if (state.focusStep !== 'hidden') return;
-      // Don't surface BlockSheet without an active entitlement. The
-      // native StoreKit-guard skips firing for inactive users, but a
-      // stale shield from a just-lapsed period could still be up.
-      if (state.subscriptionStatus !== 'active') return;
+      // No subscription gate: the shield just went up natively — hiding
+      // the unlock UI based on RC status would strand the user behind
+      // blocked apps (e.g. status still 'unknown' on an offline start).
       if (!isBlockActive()) return;
       activateKeepAwakeAsync('scheduled-block');
       state.showUnlock();

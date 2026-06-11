@@ -23,9 +23,11 @@ const START_MS = 1400;
 
 const TIMETABLE = buildTimetable(LINES, START_MS);
 
-/** When the dot field rises into the media zone — one hold after the last
- *  line. The text stays put; the field has its own area. */
-export const NOW_DOTS_DELAY_MS = TIMETABLE.finaleAt;
+/** The dot field arrives WITH the last line — it starts trickling in the
+ *  moment the payoff line begins typing. The text stays put; the field
+ *  has its own area. */
+const LAST = TIMETABLE.lines[TIMETABLE.lines.length - 1];
+export const NOW_DOTS_DELAY_MS = LAST.glideAt + LAST.glideDur;
 /** Duration of the field's rise from below. */
 export const NOW_DOTS_ENTER_MS = 1100;
 /** When the whole 'now.' performance is over: the rise has landed and the

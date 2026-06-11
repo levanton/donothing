@@ -42,10 +42,7 @@ import { Fonts } from '@/constants/theme';
 import { findActiveBlock } from '@/lib/active-block';
 import { formatTimeStat, timerDisplay } from '@/lib/format';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
-import {
-  forceUnblockAll,
-  isBlockActive,
-} from '@/lib/screen-time';
+import { isBlockActive } from '@/lib/screen-time';
 import { useAppLifecycle } from '@/hooks/useAppLifecycle';
 import { useSessionScreen } from '@/hooks/useSessionScreen';
 import { useMeasureRect } from '@/hooks/useMeasureRect';
@@ -205,9 +202,11 @@ export default function DoNothingScreen() {
       deactivateKeepAwake('session');
       setDistractionFree(false);
       // If a scheduled block is still enforcing a shield, the user has earned
-      // their unlock by completing the countdown.
+      // their unlock by completing the countdown. releaseBlockShield also
+      // re-registers every enabled block for its next occurrence — the
+      // release itself stops ALL monitors.
       if (isBlockActive()) {
-        forceUnblockAll().catch(() => {});
+        useAppStore.getState().releaseBlockShield().catch(() => {});
       }
       useAppStore.getState().completeSession();
     }
@@ -428,11 +427,11 @@ export default function DoNothingScreen() {
     const state = useAppStore.getState();
     if (state.completionVisible || state.sessionEndedVisible) return;
     if (state.focusStep !== 'hidden') return;
-    // Don't surface BlockSheet when entitlement isn't active. Native
-    // StoreKit-guard skips firing in that case, but a stale shield from
-    // before the lapse could still be up — the unlock UI without a way
-    // to actually keep blocking is misleading.
-    if (state.subscriptionStatus !== 'active') return;
+    // No subscription gate here, deliberately: an active shield means the
+    // user's apps ARE blocked right now, and this unlock UI is their only
+    // way out. Gating it on RC status stranded users whose status hadn't
+    // resolved yet (offline / slow network) behind a fully blocked phone.
+    // Entitlement is enforced where blocks get CREATED, not at the exit.
     if (!isBlockActive()) return;
     activateKeepAwakeAsync('scheduled-block');
     state.showUnlock();
@@ -447,10 +446,9 @@ export default function DoNothingScreen() {
     if (state.started) return true;
     if (state.focusStep !== 'hidden') return true;
     if (!state.ready) return false;
-    // Treat 'unknown' (RC not yet resolved) as "don't surface yet" — the
-    // RC-resolved transition will call back into pollBlockUnlock if needed.
-    // 'inactive' should never surface the unlock UI either.
-    if (state.subscriptionStatus !== 'active') return false;
+    // No subscription gate — see the comment in the started→false effect:
+    // an active shield must always surface its escape hatch, even while RC
+    // status is unresolved or lapsed (forceUnblockAll paths still work).
     if (!isBlockActive()) return false;
     activateKeepAwakeAsync('scheduled-block');
     state.showUnlock();
@@ -526,7 +524,7 @@ export default function DoNothingScreen() {
     haptics.success();
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
-    forceUnblockAll().catch(() => {});
+    useAppStore.getState().releaseBlockShield().catch(() => {});
     useAppStore.getState().unlockFocus();
   }, []);
 
@@ -781,7 +779,7 @@ export default function DoNothingScreen() {
     deactivateKeepAwake('session');
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
-    forceUnblockAll().catch(() => {});
+    useAppStore.getState().releaseBlockShield().catch(() => {});
     setDistractionFree(false);
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();

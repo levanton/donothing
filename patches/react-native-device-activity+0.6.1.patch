@@ -23,10 +23,10 @@ index 4839430..e62ef9b 100644
    }
  
 diff --git a/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift b/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift
-index f3d73de..090a7d4 100644
+index f3d73de..b8e881f 100644
 --- a/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift
 +++ b/node_modules/react-native-device-activity/targets/ActivityMonitorExtension/DeviceActivityMonitorExtension.swift
-@@ -10,13 +10,58 @@ import FamilyControls
+@@ -10,13 +10,111 @@ import FamilyControls
  import Foundation
  import ManagedSettings
  import NotificationCenter
@@ -41,6 +41,48 @@ index f3d73de..090a7d4 100644
 +  "nothing_yearly",
 +  "nothing_lifetime",
 +]
++
++// Subscription status mirrored from RevenueCat by the host app on every
++// CustomerInfo resolve (see lib/subscription.ts). RC is the same source of
++// truth the app's UI uses; reading it here keeps the gate consistent with
++// what the user sees. A direct StoreKit read in this extension process can
++// come back EMPTY right after a reinstall or in sandbox/TestFlight even
++// though the subscription is real — so StoreKit is only a fallback signal,
++// never the primary one.
++private let RC_STATUS_KEY = "nothing_subscription_status"
++private let RC_EXPIRES_AT_KEY = "nothing_subscription_expires_at"
++// Covers the auto-renewal window when the app hasn't been opened to refresh
++// the mirror since the subscription renewed.
++private let RC_EXPIRY_GRACE: TimeInterval = 24 * 60 * 60
++
++private enum EntitlementVerdict {
++  case allow
++  case deny
++  // No usable mirror data — fall back to the StoreKit check.
++  case unknown
++}
++
++private func mirroredEntitlementVerdict() -> EntitlementVerdict {
++  guard let status = userDefaults?.string(forKey: RC_STATUS_KEY) else {
++    return .unknown
++  }
++  if status != "active" {
++    return .deny
++  }
++  let expiresAtMs = userDefaults?.object(forKey: RC_EXPIRES_AT_KEY) as? Double ?? -1
++  if expiresAtMs <= 0 {
++    // Lifetime purchase or RC reported no expiry.
++    return .allow
++  }
++  let expiresAt = Date(timeIntervalSince1970: expiresAtMs / 1000)
++  if Date() <= expiresAt.addingTimeInterval(RC_EXPIRY_GRACE) {
++    return .allow
++  }
++  // Mirror says active but its expiry passed more than the grace period ago
++  // and the app hasn't refreshed it — most likely an auto-renewal the app
++  // hasn't observed yet, possibly a lapse. Let StoreKit decide.
++  return .unknown
++}
 +
 +@available(iOS 15.0, *)
 +private func hasActiveNothingSubscription(timeout: TimeInterval) -> Bool {
@@ -69,16 +111,27 @@ index f3d73de..090a7d4 100644
      super.intervalDidStart(for: activity)
      logger.log("intervalDidStart")
  
-+    // Subscription gate. Reads StoreKit 2 entitlements directly — Apple
-+    // updates these locally on refund/cancel/expiry even when the host
-+    // app is closed, so a lapsed user's blocks stop firing without the
-+    // app ever re-opening. Self-cleanup via stopMonitoring ensures this
-+    // monitor doesn't fire again once the subscription is gone.
-+    if #available(iOS 15.0, *) {
-+      if !hasActiveNothingSubscription(timeout: 2.0) {
-+        logger.log("intervalDidStart skipped — no active subscription")
-+        DeviceActivityCenter().stopMonitoring([activity])
-+        return
++    // Subscription gate. Primary signal: RC status mirrored into the app
++    // group by the host app — consistent with the UI's idea of "subscribed".
++    // StoreKit is consulted only when the mirror is absent or stale, and an
++    // empty StoreKit result skips this fire WITHOUT killing the monitor
++    // (StoreKit-empty is a known false negative after reinstall/in sandbox;
++    // the next occurrence re-checks). Only the authoritative mirror-deny
++    // self-cleans the monitor — JS also unschedules on the inactive
++    // transition, this is the belt to that suspenders.
++    switch mirroredEntitlementVerdict() {
++    case .allow:
++      break
++    case .deny:
++      logger.log("intervalDidStart skipped — subscription inactive (mirrored)")
++      DeviceActivityCenter().stopMonitoring([activity])
++      return
++    case .unknown:
++      if #available(iOS 15.0, *) {
++        if !hasActiveNothingSubscription(timeout: 2.0) {
++          logger.log("intervalDidStart skipped — no active subscription (StoreKit)")
++          return
++        }
 +      }
 +    }
 +

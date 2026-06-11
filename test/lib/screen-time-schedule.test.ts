@@ -40,10 +40,13 @@ import {
 } from 'react-native-device-activity';
 import {
   forceUnblockAll,
+  rearmDueBlocks,
   reconcileBlocks,
   scheduleBlock,
   unscheduleBlock,
 } from '@/lib/screen-time/schedule';
+import { useAppStore } from '@/lib/store';
+import type { ScheduledBlock } from '@/lib/db/types';
 
 // Published types in react-native-device-activity are narrow — cast
 // through any so mockResolvedValue / mockReturnValue accept fixtures.
@@ -116,6 +119,68 @@ describe('scheduleBlock', () => {
       expect(callArgs.intervalStart.year).toBe(2026);
       expect(callArgs.intervalStart.month).toBe(5);
       expect(callArgs.intervalStart.day).toBe(17);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('skips native registration when the subscription is known-inactive', async () => {
+    useAppStore.setState({ subscriptionStatus: 'inactive' });
+    try {
+      await scheduleBlock('b1', 9, 0, 30, []);
+      expect(startMon).not.toHaveBeenCalled();
+    } finally {
+      useAppStore.setState({ subscriptionStatus: 'unknown' });
+    }
+  });
+});
+
+describe('rearmDueBlocks', () => {
+  const block = (over: Partial<ScheduledBlock> = {}): ScheduledBlock => ({
+    id: 'b1',
+    hour: 9,
+    minute: 0,
+    durationMinutes: 30,
+    weekdays: [1, 2, 3, 4, 5, 6, 7],
+    enabled: true,
+    unlockGoalMinutes: 5,
+    ...over,
+  });
+
+  it('re-registers an enabled block whose next occurrence is far away', async () => {
+    // Wed 08:00, block at 09:00 — next fire in 1h, well past the 90s guard.
+    jest.useFakeTimers().setSystemTime(new Date(2026, 4, 13, 8, 0, 0));
+    try {
+      await rearmDueBlocks([block()]);
+      expect(stopMon).toHaveBeenCalled();
+      expect(startMon).toHaveBeenCalledWith(
+        'block-b1',
+        expect.objectContaining({ repeats: false }),
+        [],
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('leaves a block alone when its moment is less than 90s away', async () => {
+    // 08:59:30 — block fires in 30s; re-registering would push it to
+    // tomorrow (scheduleBlock needs a 30s lead), so it must be skipped.
+    jest.useFakeTimers().setSystemTime(new Date(2026, 4, 13, 8, 59, 30));
+    try {
+      await rearmDueBlocks([block()]);
+      expect(stopMon).not.toHaveBeenCalled();
+      expect(startMon).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('skips disabled blocks', async () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 4, 13, 8, 0, 0));
+    try {
+      await rearmDueBlocks([block({ enabled: false })]);
+      expect(startMon).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }

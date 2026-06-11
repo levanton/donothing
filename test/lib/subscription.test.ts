@@ -108,12 +108,12 @@ describe('getCurrentStatus', () => {
     expect(await sub.getCurrentStatus()).toBe('inactive');
   });
 
-  it('swallows RC errors and returns inactive', async () => {
+  it('returns unknown on RC errors — a transient failure must not read as a lapsed subscription', async () => {
     const Purchases = rc();
     Purchases.getCustomerInfo.mockRejectedValue(new Error('network'));
     const sub = loadModule();
     sub.initRevenueCat();
-    expect(await sub.getCurrentStatus()).toBe('inactive');
+    expect(await sub.getCurrentStatus()).toBe('unknown');
   });
 });
 

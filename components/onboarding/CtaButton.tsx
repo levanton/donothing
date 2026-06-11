@@ -4,30 +4,41 @@ import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 
 /**
- * The onboarding primary CTA — one shared pill for every "begin" /
- * "try nothing" / "bring my minute back" across the flow: big, outlined
- * (no fill — the bg shows through), dark border and dark label.
+ * The onboarding primary CTA — one shared pill, two faces: `outline`
+ * (default — no fill, dark border and label) and `filled` (solid
+ * terracotta with cream label, for the screens whose CTA is the star).
  */
 export default function CtaButton({
   label,
   onPress,
   color = palette.brown,
+  variant = 'outline',
   style,
 }: {
   label: string;
   onPress: () => void;
-  /** Border + label colour — e.g. cream on the dark quiz screens. */
+  /** Outline border + label colour — e.g. cream on the dark quiz screens. */
   color?: string;
+  variant?: 'outline' | 'filled';
   style?: StyleProp<ViewStyle>;
 }) {
+  const filled = variant === 'filled';
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.button, { borderColor: color }, style]}
+      style={[
+        styles.button,
+        filled
+          ? { backgroundColor: palette.terracotta, borderColor: palette.terracotta }
+          : { borderColor: color },
+        style,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Text style={[styles.label, { color }]}>{label}</Text>
+      <Text style={[styles.label, { color: filled ? palette.cream : color }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

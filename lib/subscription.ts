@@ -4,10 +4,20 @@ import Purchases, {
   type PurchasesOffering,
   type PurchasesPackage,
 } from 'react-native-purchases';
+import { userDefaultsSet } from 'react-native-device-activity';
 
 export type SubscriptionStatus = 'unknown' | 'active' | 'inactive';
 
 export const PRO_ENTITLEMENT_ID = 'full';
+
+// App Group UserDefaults keys mirrored for the ActivityMonitorExtension's
+// subscription gate. The extension runs in its own process where RevenueCat
+// isn't available and a direct StoreKit read can come back empty right after
+// a reinstall (or in sandbox), so RC's verdict — the same source of truth the
+// UI uses — is written here on every CustomerInfo resolve and read natively
+// at block fire time. Keys must match DeviceActivityMonitorExtension.swift.
+const MIRROR_STATUS_KEY = 'nothing_subscription_status';
+const MIRROR_EXPIRES_AT_KEY = 'nothing_subscription_expires_at';
 
 let configured = false;
 
@@ -27,6 +37,40 @@ function statusFromCustomerInfo(info: CustomerInfo): 'active' | 'inactive' {
   // them as 'pro' regardless of how the entitlement was named.
   if (info.activeSubscriptions.length > 0) return 'active';
   return 'inactive';
+}
+
+function mirrorStatusToAppGroup(
+  status: 'active' | 'inactive',
+  info: CustomerInfo,
+): void {
+  try {
+    // -1 = no known expiry (lifetime purchase, or RC didn't report a date).
+    // Otherwise the latest expiration across active entitlements, epoch ms.
+    let expiresAt = -1;
+    let sawLifetime = false;
+    for (const ent of Object.values(info.entitlements.active)) {
+      if (!ent.expirationDate) {
+        sawLifetime = true;
+        break;
+      }
+      const t = Date.parse(ent.expirationDate);
+      if (Number.isFinite(t)) expiresAt = Math.max(expiresAt, t);
+    }
+    if (sawLifetime) expiresAt = -1;
+    userDefaultsSet(MIRROR_STATUS_KEY, status);
+    userDefaultsSet(MIRROR_EXPIRES_AT_KEY, expiresAt);
+  } catch (e) {
+    // Mirror failure must never break the purchase/status flow — the
+    // extension falls back to its StoreKit check when keys are absent.
+    console.warn('[subscription] app-group mirror failed:', e);
+  }
+}
+
+/** Resolve status from CustomerInfo AND mirror it for the native gate. */
+function resolveStatus(info: CustomerInfo): 'active' | 'inactive' {
+  const status = statusFromCustomerInfo(info);
+  mirrorStatusToAppGroup(status, info);
+  return status;
 }
 
 export function initRevenueCat(): void {
@@ -58,14 +102,18 @@ export async function getAppUserId(): Promise<string | null> {
   }
 }
 
-export async function getCurrentStatus(): Promise<'active' | 'inactive'> {
+export async function getCurrentStatus(): Promise<SubscriptionStatus> {
   if (!configured) return 'inactive';
   try {
     const info = await Purchases.getCustomerInfo();
-    return statusFromCustomerInfo(info);
+    return resolveStatus(info);
   } catch (e) {
+    // 'unknown', not 'inactive' — a transient RC/network failure must not
+    // be treated as a lapsed subscription (the unknown→inactive transition
+    // force-unblocks everything, which would strip a paying user's blocks
+    // on an offline cold start).
     console.warn('[subscription] getCustomerInfo failed:', e);
-    return 'inactive';
+    return 'unknown';
   }
 }
 
@@ -73,7 +121,7 @@ export function addStatusListener(
   cb: (status: 'active' | 'inactive') => void,
 ): () => void {
   if (!configured) return () => {};
-  const handler = (info: CustomerInfo) => cb(statusFromCustomerInfo(info));
+  const handler = (info: CustomerInfo) => cb(resolveStatus(info));
   Purchases.addCustomerInfoUpdateListener(handler);
   return () => {
     try {
@@ -117,7 +165,7 @@ export async function purchasePackage(
   if (!configured) return 'inactive';
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
-    return statusFromCustomerInfo(customerInfo);
+    return resolveStatus(customerInfo);
   } catch (e: any) {
     if (e?.userCancelled) return 'cancelled';
     console.warn('[subscription] purchasePackage failed:', e);
@@ -129,7 +177,7 @@ export async function restorePurchases(): Promise<'active' | 'inactive'> {
   if (!configured) return 'inactive';
   try {
     const info = await Purchases.restorePurchases();
-    return statusFromCustomerInfo(info);
+    return resolveStatus(info);
   } catch (e) {
     console.warn('[subscription] restorePurchases failed:', e);
     return 'inactive';

@@ -129,6 +129,14 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
+// expo-audio — TurboModule binding fails to load in node. lib/sound.ts
+// creates a player at module scope, so anything that (transitively) imports
+// the store needs this stubbed.
+jest.mock('expo-audio', () => ({
+  createAudioPlayer: jest.fn(() => ({ seekTo: jest.fn(), play: jest.fn() })),
+  setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 // react-native-device-activity — internal native module, stub everything.
 jest.mock('react-native-device-activity', () => ({}));
 

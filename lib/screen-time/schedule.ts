@@ -10,6 +10,8 @@ import {
 } from 'react-native-device-activity';
 
 import type { DeviceActivityAction } from './actions';
+import type { ScheduledBlock } from '../db/types';
+import { useAppStore } from '../store';
 import { getAuth } from './auth';
 import {
   NEVER_BLOCK_SELECTION_ID,
@@ -30,18 +32,19 @@ const ALL_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 export const MAX_BLOCKS = 15;
 
 /**
- * Compute the next future moment when a block should fire.
+ * Compute the next moment (at least `leadMs` from now) when a block should fire.
  *
  * @param weekdays iOS convention 1=Sun..7=Sat, or empty/all-7 for daily
  * @returns Date in the future, or null if no day in the next week matches
  *
- * Uses a 30-second lead so we never schedule for a moment that's
+ * The default 30-second lead exists so we never schedule for a moment that's
  * effectively "now" — Apple needs `intervalStart` strictly in the future.
  */
 function nextFireDate(
   hour: number,
   minute: number,
   weekdays: number[],
+  leadMs = 30 * 1000,
 ): Date | null {
   const now = new Date();
   const today = new Date(
@@ -55,7 +58,7 @@ function nextFireDate(
   );
   for (let offset = 0; offset < 7; offset++) {
     const candidate = new Date(today.getTime() + offset * 24 * 60 * 60 * 1000);
-    if (candidate.getTime() <= now.getTime() + 30 * 1000) continue;
+    if (candidate.getTime() <= now.getTime() + leadMs) continue;
     const candWeekday = candidate.getDay() + 1;
     if (weekdays.length === 0 || weekdays.includes(candWeekday)) {
       return candidate;
@@ -109,6 +112,17 @@ export async function scheduleBlock(
   const auth = await getAuth();
   if (auth !== 'approved') {
     console.log('[ScreenTime] scheduleBlock skipped — auth status:', auth);
+    return;
+  }
+
+  // Subscription gate: a known-inactive user gets no native monitor at all —
+  // blocks are a paid feature, and the DB row (user intent) is restored by
+  // `restoreAllBlocksAfterRenewal` on the inactive→active transition.
+  // 'unknown' (RC not yet resolved / offline) schedules optimistically: the
+  // extension's own gate reads the mirrored RC status at fire time, so a
+  // truly-lapsed user is still refused there.
+  if (useAppStore.getState().subscriptionStatus === 'inactive') {
+    console.log('[ScreenTime] scheduleBlock skipped — subscription inactive');
     return;
   }
 
@@ -173,6 +187,32 @@ export function unscheduleBlock(blockId: string): void {
   names.push(`block-${blockId}`);
   names.push(`block-${blockId}-once`);
   stopMonitoring(names);
+}
+
+/**
+ * Re-register every enabled block for its next occurrence. Monitors are
+ * one-shot (`repeats: false`), so a block that has fired stays dead until
+ * something re-registers it — this runs on every foreground (and after the
+ * post-unlock reset) so a spent block is always re-armed the next time the
+ * user is in the app, not only on a cold start.
+ *
+ * Re-registering an untouched pending monitor is harmless — it lands on the
+ * same occurrence. The one exception: inside the last 90 seconds before a
+ * block's moment, re-registering would push it to the NEXT occurrence
+ * (scheduleBlock needs a 30s lead), so an imminent block is left alone.
+ */
+export async function rearmDueBlocks(blocks: ScheduledBlock[]): Promise<void> {
+  for (const b of blocks) {
+    if (!b.enabled) continue;
+    const fire = nextFireDate(b.hour, b.minute, b.weekdays, 0);
+    if (fire && fire.getTime() - Date.now() < 90 * 1000) continue;
+    try {
+      unscheduleBlock(b.id);
+      await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays);
+    } catch (e) {
+      console.error('[ScreenTime] rearm failed for block', b.id, e);
+    }
+  }
 }
 
 /** @internal Used only by dev diagnostics. */

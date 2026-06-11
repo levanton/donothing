@@ -294,6 +294,16 @@ export interface AppState {
   unlockFocus: () => void;
   showUnlock: () => void;
 
+  /**
+   * Release the native shield after an earned unlock (completed countdown,
+   * "unlock now" from the pause sheet, emergency unlock) AND immediately
+   * re-register every enabled block for its next occurrence. The release
+   * stops ALL monitors (one-shot or pending), so without the re-register
+   * step every other block would silently never fire again until the next
+   * cold start — the original "blocks stopped working" bug.
+   */
+  releaseBlockShield: () => Promise<void>;
+
   // Settings actions
   openSettings: () => void;
   closeSettings: () => void;
@@ -852,6 +862,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ focusStep: 'done', focusRemaining: 0 });
   },
 
+  releaseBlockShield: async () => {
+    try {
+      const { forceUnblockAll, scheduleBlock } = await import('./screen-time');
+      await forceUnblockAll();
+      // scheduleBlock self-gates on auth + subscription, so this is safe
+      // to run unconditionally — an inactive user just gets no monitors.
+      for (const b of get().scheduledBlocks) {
+        if (!b.enabled) continue;
+        await scheduleBlock(b.id, b.hour, b.minute, b.durationMinutes, b.weekdays);
+      }
+    } catch (e) {
+      console.error('[store.releaseBlockShield] failed:', e);
+    }
+  },
+
   // --- Settings ---
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
@@ -974,6 +999,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleForeground: () => {
     set({ weekStats: getWeekStats() });
+    // Re-arm spent one-shot monitors. iOS keeps the process alive for days,
+    // so cold-start init alone can't be the only re-registration point — a
+    // block that fired yesterday would never fire again. Fire-and-forget;
+    // skipped while a shield is up (the post-unlock releaseBlockShield
+    // re-registers everything) or a session is live.
+    const s = get();
+    if (s.ready && !s.started && !s.paused && s.subscriptionStatus !== 'inactive') {
+      import('./screen-time')
+        .then(({ isBlockActive, rearmDueBlocks }) => {
+          if (isBlockActive()) return;
+          return rearmDueBlocks(get().scheduledBlocks);
+        })
+        .catch((e) => console.error('[store.handleForeground] rearm failed:', e));
+    }
     // Re-anchor the focus timer. iOS aggressively pauses JS intervals
     // while backgrounded, and a manual clock change (or DST flip) can
     // leave focusRemaining stale. Recompute from focusEndTime so the

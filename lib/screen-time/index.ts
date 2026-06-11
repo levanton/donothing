@@ -20,6 +20,7 @@ export {
   MAX_BLOCKS,
   forceUnblockAll,
   getActiveMonitors,
+  rearmDueBlocks,
   reconcileBlocks,
   scheduleBlock,
   unscheduleBlock,

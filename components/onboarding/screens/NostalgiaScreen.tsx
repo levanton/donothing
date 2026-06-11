@@ -15,7 +15,7 @@ import { buildTimetable, TeleprompterColumn, type TypeLineSpec } from '../TypeRe
 // One flat column — 'remember?' is simply the first line.
 const LINES: TypeLineSpec[] = [
   { segs: [{ text: 'remember?' }] },
-  { segs: [{ text: 'whole afternoons in the grass.' }] },
+  { segs: [{ text: 'lying in the grass.' }] },
   { segs: [{ text: 'clouds drifting by.' }] },
   { segs: [{ text: 'nowhere to be.' }] },
   { segs: [{ text: 'time just… ' }, { text: 'stopped.', strong: true }] },
@@ -38,6 +38,11 @@ const BREATH_SCALE = 0.03;
 const IMAGE_REVEAL_MS = 1100;
 
 const grassImage = require('@/assets/images/child.png');
+
+/** The picture arrives WITH the last line — it starts fading in the
+ *  moment "time just… stopped." begins typing. */
+const LAST = TIMETABLE.lines[TIMETABLE.lines.length - 1];
+const IMAGE_AT_MS = LAST.glideAt + LAST.glideDur;
 
 /** When the arrow may appear — as soon as the text is typed; the picture
  *  keeps fading in alongside it. */
@@ -67,7 +72,7 @@ export default function NostalgiaScreen({ isActive, theme }: Props) {
       true,
     );
     imgReveal.value = withDelay(
-      TIMETABLE.finaleAt,
+      IMAGE_AT_MS,
       withTiming(1, { duration: IMAGE_REVEAL_MS, easing: EASE_IN_OUT }),
     );
   }, [isActive]);

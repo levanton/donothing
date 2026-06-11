@@ -42,6 +42,17 @@ const PARAGRAPH_PAUSE_MS = 250;
  *  whole phrase a single unbreakable "word" for the renderer. */
 const nb = (s: string) => s.replace(/ /g, ' ');
 
+/** The punch after the years-on-screen number — a life-sized comparison
+ *  matched to the magnitude, so it's always honest: a light user sees a
+ *  degree, a heavy young user sees more than a childhood. */
+function comparisonFor(years: number): string {
+  if (years >= 18) return 'more than your whole childhood.';
+  if (years >= 14) return 'a whole childhood.';
+  if (years >= 9) return 'all your school years.';
+  if (years >= 5) return 'your entire teens.';
+  return 'a whole university degree.';
+}
+
 function buildParagraphs(hoursPerDay: number, yearsLeft: number): Seg[][] {
   const hoursPerYear = Math.round(hoursPerDay * 365);
   const daysPerYear = Math.round(hoursPerYear / 24);
@@ -61,7 +72,8 @@ function buildParagraphs(hoursPerDay: number, yearsLeft: number): Seg[][] {
     [
       { text: `Over your next ~${yearsLeft} years — ` },
       { text: nb(`~${yearsScrollingLeft} years`), accent: true, strong: true },
-      { text: ` of scrolling.` },
+      { text: `. ` },
+      { text: comparisonFor(yearsScrollingLeft), strong: true },
     ],
     [
       { text: `What if you took just ` },
@@ -134,7 +146,7 @@ export default function ScreenTimeStatsScreen({
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <CtaButton label="bring my minute back" onPress={onNext} />
+          <CtaButton label="bring my minute back" onPress={onNext} variant="filled" />
         </Animated.View>
       </View>
     </View>
