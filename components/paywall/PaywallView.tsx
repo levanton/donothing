@@ -112,6 +112,7 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
     skip,
     purchase,
     restore,
+    restoring,
     promoVisible,
     closePromo,
     promoPurchase,
@@ -225,7 +226,10 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
         </Animated.View>
       </Animated.ScrollView>
 
-      <PurchasingOverlay visible={purchasing} />
+      <PurchasingOverlay
+        visible={purchasing || restoring}
+        label={restoring ? 'Restoring your purchases...' : undefined}
+      />
 
       {/* Win-back promo — overlays the paywall when the user taps the X */}
       <PromoOffer

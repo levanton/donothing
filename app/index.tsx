@@ -81,8 +81,7 @@ export default function DoNothingScreen() {
   const tutorialCompleted = useAppStore((s) => s.tutorialCompleted);
 
   // The spotlight tour runs by itself on the first visit: one quiet second
-  // so the user takes the home screen in, then it appears. Starting a
-  // session within that second cancels it (it re-arms after the session).
+  // so the user takes the home screen in, then it appears.
   useEffect(() => {
     if (!ready || !onboardingComplete || tutorialCompleted || started) return;
     const t = setTimeout(() => {
@@ -90,6 +89,11 @@ export default function DoNothingScreen() {
     }, 1000);
     return () => clearTimeout(t);
   }, [ready, onboardingComplete, tutorialCompleted, started]);
+
+  // Until that first tour is completed (or skipped), the home screen is
+  // locked: no swipes, no taps — the tour drives, the user watches. The
+  // shield below blocks touches; the swipe gestures are gated explicitly.
+  const tutorialGate = ready && onboardingComplete && !tutorialCompleted;
 
   const accountSheetRef = useRef<BottomSheet>(null);
   // BlockSheet and SessionEndedSheet are now driven by a `visible` prop
@@ -353,7 +357,7 @@ export default function DoNothingScreen() {
     direction: 'up',
     mode: 'open',
     unit: SCREEN_H,
-    enabled: !started,
+    enabled: !started && !tutorialGate,
   });
 
   // Swipe left on main → open settings (commits via store action)
@@ -365,7 +369,7 @@ export default function DoNothingScreen() {
     direction: 'right',
     mode: 'open',
     unit: SCREEN_W,
-    enabled: !started,
+    enabled: !started && !tutorialGate,
     onCommit: openSettingsJS,
   });
 
@@ -1252,6 +1256,10 @@ export default function DoNothingScreen() {
           {/* (Running-mode UI — phrase, stop, eye-toggle — now lives in
               the terracotta camera overlay rendered above this stack.
               Nothing renders here while `started` is true.) */}
+
+          {/* First-run shield — swallows every tap until the tour is done.
+              The copilot tooltips render in a portal above this. */}
+          {tutorialGate && <View style={styles.tutorialShield} />}
         </Animated.View>
       </GestureDetector>
 
@@ -1632,6 +1640,10 @@ const styles = StyleSheet.create({
   lockButton: {
     position: 'absolute',
     left: 24,
+  },
+  tutorialShield: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
   },
   themeToggle: {
     position: 'absolute',
