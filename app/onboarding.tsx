@@ -1,12 +1,13 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
+import CircleNextButton from '@/components/onboarding/CircleNextButton';
 import PillButton from '@/components/PillButton';
 
 export default function OnboardingRoute() {
@@ -54,13 +55,13 @@ export default function OnboardingRoute() {
       {/* Circle next arrow — rendered above the sliding view so it stays put
           while page content slides in/out. */}
       {currentPage.hasCircleNext && (
-        <Pressable
-          onPress={flow.goNext}
-          style={[styles.circleNext, { bottom: insets.bottom + 24, borderColor: screenTheme.text }]}
-          hitSlop={12}
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(300)}
+          style={[styles.circleNext, { bottom: insets.bottom + 24 }]}
         >
-          <Feather name="arrow-right" size={22} color={screenTheme.text} />
-        </Pressable>
+          <CircleNextButton onPress={flow.goNext} />
+        </Animated.View>
       )}
 
       {/* Top bar: back button + progress */}
@@ -109,12 +110,6 @@ const styles = StyleSheet.create({
   circleNext: {
     position: 'absolute',
     right: 32,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   topBar: {
     position: 'absolute',

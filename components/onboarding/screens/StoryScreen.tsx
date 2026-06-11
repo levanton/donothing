@@ -18,6 +18,7 @@ import { EASE_IN_OUT } from '@/constants/animations';
 import { track } from '@/lib/analytics';
 import { haptics } from '@/lib/haptics';
 import PillButton from '@/components/PillButton';
+import CircleNextButton from '../CircleNextButton';
 import RadialDots from '../RadialDots';
 import { DOT_MORPH_MS, getDotFieldLayout } from '../dotFieldLayout';
 import { fadeEnter, fadeExit } from '../transitions';
@@ -193,23 +194,17 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
       {act < LAST_ACT && arrowReady && (
         <Animated.View
           entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(300)}
           style={[styles.circleNextWrap, { bottom: insets.bottom + 24 }]}
         >
-          <Pressable
-            onPress={() => goAct(act + 1)}
-            style={[styles.circleNext, { borderColor: theme.text }]}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Feather name="arrow-right" size={22} color={theme.text} />
-          </Pressable>
+          <CircleNextButton onPress={() => goAct(act + 1)} />
         </Animated.View>
       )}
 
       {act === LAST_ACT && (
         <Animated.View
           entering={FadeIn.duration(400).delay(WHATIF_DONE_MS)}
+          exiting={FadeOut.duration(300)}
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
           <PillButton
@@ -223,15 +218,21 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
 
       {/* Back between acts — the first act has nowhere to go back to. */}
       {act > 0 && (
-        <Pressable
-          onPress={() => goAct(act - 1)}
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(300)}
           style={[styles.backButton, { top: insets.top + 10 }]}
-          hitSlop={16}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
         >
-          <Feather name="chevron-left" size={22} color={theme.text} />
-        </Pressable>
+          <Pressable
+            onPress={() => goAct(act - 1)}
+            style={styles.backPressable}
+            hitSlop={16}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Feather name="chevron-left" size={22} color={theme.text} />
+          </Pressable>
+        </Animated.View>
       )}
     </View>
   );
@@ -258,17 +259,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 32,
   },
-  circleNext: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   backButton: {
     position: 'absolute',
     left: 16,
+  },
+  backPressable: {
     width: 28,
     height: 28,
     alignItems: 'center',
