@@ -7,7 +7,7 @@
  */
 const CENTER_FRACTION = 0.66;
 // Hand-tuned pixel nudge of the whole media zone.
-const ZONE_NUDGE_PX = 10;
+const ZONE_NUDGE_PX = 26;
 
 /** One timing for the scatter → rings morph on 'what if…'. */
 export const DOT_MORPH_MS = 1200;

@@ -68,7 +68,7 @@ export const GLIDE_EASING = Easing.bezier(0.65, 0, 0.35, 1);
 /** Gap between the active (focal) line's bottom edge and the top of the
  *  media zone — the focal line is DERIVED from the zone, so the text can
  *  never collide with the picture / the dot field on any screen. */
-const TEXT_ZONE_GAP_PX = 38;
+const TEXT_ZONE_GAP_PX = 54;
 export const STORY_LINE_HEIGHT = 38;
 
 // Spaces keep the typing beat (the clock ticks through them) but are not
