@@ -28,8 +28,9 @@ import {
   rideWithDotsEnter,
   rideWithDotsExit,
 } from '../transitions';
-import NostalgiaScreen from './NostalgiaScreen';
+import NostalgiaScreen, { NOSTALGIA_DONE_MS } from './NostalgiaScreen';
 import RushingScreen, {
+  NOW_DONE_MS,
   NOW_DOTS_DELAY_MS,
   NOW_DOTS_ENTER_MS,
 } from './RushingScreen';
@@ -149,6 +150,23 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
     setAct(next);
   };
 
+  // The arrow waits for the act's performance to finish — no exit door
+  // while the story is still telling itself. (Re-arms when the user goes
+  // back, since acts replay from scratch.)
+  const [arrowReady, setArrowReady] = useState(false);
+  useEffect(() => {
+    if (act >= LAST_ACT) {
+      setArrowReady(true);
+      return;
+    }
+    setArrowReady(false);
+    const t = setTimeout(
+      () => setArrowReady(true),
+      act === 0 ? NOSTALGIA_DONE_MS : NOW_DONE_MS,
+    );
+    return () => clearTimeout(t);
+  }, [act]);
+
   const { Act, enter, exit } = ACTS[act];
 
   return (
@@ -193,19 +211,21 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
 
       {/* Circle arrow drives the acts; on the last act it's the continue
           pill instead, and it waits for the ride-up hand-off to finish. */}
-      {act < LAST_ACT && (
-        <Pressable
-          onPress={() => goAct(act + 1)}
-          style={[
-            styles.circleNext,
-            { bottom: insets.bottom + 24, borderColor: theme.text },
-          ]}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Continue"
+      {act < LAST_ACT && arrowReady && (
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[styles.circleNextWrap, { bottom: insets.bottom + 24 }]}
         >
-          <Feather name="arrow-right" size={22} color={theme.text} />
-        </Pressable>
+          <Pressable
+            onPress={() => goAct(act + 1)}
+            style={[styles.circleNext, { borderColor: theme.text }]}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Continue"
+          >
+            <Feather name="arrow-right" size={22} color={theme.text} />
+          </Pressable>
+        </Animated.View>
       )}
 
       {act === LAST_ACT && (
@@ -255,9 +275,11 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
-  circleNext: {
+  circleNextWrap: {
     position: 'absolute',
     right: 32,
+  },
+  circleNext: {
     width: 52,
     height: 52,
     borderRadius: 26,
