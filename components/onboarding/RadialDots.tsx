@@ -31,6 +31,11 @@ const TWO_PI = Math.PI * 2;
 // rings form it resolves to the full, vivid circle colour.
 const MURKY_CIRCLE = '#B68D78';
 
+// While a dot is travelling to its ring it softens (fully solid brown dots
+// read almost black against the cream bg mid-flight); once it has settled
+// into the ring the extra softness is gone — full colour again.
+const MORPH_MIN_OPACITY = 0.72;
+
 /**
  * RadialDots — a field of small dots that morphs between two states driven by
  * a single `progress` shared value:
@@ -231,11 +236,15 @@ function DotView({
       Extrapolation.CLAMP,
     );
 
+    // Soften only mid-morph: full colour at rest (0) and once settled (1),
+    // dipping to the floor halfway through the journey.
+    const morphDim = 1 - (1 - MORPH_MIN_OPACITY) * Math.sin(Math.PI * local);
+
     return {
       width: size,
       height: size,
       borderRadius: size / 2,
-      opacity: dot.opacity * rev,
+      opacity: dot.opacity * morphDim * rev,
       transform: [{ translateX: x - size / 2 }, { translateY: y - size / 2 }],
     };
   });

@@ -9,10 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
   FadeOut,
-  useAnimatedStyle,
   useSharedValue,
   withTiming,
-  type EntryExitAnimationFunction,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
@@ -22,19 +20,16 @@ import { haptics } from '@/lib/haptics';
 import PillButton from '@/components/PillButton';
 import RadialDots from '../RadialDots';
 import { DOT_MORPH_MS, getDotFieldLayout } from '../dotFieldLayout';
-import {
-  fadeEnter,
-  fadeExit,
-  rideWithDotsEnter,
-  rideWithDotsExit,
-} from '../transitions';
+import { fadeEnter, fadeExit } from '../transitions';
 import NostalgiaScreen, { NOSTALGIA_DONE_MS } from './NostalgiaScreen';
 import RushingScreen, {
   NOW_DONE_MS,
   NOW_DOTS_DELAY_MS,
-  NOW_DOTS_ENTER_MS,
 } from './RushingScreen';
-import PhoneSymptomScreen from './PhoneSymptomScreen';
+import PhoneSymptomScreen, {
+  WHATIF_DONE_MS,
+  WHATIF_RINGS_AT_MS,
+} from './PhoneSymptomScreen';
 
 /**
  * StoryScreen — ONE onboarding page on which the whole opening tale plays
@@ -66,33 +61,15 @@ interface ActEntry {
 }
 
 const ACTS: ActEntry[] = [
-  // 'remember?' fades in softly; each later hand-off is one upward stream.
-  { id: 'nostalgia',    Act: NostalgiaScreen,    enter: fadeEnter,         exit: rideWithDotsExit },
-  { id: 'rushing',      Act: RushingScreen,      enter: rideWithDotsEnter, exit: rideWithDotsExit },
-  { id: 'phoneSymptom', Act: PhoneSymptomScreen, enter: rideWithDotsEnter, exit: fadeExit },
+  // Acts hand off by pure crossfade — the outgoing text (and the picture)
+  // simply dissolve in place, nothing travels.
+  { id: 'nostalgia',    Act: NostalgiaScreen,    enter: fadeEnter, exit: fadeExit },
+  { id: 'rushing',      Act: RushingScreen,      enter: fadeEnter, exit: fadeExit },
+  { id: 'phoneSymptom', Act: PhoneSymptomScreen, enter: fadeEnter, exit: fadeExit },
 ];
 
 const LAST_ACT = ACTS.length - 1;
 
-// The dot field arrives on 'now.' the same way the picture arrives on
-// 'remember?': it rises from below while its dots trickle in, pushing the
-// act's text up (the push lives in RushingScreen, timed off the same
-// constants).
-const DOT_RISE_PX = 96;
-
-const dotFieldEnter: EntryExitAnimationFunction = () => {
-  'worklet';
-  return {
-    initialValues: {
-      transform: [{ translateY: DOT_RISE_PX }],
-    },
-    animations: {
-      transform: [
-        { translateY: withTiming(0, { duration: NOW_DOTS_ENTER_MS, easing: EASE_IN_OUT }) },
-      ],
-    },
-  };
-};
 
 export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
   const insets = useSafeAreaInsets();
@@ -118,23 +95,29 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
   }, [act, dotsOn]);
 
   // ── Dot field ───────────────────────────────────────────────────────────
-  // One RadialDots instance lives across the 'now.' ↔ 'what if…' acts. It is
-  // a sibling of the swapping act view, so it survives the hand-off and
-  // morphs instead of remounting. It travels between the bands as the morph
-  // progresses: progress 0 keeps it in the lower band ('now.'), progress 1
-  // lifts it to the upper band ('what if…') — one timing drives both.
+  // One RadialDots instance lives across the 'now.' ↔ 'what if…' acts,
+  // always below the text in the lower band — it never travels. It is a
+  // sibling of the swapping act view, so it survives the hand-off. On
+  // 'what if…' the scatter resolves into rings as the payoff line is about
+  // to type; going back dissolves them again.
   const dotField = getDotFieldLayout(width, height);
-  const dotTravel = dotField.highTop - dotField.lowTop;
   const dotProgress = useSharedValue(0);
-  const dotLayerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: dotProgress.value * dotTravel }],
-  }));
+  const [ringsOn, setRingsOn] = useState(false);
 
   useEffect(() => {
-    dotProgress.value = withTiming(act === LAST_ACT ? 1 : 0, {
-      duration: DOT_MORPH_MS,
-      easing: EASE_IN_OUT,
-    });
+    if (act !== LAST_ACT) {
+      setRingsOn(false);
+      dotProgress.value = withTiming(0, { duration: 600, easing: EASE_IN_OUT });
+      return;
+    }
+    const t = setTimeout(() => {
+      setRingsOn(true);
+      dotProgress.value = withTiming(1, {
+        duration: DOT_MORPH_MS,
+        easing: EASE_IN_OUT,
+      });
+    }, WHATIF_RINGS_AT_MS);
+    return () => clearTimeout(t);
   }, [act]);
 
   // The flow logs this page once as 'story'; the inner acts keep reporting
@@ -180,10 +163,9 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
         <Act isActive={isActive} onNext={onNext} theme={theme} />
       </Animated.View>
 
-      {/* The dot field arrives after the 'now.' text — rising from below
-          while its dots trickle in (the inner view owns the rise; the outer
-          one owns the band-to-band travel) — then glides to the upper band
-          while morphing scatter → rings on 'what if…'. */}
+      {/* The dot field arrives after the 'now.' text — in place, purely by
+          opacity (its dots trickle in one by one) — and stays in the media
+          zone, under the text, for the rest of the story. */}
       {act > 0 && dotsOn && (
         <Animated.View
           exiting={FadeOut.duration(300)}
@@ -196,16 +178,13 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
               width: dotField.size,
               height: dotField.size,
             },
-            dotLayerStyle,
           ]}
         >
-          <Animated.View entering={dotFieldEnter as never}>
-            <RadialDots
-              progress={dotProgress}
-              size={dotField.size}
-              orbiting={act === LAST_ACT}
-            />
-          </Animated.View>
+          <RadialDots
+            progress={dotProgress}
+            size={dotField.size}
+            orbiting={ringsOn}
+          />
         </Animated.View>
       )}
 
@@ -230,7 +209,7 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
 
       {act === LAST_ACT && (
         <Animated.View
-          entering={FadeIn.duration(400).delay(DOT_MORPH_MS)}
+          entering={FadeIn.duration(400).delay(WHATIF_DONE_MS)}
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
           <PillButton

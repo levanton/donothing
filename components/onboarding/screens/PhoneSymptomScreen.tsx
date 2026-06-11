@@ -1,26 +1,43 @@
-import { palette } from '@/lib/theme';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ONBOARDING_BODY_BOLD, onboardingText } from '../textStyles';
-import { getDotFieldLayout } from '../dotFieldLayout';
+import { StyleSheet, View } from 'react-native';
 
-const HEADING = 'what if…';
+import { DOT_MORPH_MS } from '../dotFieldLayout';
+import {
+  buildTimetable,
+  TeleprompterColumn,
+  type TypeLineSpec,
+} from '../TypeReveal';
 
-interface LineSpec {
-  text: string;
-  bold?: boolean;
-  accent?: boolean;
-  paragraph?: boolean;
-}
-
-const LINES: LineSpec[] = [
-  { text: 'you could stop time again?' },
-  { text: 'one minute.', paragraph: true },
-  { text: 'no phone. no plans.' },
-  { text: 'just you.' },
-  { text: 'even one minute a day', paragraph: true },
-  { text: 'can change everything.', bold: true, accent: true },
+// One flat column — 'what if…' is simply the first line. Same teleprompter
+// as the other acts; the dot field stays put in the lower band, so this
+// act's focal line sits higher, above it.
+const LINES: TypeLineSpec[] = [
+  { segs: [{ text: 'what if…' }] },
+  { segs: [{ text: 'you could stop time again?' }] },
+  { segs: [{ text: 'one minute.' }] },
+  { segs: [{ text: 'no phone. no plans.' }] },
+  { segs: [{ text: 'just you.' }] },
+  { segs: [{ text: 'even one minute a day' }] },
+  { segs: [{ text: 'can change everything.', strong: true, accent: true }], stepMs: 65 },
 ];
+
+// The act fades in over the resting dot field — typing starts after a
+// breath.
+const START_MS = 1400;
+
+const TIMETABLE = buildTimetable(LINES, START_MS);
+
+/** When the dots resolve into rings: the exact moment the payoff line
+ *  ("can change everything.") starts typing — the order forms underneath
+ *  the words as they land. */
+const LAST = TIMETABLE.lines[TIMETABLE.lines.length - 1];
+export const WHATIF_RINGS_AT_MS = LAST.glideAt + LAST.glideDur;
+
+/** When the whole 'what if…' performance is over: text typed AND the
+ *  scatter→rings morph has settled. */
+export const WHATIF_DONE_MS = Math.max(
+  TIMETABLE.end,
+  WHATIF_RINGS_AT_MS + DOT_MORPH_MS,
+);
 
 interface Props {
   isActive: boolean;
@@ -29,47 +46,11 @@ interface Props {
 }
 
 export default function PhoneSymptomScreen({ theme }: Props) {
-  const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
-  const field = getDotFieldLayout(width, height);
-
-  // No own background: the route container already paints the page bg. An
-  // opaque sheet here would ride up with the page and cover the outgoing
-  // "now." text during the hand-off.
+  // No own background: the route container already paints the page bg, and
+  // the persistent dot field must stay visible under the swapping acts.
   return (
     <View style={styles.container}>
-      {/* The dot field sits in the upper band here, so the text fills the
-          space below it, clear of the bottom continue pill. */}
-      <View
-        style={[
-          styles.content,
-          {
-            top: field.highTop + field.size,
-            paddingBottom: insets.bottom + 104,
-          },
-        ]}
-      >
-        {/* Same size as the body — one uniform text block, no title tier. */}
-        <Text style={[onboardingText.story, styles.heading, { color: theme.text }]}>
-          {HEADING}
-        </Text>
-
-        <View style={styles.body}>
-          {LINES.map((spec, i) => (
-            <Text
-              key={i}
-              style={[
-                onboardingText.story,
-                { color: spec.accent ? palette.terracotta : theme.text },
-                spec.bold && ONBOARDING_BODY_BOLD,
-                spec.paragraph && { marginTop: 18 },
-              ]}
-            >
-              {spec.text}
-            </Text>
-          ))}
-        </View>
-      </View>
+      <TeleprompterColumn timetable={TIMETABLE} color={theme.text} />
     </View>
   );
 }
@@ -78,16 +59,4 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 32,
-    justifyContent: 'center',
-  },
-  heading: {
-    marginBottom: 14,
-  },
-  body: {},
 });
