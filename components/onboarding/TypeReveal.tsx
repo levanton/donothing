@@ -60,8 +60,8 @@ export type TypedWord = TypedLetter[];
 export const LETTER_STEP_MS = 50;
 export const LETTER_FADE_MS = 160;
 /** The pause between a line finishing and the column gliding on. */
-export const LINE_HOLD_MS = 500;
-export const GLIDE_MS = 900;
+export const LINE_HOLD_MS = 400;
+export const GLIDE_MS = 750;
 // A pronounced S-curve: the column leans into the move, sweeps through the
 // middle and settles softly — clearly a curve, never a constant-speed slide.
 export const GLIDE_EASING = Easing.bezier(0.65, 0, 0.35, 1);
@@ -145,7 +145,9 @@ function Letter({
       delay,
       withTiming(1, { duration: LETTER_FADE_MS, easing: Easing.out(Easing.quad) }),
     );
-    // The typewriter's tick — one per letter.
+    // The typewriter's tick — one per letter; whitespace (e.g. the NBSPs
+    // inside unbreakable stat phrases) stays silent.
+    if (!ch.trim()) return;
     const t = setTimeout(() => haptics.select(), delay);
     return () => clearTimeout(t);
   }, [delay]);

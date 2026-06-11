@@ -8,7 +8,7 @@ import { palette, getStatusBarStyle } from '@/lib/theme';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
 import { SCREEN_REGISTRY } from '@/components/onboarding/screens/registry';
 import CircleNextButton from '@/components/onboarding/CircleNextButton';
-import PillButton from '@/components/PillButton';
+import CtaButton from '@/components/onboarding/CtaButton';
 
 export default function OnboardingRoute() {
   const insets = useSafeAreaInsets();
@@ -43,11 +43,10 @@ export default function OnboardingRoute() {
           entering={FadeIn.duration(400)}
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
-          <PillButton
+          <CtaButton
             label={flow.isLastScreen ? 'start' : 'continue'}
             onPress={flow.isLastScreen ? flow.finish : flow.goNext}
-            color={flow.isLastScreen ? palette.terracotta : screenTheme.text}
-            variant={flow.isLastScreen ? 'filled' : 'outline'}
+            color={screenTheme.text}
           />
         </Animated.View>
       )}

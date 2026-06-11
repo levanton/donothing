@@ -1,4 +1,5 @@
 import { Entypo, Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -81,6 +82,17 @@ export default function DoNothingScreen() {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const onboardingComplete = useAppStore((s) => s.onboardingComplete);
   const tutorialCompleted = useAppStore((s) => s.tutorialCompleted);
+
+  // The spotlight tour runs by itself on the first visit: one quiet second
+  // so the user takes the home screen in, then it appears. Starting a
+  // session within that second cancels it (it re-arms after the session).
+  useEffect(() => {
+    if (!ready || !onboardingComplete || tutorialCompleted || started) return;
+    const t = setTimeout(() => {
+      useAppStore.getState().setTutorialPending(true);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [ready, onboardingComplete, tutorialCompleted, started]);
 
   const accountSheetRef = useRef<BottomSheet>(null);
   // BlockSheet and SessionEndedSheet are now driven by a `visible` prop
@@ -888,33 +900,6 @@ export default function DoNothingScreen() {
             </Pressable>
           </TutorialStepWrapper>
 
-          {/* One-time "how it works" button — top center. Shown only until the
-              spotlight tour is completed (tutorialCompleted persists '1' on
-              finish/skip), then it's gone for good. Hidden during a session.
-              box-none wrapper so taps outside the pill still reach the screen. */}
-          {!tutorialCompleted && !started && (
-            <View
-              style={[styles.tourButtonWrap, { top: insets.top + 12 }]}
-              pointerEvents="box-none"
-            >
-              <Pressable
-                onPress={() => {
-                  haptics.light();
-                  useAppStore.getState().setTutorialPending(true);
-                }}
-                style={[styles.tourButton, { borderColor: theme.text + '40' }]}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="How it works"
-              >
-                <Feather name="compass" size={13} color={theme.text} />
-                <Text style={[styles.tourButtonText, { color: theme.text, fontFamily: Fonts!.serif }]}>
-                  how it works
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
           {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
           <View
             style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]}
@@ -968,6 +953,32 @@ export default function DoNothingScreen() {
               </Text>
             </Animated.View>
           </View>
+
+          {/* Replay onboarding — top right, next to the theme toggle */}
+          <Pressable
+            onPress={() => {
+              haptics.light();
+              router.push('/onboarding');
+            }}
+            disabled={started}
+            accessibilityRole="button"
+            accessibilityLabel="Replay onboarding"
+            style={[
+              styles.onboardingButton,
+              {
+                top: insets.top + 12,
+                opacity: started ? 0 : 1,
+              },
+            ]}
+            hitSlop={16}
+          >
+            <Feather
+              name="rotate-ccw"
+              size={20}
+              color={theme.text}
+              style={{ opacity: 0.9 }}
+            />
+          </Pressable>
 
           {/* Theme toggle — top right */}
           <Pressable
@@ -1624,28 +1635,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
   },
-  tourButtonWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  tourButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  tourButtonText: {
-    fontSize: 13,
-    letterSpacing: 0.3,
-  },
   themeToggle: {
     position: 'absolute',
     right: 24,
+  },
+  onboardingButton: {
+    position: 'absolute',
+    right: 64,
   },
   themeCircle: {
     width: 28,

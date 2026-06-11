@@ -1,18 +1,15 @@
 import { useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withDelay,
 } from 'react-native-reanimated';
-import { EASE_OUT } from '@/constants/animations';
-import { Fonts } from '@/constants/theme';
-import { palette } from '@/lib/theme';
-import { haptics } from '@/lib/haptics';
 
+import { EASE_OUT } from '@/constants/animations';
+import CtaButton from '../CtaButton';
+import { TypedLine, typeText, type Seg, type TypedWord } from '../TypeReveal';
 
 const HOURS_MAP: Record<string, number> = {
   '2–3h': 2.5,
@@ -34,62 +31,44 @@ const YEARS_LEFT_MAP: Record<string, number> = {
 };
 const DEFAULT_YEARS_LEFT = 50;
 
-type Token = { word: string; accent: boolean; bold: boolean };
+// The same letter-by-letter typing as the story acts, deliberately slower —
+// these numbers should land one keystroke at a time. Paragraphs are typed
+// in sequence with a breath between them.
+const START_MS = 800;
+const LETTER_STEP = 55;
+const PARAGRAPH_PAUSE_MS = 250;
 
-function buildLines(hoursPerDay: number, yearsLeft: number): { text: string; accent: boolean; bold: boolean }[] {
+/** Keep an accent stat (e.g. "~2 373 hours") on one line — NBSP makes the
+ *  whole phrase a single unbreakable "word" for the renderer. */
+const nb = (s: string) => s.replace(/ /g, ' ');
+
+function buildParagraphs(hoursPerDay: number, yearsLeft: number): Seg[][] {
   const hoursPerYear = Math.round(hoursPerDay * 365);
   const daysPerYear = Math.round(hoursPerYear / 24);
   const yearsScrollingLeft = Math.round((hoursPerDay * 365 * yearsLeft) / 8760);
 
-  // Use non-breaking space ( ) inside accent phrases so they stay
-  // on a single line — the word-by-word splitter below uses regular
-  // space as the delimiter, and the renderer treats   as
-  // unbreakable, so e.g. "~6 years" never wraps mid-phrase.
   return [
-    { text: `That's`, accent: false, bold: false },
-    { text: `~${hoursPerYear.toLocaleString()} hours`, accent: true, bold: true },
-    { text: `on your phone this year.`, accent: false, bold: false },
-    { text: `\n\n~${daysPerYear} full days.`, accent: true, bold: true },
-    { text: `Gone.`, accent: false, bold: true },
-    { text: `\n\nOver your next ~${yearsLeft} years —`, accent: false, bold: false },
-    { text: `~${yearsScrollingLeft} years`, accent: true, bold: true },
-    { text: `of scrolling.`, accent: false, bold: false },
-    { text: `\n\nWhat if you took just`, accent: false, bold: false },
-    { text: `one minute`, accent: true, bold: true },
-    { text: `back?`, accent: false, bold: false },
+    [
+      { text: `That's ` },
+      { text: nb(`~${hoursPerYear.toLocaleString()} hours`), accent: true, strong: true },
+      { text: ` on your phone this year.` },
+    ],
+    [
+      { text: nb(`~${daysPerYear} full days.`), accent: true, strong: true },
+      { text: ` ` },
+      { text: `Gone.`, strong: true },
+    ],
+    [
+      { text: `Over your next ~${yearsLeft} years — ` },
+      { text: nb(`~${yearsScrollingLeft} years`), accent: true, strong: true },
+      { text: ` of scrolling.` },
+    ],
+    [
+      { text: `What if you took just ` },
+      { text: nb(`one minute`), accent: true, strong: true },
+      { text: ` back?` },
+    ],
   ];
-}
-
-function Word({ text, delay, bold, accent }: { text: string; delay: number; bold?: boolean; accent?: boolean }) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(10);
-
-  useEffect(() => {
-    opacity.value = withDelay(delay, withTiming(1, { duration: 700, easing: EASE_OUT }));
-    translateY.value = withDelay(delay, withTiming(0, { duration: 700, easing: EASE_OUT }));
-    // Tactile "typewriter" pulse synced to each word's reveal — a subtle
-    // selection tick for plain words, a slightly firmer light tap on the
-    // coloured stats so the numbers land with emphasis.
-    const t = setTimeout(() => (accent ? haptics.light() : haptics.select()), delay);
-    return () => clearTimeout(t);
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Animated.Text
-      style={[
-        animStyle,
-        bold && { fontWeight: '600' },
-        accent && { color: palette.terracotta },
-      ]}
-    >
-      {text}{' '}
-    </Animated.Text>
-  );
 }
 
 interface Props {
@@ -100,26 +79,30 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnswer, ageAnswer, theme }: Props) {
+export default function ScreenTimeStatsScreen({
+  isActive,
+  onNext,
+  screenTimeAnswer,
+  ageAnswer,
+  theme,
+}: Props) {
   const insets = useSafeAreaInsets();
 
   const hoursPerDay = HOURS_MAP[screenTimeAnswer] ?? 4.5;
   const yearsLeft = YEARS_LEFT_MAP[ageAnswer] ?? DEFAULT_YEARS_LEFT;
-  const lines = useMemo(() => buildLines(hoursPerDay, yearsLeft), [hoursPerDay, yearsLeft]);
 
-  // Accent phrases are kept as a single token (with internal spaces
-  // swapped for NBSP) so the colored stat — e.g. "~6 years" — never
-  // wraps mid-phrase. Non-accent lines split into words as before.
-  const allWords: Token[] = useMemo(() =>
-    lines.flatMap(l => {
-      if (l.accent) {
-        return [{ word: l.text.replace(/ /g, ' '), bold: l.bold, accent: l.accent }];
-      }
-      return l.text.split(' ').map(w => ({ word: w, bold: l.bold, accent: l.accent }));
-    }), [lines]);
-
-  const WORD_DELAY = 120;
-  const totalWordsDuration = allWords.length * WORD_DELAY + 700;
+  // Type the paragraphs one after another, a breath between each.
+  const { paragraphs, doneAt } = useMemo(() => {
+    let t = START_MS;
+    const typed: TypedWord[][] = buildParagraphs(hoursPerDay, yearsLeft).map(
+      (segs) => {
+        const out = typeText(segs, t, LETTER_STEP);
+        t = out.end + PARAGRAPH_PAUSE_MS;
+        return out.words;
+      },
+    );
+    return { paragraphs: typed, doneAt: t - PARAGRAPH_PAUSE_MS };
+  }, [hoursPerDay, yearsLeft]);
 
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(12);
@@ -129,9 +112,10 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
     const t1 = setTimeout(() => {
       buttonOpacity.value = withTiming(1, { duration: 600, easing: EASE_OUT });
       buttonTranslateY.value = withTiming(0, { duration: 600, easing: EASE_OUT });
-    }, totalWordsDuration + 200);
+    }, doneAt + 300);
     return () => clearTimeout(t1);
-  }, [isActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, doneAt]);
 
   const buttonAnimStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
@@ -143,20 +127,14 @@ export default function ScreenTimeStatsScreen({ isActive, onNext, screenTimeAnsw
       <View style={[styles.content, { paddingBottom: insets.bottom }]}>
         <View style={styles.centerArea}>
           <View style={styles.textArea}>
-            <Text style={[styles.body, { color: theme.text }]}>
-              {allWords.map((w, i) => (
-                <Word key={i} text={w.word} delay={i * WORD_DELAY} bold={w.bold} accent={w.accent} />
-              ))}
-            </Text>
+            {paragraphs.map((words, i) => (
+              <TypedLine key={i} words={words} color={theme.text} />
+            ))}
           </View>
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <Pressable onPress={onNext} style={styles.ctaButton}>
-            <Text style={styles.ctaText}>
-              bring my minute back
-            </Text>
-          </Pressable>
+          <CtaButton label="bring my minute back" onPress={onNext} />
         </Animated.View>
       </View>
     </View>
@@ -175,27 +153,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  textArea: {},
-  body: {
-    fontFamily: Fonts?.serif,
-    fontSize: 26,
-    fontWeight: '400',
-    textAlign: 'left',
-    lineHeight: 38,
+  textArea: {
+    gap: 18,
   },
   buttonArea: {
     alignItems: 'center',
-  },
-  ctaButton: {
-    backgroundColor: palette.terracotta,
-    borderRadius: 100,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-  },
-  ctaText: {
-    fontFamily: Fonts?.serif,
-    fontSize: 18,
-    fontWeight: '400',
-    color: palette.cream,
   },
 });

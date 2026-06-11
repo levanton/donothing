@@ -17,7 +17,8 @@ interface Props {
 // Lives inside the home screen (so it can drive the slide animations)
 // while still under <CopilotProvider> from the root layout. Watches
 // copilot events and the `tutorialPending` store flag to:
-//   1) start the tour when the home "how it works" button sets it pending
+//   1) start the tour when the home screen sets it pending (auto, one
+//      second after the user first lands there)
 //   2) open the right panel for each step's `screen`
 //   3) mark the tour complete + close panels on stop/finish
 export function TutorialController({ showHome, showSettings, showHistory, settleMs = 450 }: Props) {
@@ -41,11 +42,11 @@ export function TutorialController({ showHome, showSettings, showHistory, settle
   const setTutorialPendingRef = useRef(setTutorialPending);
   setTutorialPendingRef.current = setTutorialPending;
 
-  // The tour never auto-shows. It starts only when the user taps the
-  // "how it works" button on the home screen, which sets `tutorialPending`.
-  // Clears the flag only inside the timer (after start) so the synchronous
-  // state change can't cancel its own start. The 400ms delay lets the home
-  // settle so copilot measures the first target cleanly.
+  // The tour starts when the home screen sets `tutorialPending` (one quiet
+  // second after the first visit). Clears the flag only inside the timer
+  // (after start) so the synchronous state change can't cancel its own
+  // start. The 400ms delay lets the home settle so copilot measures the
+  // first target cleanly.
   useEffect(() => {
     if (!ready || !tutorialPending) return;
     startedRef.current = true;

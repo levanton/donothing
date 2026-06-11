@@ -17,8 +17,8 @@ import { Feather } from '@expo/vector-icons';
 import { EASE_IN_OUT } from '@/constants/animations';
 import { track } from '@/lib/analytics';
 import { haptics } from '@/lib/haptics';
-import PillButton from '@/components/PillButton';
 import CircleNextButton from '../CircleNextButton';
+import CtaButton from '../CtaButton';
 import RadialDots from '../RadialDots';
 import { DOT_MORPH_MS, getDotFieldLayout } from '../dotFieldLayout';
 import { fadeEnter, fadeExit } from '../transitions';
@@ -207,12 +207,7 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
           exiting={FadeOut.duration(300)}
           style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
-          <PillButton
-            label="continue"
-            onPress={onNext}
-            color={theme.text}
-            variant="outline"
-          />
+          <CtaButton label="continue" onPress={onNext} />
         </Animated.View>
       )}
 

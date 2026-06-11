@@ -1,6 +1,5 @@
 import { StyleSheet, View } from 'react-native';
 
-import { DOT_MORPH_MS } from '../dotFieldLayout';
 import {
   buildTimetable,
   TeleprompterColumn,
@@ -32,12 +31,9 @@ const TIMETABLE = buildTimetable(LINES, START_MS);
 const LAST = TIMETABLE.lines[TIMETABLE.lines.length - 1];
 export const WHATIF_RINGS_AT_MS = LAST.glideAt + LAST.glideDur;
 
-/** When the whole 'what if…' performance is over: text typed AND the
- *  scatter→rings morph has settled. */
-export const WHATIF_DONE_MS = Math.max(
-  TIMETABLE.end,
-  WHATIF_RINGS_AT_MS + DOT_MORPH_MS,
-);
+/** When the continue pill may appear — as soon as the text is typed (the
+ *  rings finish forming just before that). */
+export const WHATIF_DONE_MS = TIMETABLE.end;
 
 interface Props {
   isActive: boolean;

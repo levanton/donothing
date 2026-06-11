@@ -103,7 +103,7 @@ export interface OnboardingPage {
 }
 
 export const PAGES: OnboardingPage[] = [
-  { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  hasCircleNext: true, showProgress: false, showBackButton: false },
+  { id: 'welcome',         bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },
   // The three-act story ("remember?" → "now." → "what if…") lives on ONE
   // page — StoryScreen advances its own acts and owns its arrow/back.
   { id: 'story',           bg: APP_BG,             theme: 'light', hasOwnButton: true,  showProgress: false, showBackButton: false },

@@ -9,6 +9,7 @@ import { palette, themes, CARD_BORDER_WIDTH, type AppTheme } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
 import type { ScheduledBlock } from '@/lib/db/types';
 import PillButton from '@/components/PillButton';
+import CtaButton from '../CtaButton';
 import PickerSheet from '@/components/PickerSheet';
 import BlockPickerContent from '@/components/BlockPicker';
 import AlertModal from '@/components/AlertModal';
@@ -210,12 +211,7 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
       </ScrollView>
 
       <View style={[styles.continueWrap, { paddingBottom: insets.bottom + 24 }]}>
-        <PillButton
-          label="continue"
-          color={palette.terracotta}
-          variant="filled"
-          onPress={onNext}
-        />
+        <CtaButton label="continue" onPress={onNext} />
       </View>
 
       <PickerSheet

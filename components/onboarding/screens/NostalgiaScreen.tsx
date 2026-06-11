@@ -39,8 +39,9 @@ const IMAGE_REVEAL_MS = 1100;
 
 const grassImage = require('@/assets/images/child.png');
 
-/** When the whole 'remember?' performance (text + picture) has finished. */
-export const NOSTALGIA_DONE_MS = TIMETABLE.finaleAt + IMAGE_REVEAL_MS;
+/** When the arrow may appear — as soon as the text is typed; the picture
+ *  keeps fading in alongside it. */
+export const NOSTALGIA_DONE_MS = TIMETABLE.end;
 
 interface Props {
   isActive: boolean;
