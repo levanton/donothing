@@ -9,9 +9,12 @@ import { useFaceDown } from '@/hooks/useFaceDown';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -107,8 +110,32 @@ function SessionEndedSheet({
       }
     }, [visible, iconOpacity]);
 
+    // One shared breathing rhythm for the paused screen — the hourglass
+    // floats gently and the leading sand grain pulses on the same slow
+    // cycle, so the held session reads as waiting, not dead. The float
+    // is mostly movement: a soft 5pt drift with only a whisper of
+    // opacity, so the artwork never visibly fades.
+    const breath = useSharedValue(0);
+    useEffect(() => {
+      if (visible) {
+        breath.value = withRepeat(
+          withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+          -1,
+          true,
+        );
+        return;
+      }
+      cancelAnimation(breath);
+      breath.value = 0;
+    }, [visible, breath]);
+
     const overlayStyle = useAnimatedStyle(() => ({
-      opacity: iconOpacity.value,
+      opacity: iconOpacity.value * (0.94 + 0.06 * breath.value),
+      transform: [{ translateY: -5 * breath.value }],
+    }));
+
+    const leadGrainStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: 1 + 0.18 * breath.value }],
     }));
 
     // BottomSheetModal renders into a portal — no z-index/layout
@@ -156,6 +183,15 @@ function SessionEndedSheet({
     const [sheetTopY, setSheetTopY] = useState<number | null>(null);
     const pauseCentreY = sheetTopY != null ? sheetTopY / 2 : SCREEN_H * 0.25;
 
+    // Floating-card geometry. Neither gorhom's detached/bottomInset nor
+    // margins on backgroundStyle lift a dynamically-sized modal off the
+    // bottom edge (both verified on device — the background container is
+    // an absolute fill that ignores bottom margin). So the sheet itself
+    // is fully transparent and the visible card is plain content: a
+    // regular View with side gutters and a bottom margin clearing the
+    // home indicator. Layout margins on flow views cannot be ignored.
+    const cardBottomGutter = insets.bottom + 4;
+
     // The user paused mid-session — they did NOT finish. Copy and
     // visuals lean into "here's what's still ahead" rather than any
     // congratulatory framing. The big number is the focal point:
@@ -191,29 +227,37 @@ function SessionEndedSheet({
         enableContentPanningGesture={false}
         backdropComponent={TerracottaBackdrop}
         handleComponent={null}
-        backgroundStyle={{
-          backgroundColor: theme.bg,
-          borderTopLeftRadius: 36,
-          borderTopRightRadius: 36,
-        }}
+        backgroundComponent={null}
+        // Positioning is handled by the card's own margins; `detached`
+        // is here only because it flips gorhom's content container to
+        // overflow: visible — without it the card's top shadow is
+        // clipped at the sheet edge.
+        detached
         onDismiss={onClose}
       >
         <BottomSheetView
-          style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
+          style={styles.sheetWrap}
           onLayout={(e) =>
             setSheetTopY(SCREEN_H - e.nativeEvent.layout.height)
           }
         >
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.bg, marginBottom: cardBottomGutter },
+          ]}
+        >
           {/* The next action, as the sheet's headline: putting the phone
-              face down resumes. Tappable as the no-sensor fallback. */}
-          <Pressable onPress={handleContinue} hitSlop={8} style={styles.flipHeading}>
-            <Text style={[styles.flipHeadingText, { color: theme.text, fontFamily: Fonts!.serif }]}>
-              place the phone face down
-            </Text>
-            <Text style={[styles.flipHeadingSub, { fontFamily: Fonts!.serif }]}>
-              the timer continues on its own
-            </Text>
-          </Pressable>
+              face down resumes. Tappable as the no-sensor fallback. Set
+              in mono — the same instruction voice as the face-down
+              gate, so both ritual screens speak one language. */}
+          <Animated.View entering={FadeIn.duration(400)}>
+            <Pressable onPress={handleContinue} hitSlop={8} style={styles.flipHeading}>
+              <Text style={[styles.flipHeadingText, { color: theme.text, fontFamily: Fonts!.mono }]}>
+                place the phone{'\n'}face down to continue
+              </Text>
+            </Pressable>
+          </Animated.View>
 
           {/* Hero — big mono number with a soft caption underneath.
               Goal mode: shows time remaining; free mode: shows what
@@ -221,7 +265,8 @@ function SessionEndedSheet({
               progress bar is hidden, so we add bottom padding here
               to keep breathing room before the continue pill instead
               of cramming the timer onto it. */}
-          <View
+          <Animated.View
+            entering={FadeIn.duration(400).delay(80)}
             style={[
               styles.hero,
               !hasGoal && styles.heroFree,
@@ -235,7 +280,7 @@ function SessionEndedSheet({
             >
               {timerDisplay(heroSeconds)}
             </Text>
-          </View>
+          </Animated.View>
 
           {/* Progress visual — a row of "sand grains" in tune with the
               hourglass icon above the sheet. Each grain represents 1/N
@@ -245,7 +290,10 @@ function SessionEndedSheet({
               generic progress bar. Hidden in free mode where there's
               no goal to track against. */}
           {hasGoal && (
-            <View style={styles.progressWrap}>
+            <Animated.View
+              entering={FadeIn.duration(400).delay(160)}
+              style={styles.progressWrap}
+            >
               <View style={styles.progressTrack}>
                 {Array.from({ length: PROGRESS_DOT_COUNT }, (_, i) => {
                   // Each grain occupies 1/N of the bar; we mark grain i
@@ -255,6 +303,22 @@ function SessionEndedSheet({
                   const isLead =
                     isFilled &&
                     grainCentre > progressPct / 100 - 1 / PROGRESS_DOT_COUNT;
+                  // The leading grain — the one currently "dropping" —
+                  // pulses on the shared breath so the bar feels held
+                  // mid-pour rather than stopped.
+                  if (isLead) {
+                    return (
+                      <Animated.View
+                        key={i}
+                        style={[
+                          styles.progressDot,
+                          styles.progressDotFilled,
+                          styles.progressDotLead,
+                          leadGrainStyle,
+                        ]}
+                      />
+                    );
+                  }
                   return (
                     <View
                       key={i}
@@ -262,7 +326,6 @@ function SessionEndedSheet({
                         styles.progressDot,
                         { backgroundColor: theme.text },
                         isFilled && styles.progressDotFilled,
-                        isLead && styles.progressDotLead,
                       ]}
                     />
                   );
@@ -286,10 +349,13 @@ function SessionEndedSheet({
                   {timerDisplay(goalSeconds)}
                 </Text>
               </View>
-            </View>
+            </Animated.View>
           )}
 
-          <View style={styles.secondaryRow}>
+          <Animated.View
+            entering={FadeIn.duration(400).delay(240)}
+            style={styles.secondaryRow}
+          >
             <Pressable
               onPress={handleStartOver}
               style={({ pressed }) => [
@@ -324,7 +390,8 @@ function SessionEndedSheet({
                 {isBlockSession ? 'unlock now' : 'back home'}
               </Text>
             </Pressable>
-          </View>
+          </Animated.View>
+        </View>
         </BottomSheetView>
       </BottomSheetModal>
       </>
@@ -341,16 +408,12 @@ const CHIP_LIGHT = palette.sand;
 const styles = StyleSheet.create({
   flipHeading: {
     alignItems: 'center',
-    gap: 3,
     marginBottom: 4,
   },
   flipHeadingText: {
-    fontSize: 21,
-    textAlign: 'center',
-  },
-  flipHeadingSub: {
-    fontSize: 14,
-    color: TERRACOTTA,
+    fontSize: 17,
+    lineHeight: 26,
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
   // Fixed position relative to the screen so the icon doesn't slide
@@ -369,10 +432,22 @@ const styles = StyleSheet.create({
     height: PAUSE_SIZE,
     resizeMode: 'contain',
   },
-  body: {
+  // Transparent sheet content: a 12pt side gutter around the card.
+  sheetWrap: {
+    paddingHorizontal: 12,
+  },
+  // The visible floating card — colour and bottom gutter applied inline.
+  // Soft drop shadow lifts the card off the terracotta backdrop.
+  card: {
+    borderRadius: 36,
     paddingHorizontal: 28,
     paddingTop: 28,
+    paddingBottom: 28,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   hero: {
     alignSelf: 'stretch',
@@ -445,7 +520,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   progressLabelText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
     letterSpacing: 0.6,

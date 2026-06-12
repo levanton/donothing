@@ -130,15 +130,16 @@ export default function RunOverlay({
   }));
 
   // Gate choreography. While the screen waits for the flip the
-  // illustration breathes — a slow opacity swell at a resting-breath
-  // pace — and the goal digits hold at a smaller scale so the
-  // instruction stays the protagonist. The moment the clock actually
-  // starts the digits grow to full size while gliding to the centre.
+  // illustration floats — a gentle 5pt drift with only a whisper of
+  // opacity, at a resting-breath pace — and the goal digits hold at a
+  // smaller scale so the instruction stays the protagonist. The moment
+  // the clock actually starts the digits grow to full size while
+  // gliding to the centre.
   const breath = useSharedValue(0);
   useEffect(() => {
     if (awaitingFaceDown) {
       breath.value = withRepeat(
-        withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
         -1,
         true,
       );
@@ -148,7 +149,8 @@ export default function RunOverlay({
     breath.value = 0;
   }, [awaitingFaceDown, breath]);
   const breathStyle = useAnimatedStyle(() => ({
-    opacity: 0.62 + 0.38 * breath.value,
+    opacity: 0.74 + 0.08 * breath.value,
+    transform: [{ translateY: -5 * breath.value }],
   }));
 
   const gateHold = useSharedValue(awaitingFaceDown ? 1 : 0);

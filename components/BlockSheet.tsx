@@ -160,15 +160,25 @@ function BlockSheet({
         enableContentPanningGesture={false}
         backdropComponent={TerracottaBackdrop}
         handleComponent={null}
-        backgroundStyle={{
-          backgroundColor: theme.bg,
-          borderTopLeftRadius: 36,
-          borderTopRightRadius: 36,
-        }}
+        backgroundComponent={null}
+        // Positioning is handled by the card's own margins; `detached`
+        // is here only because it flips gorhom's content container to
+        // overflow: visible — without it the card's top shadow is
+        // clipped at the sheet edge.
+        detached
         onDismiss={onClose}
       >
-        <BottomSheetView
-          style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
+        {/* Floating card — the sheet itself is transparent; the visible
+            card is a flow View with side gutters and a bottom margin
+            clearing the home indicator (same treatment as
+            SessionEndedSheet — gorhom's own background ignores bottom
+            margins, a flow view can't). */}
+        <BottomSheetView style={styles.sheetWrap}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.bg, marginBottom: insets.bottom + 4 },
+          ]}
         >
           {/* Eyebrow */}
           <View style={styles.eyebrowRow}>
@@ -286,6 +296,7 @@ function BlockSheet({
               />
             </View>
           </Pressable>
+        </View>
         </BottomSheetView>
       </BottomSheetModal>
     );
@@ -313,10 +324,22 @@ const styles = StyleSheet.create({
     height: MOUNTAIN_SIZE,
     resizeMode: 'contain',
   },
-  body: {
+  // Transparent sheet content: a 12pt side gutter around the card.
+  sheetWrap: {
+    paddingHorizontal: 12,
+  },
+  // The visible floating card — colour and bottom gutter applied inline.
+  // Soft drop shadow lifts the card off the terracotta backdrop.
+  card: {
+    borderRadius: 36,
     paddingHorizontal: 28,
     paddingTop: 28,
+    paddingBottom: 28,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   eyebrowRow: {
     flexDirection: 'row',
@@ -383,7 +406,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     backgroundColor: TERRACOTTA,
     borderRadius: 100,
-    paddingVertical: 20,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
