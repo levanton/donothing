@@ -12,6 +12,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -173,6 +174,38 @@ function SessionEndedSheet({
       haptics.success();
       onUnlock?.();
     }, [onUnlock]);
+
+    // Hold-to-unlock — same ritual as the BlockSheet's pill: a tap does
+    // nothing, a sustained 1.5s hold fills the chip and unlocks. Leaving
+    // a block early should cost the same deliberate gesture everywhere.
+    const holdProgress = useSharedValue(0);
+    const handleUnlockHoldStart = useCallback(() => {
+      haptics.light();
+      holdProgress.value = withTiming(
+        1,
+        { duration: 1500, easing: Easing.linear },
+        (finished) => {
+          if (finished) {
+            holdProgress.value = 0;
+            runOnJS(handleUnlock)();
+          }
+        },
+      );
+    }, [holdProgress, handleUnlock]);
+    const handleUnlockHoldEnd = useCallback(() => {
+      cancelAnimation(holdProgress);
+      holdProgress.value = withTiming(0, {
+        duration: 200,
+        easing: Easing.out(Easing.quad),
+      });
+    }, [holdProgress]);
+
+    const holdTintStyle = useAnimatedStyle(() => ({
+      opacity: holdProgress.value * 0.35,
+    }));
+    const holdBarStyle = useAnimatedStyle(() => ({
+      width: `${holdProgress.value * 100}%`,
+    }));
 
     const isBlockSession = sessionOrigin === 'block';
 
@@ -371,25 +404,55 @@ function SessionEndedSheet({
                 start over
               </Text>
             </Pressable>
-            <Pressable
-              onPress={isBlockSession ? handleUnlock : handleEnd}
-              style={({ pressed }) => [
-                styles.secondaryChip,
-                pressed && styles.secondaryChipPressed,
-              ]}
-              hitSlop={8}
-            >
-              <Feather
-                name={isBlockSession ? 'unlock' : 'home'}
-                size={14}
-                color={BROWN}
-              />
-              <Text
-                style={[styles.secondaryText, { fontFamily: Fonts!.serif }]}
+            {isBlockSession ? (
+              <Pressable
+                onPressIn={handleUnlockHoldStart}
+                onPressOut={handleUnlockHoldEnd}
+                style={styles.secondaryChip}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Hold to unlock now"
               >
-                {isBlockSession ? 'unlock now' : 'back home'}
-              </Text>
-            </Pressable>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.holdTint,
+                    { backgroundColor: TERRACOTTA },
+                    holdTintStyle,
+                  ]}
+                />
+                <Feather name="unlock" size={14} color={BROWN} />
+                <Text
+                  style={[styles.secondaryText, { fontFamily: Fonts!.serif }]}
+                >
+                  hold to unlock
+                </Text>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.holdBar,
+                    { backgroundColor: TERRACOTTA },
+                    holdBarStyle,
+                  ]}
+                />
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleEnd}
+                style={({ pressed }) => [
+                  styles.secondaryChip,
+                  pressed && styles.secondaryChipPressed,
+                ]}
+                hitSlop={8}
+              >
+                <Feather name="home" size={14} color={BROWN} />
+                <Text
+                  style={[styles.secondaryText, { fontFamily: Fonts!.serif }]}
+                >
+                  back home
+                </Text>
+              </Pressable>
+            )}
           </Animated.View>
         </View>
         </BottomSheetView>
@@ -564,6 +627,19 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     minWidth: 132,
     justifyContent: 'center',
+    // Clips the hold tint/progress bar to the pill curve.
+    overflow: 'hidden',
+  },
+  // Hold-to-unlock feedback — mirrors the BlockSheet pill: a soft
+  // terracotta tint across the chip plus a thin honest progress bar.
+  holdTint: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  holdBar: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 2.5,
   },
   secondaryChipPressed: {
     opacity: 0.85,
