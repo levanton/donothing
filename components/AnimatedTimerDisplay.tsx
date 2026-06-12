@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
-    fontWeight: '200',
+    fontWeight: '100',
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },

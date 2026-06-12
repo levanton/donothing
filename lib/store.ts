@@ -718,6 +718,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       return;
     }
+    // The same "it has begun" cue as beginCountdown — the clock resuming
+    // is a start too, and must never be silent.
+    sound.start();
     // Re-anchor sessionStartTime to the frozen elapsed so the next
     // interval tick continues from where we paused.
     sessionStartTime = Date.now() - elapsed * 1000;

@@ -6,7 +6,7 @@ import {
 } from '@gorhom/bottom-sheet';
 import { haptics } from '@/lib/haptics';
 import { useFaceDown } from '@/hooks/useFaceDown';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -149,6 +149,13 @@ function SessionEndedSheet({
 
     const isBlockSession = sessionOrigin === 'block';
 
+    // The hourglass centres in the free terracotta band between the top
+    // of the screen and the sheet's top edge. The sheet is dynamically
+    // sized, so its top is only known after the content measures —
+    // until then fall back to the old fixed 25%-height placement.
+    const [sheetTopY, setSheetTopY] = useState<number | null>(null);
+    const pauseCentreY = sheetTopY != null ? sheetTopY / 2 : SCREEN_H * 0.25;
+
     // The user paused mid-session — they did NOT finish. Copy and
     // visuals lean into "here's what's still ahead" rather than any
     // congratulatory framing. The big number is the focal point:
@@ -165,7 +172,11 @@ function SessionEndedSheet({
       <>
       <Animated.View
         pointerEvents="none"
-        style={[styles.pauseOverlay, overlayStyle]}
+        style={[
+          styles.pauseOverlay,
+          { top: pauseCentreY - PAUSE_SIZE / 2 },
+          overlayStyle,
+        ]}
       >
         <Image source={pauseImage} style={styles.pauseImage} fadeDuration={0} />
       </Animated.View>
@@ -189,6 +200,9 @@ function SessionEndedSheet({
       >
         <BottomSheetView
           style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
+          onLayout={(e) =>
+            setSheetTopY(SCREEN_H - e.nativeEvent.layout.height)
+          }
         >
           {/* The next action, as the sheet's headline: putting the phone
               face down resumes. Tappable as the no-sensor fallback. */}
@@ -340,12 +354,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   // Fixed position relative to the screen so the icon doesn't slide
-  // down with the sheet on dismiss — it just fades. Sits at ~25% from
-  // the top, which lands roughly above the sheet's top edge on
-  // standard iPhone heights regardless of sheet content size.
+  // down with the sheet on dismiss — it just fades. The vertical
+  // placement (centred in the band above the measured sheet) is
+  // applied inline.
   pauseOverlay: {
     position: 'absolute',
-    top: SCREEN_H * 0.25 - PAUSE_SIZE / 2,
     left: 0,
     right: 0,
     alignItems: 'center',

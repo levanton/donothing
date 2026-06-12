@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -17,6 +20,8 @@ import { Fonts } from '@/constants/theme';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
+
+const phoneDownImage = require('@/assets/images/phone-down-7-trimmed.png');
 
 interface RunOverlayProps {
   theme: AppTheme;
@@ -166,21 +171,42 @@ export default function RunOverlay({
 
           {/* Big cream timer at vertical centre. NOT rendered at all while the
               interrupt sheet is up (paused / lock) so it can never duplicate the
-              sheet's MM:SS — the paused state always wins. */}
+              sheet's MM:SS — the paused state always wins. While the face-down
+              gate is up, its instruction + illustration join this column so the
+              whole gate reads as one vertically centred group; when the gate
+              clears, the timer glides back to the exact centre. */}
           {(!suppressed || awaitingFaceDown) && (
             <Animated.View
               style={[styles.runCenter, contentStyle]}
               pointerEvents="none"
             >
-              <AnimatedTimerDisplay
-                seconds={
-                  goalSeconds > 0
-                    ? Math.max(0, goalSeconds - elapsed)
-                    : elapsed
-                }
-                color={palette.cream}
-                fontSize={80}
-              />
+              {awaitingFaceDown && (
+                <Animated.View
+                  entering={FadeIn.duration(600)}
+                  exiting={FadeOut.duration(400)}
+                  style={styles.gateIntro}
+                >
+                  <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
+                    place your phone{'\n'}face down to start
+                  </Text>
+                  <Image
+                    source={phoneDownImage}
+                    style={styles.gateIllustration}
+                    fadeDuration={0}
+                  />
+                </Animated.View>
+              )}
+              <Animated.View layout={LinearTransition.duration(400)}>
+                <AnimatedTimerDisplay
+                  seconds={
+                    goalSeconds > 0
+                      ? Math.max(0, goalSeconds - elapsed)
+                      : elapsed
+                  }
+                  color={palette.cream}
+                  fontSize={76}
+                />
+              </Animated.View>
             </Animated.View>
           )}
 
@@ -287,6 +313,30 @@ const styles = StyleSheet.create({
   runCenter: {
     alignItems: 'center',
     justifyContent: 'center',
+    // Lifts the centred group slightly above the true centre — optically
+    // it reads as centred once the bottom pill row is in the frame.
+    paddingBottom: 60,
+  },
+  // Face-down gate instruction block — flows above the timer inside the
+  // centred column so title + illustration + digits centre as one group.
+  gateIntro: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  gateTitle: {
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 27,
+    color: palette.cream,
+    textAlign: 'center',
+  },
+  gateIllustration: {
+    // Trimmed to the artwork's real bounds, ~1.4:1.
+    width: 170,
+    height: 120,
+    marginTop: 24,
+    resizeMode: 'contain',
+    opacity: 0.8,
   },
   // Interrupt is the primary action — substantial cream-outline
   // pill at the bottom, reachable thumb position. Wrapper carries
