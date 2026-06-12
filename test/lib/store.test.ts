@@ -16,6 +16,7 @@ jest.mock('@/lib/screen-time', () => ({
 jest.mock('@/lib/notifications', () => ({
   configureNotifications: jest.fn(),
   scheduleSessionCompleteNotification: jest.fn().mockResolvedValue('notif-id'),
+  scheduleBlocksPausedNotification: jest.fn().mockResolvedValue('notif-id'),
   cancelNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
