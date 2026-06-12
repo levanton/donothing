@@ -5,6 +5,7 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { haptics } from '@/lib/haptics';
+import { useFaceDown } from '@/hooks/useFaceDown';
 import { useCallback, useEffect, useRef } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -121,6 +122,16 @@ function SessionEndedSheet({
       onContinue?.();
     }, [onContinue]);
 
+    // The ritual continues the session: putting the phone back face down
+    // resumes it (same sustained-reading detector as the start gate). The
+    // instruction text below stays tappable as the no-sensor fallback.
+    const { faceDown } = useFaceDown(visible);
+    useEffect(() => {
+      if (!visible || !faceDown) return;
+      haptics.begin();
+      onContinue?.();
+    }, [visible, faceDown, onContinue]);
+
     const handleStartOver = useCallback(() => {
       haptics.light();
       onStartOver?.();
@@ -179,6 +190,17 @@ function SessionEndedSheet({
         <BottomSheetView
           style={[styles.body, { paddingBottom: insets.bottom + 28 }]}
         >
+          {/* The next action, as the sheet's headline: putting the phone
+              face down resumes. Tappable as the no-sensor fallback. */}
+          <Pressable onPress={handleContinue} hitSlop={8} style={styles.flipHeading}>
+            <Text style={[styles.flipHeadingText, { color: theme.text, fontFamily: Fonts!.serif }]}>
+              place the phone face down
+            </Text>
+            <Text style={[styles.flipHeadingSub, { fontFamily: Fonts!.serif }]}>
+              the timer continues on its own
+            </Text>
+          </Pressable>
+
           {/* Hero — big mono number with a soft caption underneath.
               Goal mode: shows time remaining; free mode: shows what
               they've done so far. In stopwatch (free) mode the
@@ -253,18 +275,6 @@ function SessionEndedSheet({
             </View>
           )}
 
-          <Pressable
-            onPress={handleContinue}
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              pressed && styles.primaryBtnPressed,
-            ]}
-            hitSlop={8}
-          >
-            <Text style={[styles.primaryText, { fontFamily: Fonts!.serif }]}>
-              continue
-            </Text>
-          </Pressable>
           <View style={styles.secondaryRow}>
             <Pressable
               onPress={handleStartOver}
@@ -315,6 +325,20 @@ const TERRACOTTA = palette.terracotta;
 const CHIP_LIGHT = palette.sand;
 
 const styles = StyleSheet.create({
+  flipHeading: {
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 4,
+  },
+  flipHeadingText: {
+    fontSize: 21,
+    textAlign: 'center',
+  },
+  flipHeadingSub: {
+    fontSize: 14,
+    color: TERRACOTTA,
+    textAlign: 'center',
+  },
   // Fixed position relative to the screen so the icon doesn't slide
   // down with the sheet on dismiss — it just fades. Sits at ~25% from
   // the top, which lands roughly above the sheet's top edge on

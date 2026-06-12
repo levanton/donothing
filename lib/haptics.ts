@@ -15,6 +15,21 @@ export const haptics = {
   success: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}),
   warning: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}),
   error: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {}),
+  // A firm, unmistakable "it has begun" — felt through the table when the
+  // phone has just been laid face down. Shorter and punchier than the
+  // end-of-session celebrate.
+  begin: () => {
+    if (CoreHaptics.isSupported()) {
+      CoreHaptics.playSwell(0.85, 1.0);
+      return;
+    }
+    // Fallback: three rising impacts — reads as one decisive pulse.
+    const I = Haptics.ImpactFeedbackStyle;
+    Haptics.impactAsync(I.Medium).catch(() => {});
+    setTimeout(() => Haptics.impactAsync(I.Heavy).catch(() => {}), 90);
+    setTimeout(() => Haptics.impactAsync(I.Heavy).catch(() => {}), 200);
+  },
+
   // A long, smooth "swell" played when a session finishes — in place of an
   // end-of-timer notification.
   //

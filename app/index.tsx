@@ -35,6 +35,8 @@ import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import DriftingDots from '@/components/DriftingDots';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
+import FaceDownGate from '@/components/FaceDownGate';
+import { useFaceDown } from '@/hooks/useFaceDown';
 import SettingsContent from '@/components/SettingsContent';
 import TimerDisplay from '@/components/TimerDisplay';
 import { TutorialController, TutorialStepWrapper } from '@/components/tutorial';
@@ -70,6 +72,12 @@ export default function DoNothingScreen() {
   const weekStats = useAppStore((s) => s.weekStats);
   const ready = useAppStore((s) => s.ready);
   const started = useAppStore((s) => s.started);
+  const phase = useAppStore((s) => s.phase);
+  const awaitingFaceDown = useAppStore((s) => s.awaitingFaceDown);
+  const completionHeld = useAppStore((s) => s.completionHeld);
+  // Live face-down reading, readable from effects declared above the
+  // sensor hook (refs dodge the TDZ on the hook's return value).
+  const faceDownRef = useRef(false);
   const goalSeconds = useAppStore((s) => s.goalSeconds);
   // sliderMinutes is intentionally NOT subscribed here — every snap
   // would re-render this 1700-line component. The resting timer text
@@ -203,8 +211,6 @@ export default function DoNothingScreen() {
     if (started && goalSeconds > 0 && elapsed >= goalSeconds) {
       // A long, warm haptic marks the end — no notification.
       haptics.celebrate();
-      deactivateKeepAwake('session');
-      setDistractionFree(false);
       // If a scheduled block is still enforcing a shield, the user has earned
       // their unlock by completing the countdown. releaseBlockShield also
       // re-registers every enabled block for its next occurrence — the
@@ -212,7 +218,9 @@ export default function DoNothingScreen() {
       if (isBlockActive()) {
         useAppStore.getState().releaseBlockShield().catch(() => {});
       }
-      useAppStore.getState().completeSession();
+      // If the phone is lying face down, the celebration waits — the
+      // success screen greets the user as they pick the phone up.
+      useAppStore.getState().completeSession({ holdUntilLift: faceDownRef.current });
     }
   }, [elapsed, started, goalSeconds]);
 
@@ -229,24 +237,12 @@ export default function DoNothingScreen() {
   // --- Reset main screen visuals when a session was cancelled ---
   useEffect(() => {
     if (!sessionEndedVisible) return;
-    setDistractionFree(false);
     timerOpacity.value = 0.9;
     showOpacity.value = 0;
     showWidth.value = 0;
     hideWidth.value = 1;
     hideOpacity.value = 1;
   }, [sessionEndedVisible]);
-
-  // Stale-state normaliser — clears any leftover sessionEndedVisible
-  // that isn't tied to a manual pause. The recovery sheet flow was
-  // removed, so a non-manual `sessionEndedVisible: true` (e.g. from
-  // a previous app version persisted in the store) would otherwise
-  // sit in the store forever, gating other UI off it.
-  useEffect(() => {
-    if (sessionEndedVisible && cancelReason !== 'manual') {
-      useAppStore.getState().dismissSessionEnded();
-    }
-  }, [sessionEndedVisible, cancelReason]);
 
   const timerEntryStyle = useAnimatedStyle(() => ({
     opacity: timerOpacity.value,
@@ -428,17 +424,14 @@ export default function DoNothingScreen() {
     const wasStarted = prevStartedRef.current;
     prevStartedRef.current = started;
     if (!wasStarted || started) return;
-    const state = useAppStore.getState();
-    if (state.completionVisible || state.sessionEndedVisible) return;
-    if (state.focusStep !== 'hidden') return;
-    // No subscription gate here, deliberately: an active shield means the
-    // user's apps ARE blocked right now, and this unlock UI is their only
-    // way out. Gating it on RC status stranded users whose status hadn't
-    // resolved yet (offline / slow network) behind a fully blocked phone.
-    // Entitlement is enforced where blocks get CREATED, not at the exit.
-    if (!isBlockActive()) return;
-    activateKeepAwakeAsync('scheduled-block');
-    state.showUnlock();
+    // One door: requestBlockUnlock decides (phase must be idle, focus
+    // hidden, shield actually up). No subscription gate, deliberately: an
+    // active shield means the user's apps ARE blocked right now and this
+    // unlock UI is their only way out — entitlement is enforced where
+    // blocks get CREATED, not at the exit.
+    if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
+      activateKeepAwakeAsync('scheduled-block');
+    }
   }, [started]);
 
   // Whether to surface the BlockSheet on the home screen — true when
@@ -446,17 +439,12 @@ export default function DoNothingScreen() {
   // Wrapped in a ref-friendly poll because the native shield state
   // sync isn't always immediate on cold start / foreground transition.
   const checkAndShowBlockUnlock = useCallback(() => {
-    const state = useAppStore.getState();
-    if (state.started) return true;
-    if (state.focusStep !== 'hidden') return true;
-    if (!state.ready) return false;
-    // No subscription gate — see the comment in the started→false effect:
-    // an active shield must always surface its escape hatch, even while RC
-    // status is unresolved or lapsed (forceUnblockAll paths still work).
-    if (!isBlockActive()) return false;
-    activateKeepAwakeAsync('scheduled-block');
-    state.showUnlock();
-    return true;
+    // One door: 'busy' (a session/celebration owns the screen) and 'shown'
+    // both stop the poll; 'none' keeps it retrying. No subscription gate —
+    // see the comment in the started→false effect above.
+    const result = useAppStore.getState().requestBlockUnlock(isBlockActive());
+    if (result === 'shown') activateKeepAwakeAsync('scheduled-block');
+    return result !== 'none';
   }, []);
 
   // Polls the native shield state up to three times (now, +300ms,
@@ -535,25 +523,18 @@ export default function DoNothingScreen() {
   const handleStartBlockSession = useCallback(
     (minutes: number) => {
       haptics.medium();
-      activateKeepAwakeAsync('session');
       // Jump the header morph to the "Doing nothing" state so the user doesn't
       // see a flash of "Ready to Do nothing?" when leaving the block-waiting UI.
       hideOpacity.value = 0;
       hideWidth.value = 0;
       showOpacity.value = 1;
       showWidth.value = 1;
-      useAppStore.setState({
-        focusStep: 'hidden',
-        goalSeconds: minutes * 60,
-      });
       // Same reason as handleStart: snap to home so the camera/timer
       // are anchored to the visible screen when the block flow fires
       // while the user was on settings or history.
       settingsSlide.value = 0;
       historySlide.value = 0;
-      // fromBlock: true so the pause sheet swaps "back home" for
-      // "unlock now" — the only out for a user mid-block session.
-      useAppStore.getState().startSession({ fromBlock: true });
+      useAppStore.getState().startBlockSession(minutes);
     },
     [hideOpacity, hideWidth, showOpacity, showWidth, settingsSlide, historySlide],
   );
@@ -682,30 +663,60 @@ export default function DoNothingScreen() {
   }));
 
   // --- Distraction-free mode: manual "hide everything + go dark" toggle ---
-  const [distractionFree, setDistractionFree] = useState(false);
 
-  // Paused / interrupt sheet up (incl. lock-triggered): the running timers are
-  // not rendered and the screen is never dimmed in this state.
-  const suppressed = paused || sessionEndedVisible;
+  // Paused / the face-down gate: the running timers are not rendered and
+  // the screen is never dimmed — the sheet / the gate instruction must
+  // stay readable. Straight from the machine phase.
+  const suppressed = phase === 'paused' || phase === 'arming';
+
+  // Face-down is the session's contract: once the phone has been lying
+  // face down during a RUNNING session, lifting it pauses — same flow as
+  // the pause pill (SessionEndedSheet: continue / start over / end). A
+  // session started via the manual fallback (never face down) is exempt —
+  // the ref only arms after a real face-down reading.
+  const runningGate = started && !awaitingFaceDown && !paused;
+  const { faceDown: runningFaceDown } = useFaceDown(runningGate || completionHeld);
+  useEffect(() => {
+    faceDownRef.current = runningFaceDown;
+  }, [runningFaceDown]);
+  const wasFaceDownRef = useRef(false);
+  useEffect(() => {
+    if (!runningGate) {
+      wasFaceDownRef.current = false;
+      return;
+    }
+    if (runningFaceDown) {
+      wasFaceDownRef.current = true;
+      return;
+    }
+    if (wasFaceDownRef.current) {
+      wasFaceDownRef.current = false;
+      haptics.light();
+      useAppStore.getState().pauseSession();
+    }
+  }, [runningGate, runningFaceDown]);
+
+  // The held celebration fires the moment the phone comes off the table.
+  useEffect(() => {
+    if (completionHeld && !runningFaceDown) {
+      useAppStore.getState().revealCompletion();
+    }
+  }, [completionHeld, runningFaceDown]);
 
   // Screen-dimming controller — owns brightness, the content fade and the
   // tap-to-wake state. See hooks/useSessionScreen. While it's still fading
   // (`!fullyDark`) the UI is untouched so the pause button stays tappable;
   // once fully black, `fullyDark` turns on and we put up a tap-catcher.
+  // While face down the backlight drops to true zero.
   const { contentStyle, fullyDark, wake } = useSessionScreen({
     active: started,
     suppressed,
-    distractionFree,
+    distractionFree: false,
+    faceDown: runningFaceDown,
   });
-
-  const toggleDistractionFree = useCallback(() => {
-    haptics.light();
-    setDistractionFree((v) => !v);
-  }, []);
 
   const handleStart = useCallback(() => {
     haptics.medium();
-    activateKeepAwakeAsync('session');
     // Snap to home so the running camera + timer aren't drawn at an
     // off-screen anchor when start fires while settings/history slides
     // are still partially open (block-session-from-settings flow).
@@ -726,8 +737,6 @@ export default function DoNothingScreen() {
       return;
     }
     // Nothing elapsed — quick stop straight back to home.
-    deactivateKeepAwake('session');
-    setDistractionFree(false);
     await useAppStore.getState().stopSession();
     runResetAnimations();
   }, []);
@@ -739,8 +748,6 @@ export default function DoNothingScreen() {
   // mood dial and farewell beat all run as expected.
   const handleFinishStopwatch = useCallback(async () => {
     haptics.success();
-    deactivateKeepAwake('session');
-    setDistractionFree(false);
     await useAppStore.getState().completeSession();
   }, []);
 
@@ -754,6 +761,21 @@ export default function DoNothingScreen() {
     setTimeout(() => useAppStore.getState().resetElapsed(), 700);
   }, []);
 
+  // The resting visuals (the "Ready to Do nothing?" header morph, timer
+  // opacity) follow the MACHINE, not individual buttons: whenever the
+  // phase comes back to idle — whatever path led there (gate "back",
+  // sheet end, unlock, quick stop) — the home screen restores itself.
+  // Individual handlers may still call runResetAnimations earlier for
+  // snappier feel; the calls are idempotent.
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+    if (phase === 'idle' && prev !== 'idle' && prev !== 'celebrating') {
+      runResetAnimations();
+    }
+  }, [phase, runResetAnimations]);
+
   // Sheet handlers — only used in the manual pause flow.
   const handleSheetContinue = useCallback(() => {
     useAppStore.getState().resumeSession();
@@ -766,8 +788,6 @@ export default function DoNothingScreen() {
   }, []);
 
   const handleSheetEnd = useCallback(async () => {
-    deactivateKeepAwake('session');
-    setDistractionFree(false);
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();
     runResetAnimations();
@@ -780,11 +800,9 @@ export default function DoNothingScreen() {
   // device with no way to recover until the next unlock cycle.
   const handleSheetUnlock = useCallback(async () => {
     haptics.success();
-    deactivateKeepAwake('session');
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
     useAppStore.getState().releaseBlockShield().catch(() => {});
-    setDistractionFree(false);
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();
     runResetAnimations();
@@ -904,8 +922,7 @@ export default function DoNothingScreen() {
 
           {/* Header — morphs "Ready to Do·ing nothing?" → "Doing nothing" */}
           <View
-            style={[styles.headerRow, { opacity: distractionFree ? 0 : 1 }]}
-            pointerEvents={distractionFree ? 'none' : 'auto'}
+            style={styles.headerRow}
           >
             <Animated.View style={hideStyle}>
               <Text
@@ -1015,8 +1032,8 @@ export default function DoNothingScreen() {
                 lock-triggered sessionEndedVisible) so it doesn't peek out from
                 under the fading camera and duplicate the sheet's MM:SS. */}
             <View
-              style={{ opacity: distractionFree || suppressed ? 0 : 1 }}
-              pointerEvents={distractionFree || suppressed ? 'none' : 'auto'}
+              style={{ opacity: suppressed ? 0 : 1 }}
+              pointerEvents={suppressed ? 'none' : 'auto'}
             >
               <Animated.View style={[timerEntryStyle, styles.centerContent]}>
                 {!started ? (
@@ -1038,8 +1055,7 @@ export default function DoNothingScreen() {
 
             {/* Yes button — static terracotta pill at rest. */}
             <View
-              style={[styles.orbitWrap, { opacity: distractionFree ? 0 : 1 }]}
-              pointerEvents={distractionFree ? 'none' : 'auto'}
+              style={styles.orbitWrap}
             >
               <View style={styles.orbitArea}>
                 <View style={styles.orbitCenter}>
@@ -1327,6 +1343,9 @@ export default function DoNothingScreen() {
             style={[styles.runLayer, runUiStyle]}
             pointerEvents="box-none"
           >
+          {/* "Put me face down" gate — the armed state's whole UI. */}
+          {awaitingFaceDown && <FaceDownGate />}
+
           {/* Drifting cream dots — atmospheric layer that floats up
               through the screen, like dust motes in golden-hour
               light. Behind the timer in z-order. Wrapped so the
@@ -1347,7 +1366,7 @@ export default function DoNothingScreen() {
           {/* Big cream timer at vertical centre. NOT rendered at all while the
               interrupt sheet is up (paused / lock) so it can never duplicate the
               sheet's MM:SS — the paused state always wins. */}
-          {!suppressed && (
+          {(!suppressed || awaitingFaceDown) && (
             <Animated.View
               style={[styles.runCenter, contentStyle]}
               pointerEvents="none"
@@ -1367,7 +1386,7 @@ export default function DoNothingScreen() {
           {/* Running controls — interrupt + hide. Hidden when paused
               so they don't peek through the SessionEndedSheet
               backdrop while it animates in. */}
-          {!paused && (
+          {!paused && !awaitingFaceDown && (
             <>
               <Animated.View
                 style={[
@@ -1375,7 +1394,6 @@ export default function DoNothingScreen() {
                   { bottom: insets.bottom + 30 },
                   contentStyle,
                 ]}
-                pointerEvents={distractionFree ? 'none' : 'auto'}
               >
                 <View style={styles.runControlRow}>
                   <Pressable
@@ -1437,55 +1455,15 @@ export default function DoNothingScreen() {
                 </View>
               </Animated.View>
 
-              <Animated.View
-                style={[
-                  styles.runHideStack,
-                  { bottom: insets.bottom + 110 },
-                  contentStyle,
-                ]}
-                pointerEvents={distractionFree ? 'none' : 'box-none'}
-              >
-                <Pressable
-                  onPress={toggleDistractionFree}
-                  style={styles.runHideIconBtn}
-                  hitSlop={16}
-                  accessibilityRole="button"
-                  accessibilityLabel="Hide everything"
-                >
-                  <Feather
-                    name="eye-off"
-                    size={18}
-                    color={palette.cream}
-                    style={{ opacity: 0.78 }}
-                  />
-                </Pressable>
-                <Text
-                  style={[
-                    styles.runHideHint,
-                    { fontFamily: Fonts!.serif },
-                  ]}
-                >
-                  tap so nothing distracts
-                </Text>
-              </Animated.View>
             </>
-          )}
-
-          {/* Tap-anywhere overlay — only catches taps in distraction-
-              free mode, where it toggles distraction-free off. The
-              session itself is still controlled by the explicit stop
-              link, so no risk of accidental cancellation. */}
-          {distractionFree && (
-            <Pressable
-              onPress={toggleDistractionFree}
-              style={StyleSheet.absoluteFillObject}
-              accessibilityRole="button"
-              accessibilityLabel="Show controls"
-            />
           )}
           </Animated.View>
         )}
       </Animated.View>
+
+      {/* While the finished phone still lies face down: a solid curtain so
+          nothing (home UI, brightness restore) shows before the reveal. */}
+      {completionHeld && <View style={styles.completionHold} />}
 
       {/* Shared account sheet — available from Settings header and from both gates */}
       <AccountSheet
@@ -1509,7 +1487,7 @@ export default function DoNothingScreen() {
           so any non-manual sessionEndedVisible state is treated
           as stale and the sheet stays closed. */}
       <SessionEndedSheet
-        visible={sessionEndedVisible && cancelReason === 'manual'}
+        visible={phase === 'paused'}
         theme={theme}
         interruptedDuration={interruptedDuration}
         goalSeconds={goalSeconds}
@@ -1593,7 +1571,7 @@ export default function DoNothingScreen() {
           wakes it. Only when fullyDark (so the pause button stays tappable
           while fading) and not in the manual distraction-free toggle (which
           has its own exit). */}
-      {fullyDark && !distractionFree && (
+      {fullyDark && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
           onPress={wake}
@@ -1644,6 +1622,11 @@ const styles = StyleSheet.create({
   tutorialShield: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,
+  },
+  completionHold: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: palette.terracotta,
+    zIndex: 60,
   },
   themeToggle: {
     position: 'absolute',
@@ -1780,16 +1763,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     zIndex: 110,
   },
-  distractionFreeButton: {
-    position: 'absolute',
-    alignSelf: 'center',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   idlePhraseLayer: {
     position: 'absolute',
     left: 0,
@@ -1901,29 +1874,6 @@ const styles = StyleSheet.create({
   },
   // Hide is secondary — small icon button above the stop pill, with
   // its hint beneath. Lighter border + half the visual weight.
-  runHideStack: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  runHideIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(249, 242, 224, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  runHideHint: {
-    color: palette.cream,
-    fontSize: 11,
-    letterSpacing: 0.3,
-    opacity: 0.55,
-    marginTop: 8,
-    textAlign: 'center',
-  },
   splashLabelWrap: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -11,11 +11,6 @@ import Animated, {
 
 import { palette } from '@/lib/theme';
 
-// Tiny epsilon — t.value below this is treated as "never started"
-// (the cycle hadn't crossed the initial-stagger gate yet), so we
-// re-apply the stagger delay rather than resuming from "0".
-const RESUME_EPSILON = 1e-4;
-
 // Drifting warm-tone dots that float upward across the running
 // screen, like dust motes in golden-hour light. Mixed colours +
 // mixed sizes give the layer constellation-like variety so it never
@@ -76,55 +71,47 @@ interface DriftingDotProps {
 }
 
 const DriftingDot = memo(function DriftingDot({ config, active }: DriftingDotProps) {
-  // Cycle progress 0..1 — the only animated value per dot. Position +
-  // opacity are derived inside the animated style worklet.
-  const t = useSharedValue(0);
+  // Cycle progress — the only animated value per dot. Position + opacity
+  // are derived inside the animated style worklet. The entry stagger is
+  // SEEDED as negative progress (-delay/duration … 0) instead of a JS
+  // setTimeout: backgrounding suspends timers and used to fire them all at
+  // once on return, which marched every dot upward in one synchronized
+  // line. Inside the animation timeline the phases pause and resume
+  // together, so the spread survives any background trip.
+  const t = useSharedValue(-config.delay / DOT_DURATION);
 
   useEffect(() => {
     if (!active) {
-      // Freeze in place. NO `t.value = 0` reset — that's what made
-      // pausing send the dots back to the bottom of the screen.
+      // Freeze in place. NO reset — that's what made pausing send the
+      // dots back to the bottom of the screen.
       cancelAnimation(t);
       return;
     }
-    const startCycle = () => {
-      // From the current position, finish the in-flight cycle (only
-      // covers the remaining 1 - t fraction at the original rate),
-      // then snap back to 0 and repeat indefinitely. Without the
-      // partial first leg, withRepeat would run a full DOT_DURATION
-      // cycle starting from the resume point, which both stretches
-      // the timing and visibly skips the dot to the top.
-      const remaining = 1 - t.value;
-      t.value = withTiming(
-        1,
-        { duration: remaining * DOT_DURATION, easing: Easing.linear },
-        (finished) => {
-          if (!finished) return;
-          t.value = 0;
-          t.value = withRepeat(
-            withTiming(1, { duration: DOT_DURATION, easing: Easing.linear }),
-            -1,
-            false,
-          );
-        },
-      );
-    };
-    // First entrance — apply the stagger so dots don't all surface
-    // at once. Resume — start immediately from the frozen position.
-    if (t.value > RESUME_EPSILON) {
-      startCycle();
-      return () => cancelAnimation(t);
-    }
-    const timer = setTimeout(startCycle, config.delay);
-    return () => {
-      clearTimeout(timer);
-      cancelAnimation(t);
-    };
+    // From the current (possibly negative — still waiting to enter)
+    // position, finish the in-flight cycle at the original rate, then
+    // repeat full cycles forever. The partial first leg keeps resume
+    // from stretching the timing or skipping the dot to the top.
+    const remaining = 1 - t.value;
+    t.value = withTiming(
+      1,
+      { duration: remaining * DOT_DURATION, easing: Easing.linear },
+      (finished) => {
+        if (!finished) return;
+        t.value = 0;
+        t.value = withRepeat(
+          withTiming(1, { duration: DOT_DURATION, easing: Easing.linear }),
+          -1,
+          false,
+        );
+      },
+    );
+    return () => cancelAnimation(t);
   }, [active]);
 
   const dotStyle = useAnimatedStyle(() => {
     'worklet';
-    const tt = t.value;
+    // Negative progress = still waiting below the screen, invisible.
+    const tt = Math.max(0, t.value);
     // Vertical drift — linear from band bottom to band top.
     const dy = -tt * DRIFT_HEIGHT;
     // Horizontal sway — slow sine, two periods per cycle so the path
@@ -134,7 +121,8 @@ const DriftingDot = memo(function DriftingDot({ config, active }: DriftingDotPro
       Math.sin((tt + config.swayPhase) * Math.PI * 2) * config.swayAmplitude;
     // Fade in over first 12%, hold, fade out over last 18%.
     let opacity: number;
-    if (tt < 0.12) opacity = (tt / 0.12) * config.peakOpacity;
+    if (t.value <= 0) opacity = 0;
+    else if (tt < 0.12) opacity = (tt / 0.12) * config.peakOpacity;
     else if (tt > 0.82) opacity = ((1 - tt) / 0.18) * config.peakOpacity;
     else opacity = config.peakOpacity;
     return {

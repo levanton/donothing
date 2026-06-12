@@ -1,0 +1,8 @@
+{
+  "name": "face-down",
+  "version": "0.1.0",
+  "description": "Local Expo module that detects the phone lying face down via the raw accelerometer (CMMotionManager) — no Motion & Fitness permission, no dialog. Debounce and hysteresis live natively; JS only receives lay-down / pick-up transitions.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true
+}

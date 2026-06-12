@@ -78,17 +78,10 @@ export function useAppLifecycle(
   useEffect(() => {
     const handleScheduledBlock = async (data: Record<string, unknown>) => {
       if (!(data?.type === 'scheduledBlock' && data?.durationMinutes)) return;
-      // Don't intrude on an active or paused session — the user is
-      // already doing nothing (which is the block's whole point) or
-      // mid-decision on the pause sheet. The native shield is up
-      // either way, so apps stay locked in the background; we just
-      // skip the BlockSheet UI here. After the session ends the
-      // started→false useEffect in app/index.tsx polls the shield
-      // and surfaces the sheet.
-      const state = useAppStore.getState();
-      if (state.started || state.paused) {
-        return;
-      }
+      // Visibility is decided by the ONE door (requestBlockUnlock below):
+      // it ignores the request while a session or its celebration owns the
+      // screen. The native shield is up either way — after the session
+      // ends, the started→false effect in app/index.tsx re-requests.
       // No subscription gate: this notification only exists because the
       // native extension fired a block (its gate passed), so the shield is
       // up — the unlock UI must be reachable regardless of what RC says
@@ -104,11 +97,12 @@ export function useAppLifecycle(
         console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
         return;
       }
-      activateKeepAwakeAsync('scheduled-block');
       // Native DeviceActivity raises the shield at intervalDidStart; we
       // only need to mirror the UI. If the user taps the banner from
       // outside the app, this opens the unlock view as they come back in.
-      useAppStore.getState().showUnlock();
+      if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
+        activateKeepAwakeAsync('scheduled-block');
+      }
     };
 
     const sub1 = Notifications.addNotificationReceivedListener((notification) => {
@@ -132,22 +126,13 @@ export function useAppLifecycle(
   // truth — we just mirror it into the UI.
   useEffect(() => {
     const sub = onBlockShieldRaised(() => {
-      const state = useAppStore.getState();
-      // Cold-start race: native extension can fire intervalDidStart before
-      // init() finishes loading scheduledBlocks. Skip until the store is
-      // ready — init() itself calls showUnlock() if a block is active.
-      if (!state.ready) return;
-      // Same rule as the notification listener — don't intrude on an
-      // active or paused session. Shield stays up natively; the UI
-      // surfaces after the session ends.
-      if (state.started || state.paused) return;
-      if (state.focusStep !== 'hidden') return;
-      // No subscription gate: the shield just went up natively — hiding
-      // the unlock UI based on RC status would strand the user behind
-      // blocked apps (e.g. status still 'unknown' on an offline start).
-      if (!isBlockActive()) return;
-      activateKeepAwakeAsync('scheduled-block');
-      state.showUnlock();
+      // One door (requestBlockUnlock): handles the cold-start race (not
+      // ready → 'none'), busy sessions/celebrations ('busy') and the
+      // shield check. No subscription gate: hiding the unlock UI based on
+      // RC status would strand the user behind blocked apps.
+      if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
+        activateKeepAwakeAsync('scheduled-block');
+      }
     });
     return () => {
       try { sub.remove(); } catch (e) { console.error('[lifecycle] shield sub remove failed:', e); }

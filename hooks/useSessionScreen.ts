@@ -38,6 +38,10 @@ interface Args {
   suppressed: boolean;
   /** Manual distraction-free toggle. */
   distractionFree: boolean;
+  /** The phone lies face down — nobody sees the screen, so the backlight
+   *  goes to true zero instead of the dim floor; back the moment it's
+   *  lifted. */
+  faceDown?: boolean;
   /** Auto session fade duration (ms). */
   dimDurationMs?: number;
 }
@@ -46,10 +50,18 @@ export function useSessionScreen({
   active,
   suppressed,
   distractionFree,
+  faceDown = false,
   dimDurationMs = 5500,
 }: Args) {
   const [awake, setAwake] = useState(false);
   const [fullyDark, setFullyDark] = useState(false);
+
+  // The brightness floor of the moment — 0 while the phone lies face down.
+  // A ref so the slow main fade always reads the latest value without
+  // re-triggering on flips; the quick effect below handles those.
+  const floor = faceDown ? 0 : DIM_FLOOR;
+  const floorRef = useRef(floor);
+  floorRef.current = floor;
 
   const dark = (active && !suppressed && !awake) || distractionFree;
   const fadeMs = distractionFree ? MANUAL_FADE_MS : dimDurationMs;
@@ -69,14 +81,26 @@ export function useSessionScreen({
     }
   }, []);
 
-  // expo-brightness has no easing, so tween it in JS.
+  // expo-brightness has no easing, so tween it in JS. The generation
+  // counter makes overlapping calls race-safe: every call starts with an
+  // async getBrightnessAsync, and without the token two near-simultaneous
+  // calls (e.g. "lift raises the floor" + "pause restores brightness")
+  // each spawn their interval AFTER the other's stop — two tweens fighting
+  // every frame (visible flicker) and the loser's target sticking at the
+  // end (screen stuck dim after lifting the phone).
+  const genRef = useRef(0);
   const animateBrightness = useCallback(
     (to: number, durationMs: number) => {
+      const gen = ++genRef.current;
       stopBrightness();
       Brightness.getBrightnessAsync()
         .then((from) => {
+          // A newer animation took over while we awaited — stand down.
+          if (gen !== genRef.current) return;
+          stopBrightness();
           const start = Date.now();
           const tick = () => {
+            if (gen !== genRef.current) return;
             const t = Math.min(1, (Date.now() - start) / durationMs);
             const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
             Brightness.setBrightnessAsync(from + (to - from) * eased).catch(() => {});
@@ -114,7 +138,7 @@ export function useSessionScreen({
           if (savedRef.current == null) savedRef.current = cur;
           // Never *raise* brightness to reach the floor — someone already
           // below it (night use) stays where they are.
-          animateBrightness(Math.min(cur, DIM_FLOOR), fadeMs);
+          animateBrightness(Math.min(cur, floorRef.current), fadeMs);
         })
         .catch(() => {});
       fullyDarkTimer.current = setTimeout(() => setFullyDark(true), fadeMs);
@@ -132,6 +156,17 @@ export function useSessionScreen({
     }
   }, [dark, fadeMs, animateBrightness]);
 
+  // Face-down flips while already dark: a quick step between the floors
+  // (0 ↔ DIM_FLOOR), not the slow session fade. Restores from the saved
+  // user brightness as the base so lifting can come back UP to the floor.
+  useEffect(() => {
+    if (!dark) return;
+    const base = savedRef.current;
+    if (base == null) return; // the main fade hasn't started yet
+    animateBrightness(Math.min(base, floor), RESTORE_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floor]);
+
   // Re-assert on foreground — JS/reanimated animations don't progress while
   // backgrounded (locking mid-fade), so snap to the correct state on return.
   useEffect(() => {
@@ -140,7 +175,10 @@ export function useSessionScreen({
       contentFade.value = dark ? 0 : 1;
       if (dark) {
         const saved = savedRef.current;
-        animateBrightness(saved != null ? Math.min(saved, DIM_FLOOR) : DIM_FLOOR, RESTORE_MS);
+        animateBrightness(
+          saved != null ? Math.min(saved, floorRef.current) : floorRef.current,
+          RESTORE_MS,
+        );
       } else if (savedRef.current != null) {
         const restore = savedRef.current;
         savedRef.current = null;

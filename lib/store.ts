@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
 import { initDatabase, wipeUserData } from './db';
@@ -26,6 +27,13 @@ import {
 import type { ScheduledBlock, Session } from './db/types';
 import type { MoodKey } from '@/lib/mood';
 import { getWeekStats, WeekDay } from './stats';
+import {
+  flagsForPhase,
+  isSessionSurfaceFree,
+  nextPhase,
+  type SessionEvent,
+  type SessionPhase,
+} from './session-machine';
 import { ThemeMode } from './theme';
 import { getAchievedMilestones } from './db/milestones-db';
 import { evaluateAndSaveNewMilestones } from './milestones';
@@ -33,6 +41,7 @@ import {
   configureNotifications,
   cancelNotification,
 } from './notifications';
+import torch from 'torch';
 import type { SubscriptionStatus } from './subscription';
 import { captureError } from './sentry';
 import { track } from './analytics';
@@ -231,6 +240,11 @@ export interface AppState {
 
   // Session completion (countdown reached 00:00)
   completionVisible: boolean;
+  // The countdown finished while the phone lay face down — the celebration
+  // waits until the user picks the phone up (revealCompletion), so the
+  // success screen is what greets them as they turn it over.
+  completionHeld: boolean;
+  revealCompletion: () => void;
 
   // Milestones (data only — no overlay UI)
   achievedMilestones: Map<string, number>;
@@ -258,7 +272,7 @@ export interface AppState {
   setTutorialPending: (next: boolean) => void;
 
   // Completion actions
-  completeSession: () => Promise<void>;
+  completeSession: (opts?: { holdUntilLift?: boolean }) => Promise<void>;
   dismissCompletion: () => void;
 
   // Milestone actions
@@ -267,9 +281,29 @@ export interface AppState {
   // Interruption actions
   dismissSessionEnded: () => void;
 
+  // The session lifecycle phase — THE source of truth. All the booleans
+  // below it (started/paused/awaitingFaceDown/…) are derived views written
+  // atomically by the machine (lib/session-machine.ts); never set them
+  // directly.
+  phase: SessionPhase;
+  // Face-down start ritual: startSession arms the session ("place your
+  // phone face down"), beginCountdown actually starts the clock — called by
+  // the gate when the accelerometer reports a stable face-down (or via the
+  // manual fallback, so nobody can ever get stuck).
+  awaitingFaceDown: boolean;
+  beginCountdown: () => void;
+  /** The single door for surfacing the block-unlock UI. Every surfacer
+   *  (cold start, foreground poll, notification, Darwin listener,
+   *  session-end) calls this; the decision lives in ONE place.
+   *  'busy' = a session/celebration owns the screen, try again later. */
+  requestBlockUnlock: (shieldActive: boolean) => 'shown' | 'busy' | 'none';
+
   // Actions
   init: () => Promise<void>;
   startSession: (opts?: { fromBlock?: boolean }) => void;
+  /** The BlockSheet's "do nothing": hide the unlock UI, adopt the block's
+   *  unlock goal and arm the face-down ritual — one atomic step. */
+  startBlockSession: (unlockMinutes: number) => void;
   stopSession: () => Promise<void>;
   // Manual interrupt — pause the timer without saving so the user
   // can decide (continue, start over, or end).
@@ -343,10 +377,46 @@ export interface AppState {
   deleteLocalAccount: () => Promise<void>;
 }
 
+// ── Session state machine plumbing ─────────────────────────────────────────
+// The ONLY writer of `phase` and its derived legacy flags. Returns false
+// (and changes nothing) when the event is illegal in the current phase —
+// callers treat that as "stale tap / race, ignore quietly".
+type SessionSet = (partial: Partial<AppState>) => void;
+function sessionTransition(
+  set: SessionSet,
+  get: () => AppState,
+  event: SessionEvent,
+  extra?: Partial<AppState>,
+): boolean {
+  const next = nextPhase(get().phase, event);
+  if (next == null) {
+    if (__DEV__) {
+      console.warn(`[session-machine] ignored ${event} in phase ${get().phase}`);
+    }
+    return false;
+  }
+  set({ phase: next, ...flagsForPhase(next), ...extra });
+  // Keep-awake follows the machine, not scattered UI handlers: the screen
+  // must not auto-lock from the moment a session is armed until the user
+  // is back on the idle home screen.
+  try {
+    if (event === 'ARM') {
+      void activateKeepAwakeAsync('session').catch(() => {});
+    } else if (next === 'idle') {
+      void deactivateKeepAwake('session').catch(() => {});
+    }
+  } catch {
+    // keep-awake is best-effort (e.g. test envs without the native module)
+  }
+  return true;
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial values
   elapsed: 0,
+  phase: 'idle',
   started: false,
+  awaitingFaceDown: false,
   paused: false,
   sessionOrigin: 'normal',
   weekStats: [],
@@ -366,6 +436,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Session completion
   completionVisible: false,
+  completionHeld: false,
 
   // Milestones (data only — no overlay UI)
   achievedMilestones: new Map(),
@@ -518,26 +589,47 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  // --- Timer ---
+  // --- Session lifecycle ------------------------------------------------
+  // Every action below is a thin wrapper around ONE machine transition
+  // (lib/session-machine.ts — see the diagram there) plus its side effects
+  // (timers, sounds, persistence). The hard invariant: only BEGIN and
+  // RESUME create a ticking interval, and both are reached through the
+  // face-down ritual or its explicit fallback taps.
+
   startSession: (opts) => {
+    const origin = opts?.fromBlock ? 'block' : 'normal';
+    // Arm only — the clock starts in beginCountdown() once the phone is
+    // face down. No pending session is persisted yet: an armed-but-never-
+    // started session is nothing.
+    if (!sessionTransition(set, get, 'ARM', { elapsed: 0, sessionOrigin: origin })) return;
+    track('session_armed', { goalSec: get().goalSeconds, origin });
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  },
+
+  startBlockSession: (unlockMinutes) => {
+    set({ focusStep: 'hidden', goalSeconds: unlockMinutes * 60 });
+    get().startSession({ fromBlock: true });
+  },
+
+  beginCountdown: () => {
+    if (!sessionTransition(set, get, 'BEGIN', { elapsed: 0 })) return;
     sessionStartTime = Date.now();
     const goalSeconds = get().goalSeconds;
-    track('session_started', {
-      goalSec: goalSeconds,
-      origin: opts?.fromBlock ? 'block' : 'normal',
-    });
-    set({
-      started: true,
-      elapsed: 0,
-      sessionOrigin: opts?.fromBlock ? 'block' : 'normal',
-    });
+    track('session_started', { goalSec: goalSeconds, origin: get().sessionOrigin });
+    // "It has begun" — felt through the table AND heard (even on silent),
+    // so a disabled-vibration setting can't make the start go unnoticed.
+    haptics.begin();
+    sound.start();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
     trackInterval(timerInterval);
-    // No end-of-timer notification — completion is signalled by a long, warm
-    // haptic in-app (haptics.celebrate). Still persist the pending session so a
+    // No end-of-timer notification — completion is signalled in-app
+    // (chime + haptic + torch). Just persist the pending session so a
     // relaunch can recover it.
     sessionNotificationId = null;
     writePendingSession({
@@ -548,6 +640,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   stopSession: async () => {
+    const phase = get().phase;
+    const event: SessionEvent = phase === 'arming' ? 'CANCEL_ARM' : 'END';
+    if (nextPhase(phase, event) == null) return; // nothing to stop
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
@@ -557,6 +652,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionNotificationId = null;
     }
     clearPendingSession();
+    // Backing out of the "place your phone face down" gate — nothing ever
+    // ran, so there is nothing to save or celebrate.
+    if (event === 'CANCEL_ARM') {
+      track('session_arm_cancelled');
+      sessionTransition(set, get, 'CANCEL_ARM', {
+        elapsed: 0,
+        sessionOrigin: 'normal',
+        cancelReason: null,
+        interruptedDuration: null,
+        goalSeconds: get().sliderMinutes * 60,
+      });
+      return;
+    }
     // Use displayed elapsed instead of (Date.now() - sessionStartTime)
     // so paused sessions save the frozen value, not real-time-since-
     // start (which would over-count by the pause duration).
@@ -565,94 +673,95 @@ export const useAppStore = create<AppState>((set, get) => ({
     // A write failure must not leave the UI in a "stopped but still started"
     // zombie state — saveSessionWithRetry returns null and we reset anyway.
     const session = saveSessionWithRetry(duration);
-    set({
-      started: false,
-      paused: false,
+    sessionTransition(set, get, 'END', {
       sessionOrigin: 'normal',
+      cancelReason: null,
+      interruptedDuration: null,
       weekStats: getWeekStats(),
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
-      // Same reason as completeSession — make the next tap start from the
-      // slider's visible value, not whatever the last block session set.
+      // Sync the goal back to the slider's visible value — block sessions
+      // override goalSeconds and must not leak into the next normal tap.
       goalSeconds: get().sliderMinutes * 60,
     });
     get().checkMilestones();
   },
 
   pauseSession: () => {
-    if (!get().started || get().paused) return;
+    // PAUSE is only legal from `running` — arming/paused/holding all
+    // ignore it (this is what stray taps and background trips hit).
+    if (
+      !sessionTransition(set, get, 'PAUSE', {
+        cancelReason: 'manual',
+        interruptedDuration: get().elapsed,
+      })
+    ) {
+      return;
+    }
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
     }
-    // Cancel the scheduled completion notification — its trigger
-    // time was set at session-start and would fire mid-pause,
-    // notifying the user that a session "ended" while they're still
-    // deciding what to do. Will be rescheduled on resume.
     if (sessionNotificationId) {
       cancelNotification(sessionNotificationId).catch(() => {});
       sessionNotificationId = null;
     }
-    // Open the SessionEndedSheet (gorhom) in 'manual' mode — the
-    // sheet is what surfaces continue / start over / back home.
-    // The session itself stays alive (started: true) so resume can
-    // pick up from the frozen elapsed.
-    set({
-      paused: true,
-      sessionEndedVisible: true,
-      cancelReason: 'manual',
-      interruptedDuration: get().elapsed,
-    });
   },
 
   resumeSession: () => {
-    if (!get().started || !get().paused) return;
+    const elapsed = get().elapsed;
+    if (
+      !sessionTransition(set, get, 'RESUME', {
+        cancelReason: null,
+        interruptedDuration: null,
+      })
+    ) {
+      return;
+    }
     // Re-anchor sessionStartTime to the frozen elapsed so the next
     // interval tick continues from where we paused.
-    const elapsed = get().elapsed;
     sessionStartTime = Date.now() - elapsed * 1000;
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
     }, 1000);
     trackInterval(timerInterval);
-    set({ paused: false });
-    // No completion notification (replaced by an in-app haptic) — just persist
-    // the pending session for crash/relaunch recovery.
-    const goalSeconds = get().goalSeconds;
+    // Persist the pending session for crash/relaunch recovery.
     writePendingSession({
       startedAt: sessionStartTime,
-      goalSeconds,
+      goalSeconds: get().goalSeconds,
       notificationId: null,
     });
   },
 
   restartSession: () => {
-    if (!get().started) return;
-    // Cancel any pending completion notification — its scheduled
-    // time is no longer valid since we're resetting elapsed to 0.
+    if (nextPhase(get().phase, 'START_OVER') == null) return;
     if (sessionNotificationId) {
       cancelNotification(sessionNotificationId).catch(() => {});
       sessionNotificationId = null;
     }
-    // Save what they did so far so it's not lost from history. Same
-    // retry + Sentry path as completion — a persistent failure is real
-    // data loss, but the restart itself proceeds either way (returns
+    // Save what they did so far so it is not lost from history (returns
     // null on failure; losing one segment beats blocking a fresh start).
     const prevElapsed = get().elapsed;
     if (prevElapsed > 0) {
       saveSessionWithRetry(prevElapsed);
     }
-    // Reset and (re)start the timer.
-    sessionStartTime = Date.now();
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-      set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
-    }, 1000);
-    trackInterval(timerInterval);
-    set({
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    clearPendingSession();
+    // Back through the ritual — the fresh run begins in beginCountdown()
+    // once the phone lies face down again.
+    track('session_armed', {
+      goalSec: get().goalSeconds,
+      origin: get().sessionOrigin,
+      restart: true,
+    });
+    sessionTransition(set, get, 'START_OVER', {
       elapsed: 0,
-      paused: false,
+      cancelReason: null,
+      interruptedDuration: null,
       weekStats: getWeekStats(),
     });
     // The saved segment counts toward totals — a milestone threshold
@@ -660,20 +769,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (prevElapsed > 0) {
       get().checkMilestones();
     }
-    // Re-write pendingSession with fresh start time.
-    const goalSeconds = get().goalSeconds;
-    writePendingSession({
-      startedAt: sessionStartTime,
-      goalSeconds,
-      notificationId: null,
-    });
   },
 
   resetElapsed: () => set({ elapsed: 0 }),
 
   // --- Completion (countdown reached 00:00) ---
-  completeSession: async () => {
-    if (!get().started) return;
+  completeSession: async (opts) => {
+    // Face down → `holding` (the celebration waits for the lift);
+    // in hand → straight to `celebrating`.
+    const event: SessionEvent = opts?.holdUntilLift ? 'COMPLETE_HELD' : 'COMPLETE';
+    if (nextPhase(get().phase, event) == null) return;
     if (timerInterval) {
       clearInterval(timerInterval);
       timerInterval = null;
@@ -683,20 +788,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionNotificationId = null;
     }
     clearPendingSession();
-    // Same rule as stopSession: use the displayed elapsed, not
-    // (Date.now() - sessionStartTime). resumeSession re-anchors the
-    // start time so the two normally agree, but if this ever runs
-    // while paused (external caller, future feature) the wall-clock
-    // formula would over-count by the pause duration.
     const duration = get().elapsed;
-    // Below the threshold this isn't a session — UI guards prevent it,
-    // but if anything calls completeSession through a different path
-    // (background AppState, future feature) we still must NOT write a
-    // false-positive row or surface the celebration screen.
+    // Below the threshold this isn't a session — never write a false
+    // positive row or surface the celebration.
     if (duration < MIN_SAVABLE_DURATION) {
-      set({
-        started: false,
-        paused: false,
+      sessionTransition(set, get, 'END', {
         elapsed: 0,
         sessionOrigin: 'normal',
         goalSeconds: get().sliderMinutes * 60,
@@ -707,24 +803,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     track('session_completed', { durationSec: duration, origin: get().sessionOrigin });
     haptics.success();
     sound.complete();
-    set({
-      started: false,
+    // The phone usually lies face down — breathe light up off the table so
+    // the end is visible across the room, not just audible.
+    void torch.blink();
+    sessionTransition(set, get, event, {
       elapsed: 0,
       weekStats: getWeekStats(),
       lastSessionId: session?.id ?? '',
       lastSessionDuration: duration,
-      completionVisible: true,
-      // Sync goal back to the slider display — block sessions override
-      // goalSeconds to unlockMin*60, and without this reset a subsequent
-      // normal tap would start a session at the stale block duration
-      // while the UI still shows the slider's value.
+      // Sync the goal back to the slider's visible value (see stopSession).
       goalSeconds: get().sliderMinutes * 60,
     });
   },
 
+  revealCompletion: () => {
+    sessionTransition(set, get, 'REVEAL');
+  },
+
   dismissCompletion: () => {
-    set({ completionVisible: false });
+    if (!sessionTransition(set, get, 'DISMISS')) return;
     get().checkMilestones();
+  },
+
+  /** See AppState.requestBlockUnlock — the one door for the block UI. */
+  requestBlockUnlock: (shieldActive) => {
+    const s = get();
+    if (!s.ready) return 'none';
+    // A session or its celebration owns the screen — the shield stays up
+    // natively; the unlock UI surfaces when the surface is free again.
+    if (!isSessionSurfaceFree(s.phase)) return 'busy';
+    if (s.focusStep !== 'hidden') return 'busy';
+    if (!shieldActive) return 'none';
+    s.showUnlock();
+    return 'shown';
   },
 
   // --- Milestones ---
@@ -976,10 +1087,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // --- Interruption handling ---
+  // Ancillary cleanup only — the sheet's visibility itself is a derived
+  // machine flag (phase === 'paused') and is never written directly.
   dismissSessionEnded: () => {
     try { deleteDeviceState(SESSION_CANCELLED_KEY); } catch {}
     set({
-      sessionEndedVisible: false,
       cancelReason: null,
       interruptedDuration: null,
     });
@@ -1096,8 +1208,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // in sync if you add new state fields.
     set({
       elapsed: 0,
-      started: false,
-      paused: false,
+      phase: 'idle',
+      ...flagsForPhase('idle'),
       sessionOrigin: 'normal',
       weekStats: [],
       themeMode: 'dark',

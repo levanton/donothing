@@ -68,7 +68,9 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.levanton.nothing"
     },
-    "platforms": ["ios"],
+    "platforms": [
+      "ios"
+    ],
     "plugins": [
       "expo-router",
       [

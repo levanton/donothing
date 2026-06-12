@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  FadeIn,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import torch from 'torch';
+
 import { EASE_OUT } from '@/constants/animations';
 import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
@@ -17,6 +19,7 @@ import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
+import { useFaceDown } from '@/hooks/useFaceDown';
 import { useSessionScreen } from '@/hooks/useSessionScreen';
 
 const SESSION_DURATION = 60;
@@ -24,6 +27,8 @@ const YES_BUTTON_SIZE = 140;
 // Slower auto-dim than the real timer (default 5.5s) — this onboarding
 // minute eases into darkness more gently.
 const DIM_DURATION_MS = 15000;
+// Manual escape hatch if the face-down sensor never triggers.
+const FALLBACK_AFTER_MS = 7000;
 
 interface Props {
   isActive: boolean;
@@ -34,15 +39,14 @@ interface Props {
 
 export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const insets = useSafeAreaInsets();
+  // idle → (yes) → arming ("put me face down") → running → done.
+  const [arming, setArming] = useState(false);
   const [started, setStarted] = useState(false);
+  // The minute is over but the phone still lies face down — the next
+  // screen waits until the user picks it up.
+  const [finished, setFinished] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [distractionFree, setDistractionFree] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
-
-  const toggleDistractionFree = useCallback(() => {
-    haptics.light();
-    setDistractionFree((v) => !v);
-  }, []);
 
   const handleSkip = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -55,16 +59,20 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const entryTranslateY = useSharedValue(12);
 
   const yesOpacity = useSharedValue(1);
-  const headerOpacity = useSharedValue(1);
   const hintOpacity = useSharedValue(1);
 
+  // The accelerometer starts the minute the phone settles face down —
+  // and stays on so the finish can wait for the pick-up gesture.
+  const { faceDown, available } = useFaceDown((arming || started) && isActive);
+
   // Same screen-dimming behaviour as the real session timer: once started,
-  // the brightness + timer fade to black; a tap anywhere then wakes it. The
-  // eye toggle dims instantly (distraction-free) like the real running UI.
+  // the brightness + timer fade to black; a tap anywhere then wakes it.
+  // While face down the backlight drops to true zero.
   const { contentStyle, fullyDark, wake } = useSessionScreen({
     active: started,
     suppressed: false,
-    distractionFree,
+    distractionFree: false,
+    faceDown,
     dimDurationMs: DIM_DURATION_MS,
   });
 
@@ -74,16 +82,26 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     entryTranslateY.value = withDelay(300, withTiming(0, { duration: 700, easing: EASE_OUT }));
   }, [isActive]);
 
-  const startSession = useCallback(() => {
+  // Step 1 — arm: the user said yes, now teach the ritual.
+  const arm = useCallback(() => {
     haptics.medium();
-    track('onboarding_session_started');
-    // The minute dims to black while the phone lies untouched — without
-    // keep-awake the system auto-lock (30–60s) kills the demo mid-way.
+    track('onboarding_session_armed');
+    // Keep-awake from here: the armed phone may already be face down.
     activateKeepAwakeAsync('onboarding-session');
-    setStarted(true);
-
+    setArming(true);
     yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
-    headerOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
+  }, []);
+
+  // Step 2 — begin: the phone settled face down (or manual fallback).
+  const begin = useCallback(() => {
+    setArming(false);
+    setStarted(true);
+    track('onboarding_session_started');
+    // Same "it has begun" as the real session — felt through the table,
+    // heard even on silent.
+    haptics.begin();
+    sound.start();
+
     hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
 
     setElapsed(0);
@@ -97,17 +115,44 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
           // refreshes weekStats and checks milestones in one shot.
           useAppStore.getState().recordSession(SESSION_DURATION);
           track('onboarding_session_completed', { durationSec: SESSION_DURATION });
-          // Same end-of-timer feel as the real session: the Opal-style
-          // haptic swell + the soft completion sound.
+          // Same end-of-timer ritual as the real session: the Opal-style
+          // haptic swell + the soft chime + the torch breathing light up
+          // off the table.
           haptics.celebrate();
           sound.complete();
-          onNext();
+          void torch.blink();
+          setFinished(true);
           return SESSION_DURATION;
         }
         return prev + 1;
       });
     }, 1000);
   }, [onNext]);
+
+  useEffect(() => {
+    if (arming && faceDown) begin();
+  }, [arming, faceDown, begin]);
+
+  // The reveal: the user lifts the phone, the next screen greets them.
+  // (A fallback-started session was never face down — advances at once.)
+  useEffect(() => {
+    if (finished && !faceDown) onNext();
+  }, [finished, faceDown, onNext]);
+
+  // Never strand anyone: manual start appears if the sensor stays quiet.
+  const [fallbackVisible, setFallbackVisible] = useState(false);
+  useEffect(() => {
+    if (!arming) {
+      setFallbackVisible(false);
+      return;
+    }
+    if (!available) {
+      setFallbackVisible(true);
+      return;
+    }
+    const t = setTimeout(() => setFallbackVisible(true), FALLBACK_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [arming, available]);
 
   useEffect(() => {
     return () => {
@@ -125,10 +170,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     opacity: yesOpacity.value,
   }));
 
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-  }));
-
   const hintStyle = useAnimatedStyle(() => ({
     opacity: hintOpacity.value,
   }));
@@ -138,11 +179,13 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, entryStyle]}>
-        <Animated.View style={headerStyle}>
+        {/* Header: the question, then the ritual instruction. Gone once
+            the minute is running. */}
+        {!started && (
           <Text style={[styles.headerText, { fontFamily: Fonts?.serif }]}>
-            Ready to try nothing?
+            {arming ? 'place your phone face down' : 'Ready to try nothing?'}
           </Text>
-        </Animated.View>
+        )}
 
         <Animated.View style={contentStyle}>
           <AnimatedTimerDisplay
@@ -153,28 +196,53 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
         </Animated.View>
 
         <View style={styles.yesWrap}>
-          <Animated.View style={yesStyle} pointerEvents={started ? 'none' : 'auto'}>
-            <Pressable onPress={!started ? startSession : undefined}>
-              <View style={styles.yesButton}>
-                <Text style={[styles.yesLabel, { fontFamily: Fonts?.serif }]}>
-                  yes
+          {!arming && (
+            <Animated.View style={yesStyle} pointerEvents={started ? 'none' : 'auto'}>
+              <Pressable onPress={!started && !arming ? arm : undefined}>
+                <View style={styles.yesButton}>
+                  <Text style={[styles.yesLabel, { fontFamily: Fonts?.serif }]}>
+                    yes
+                  </Text>
+                </View>
+              </Pressable>
+            </Animated.View>
+          )}
+          {arming && fallbackVisible && (
+            <Animated.View entering={FadeIn.duration(500)}>
+              <Pressable
+                onPress={begin}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Start without flipping"
+                style={styles.fallbackBtn}
+              >
+                <Text style={[styles.fallbackText, { fontFamily: Fonts?.serif }]}>
+                  can’t flip it? tap to start
                 </Text>
-              </View>
-            </Pressable>
-          </Animated.View>
+              </Pressable>
+            </Animated.View>
+          )}
         </View>
 
         <Animated.View style={[styles.footerGroup, hintStyle]} pointerEvents="none">
-          <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
-            just look around. be here.
-          </Text>
-          <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
-            and do nothing.
-          </Text>
+          {arming ? (
+            <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
+              you’ll hear a chime when it’s done — even on silent.
+            </Text>
+          ) : (
+            <>
+              <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
+                just look around. be here.
+              </Text>
+              <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
+                and do nothing.
+              </Text>
+            </>
+          )}
         </Animated.View>
       </Animated.View>
 
-      {/* Skip is only offered before the minute starts. */}
+      {/* Skip is offered any time before the minute actually runs. */}
       {!started && (
         <Pressable
           onPress={handleSkip}
@@ -185,37 +253,9 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
         </Pressable>
       )}
 
-      {/* Eye toggle — tap to turn the screen off instantly (distraction-free),
-          same as the real running UI. Fades out with the content as it dims. */}
-      {started && (
-        <Animated.View
-          style={[styles.runHideStack, { bottom: insets.bottom + 40 }, contentStyle]}
-          pointerEvents={distractionFree ? 'none' : 'box-none'}
-        >
-          <Pressable
-            onPress={toggleDistractionFree}
-            style={styles.runHideIconBtn}
-            hitSlop={16}
-          >
-            <Feather name="eye-off" size={18} color={palette.cream} style={{ opacity: 0.78 }} />
-          </Pressable>
-          <Text style={[styles.runHideHint, { fontFamily: Fonts?.serif }]}>
-            tap so nothing distracts
-          </Text>
-        </Animated.View>
-      )}
-
-      {/* In distraction-free mode a tap anywhere brings the screen back. */}
-      {distractionFree && (
-        <Pressable
-          style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
-          onPress={toggleDistractionFree}
-        />
-      )}
-
       {/* Once the auto-dim has faded fully black, a tap anywhere wakes it —
           same as the real session timer. */}
-      {fullyDark && !distractionFree && (
+      {fullyDark && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
           onPress={wake}
@@ -278,6 +318,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: palette.terracotta,
   },
+  fallbackBtn: {
+    borderWidth: 1.5,
+    borderColor: palette.cream,
+    borderRadius: 100,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+  },
+  fallbackText: {
+    fontSize: 15,
+    color: palette.cream,
+  },
   skipButton: {
     position: 'absolute',
     alignSelf: 'center',
@@ -292,28 +343,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.5,
     color: palette.cream,
-  },
-  runHideStack: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  runHideIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(249, 242, 224, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  runHideHint: {
-    color: palette.cream,
-    fontSize: 11,
-    letterSpacing: 0.3,
-    opacity: 0.55,
-    marginTop: 8,
-    textAlign: 'center',
   },
 });
