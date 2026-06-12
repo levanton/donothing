@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AccountSheet from '@/components/AccountSheet';
 import BlockSheet from '@/components/BlockSheet';
+import BlocksPausedModal from '@/components/promo/BlocksPausedModal';
 import HistoryContent from '@/components/HistoryContent';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
@@ -30,11 +31,12 @@ import { useMeasureRect, type MeasuredRect } from '@/hooks/useMeasureRect';
 import { useSessionScreen } from '@/hooks/useSessionScreen';
 import { useSlideGesture } from '@/hooks/useSlideGesture';
 import { findActiveBlock } from '@/lib/active-block';
+import { getDeviceState, setDeviceState } from '@/lib/db/settings';
 import { formatTimeStat } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { isBlockActive } from '@/lib/screen-time';
 import { getStats } from '@/lib/stats';
-import { useAppStore } from '@/lib/store';
+import { BLOCKS_PAUSED_PROMO_SHOWN_KEY, useAppStore } from '@/lib/store';
 import { palette, themes } from '@/lib/theme';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import HomePane from './HomePane';
@@ -123,6 +125,41 @@ export default function HomeShell() {
   // user always has a usable out.
   const sessionOrigin = useAppStore((s) => s.sessionOrigin);
   const scheduledBlocks = useAppStore((s) => s.scheduledBlocks);
+
+  // "Your blocks are paused" promo — shown once per lapse episode when
+  // an expired subscriber with enabled blocks lands on a free home
+  // screen. The shown-flag is device-local and cleared by the store on
+  // the next return to 'active', so a future lapse pitches once again.
+  const subscriptionStatus = useAppStore((s) => s.subscriptionStatus);
+  const [blocksPausedVisible, setBlocksPausedVisible] = useState(false);
+  useEffect(() => {
+    if (blocksPausedVisible) return;
+    if (!ready || !onboardingComplete || !tutorialCompleted) return;
+    if (subscriptionStatus !== 'inactive') return;
+    if (phase !== 'idle' || focusStep !== 'hidden') return;
+    if (!scheduledBlocks.some((b) => b.enabled)) return;
+    try {
+      if (getDeviceState('everSubscribed') !== '1') return;
+      if (getDeviceState(BLOCKS_PAUSED_PROMO_SHOWN_KEY) === '1') return;
+      setDeviceState(BLOCKS_PAUSED_PROMO_SHOWN_KEY, '1');
+    } catch {
+      return;
+    }
+    setBlocksPausedVisible(true);
+  }, [
+    blocksPausedVisible,
+    ready,
+    onboardingComplete,
+    tutorialCompleted,
+    subscriptionStatus,
+    phase,
+    focusStep,
+    scheduledBlocks,
+  ]);
+  const handleBlocksPausedClose = useCallback(
+    () => setBlocksPausedVisible(false),
+    [],
+  );
 
   // Block-waiting state: a scheduled block fired and apps are locked until the
   // user either does nothing for the required time, or force-unlocks.
@@ -884,6 +921,14 @@ export default function HomeShell() {
         yesBtnRect={yesBtnRect}
         onClose={handleCompletionClose}
         onUnlock={sessionOrigin === 'block' ? handleForceUnlock : undefined}
+      />
+
+      {/* "Your blocks are paused" promo — expired subscriber with
+          enabled blocks, once per lapse episode. Declining the pitch
+          surfaces the win-back discount. */}
+      <BlocksPausedModal
+        visible={blocksPausedVisible}
+        onClose={handleBlocksPausedClose}
       />
 
       {/* Launch splash — terracotta sheet that covers the screen and

@@ -121,6 +121,31 @@ async function pauseAllBlocksForExpiry(blocks: ScheduledBlock[]): Promise<void> 
   }
 }
 
+// Lapse-episode bookkeeping. `everSubscribed` distinguishes an expired
+// subscriber (who gets the "blocks are paused" nudges) from someone who
+// never paid (who must not). The episode flags are device-local and
+// reset on every return to 'active', so a future lapse nudges again —
+// once.
+const EVER_SUBSCRIBED_KEY = 'everSubscribed';
+const BLOCKS_PAUSED_NOTIFIED_KEY = 'blocksPausedNotified';
+export const BLOCKS_PAUSED_PROMO_SHOWN_KEY = 'blocksPausedPromoShown';
+
+// One quiet local notification per lapse episode: a former subscriber
+// whose enabled blocks just went dormant learns about it from the
+// lock screen instead of discovering it mid-scroll.
+async function maybeNotifyBlocksPaused(blocks: ScheduledBlock[]): Promise<void> {
+  try {
+    if (getDeviceState(EVER_SUBSCRIBED_KEY) !== '1') return;
+    if (!blocks.some((b) => b.enabled)) return;
+    if (getDeviceState(BLOCKS_PAUSED_NOTIFIED_KEY) === '1') return;
+    setDeviceState(BLOCKS_PAUSED_NOTIFIED_KEY, '1');
+    const { scheduleBlocksPausedNotification } = await import('./notifications');
+    await scheduleBlocksPausedNotification();
+  } catch (e) {
+    console.error('[store] maybeNotifyBlocksPaused failed:', e);
+  }
+}
+
 // Re-register native DeviceActivity monitors for every `enabled` block.
 // Called on `unknown→active` (cold start with active entitlement, where
 // native side may have self-cleaned during an offline lapse) and on
@@ -914,10 +939,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         if (from === 'active' && next === 'inactive') {
           await pauseAllBlocksForExpiry(get().scheduledBlocks);
+          await maybeNotifyBlocksPaused(get().scheduledBlocks);
         } else if (next === 'active') {
           // unknown→active or inactive→active. Either way, native side may
           // have stopped monitors (StoreKit-guard self-cleanup during a
           // lapsed period), so re-register from DB intent.
+          // Mark the user as a (once-)subscriber and close any lapse
+          // episode so the next expiry nudges exactly once again.
+          try {
+            setDeviceState(EVER_SUBSCRIBED_KEY, '1');
+            deleteDeviceState(BLOCKS_PAUSED_NOTIFIED_KEY);
+            deleteDeviceState(BLOCKS_PAUSED_PROMO_SHOWN_KEY);
+          } catch (e) {
+            console.error('[store.setSubscriptionStatus] episode flags failed:', e);
+          }
           await restoreAllBlocksAfterRenewal(get().scheduledBlocks);
         } else if (from === 'unknown' && next === 'inactive') {
           // Defensive cleanup on cold start for non-subscribed users —
@@ -928,6 +963,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           } catch (e) {
             console.error('[store.setSubscriptionStatus] forceUnblockAll failed:', e);
           }
+          // Cold start after an offline lapse lands here (never
+          // active→inactive in-app) — same one-shot nudge applies.
+          await maybeNotifyBlocksPaused(get().scheduledBlocks);
         }
       } catch (e) {
         console.error('[store.setSubscriptionStatus] transition failed:', e);

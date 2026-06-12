@@ -85,6 +85,25 @@ export async function scheduleSessionCompleteNotification(
   });
 }
 
+// One-shot nudge fired when a lapsed membership pauses the user's
+// scheduled blocks. Quiet and informational — the blocks aren't gone,
+// they're waiting. Fired at most once per lapse episode (the caller
+// guards with a device-state flag).
+export async function scheduleBlocksPausedNotification(): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'your blocks are paused',
+      body: 'they’re saved, not gone — renew your membership to bring them back.',
+      sound: 'default',
+      data: { type: 'blocksPaused' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 2,
+    },
+  });
+}
+
 export async function scheduleWeeklyNotification(
   hour: number,
   minute: number,
