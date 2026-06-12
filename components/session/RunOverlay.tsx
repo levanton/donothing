@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   FadeOut,
   LinearTransition,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
   type AnimatedStyle,
   type SharedValue,
@@ -127,6 +129,39 @@ export default function RunOverlay({
     opacity: Math.max(0, Math.min(1, (runExpand.value - 0.6) / 0.35)),
   }));
 
+  // Gate choreography. While the screen waits for the flip the
+  // illustration breathes — a slow opacity swell at a resting-breath
+  // pace — and the goal digits hold at a smaller scale so the
+  // instruction stays the protagonist. The moment the clock actually
+  // starts the digits grow to full size while gliding to the centre.
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    if (awaitingFaceDown) {
+      breath.value = withRepeat(
+        withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        true,
+      );
+      return;
+    }
+    cancelAnimation(breath);
+    breath.value = 0;
+  }, [awaitingFaceDown, breath]);
+  const breathStyle = useAnimatedStyle(() => ({
+    opacity: 0.62 + 0.38 * breath.value,
+  }));
+
+  const gateHold = useSharedValue(awaitingFaceDown ? 1 : 0);
+  useEffect(() => {
+    gateHold.value = withTiming(awaitingFaceDown ? 1 : 0, {
+      duration: 600,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+    });
+  }, [awaitingFaceDown, gateHold]);
+  const timerScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - 0.15 * gateHold.value }],
+  }));
+
   return (
     <Animated.View
       pointerEvents="box-none"
@@ -182,21 +217,27 @@ export default function RunOverlay({
             >
               {awaitingFaceDown && (
                 <Animated.View
-                  entering={FadeIn.duration(600)}
                   exiting={FadeOut.duration(400)}
                   style={styles.gateIntro}
                 >
-                  <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
+                  <Animated.Text
+                    entering={FadeIn.duration(500)}
+                    style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}
+                  >
                     place your phone{'\n'}face down to start
-                  </Text>
-                  <Image
+                  </Animated.Text>
+                  <Animated.Image
+                    entering={FadeIn.duration(500).delay(150)}
                     source={phoneDownImage}
-                    style={styles.gateIllustration}
+                    style={[styles.gateIllustration, breathStyle]}
                     fadeDuration={0}
                   />
                 </Animated.View>
               )}
-              <Animated.View layout={LinearTransition.duration(400)}>
+              <Animated.View
+                layout={LinearTransition.duration(400)}
+                style={timerScaleStyle}
+              >
                 <AnimatedTimerDisplay
                   seconds={
                     goalSeconds > 0
@@ -321,22 +362,23 @@ const styles = StyleSheet.create({
   // centred column so title + illustration + digits centre as one group.
   gateIntro: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 36,
   },
   gateTitle: {
     fontSize: 18,
     fontWeight: '400',
     lineHeight: 27,
+    letterSpacing: 0.5,
     color: palette.cream,
     textAlign: 'center',
   },
   gateIllustration: {
-    // Trimmed to the artwork's real bounds, ~1.4:1.
+    // Trimmed to the artwork's real bounds, ~1.4:1. Opacity is animated
+    // (the breathing loop) — no static opacity here.
     width: 170,
     height: 120,
-    marginTop: 24,
+    marginTop: 28,
     resizeMode: 'contain',
-    opacity: 0.8,
   },
   // Interrupt is the primary action — substantial cream-outline
   // pill at the bottom, reachable thumb position. Wrapper carries
