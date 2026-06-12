@@ -182,14 +182,18 @@ function BlockSheet({
         >
           {/* Eyebrow */}
           <View style={styles.eyebrowRow}>
-            <EyebrowChip text="your apps are locked" />
+            <EyebrowChip icon="lock" text="your apps are locked" />
           </View>
 
-          {/* Hero — the unlock number and what it asks for */}
+          {/* Hero — the dose: "5 min of nothing". The caption names the
+              substance (the noun), the CTA below supplies the verb —
+              a refrain, not a duplicate — and it doubles as the brand
+              line, which is the one kind of daily-seen copy that never
+              wears out. */}
           <View style={styles.hero}>
             <Text style={[styles.bigNumber, { color: theme.text }]}>
               {unlockMin}
-              <Text style={[styles.bigUnit, { fontFamily: Fonts!.serif }]}> min</Text>
+              <Text style={[styles.bigUnit, { fontFamily: Fonts!.mono }]}> min</Text>
             </Text>
             <Text
               style={[
@@ -197,7 +201,7 @@ function BlockSheet({
                 { color: theme.text, fontFamily: Fonts!.serif },
               ]}
             >
-              of doing nothing
+              of nothing
             </Text>
           </View>
 
@@ -208,41 +212,27 @@ function BlockSheet({
             style={[styles.heroSubRule, { backgroundColor: theme.border }]}
           />
 
-          {/* Benefits pills */}
+          {/* Benefits — a quiet beat between the hero and the CTA: bare
+              icon+word pairs in muted sand, no chip fills, so they read
+              as a whisper of "why" rather than competing with the CTA. */}
           <View style={styles.benefitsRow}>
-            <View style={[styles.benefitChip, { backgroundColor: CHIP_LIGHT }]}>
-              <Feather name='cloud' size={13} color={BROWN} />
-              <Text
-                style={[
-                  styles.benefitText,
-                  { color: BROWN, fontFamily: Fonts!.serif },
-                ]}
-              >
-                rest
-              </Text>
-            </View>
-            <View style={[styles.benefitChip, { backgroundColor: CHIP_MID }]}>
-              <Feather name='heart' size={13} color={BROWN} />
-              <Text
-                style={[
-                  styles.benefitText,
-                  { color: BROWN, fontFamily: Fonts!.serif },
-                ]}
-              >
-                calm
-              </Text>
-            </View>
-            <View style={[styles.benefitChip, { backgroundColor: CHIP_DEEP }]}>
-              <Feather name='zap' size={13} color={CREAM} />
-              <Text
-                style={[
-                  styles.benefitText,
-                  { color: CREAM, fontFamily: Fonts!.serif },
-                ]}
-              >
-                focus
-              </Text>
-            </View>
+            {([
+              ['cloud', 'rest'],
+              ['heart', 'calm'],
+              ['zap', 'focus'],
+            ] as const).map(([icon, label]) => (
+              <View key={label} style={styles.benefitItem}>
+                <Feather name={icon} size={11} color={CHIP_LIGHT} />
+                <Text
+                  style={[
+                    styles.benefitText,
+                    { color: CHIP_LIGHT, fontFamily: Fonts!.serif },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </View>
+            ))}
           </View>
 
           {/* Primary CTA — solid terracotta pill, cream text, generous shadow */}
@@ -276,7 +266,7 @@ function BlockSheet({
                 ]}
               />
               <View style={styles.holdContent} pointerEvents='none'>
-                <Feather name='lock' size={14} color={theme.text} />
+                <Feather name='unlock' size={14} color={theme.text} />
                 <Text
                   style={[
                     styles.holdText,
@@ -296,6 +286,7 @@ function BlockSheet({
               />
             </View>
           </Pressable>
+
         </View>
         </BottomSheetView>
       </BottomSheetModal>
@@ -305,12 +296,9 @@ function BlockSheet({
 export default BlockSheet;
 
 const CREAM = palette.cream;
-const BROWN = palette.brown;
 const TERRACOTTA = palette.terracotta;
-// Warm-earth ladder tied to the app palette — sand → salmon → espresso.
+// Muted sand — the benefits footnote sits quiet under the actions.
 const CHIP_LIGHT = palette.sand;
-const CHIP_MID = palette.salmon;
-const CHIP_DEEP = palette.deepBrown;
 
 const styles = StyleSheet.create({
   backdropImageWrap: {
@@ -337,9 +325,9 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
   },
   eyebrowRow: {
     flexDirection: 'row',
@@ -382,24 +370,21 @@ const styles = StyleSheet.create({
     // top and bottom gaps come entirely from this marginVertical.
     marginVertical: 14,
   },
+  // Sits between the hero divider and the do-nothing pill.
   benefitsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 28,
+    gap: 22,
+    marginBottom: 20,
   },
-  benefitChip: {
+  benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 100,
-    overflow: 'hidden',
+    gap: 5,
   },
   benefitText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.4,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   primaryBtn: {

@@ -1,3 +1,5 @@
+import { Feather } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
@@ -10,6 +12,8 @@ interface EyebrowChipProps {
   bg?: string;
   /** Text colour. Defaults to brown. */
   color?: string;
+  /** Optional leading icon (Feather name), drawn in the text colour. */
+  icon?: ComponentProps<typeof Feather>['name'];
 }
 
 /**
@@ -22,9 +26,11 @@ export default function EyebrowChip({
   text,
   bg = palette.sand,
   color = palette.brown,
+  icon,
 }: EyebrowChipProps) {
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
+      {icon && <Feather name={icon} size={11} color={color} />}
       <Text style={[styles.text, { color, fontFamily: Fonts!.serif }]}>
         {text}
       </Text>
@@ -34,6 +40,9 @@ export default function EyebrowChip({
 
 const styles = StyleSheet.create({
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 100,
