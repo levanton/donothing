@@ -23,7 +23,21 @@ jest.mock('@/lib/notifications', () => ({
 // expo-audio has a TurboModule binding that fails to load in node.
 // Replace the lib/sound wrapper instead.
 jest.mock('@/lib/sound', () => ({
-  sound: { complete: jest.fn() },
+  sound: { complete: jest.fn(), start: jest.fn() },
+}));
+
+// expo-haptics also binds natively — the recovery tests drive the real
+// start/pause/resume actions, which fire haptic cues.
+jest.mock('@/lib/haptics', () => ({
+  haptics: {
+    light: jest.fn(),
+    medium: jest.fn(),
+    success: jest.fn(),
+    error: jest.fn(),
+    select: jest.fn(),
+    begin: jest.fn(),
+    celebrate: jest.fn(),
+  },
 }));
 
 import { resetDbState } from '../db/helpers';
@@ -178,6 +192,78 @@ describe('deleteSession', () => {
     const s = store.useAppStore.getState().recordSession(120)!;
     await store.useAppStore.getState().deleteSession(s.id);
     expect(sessions.getSessionCount()).toBe(0);
+  });
+});
+
+describe('cold-start pending-session recovery', () => {
+  // Writes the pending record exactly the way a previous (killed) app
+  // process would have left it, then runs init() and inspects what
+  // landed in the sessions table.
+  const writePending = (settings: SettingsModule, p: object) => {
+    settings.setDeviceState('session_pending', JSON.stringify(p));
+  };
+
+  it('killed while RUNNING → recovers wall-clock elapsed since start', async () => {
+    const { store, settings, sessions } = loadStore();
+    writePending(settings, {
+      startedAt: Date.now() - 90_000,
+      goalSeconds: 300,
+      notificationId: null,
+    });
+    await store.useAppStore.getState().init();
+    const saved = sessions.getAllSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].duration).toBeGreaterThanOrEqual(89);
+    expect(saved[0].duration).toBeLessThanOrEqual(92);
+  });
+
+  it('killed while PAUSED → recovers the frozen elapsed, not the pause time', async () => {
+    const { store, settings, sessions } = loadStore();
+    // Stopwatch session (goal=0): paused at 75s, app killed, relaunched
+    // 3 hours later. The old bug recovered ~3h as session time.
+    writePending(settings, {
+      startedAt: Date.now() - 3 * 3600 * 1000,
+      goalSeconds: 0,
+      notificationId: null,
+      pausedElapsed: 75,
+    });
+    await store.useAppStore.getState().init();
+    const saved = sessions.getAllSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].duration).toBe(75);
+  });
+
+  it('killed while PAUSED with a goal → frozen elapsed also wins over wall time', async () => {
+    const { store, settings, sessions } = loadStore();
+    writePending(settings, {
+      startedAt: Date.now() - 10 * 60 * 1000,
+      goalSeconds: 300,
+      notificationId: null,
+      pausedElapsed: 130,
+    });
+    await store.useAppStore.getState().init();
+    const saved = sessions.getAllSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].duration).toBe(130);
+  });
+
+  it('pauseSession snapshots the frozen elapsed; resumeSession clears it', () => {
+    const { store, settings } = loadStore();
+    const s = store.useAppStore.getState();
+    s.startSession();
+    s.beginCountdown();
+    store.useAppStore.setState({ elapsed: 45 });
+    s.pauseSession();
+    const paused = JSON.parse(settings.getDeviceState('session_pending')!);
+    expect(paused.pausedElapsed).toBe(45);
+
+    store.useAppStore.getState().resumeSession();
+    const resumed = JSON.parse(settings.getDeviceState('session_pending')!);
+    expect(resumed.pausedElapsed).toBeUndefined();
+
+    // Resume restarted the ticking interval — pause again so the test
+    // doesn't leak a live timer into the rest of the suite.
+    store.useAppStore.getState().pauseSession();
   });
 });
 

@@ -173,6 +173,12 @@ interface PendingSession {
   startedAt: number;
   goalSeconds: number;
   notificationId: string | null;
+  /** Set while the session is PAUSED: the frozen elapsed seconds at the
+      moment of pause. Cold-start recovery must save exactly this value —
+      deriving elapsed from `startedAt` while paused would count the
+      whole pause (potentially hours) as session time. Absent while the
+      clock is actually ticking. */
+  pausedElapsed?: number;
 }
 
 // Validate untrusted JSON from device_state — partially-written records
@@ -186,7 +192,9 @@ function isPendingSession(x: unknown): x is PendingSession {
     Number.isFinite(o.startedAt) &&
     typeof o.goalSeconds === 'number' &&
     Number.isFinite(o.goalSeconds) &&
-    (o.notificationId === null || typeof o.notificationId === 'string')
+    (o.notificationId === null || typeof o.notificationId === 'string') &&
+    (o.pausedElapsed === undefined ||
+      (typeof o.pausedElapsed === 'number' && Number.isFinite(o.pausedElapsed)))
   );
 }
 
@@ -571,8 +579,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     // dbAddSession, and at goal+25% if a finite goal was set).
     const pending = readPendingSession();
     if (pending) {
-      const elapsedMs = Date.now() - pending.startedAt;
-      const elapsedSec = Math.floor(elapsedMs / 1000);
+      // A session killed while PAUSED recovers its frozen elapsed (the
+      // clock wasn't ticking — wall time since start would count the
+      // whole pause as session time). A session killed while RUNNING
+      // recovers wall time since start: the phone kept lying face down,
+      // the real-world session continued without the process.
+      const elapsedSec =
+        pending.pausedElapsed != null
+          ? Math.floor(pending.pausedElapsed)
+          : Math.floor((Date.now() - pending.startedAt) / 1000);
       const goal = pending.goalSeconds;
       // Cap finite-goal sessions at goal + 25% buffer (covers small
       // wall-clock drift); infinite-goal sessions get the standard
@@ -731,6 +746,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       cancelNotification(sessionNotificationId).catch(() => {});
       sessionNotificationId = null;
     }
+    // Snapshot the frozen elapsed for crash recovery. Without this the
+    // pending record still points at the original start time, so an app
+    // killed while the pause sheet is up would "recover" the whole pause
+    // duration as session time (unbounded in stopwatch mode). Resume
+    // rewrites the record without the snapshot; stop/complete clear it.
+    writePendingSession({
+      startedAt: sessionStartTime,
+      goalSeconds: get().goalSeconds,
+      notificationId: null,
+      pausedElapsed: get().elapsed,
+    });
   },
 
   resumeSession: () => {
