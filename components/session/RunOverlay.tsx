@@ -179,7 +179,7 @@ export default function RunOverlay({
                     : elapsed
                 }
                 color={palette.cream}
-                fontSize={96}
+                fontSize={80}
               />
             </Animated.View>
           )}

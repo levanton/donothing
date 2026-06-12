@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 import { useFaceDown } from '@/hooks/useFaceDown';
 import { haptics } from '@/lib/haptics';
 import { useAppStore } from '@/lib/store';
 import { palette } from '@/lib/theme';
+
+const phoneDownImage = require('@/assets/images/phone-down.png');
 
 // The session start ritual, shown over the terracotta layer while the
 // session is armed: "put me face down." The accelerometer starts the
@@ -39,9 +42,10 @@ export default function FaceDownGate() {
       style={styles.container}
     >
       <View style={styles.above} pointerEvents="none">
-        <Text style={[styles.title, { fontFamily: Fonts!.serif }]}>
-          place your phone face down
+        <Text style={[styles.title, { fontFamily: Fonts!.mono }]}>
+          place your phone{'\n'}face down
         </Text>
+        <Image source={phoneDownImage} style={styles.illustration} fadeDuration={0} />
       </View>
 
       <View style={styles.below}>
@@ -65,18 +69,18 @@ export default function FaceDownGate() {
         )}
       </View>
 
-      <Pressable
+      <PillButton
+        label="back"
         onPress={() => {
           haptics.light();
           void stopSession();
         }}
-        hitSlop={16}
-        accessibilityRole="button"
-        accessibilityLabel="Cancel"
+        outline
+        size="large"
+        color="rgba(249, 242, 224, 0.4)"
         style={styles.cancelBtn}
-      >
-        <Text style={[styles.cancelText, { fontFamily: Fonts!.serif }]}>back</Text>
-      </Pressable>
+        labelStyle={[styles.cancelText, { fontFamily: Fonts!.serif }]}
+      />
     </Animated.View>
   );
 }
@@ -102,9 +106,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 30,
+    fontSize: 20,
+    fontWeight: '300',
     color: palette.cream,
     textAlign: 'center',
+  },
+  illustration: {
+    // The source PNG is 3:2; keep the footprint modest so the instruction
+    // block still clears the centred timer digits below it.
+    width: 240,
+    height: 160,
+    marginTop: 16,
+    resizeMode: 'contain',
   },
   fallbackBtn: {
     borderWidth: 1.5,
@@ -121,11 +134,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 60,
     alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
   },
   cancelText: {
-    fontSize: 16,
     color: palette.cream,
   },
 });
