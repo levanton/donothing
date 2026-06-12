@@ -625,7 +625,14 @@ export default function HomeShell() {
     haptics.success();
     deactivateKeepAwake('focus');
     deactivateKeepAwake('scheduled-block');
-    useAppStore.getState().releaseBlockShield().catch(() => {});
+    // AWAITED on purpose: stopSession() flips started → false, which
+    // triggers the shield polls below (requestBlockUnlock). If the
+    // native shield teardown is still in flight at that point, the poll
+    // reads "shield up" and re-surfaces the BlockSheet the user just
+    // chose to leave. Sequencing the release first means the polls read
+    // settled truth — and if the release genuinely fails, showing the
+    // BlockSheet is the honest outcome (the apps really are locked).
+    await useAppStore.getState().releaseBlockShield();
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();
     runResetAnimations();
