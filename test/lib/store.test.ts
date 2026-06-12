@@ -11,6 +11,8 @@ jest.mock('@/lib/screen-time', () => ({
   reconcileBlocks: jest.fn().mockResolvedValue(undefined),
   scheduleBlock: jest.fn().mockResolvedValue(undefined),
   unscheduleBlock: jest.fn(),
+  isBlockActive: jest.fn(() => false),
+  copyShieldIcon: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/notifications', () => ({
@@ -264,6 +266,32 @@ describe('cold-start pending-session recovery', () => {
     // Resume restarted the ticking interval — pause again so the test
     // doesn't leak a live timer into the rest of the suite.
     store.useAppStore.getState().pauseSession();
+  });
+});
+
+describe('handleBackground', () => {
+  it('cancels an ARMED session (face-down gate) instead of hanging in arming', async () => {
+    const { store } = loadStore();
+    const s = store.useAppStore.getState();
+    s.startSession();
+    expect(store.useAppStore.getState().phase).toBe('arming');
+
+    await store.useAppStore.getState().handleBackground();
+    const after = store.useAppStore.getState();
+    expect(after.phase).toBe('idle');
+    expect(after.started).toBe(false);
+  });
+
+  it('pauses a RUNNING session', async () => {
+    const { store } = loadStore();
+    const s = store.useAppStore.getState();
+    s.startSession();
+    s.beginCountdown();
+
+    await store.useAppStore.getState().handleBackground();
+    const after = store.useAppStore.getState();
+    expect(after.phase).toBe('paused');
+    expect(after.paused).toBe(true);
   });
 });
 

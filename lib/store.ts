@@ -1166,10 +1166,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // --- AppState ---
   handleBackground: async () => {
-    const { started, paused } = get();
+    const { started, paused, phase } = get();
     // Skip when not running, or when the user has already paused — the
     // manual sheet is already showing, no need to re-trigger.
     if (!started || paused) return;
+    // Leaving the app from the face-down gate cancels the arm. PAUSE is
+    // only legal from `running`, so without this the session would hang
+    // in `arming` forever (gate still waiting hours later, keep-awake
+    // active). An armed-but-never-started session is nothing — the user
+    // comes back to a clean home and taps yes again. For a block-origin
+    // arm the shield stays up, so the BlockSheet resurfaces via the
+    // usual polls.
+    if (phase === 'arming') {
+      await get().stopSession();
+      return;
+    }
     // Treat a background trip the same as tapping interrupt: freeze the
     // timer and surface the SessionEndedSheet so the user comes back to
     // continue / start over / end instead of a silent kill.
