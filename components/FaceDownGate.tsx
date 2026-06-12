@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -11,13 +11,11 @@ import { palette } from '@/lib/theme';
 // The session start ritual, shown over the terracotta layer while the
 // session is armed: "put me face down." The accelerometer starts the
 // clock the moment the phone settles face down. Two guarantees:
-//   - it can NEVER strand the user: if the sensor is unavailable (or just
-//     hasn't triggered) a manual "start anyway" appears after a few
-//     seconds;
+//   - it can NEVER strand the user: if the sensor is unavailable a manual
+//     "start anyway" appears — but ONLY then, never on a timer, so a healthy
+//     sensor never offers a way to skip the ritual;
 //   - it never false-starts: the detector requires a sustained face-down
 //     reading (see useFaceDown's hold window).
-const FALLBACK_AFTER_MS = 7000;
-
 export default function FaceDownGate() {
   const beginCountdown = useAppStore((s) => s.beginCountdown);
   const stopSession = useAppStore((s) => s.stopSession);
@@ -32,19 +30,8 @@ export default function FaceDownGate() {
     beginCountdown();
   }, [faceDown, beginCountdown]);
 
-  // Escape hatch — sensors missing, thick case, whatever: never strand.
-  const [fallbackVisible, setFallbackVisible] = useState(false);
-  useEffect(() => {
-    if (!available) {
-      setFallbackVisible(true);
-      return;
-    }
-    const t = setTimeout(() => setFallbackVisible(true), FALLBACK_AFTER_MS);
-    return () => clearTimeout(t);
-  }, [available]);
-
   // The big timer (rendered by the home screen) sits at the absolute
-  // centre — the gate's texts frame it: instruction above, hint below.
+  // centre — the instruction sits above it; the dead-sensor fallback below.
   return (
     <Animated.View
       entering={FadeIn.duration(600)}
@@ -58,11 +45,7 @@ export default function FaceDownGate() {
       </View>
 
       <View style={styles.below}>
-        <Text style={[styles.hint, { fontFamily: Fonts!.serif }]}>
-          you’ll hear a chime when it’s done — even on silent.
-        </Text>
-
-        {fallbackVisible && (
+        {!available && (
           <Animated.View entering={FadeIn.duration(500)}>
             <Pressable
               onPress={() => {
@@ -117,22 +100,13 @@ const styles = StyleSheet.create({
     right: 40,
     top: '60%',
     alignItems: 'center',
-    gap: 16,
   },
   title: {
     fontSize: 30,
     color: palette.cream,
     textAlign: 'center',
   },
-  hint: {
-    fontSize: 16,
-    lineHeight: 23,
-    color: palette.cream,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
   fallbackBtn: {
-    marginTop: 18,
     borderWidth: 1.5,
     borderColor: palette.cream,
     borderRadius: 100,
