@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import PillButton from '@/components/PillButton';
+import GhostButton from '@/components/GhostButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -188,7 +188,7 @@ export default function FirstMinuteDoneScreen({ isActive, onNext }: Props) {
         </View>
 
         <Animated.View style={[styles.buttonArea, { paddingBottom: 24 }, buttonAnimStyle]}>
-          <PillButton label="continue" onPress={onNext} variant="filled" size="large" color={palette.terracotta} bg={palette.cream} />
+          <GhostButton label="continue" onPress={onNext} />
         </Animated.View>
       </View>
     </View>

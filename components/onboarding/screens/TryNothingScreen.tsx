@@ -21,7 +21,7 @@ import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
 import { track } from '@/lib/analytics';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
-import PillButton from '@/components/PillButton';
+import GhostButton from '@/components/GhostButton';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
@@ -120,9 +120,11 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
     setStarted(true);
     track('onboarding_session_started');
     // Same "it has begun" as the real session — felt through the table,
-    // heard even on silent.
+    // heard even on silent, with a brief candle-glow off the torch
+    // (the same soft light that marks the end, a short pulse here).
     haptics.begin();
     sound.start();
+    void torch.blink(1, 0.1, 220, 0);
 
     hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
 
@@ -233,14 +235,10 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
           minute, so a manual "tap to start" appears — only then, never
           on a timer (same rule as the real face-down gate). */}
       {!started && available === false && (
-        <PillButton
+        <GhostButton
           label="can’t flip it? tap to start"
           onPress={begin}
-          outline
-          size="large"
-          color="rgba(249, 242, 224, 0.4)"
           style={[styles.fallbackButton, { bottom: insets.bottom + 30 }]}
-          labelStyle={[styles.fallbackLabel, { fontFamily: Fonts!.serif }]}
         />
       )}
 
@@ -325,9 +323,6 @@ const styles = StyleSheet.create({
   fallbackButton: {
     position: 'absolute',
     alignSelf: 'center',
-  },
-  fallbackLabel: {
-    color: palette.cream,
   },
   wakeCatcher: {
     zIndex: 100,

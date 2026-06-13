@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
-import PillButton from '@/components/PillButton';
+import GhostButton from '@/components/GhostButton';
 import DriftingDots from '@/components/DriftingDots';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
@@ -101,14 +101,7 @@ export default function AllSetScreen({ isActive, onFinish }: Props) {
         </View>
 
         <Animated.View style={[styles.buttonArea, buttonStyle]}>
-          <PillButton
-            label="done"
-            onPress={onFinish}
-            variant="filled"
-            size="large"
-            color={palette.terracotta}
-            bg={palette.cream}
-          />
+          <GhostButton label="done" onPress={onFinish} />
         </Animated.View>
       </View>
     </View>

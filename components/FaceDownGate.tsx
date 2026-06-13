@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import PillButton from '@/components/PillButton';
+import GhostButton from '@/components/GhostButton';
 import { Fonts } from '@/constants/theme';
 import { useFaceDown } from '@/hooks/useFaceDown';
 import { haptics } from '@/lib/haptics';
@@ -70,16 +70,12 @@ export default function FaceDownGate() {
           </Animated.View>
         )}
 
-        <PillButton
+        <GhostButton
           label="back"
           onPress={() => {
             haptics.light();
             void stopSession();
           }}
-          outline
-          size="large"
-          color="rgba(249, 242, 224, 0.4)"
-          labelStyle={[styles.cancelText, { fontFamily: Fonts!.serif }]}
         />
       </View>
     </Animated.View>
@@ -110,9 +106,6 @@ const styles = StyleSheet.create({
   },
   fallbackText: {
     fontSize: 15,
-    color: palette.cream,
-  },
-  cancelText: {
     color: palette.cream,
   },
 });

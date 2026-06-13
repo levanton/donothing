@@ -672,8 +672,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     track('session_started', { goalSec: goalSeconds, origin: get().sessionOrigin });
     // "It has begun" — felt through the table AND heard (even on silent),
     // so a disabled-vibration setting can't make the start go unnoticed.
+    // A brief candle-glow off the torch echoes the end-of-session light,
+    // bookending the minute with the same soft signal (short pulse here
+    // vs. the long breath at completion). No-ops without hardware.
     haptics.begin();
     sound.start();
+    void torch.blink(1, 0.1, 220, 0);
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
