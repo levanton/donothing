@@ -12,10 +12,10 @@ const LINES: TypeLineSpec[] = [
   { segs: [{ text: 'one more day gone.' }] },
   { segs: [{ text: 'it keeps us busy.' }] },
   { segs: [{ text: 'but never really here.' }], stepMs: 65 },
-  {
-    segs: [{ text: 'days, months, years — gone in a blur.', strong: true }],
-    stepMs: 80,
-  },
+  // The payoff lands in two breaths — the dash stays with the clause it
+  // belongs to (never the start of a line), then the blur falls on its own.
+  { segs: [{ text: 'days, months, years —', strong: true }], stepMs: 80 },
+  { segs: [{ text: 'gone in a blur.', strong: true }], stepMs: 80 },
 ];
 
 // The act crossfades in — typing starts once the fade has settled.

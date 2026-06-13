@@ -65,6 +65,10 @@ export const GLIDE_MS = 750;
 // A pronounced S-curve: the column leans into the move, sweeps through the
 // middle and settles softly — clearly a curve, never a constant-speed slide.
 export const GLIDE_EASING = Easing.bezier(0.65, 0, 0.35, 1);
+// Once a line has been read and rises off the focal line, it recedes to this
+// opacity — the eye stays on the line now being written, the past softly
+// settling behind it. The active/typing line is always full strength.
+export const PAST_LINE_OPACITY = 0.45;
 /** Gap between the active (focal) line's bottom edge and the top of the
  *  media zone — the focal line is DERIVED from the zone, so the text can
  *  never collide with the picture / the dot field on any screen. */
@@ -103,6 +107,9 @@ export interface TimetableLine {
   words: TypedWord[];
   glideAt: number;
   glideDur: number;
+  /** When this line recedes — the moment the NEXT line begins to type, after
+   *  its glide has settled. The last line never recedes (Infinity). */
+  dimAt: number;
 }
 export interface TypeTimetable {
   lines: TimetableLine[];
@@ -125,8 +132,14 @@ export function buildTimetable(
     const glideDur = i === 0 ? 0 : GLIDE_MS;
     const out = typeText(line.segs, i === 0 ? t : glideAt + glideDur, line.stepMs ?? stepMs);
     t = out.end;
-    return { words: out.words, glideAt, glideDur };
+    return { words: out.words, glideAt, glideDur, dimAt: Number.POSITIVE_INFINITY };
   });
+  // A line keeps full strength through most of its rise and starts receding
+  // partway up — just before the next line lands and begins to type — so the
+  // dim is well under way as the new words arrive, not lagging behind them.
+  for (let i = 0; i < typed.length - 1; i++) {
+    typed[i].dimAt = typed[i + 1].glideAt + typed[i + 1].glideDur / 2;
+  }
   return { lines: typed, end: t, finaleAt: t + LINE_HOLD_MS };
 }
 
@@ -187,6 +200,44 @@ export function TypedLine({
         </View>
       ))}
     </View>
+  );
+}
+
+/**
+ * One line slot in the column. It types at full strength on the focal line
+ * and holds it through its own rise — then, once the next line has begun to
+ * type, softly recedes to PAST_LINE_OPACITY so the eye stays with the words
+ * now being written. The fade is slow and overlaps the new line's typing.
+ */
+function DimmingLine({
+  words,
+  color,
+  lineHeight,
+  dimAt,
+  onLayout,
+}: {
+  words: TypedWord[];
+  color: string;
+  lineHeight: number;
+  dimAt: number;
+  onLayout: (e: LayoutChangeEvent) => void;
+}) {
+  const dim = useSharedValue(1);
+
+  useEffect(() => {
+    if (!Number.isFinite(dimAt)) return; // the last line stays full strength
+    dim.value = withDelay(
+      dimAt,
+      withTiming(PAST_LINE_OPACITY, { duration: GLIDE_MS, easing: GLIDE_EASING }),
+    );
+  }, [dimAt]);
+
+  const style = useAnimatedStyle(() => ({ opacity: dim.value }));
+
+  return (
+    <Animated.View onLayout={onLayout} style={style}>
+      <TypedLine words={words} color={color} lineHeight={lineHeight} />
+    </Animated.View>
   );
 }
 
@@ -257,9 +308,14 @@ export function TeleprompterColumn({
     <View style={[styles.anchor, { top: focalY }]}>
       <Animated.View style={blockStyle}>
         {timetable.lines.map((line, li) => (
-          <View key={li} onLayout={onSlotLayout(li)}>
-            <TypedLine words={line.words} color={color} lineHeight={lineHeight} />
-          </View>
+          <DimmingLine
+            key={li}
+            words={line.words}
+            color={color}
+            lineHeight={lineHeight}
+            dimAt={line.dimAt}
+            onLayout={onSlotLayout(li)}
+          />
         ))}
       </Animated.View>
     </View>
