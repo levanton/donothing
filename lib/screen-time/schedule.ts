@@ -226,14 +226,29 @@ export function getActiveMonitors(): string[] {
  * Full nuclear reset — stops every monitor, drops block-all mode, and
  * resets the native block list. Use when the DB has no blocks but the
  * native shield is still active.
+ *
+ * Best-effort, then VERIFIED: each native call is individually guarded so
+ * one failure never skips the rest, and after every pass we re-read the
+ * LIVE ManagedSettings shield (`isBlockActive`) and retry until it reports
+ * nothing shielded. Callers — delete-account above all — depend on this
+ * leaving the user genuinely unblocked, not merely on the clear actions
+ * having been dispatched. An unreadable shield state is treated as "done"
+ * rather than spinning the loop.
  */
 export async function forceUnblockAll(): Promise<void> {
-  try { stopMonitoring(); } catch {}
-  try { disableBlockAllMode(); } catch {}
-  try { resetBlocks(); } catch {}
-  try {
-    await unblockSelection({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
-  } catch {}
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { stopMonitoring(); } catch {}
+    try { disableBlockAllMode(); } catch {}
+    try { resetBlocks(); } catch {}
+    try {
+      await unblockSelection({ activitySelectionId: NEVER_BLOCK_SELECTION_ID });
+    } catch {}
+    try {
+      if (!isBlockActive()) return;
+    } catch {
+      return;
+    }
+  }
 }
 
 /**

@@ -1336,6 +1336,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       throw e;
     }
 
+    // Final shield guarantee. The DB is now empty, so this is a pure native
+    // clear with no block intent left anywhere — it covers the case where
+    // the pre-wipe pass hit a transient native failure. forceUnblockAll
+    // verifies + retries; if the shield STILL reports active after that,
+    // surface it to Sentry: the user would be left blocked with nothing in
+    // the DB to manage it from. (The cold-start reconcile is the last-ditch
+    // net, but we should never rely on the user reopening the app.)
+    try {
+      const { forceUnblockAll, isBlockActive } = await import('./screen-time');
+      await forceUnblockAll();
+      if (isBlockActive()) {
+        captureError(
+          new Error('deleteLocalAccount: shield still active after wipe + retry'),
+        );
+      }
+    } catch (e) {
+      console.error('[store.deleteLocalAccount] final unblock failed:', e);
+    }
+
     // Reset Zustand back to first-launch defaults. Mirrors the
     // initial values declared at the top of create() — keep the two
     // in sync if you add new state fields.

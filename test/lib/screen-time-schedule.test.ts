@@ -229,6 +229,29 @@ describe('forceUnblockAll', () => {
     await expect(forceUnblockAll()).resolves.toBeUndefined();
     expect(resetBlocks).toHaveBeenCalled();
   });
+
+  it('retries until the live shield reports cleared', async () => {
+    // Shield still up after the first pass, confirmed down on the second.
+    shieldActive.mockReturnValueOnce(true).mockReturnValue(false);
+    await forceUnblockAll();
+    expect((resetBlocks as jest.Mock).mock.calls.length).toBe(2);
+  });
+
+  it('caps retries when the shield never reports cleared', async () => {
+    shieldActive.mockReturnValue(true);
+    await forceUnblockAll();
+    expect((resetBlocks as jest.Mock).mock.calls.length).toBe(3);
+  });
+
+  it('stops after one pass when the shield state is unreadable', async () => {
+    shieldActive.mockImplementation(() => {
+      throw new Error('extension unavailable');
+    });
+    await forceUnblockAll();
+    // isBlockActive() swallows the throw → false → first pass is treated as
+    // done; no spinning.
+    expect((resetBlocks as jest.Mock).mock.calls.length).toBe(1);
+  });
 });
 
 describe('reconcileBlocks', () => {
