@@ -13,7 +13,7 @@ const LINES: TypeLineSpec[] = [
   { segs: [{ text: 'what if…' }] },
   { segs: [{ text: 'you could stop time again?' }] },
   { segs: [{ text: 'one minute.' }] },
-  { segs: [{ text: 'no phone. no plans.' }] },
+  { segs: [{ text: 'no phone. no plans. no rush.' }] },
   { segs: [{ text: 'just you.' }] },
   { segs: [{ text: 'even one minute a day' }] },
   { segs: [{ text: 'can change everything.', strong: true, accent: true }], stepMs: 65 },
