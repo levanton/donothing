@@ -45,7 +45,7 @@ interface Props {
   theme: { text: string; bg: string };
 }
 
-export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
+export default function TryNothingScreen({ isActive, onNext }: Props) {
   const insets = useSafeAreaInsets();
   // arming ("place your phone face down") → running → done. No "yes" tap:
   // the rehearsal IS the face-down ritual, so the screen arms itself the
@@ -58,13 +58,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
-  const handleSkip = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    haptics.light();
-    track('onboarding_session_skipped');
-    (onSkip ?? onNext)();
-  }, [onNext, onSkip]);
-
   const entryOpacity = useSharedValue(0);
   const entryTranslateY = useSharedValue(12);
 
@@ -72,12 +65,12 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
 
   // The accelerometer starts the minute the phone settles face down —
   // and stays on so the finish can wait for the pick-up gesture.
-  const { faceDown } = useFaceDown((arming || started) && isActive);
+  const { faceDown, available } = useFaceDown((arming || started) && isActive);
 
   // Same screen-dimming behaviour as the real session timer: once started,
   // the brightness + timer fade to black; a tap anywhere then wakes it.
   // While face down the backlight drops to true zero.
-  const { contentStyle, fullyDark, wake } = useSessionScreen({
+  const { contentStyle, dimmed, wake } = useSessionScreen({
     active: started,
     suppressed: false,
     faceDown,
@@ -232,23 +225,29 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
         )}
       </Animated.View>
 
-      {/* Skip — same large translucent-cream outline pill as the real
-          gate's "back" button, before the minute actually runs. */}
-      {!started && (
+      {/* No skip here on purpose: this is the first taste of the whole
+          app — offering an exit at the moment of value invites the user
+          out exactly when we want them in. The minute is short and the
+          flip is the only ask. The ONE exception is a dead/unavailable
+          accelerometer: without the sensor the flip can never start the
+          minute, so a manual "tap to start" appears — only then, never
+          on a timer (same rule as the real face-down gate). */}
+      {!started && available === false && (
         <PillButton
-          label="skip"
-          onPress={handleSkip}
+          label="can’t flip it? tap to start"
+          onPress={begin}
           outline
           size="large"
           color="rgba(249, 242, 224, 0.4)"
-          style={[styles.skipButton, { bottom: insets.bottom + 30 }]}
-          labelStyle={[styles.skipLabel, { fontFamily: Fonts!.serif }]}
+          style={[styles.fallbackButton, { bottom: insets.bottom + 30 }]}
+          labelStyle={[styles.fallbackLabel, { fontFamily: Fonts!.serif }]}
         />
       )}
 
-      {/* Once the auto-dim has faded fully black, a tap anywhere wakes it —
-          same as the real session timer. */}
-      {fullyDark && (
+      {/* A tap anywhere wakes the screen the whole time it's dimming or
+          dark — not only once fully black — so the user can bring the
+          content back mid-fade. */}
+      {dimmed && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
           onPress={wake}
@@ -294,9 +293,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footer: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '400',
-    lineHeight: 26,
+    lineHeight: 30,
     color: palette.cream,
     textAlign: 'center',
   },
@@ -323,14 +322,14 @@ const styles = StyleSheet.create({
     color: palette.cream,
     textAlign: 'center',
   },
-  skipButton: {
+  fallbackButton: {
     position: 'absolute',
     alignSelf: 'center',
   },
+  fallbackLabel: {
+    color: palette.cream,
+  },
   wakeCatcher: {
     zIndex: 100,
-  },
-  skipLabel: {
-    color: palette.cream,
   },
 });

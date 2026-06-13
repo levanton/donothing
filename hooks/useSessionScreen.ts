@@ -199,5 +199,10 @@ export function useSessionScreen({
 
   const wake = useCallback(() => setAwake(true), []);
 
-  return { contentStyle, fullyDark, wake };
+  // `dimmed` is true the whole time the screen is dark OR on its way
+  // there (the slow fade), so the caller can mount the tap-to-wake
+  // catcher for the entire fade — not only once it's fully black.
+  // Without this a tap during the fade did nothing until the content
+  // had vanished completely.
+  return { contentStyle, fullyDark, dimmed: dark, wake };
 }

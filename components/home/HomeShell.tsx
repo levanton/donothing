@@ -569,11 +569,11 @@ export default function HomeShell() {
   }, [completionHeld, runningFaceDown]);
 
   // Screen-dimming controller — owns brightness, the content fade and the
-  // tap-to-wake state. See hooks/useSessionScreen. While it's still fading
-  // (`!fullyDark`) the UI is untouched so the pause button stays tappable;
-  // once fully black, `fullyDark` turns on and we put up a tap-catcher.
+  // tap-to-wake state. See hooks/useSessionScreen. `dimmed` is true the
+  // whole time the screen is dark OR fading there, so a tap brings the
+  // content back at any point in the fade (not only once fully black).
   // While face down the backlight drops to true zero.
-  const { contentStyle, fullyDark, wake } = useSessionScreen({
+  const { contentStyle, dimmed, wake } = useSessionScreen({
     active: started,
     suppressed,
     faceDown: runningFaceDown,
@@ -954,11 +954,10 @@ export default function HomeShell() {
         initialSize={splashInitialSize}
       />
 
-      {/* Once the session has faded the screen fully black, a tap anywhere
-          wakes it. Only when fullyDark (so the pause button stays tappable
-          while fading) and not in the manual distraction-free toggle (which
-          has its own exit). */}
-      {fullyDark && (
+      {/* A tap anywhere wakes the screen the whole time it's dimming or
+          dark — not only once fully black — so the content comes back
+          mid-fade instead of forcing the user to wait it out. */}
+      {dimmed && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.wakeCatcher]}
           onPress={wake}
