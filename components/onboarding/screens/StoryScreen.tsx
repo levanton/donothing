@@ -17,7 +17,6 @@ import { Feather } from '@expo/vector-icons';
 import { EASE_IN_OUT } from '@/constants/animations';
 import { track } from '@/lib/analytics';
 import { haptics } from '@/lib/haptics';
-import CircleNextButton from '../CircleNextButton';
 import CtaButton from '../CtaButton';
 import RadialDots from '../RadialDots';
 import { DOT_MORPH_MS, getDotFieldLayout } from '../dotFieldLayout';
@@ -39,13 +38,18 @@ import PhoneSymptomScreen, {
  * The acts are the existing narrative screens, unchanged — words melting in,
  * the child illustration rising from below the text, the to-do lines
  * dropping in, the dot field. What used to be three pages glued together by
- * a persistent layer in the route is now just internal state here: tapping
- * the arrow advances the act, and every hand-off is the same upward stream
- * as before — the old act rides up and dissolves out the top while the new
- * one emerges from below. The dot field appears with 'now.' and glides to
- * the upper band on 'what if…' while morphing scatter → rings; the continue
- * pill waits for that ride to finish.
+ * a persistent layer in the route is now just internal state here. There are
+ * NO arrows: 'remember?' waits on a centred 'now' pill (like the other
+ * onboarding screens), but the 'now.' → 'what if…' hand-off plays itself —
+ * once 'now.' has landed it holds a short breath and 'what if…' simply creeps
+ * in, the old act riding up and dissolving out the top while the new one
+ * emerges from below. The dot field appears with 'now.' and glides to the
+ * upper band on 'what if…' while morphing scatter → rings; the continue pill,
+ * at the very end, waits for that ride to finish.
  */
+
+/** The breath 'now.' holds before 'what if…' creeps in. */
+const ACT_PAUSE_MS = 900;
 
 interface ScreenProps {
   isActive: boolean;
@@ -134,20 +138,13 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
     setAct(next);
   };
 
-  // The arrow waits for the act's performance to finish — no exit door
-  // while the story is still telling itself. (Re-arms when the user goes
-  // back, since acts replay from scratch.)
-  const [arrowReady, setArrowReady] = useState(false);
+  // 'now.' hands off on its own — once its performance has landed, a short
+  // breath, then 'what if…' creeps in from below. ('remember?' instead waits
+  // on its 'now' pill; the last act waits on the continue pill.)
+  // Going back replays the act and flows on again, by design.
   useEffect(() => {
-    if (act >= LAST_ACT) {
-      setArrowReady(true);
-      return;
-    }
-    setArrowReady(false);
-    const t = setTimeout(
-      () => setArrowReady(true),
-      act === 0 ? NOSTALGIA_DONE_MS : NOW_DONE_MS,
-    );
+    if (act !== 1) return;
+    const t = setTimeout(() => setAct(2), NOW_DONE_MS + ACT_PAUSE_MS);
     return () => clearTimeout(t);
   }, [act]);
 
@@ -189,18 +186,19 @@ export default function StoryScreen({ isActive, onNext, theme }: ScreenProps) {
         </Animated.View>
       )}
 
-      {/* Circle arrow drives the acts; on the last act it's the continue
-          pill instead, and it waits for the ride-up hand-off to finish. */}
-      {act < LAST_ACT && arrowReady && (
+      {/* 'remember?' waits on a centred 'now' pill — no arrow. It appears
+          once the act's text has typed. */}
+      {act === 0 && (
         <Animated.View
-          entering={FadeIn.duration(400)}
+          entering={FadeIn.duration(400).delay(NOSTALGIA_DONE_MS)}
           exiting={FadeOut.duration(300)}
-          style={[styles.circleNextWrap, { bottom: insets.bottom + 24 }]}
+          style={[styles.bottomButton, { paddingBottom: insets.bottom + 24 }]}
         >
-          <CircleNextButton onPress={() => goAct(act + 1)} />
+          <CtaButton label="now" onPress={() => goAct(1)} />
         </Animated.View>
       )}
 
+      {/* 'now.' flows on its own; only the final 'what if…' shows continue. */}
       {act === LAST_ACT && (
         <Animated.View
           entering={FadeIn.duration(400).delay(WHATIF_DONE_MS)}
@@ -249,10 +247,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-  },
-  circleNextWrap: {
-    position: 'absolute',
-    right: 32,
   },
   backButton: {
     position: 'absolute',
