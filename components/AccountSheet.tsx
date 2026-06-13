@@ -83,7 +83,7 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
     } catch {
       // best-effort — diagnostics are a nicety, never block the email
     }
-    const subject = 'Nothing — an idea ✨';
+    const subject = 'Nothing — contact';
     const body =
       `\n\n\n———\n(this helps us — feel free to leave it)\n` +
       `app: ${ver}${bld ? ` (${bld})` : ''}\n` +
