@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccountSheet from '@/components/AccountSheet';
 import BlockSheet from '@/components/BlockSheet';
 import BlocksPausedModal from '@/components/promo/BlocksPausedModal';
+import GhostButton from '@/components/GhostButton';
 import HistoryContent from '@/components/HistoryContent';
 import SessionCompleteScreen from '@/components/SessionCompleteScreen';
 import SessionEndedSheet from '@/components/SessionEndedSheet';
@@ -56,6 +57,8 @@ export default function HomeShell() {
   const themeMode = useAppStore((s) => s.themeMode);
   const weekStats = useAppStore((s) => s.weekStats);
   const ready = useAppStore((s) => s.ready);
+  const initError = useAppStore((s) => s.initError);
+  const retryInit = useAppStore((s) => s.retryInit);
   const started = useAppStore((s) => s.started);
   const phase = useAppStore((s) => s.phase);
   const awaitingFaceDown = useAppStore((s) => s.awaitingFaceDown);
@@ -735,6 +738,18 @@ export default function HomeShell() {
     historySlide.value = withTiming(1, { duration: 500 });
   }, []);
 
+  if (initError) {
+    // init() threw (DB open / migration) — give the user a way out instead of
+    // an indefinite blank splash. retryInit() re-runs init(); on success the
+    // app proceeds, on a repeat failure this screen returns.
+    return (
+      <View style={[styles.container, { backgroundColor: palette.terracotta }]}>
+        <Text style={styles.fallbackTitle}>Something didn’t load.</Text>
+        <GhostButton label="Try again" onPress={() => retryInit()} />
+      </View>
+    );
+  }
+
   if (!ready) {
     // Match the launch splash colour so there is no dark flash between the
     // native splash hiding and the JS splash overlay mounting.
@@ -977,6 +992,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
     paddingBottom: 24,
+  },
+  fallbackTitle: {
+    fontFamily: Fonts!.serif,
+    color: palette.cream,
+    fontSize: 24,
+    lineHeight: 32,
+    textAlign: 'center',
+    marginBottom: 28,
   },
   historyContainer: {
     position: 'absolute',

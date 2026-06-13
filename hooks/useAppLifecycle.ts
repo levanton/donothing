@@ -53,22 +53,32 @@ export function useAppLifecycle(
     useAppStore
       .getState()
       .init()
-      .then(async () => {
-        // Resolve subscription status once DB is ready so the transition
-        // side-effects (pause/restore blocks) operate on the freshly-loaded
-        // scheduledBlocks rather than the empty initial array.
-        const status = await getCurrentStatus();
-        await useAppStore.getState().setSubscriptionStatus(status);
-        pollBlockUnlock(cancelledRef);
-      })
-      .catch((e) => {
-        // Without this, an init() failure (e.g. a migration throwing) is
-        // an unhandled rejection: `ready` stays false and the app sits on
-        // a dead home screen with zero diagnostics. Capture it so the
-        // crash-loop class of bugs is at least visible in Sentry.
-        console.error('[lifecycle] store init failed:', e);
-        captureError(e instanceof Error ? e : new Error(String(e)));
-      });
+      .then(
+        async () => {
+          // Post-init: seed subscription status once the DB is ready so the
+          // transition side-effects (pause/restore blocks) operate on the
+          // freshly-loaded scheduledBlocks. A failure HERE must NOT trip the
+          // init-failed screen — the app is already `ready` and usable, and
+          // the RC listener reconciles status anyway. Log/capture only.
+          try {
+            const status = await getCurrentStatus();
+            await useAppStore.getState().setSubscriptionStatus(status);
+            pollBlockUnlock(cancelledRef);
+          } catch (e) {
+            console.error('[lifecycle] post-init status seed failed:', e);
+            captureError(e instanceof Error ? e : new Error(String(e)));
+          }
+        },
+        // Scoped to init()'s OWN rejection (second .then arg, not a trailing
+        // .catch) so a post-init error above can't spuriously surface the
+        // error screen over a ready app. init() failing leaves `ready` false;
+        // flag the recoverable "Try again" screen instead of a blank splash.
+        (e) => {
+          console.error('[lifecycle] store init failed:', e);
+          captureError(e instanceof Error ? e : new Error(String(e)));
+          useAppStore.getState().setInitError(true);
+        },
+      );
     return () => {
       cancelledRef.current = true;
       try { unsub(); } catch (e) { console.error('[lifecycle] RC unsub failed:', e); }

@@ -243,6 +243,9 @@ export interface AppState {
   sessionOrigin: 'normal' | 'block';
   weekStats: WeekDay[];
   ready: boolean;
+  /** True when init() threw before the app could become ready — drives the
+   *  recoverable fallback screen instead of an indefinite blank splash. */
+  initError: boolean;
 
   // Theme
   themeMode: ThemeMode;
@@ -334,6 +337,10 @@ export interface AppState {
 
   // Actions
   init: () => Promise<void>;
+  /** Set by the lifecycle boot when init() rejects. */
+  setInitError: (v: boolean) => void;
+  /** Re-run init() from the fallback screen's "Try again". */
+  retryInit: () => Promise<void>;
   startSession: (opts?: { fromBlock?: boolean }) => void;
   /** The BlockSheet's "do nothing": hide the unlock UI, adopt the block's
    *  unlock goal and arm the face-down ritual — one atomic step. */
@@ -445,6 +452,12 @@ function sessionTransition(
   return true;
 }
 
+// Re-entrancy guard for the fallback screen's "Try again": a fast double-tap
+// must not spawn two concurrent init() runs (one could finish ready=true while
+// the other rejects to initError=true, surfacing the error screen over a
+// loaded app). One retry at a time.
+let retryInFlight = false;
+
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial values
   elapsed: 0,
@@ -455,6 +468,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionOrigin: 'normal',
   weekStats: [],
   ready: false,
+  initError: false,
   themeMode: 'dark',
   subscriptionStatus: 'unknown',
   isSubscribed: false,
@@ -637,6 +651,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     // not whenever the next unrelated save happens to re-check.
     if (recoveredSession) {
       get().checkMilestones();
+    }
+  },
+
+  setInitError: (v) => set({ initError: v }),
+
+  // Retry path for the fallback screen: clear the error, re-run init().
+  // The RC status listener attached at boot is still alive, so subscription
+  // state reconciles on success without re-seeding it here.
+  retryInit: async () => {
+    if (retryInFlight) return;
+    retryInFlight = true;
+    set({ initError: false });
+    try {
+      await get().init();
+    } catch (e) {
+      console.error('[store.retryInit] failed again:', e);
+      set({ initError: true });
+    } finally {
+      retryInFlight = false;
     }
   },
 
