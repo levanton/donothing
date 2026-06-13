@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -195,6 +196,12 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
             <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
               when you’re ready,{'\n'}place your phone face down
             </Text>
+            <View style={styles.chimeRow}>
+              <Feather name="bell" size={13} color={palette.cream} />
+              <Text style={[styles.chimeText, { fontFamily: Fonts?.serif }]}>
+                a gentle chime when the minute’s up
+              </Text>
+            </View>
             <Animated.Image
               source={phoneDownImage}
               style={[styles.gateIllustration, breathStyle]}
@@ -220,9 +227,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
             </Text>
             <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
               and do nothing.
-            </Text>
-            <Text style={[styles.footerSub, { fontFamily: Fonts?.serif }]}>
-              a gentle chime tells you when{'\n'}the minute’s up — even on silent.
             </Text>
           </Animated.View>
         )}
@@ -299,14 +303,25 @@ const styles = StyleSheet.create({
   footerStrong: {
     fontWeight: '600',
   },
-  // Quiet practical line under the vibe — how we signal the end.
-  footerSub: {
-    fontSize: 14,
+  // Quiet practical note under the vibe — a bell icon + how we signal
+  // the end. Set apart from the vibe copy with a soft cream pill so it
+  // reads as a system reassurance, not part of the mantra.
+  chimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(249, 242, 224, 0.12)',
+  },
+  chimeText: {
+    fontSize: 15,
     fontWeight: '400',
     lineHeight: 20,
     color: palette.cream,
     textAlign: 'center',
-    marginTop: 14,
   },
   skipButton: {
     position: 'absolute',
