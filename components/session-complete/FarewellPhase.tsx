@@ -85,7 +85,7 @@ export default function FarewellPhase({
         <Animated.Text
           style={[styles.eyebrow, { color: textColor, fontFamily: Fonts.serif }, eyebrowStyle]}
         >
-          see you tomorrow
+          come back anytime
         </Animated.Text>
 
         <Animated.Text
