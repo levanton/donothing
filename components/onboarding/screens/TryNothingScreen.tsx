@@ -352,8 +352,8 @@ const styles = StyleSheet.create({
     gap: 18,
   },
   pauseIllustration: {
-    width: 130,
-    height: 130,
+    width: 190,
+    height: 150,
     resizeMode: 'contain',
   },
   footerGroup: {
