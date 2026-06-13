@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 
+import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { useAppStore } from '@/lib/store';
 import { getAuth, isBlockActive, onBlockShieldRaised } from '@/lib/screen-time';
 import {
@@ -101,7 +102,7 @@ export function useAppLifecycle(
       // only need to mirror the UI. If the user taps the banner from
       // outside the app, this opens the unlock view as they come back in.
       if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
-        activateKeepAwakeAsync('scheduled-block');
+        activateKeepAwakeAsync(KEEP_AWAKE.BLOCK);
       }
     };
 
@@ -131,7 +132,7 @@ export function useAppLifecycle(
       // shield check. No subscription gate: hiding the unlock UI based on
       // RC status would strand the user behind blocked apps.
       if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
-        activateKeepAwakeAsync('scheduled-block');
+        activateKeepAwakeAsync(KEEP_AWAKE.BLOCK);
       }
     });
     return () => {
@@ -155,7 +156,7 @@ export function useAppLifecycle(
       // the session the same way as backgrounding does.
       if (nextState !== 'active' && isActiveRef.current) {
         isActiveRef.current = false;
-        deactivateKeepAwake('session');
+        deactivateKeepAwake(KEEP_AWAKE.SESSION);
         bgInFlight = useAppStore.getState().handleBackground();
         try {
           await bgInFlight;
@@ -177,7 +178,7 @@ export function useAppLifecycle(
         // end paths (sheet end/unlock, stop, countdown complete) all
         // deactivate, so this can't leak past the session.
         if (useAppStore.getState().started) {
-          activateKeepAwakeAsync('session');
+          activateKeepAwakeAsync(KEEP_AWAKE.SESSION);
         }
         // Refresh subscription on every foreground in case RC didn't
         // push an update while we were backgrounded (renewal, refund,

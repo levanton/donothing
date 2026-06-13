@@ -11,7 +11,7 @@ import { haptics } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
 import { WINBACK_PRODUCT_ID } from '@/lib/paywall-config';
 import { useAppStore } from '@/lib/store';
-import { getOfferings, purchasePackage } from '@/lib/subscription';
+import { getOfferings, isIntroEligible, purchasePackage } from '@/lib/subscription';
 
 export function useWinbackOffer(onPurchased: () => void) {
   const [winbackPkg, setWinbackPkg] = useState<PurchasesPackage | null>(null);
@@ -26,7 +26,14 @@ export function useWinbackOffer(onPurchased: () => void) {
       const pkg = offering.availablePackages.find(
         (p) => p.product.identifier === WINBACK_PRODUCT_ID,
       );
-      if (pkg) setWinbackPkg(pkg);
+      // Only arm the offer if the user can actually redeem its intro
+      // price — Apple grants the intro once per subscription group, so a
+      // returning subscriber would be shown a discount they can't get.
+      if (pkg) {
+        isIntroEligible(pkg.product.identifier).then((eligible) => {
+          if (!cancelled && eligible) setWinbackPkg(pkg);
+        });
+      }
     });
     return () => {
       cancelled = true;

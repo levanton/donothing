@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import Purchases, {
+  INTRO_ELIGIBILITY_STATUS,
   type CustomerInfo,
   type PurchasesOffering,
   type PurchasesPackage,
@@ -156,6 +157,35 @@ export async function getProductPriceString(
   } catch (e) {
     console.warn('[subscription] getProducts failed:', e);
     return null;
+  }
+}
+
+/**
+ * Whether the user can actually redeem the intro/discount price on a
+ * product. Apple grants an introductory offer ONCE per subscription
+ * group — a returning subscriber who already used it pays full price,
+ * even though the product still advertises an `introPrice`. Showing them
+ * a "50% off" win-back is a broken promise (they tap, the discount isn't
+ * there). Call this before surfacing any intro-priced promo.
+ *
+ * Returns true ONLY for an explicit ELIGIBLE verdict. UNKNOWN (RC docs:
+ * "display the non-intro pricing"), INELIGIBLE, and NO_INTRO_OFFER_EXISTS
+ * all mean "don't promise the discount".
+ */
+export async function isIntroEligible(productId: string): Promise<boolean> {
+  if (!configured) return false;
+  try {
+    const map = await Purchases.checkTrialOrIntroductoryPriceEligibility([
+      productId,
+    ]);
+    return (
+      map[productId]?.status ===
+      INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+    );
+  } catch (e) {
+    // On any failure, don't promise a discount we can't confirm.
+    console.warn('[subscription] intro eligibility check failed:', e);
+    return false;
   }
 }
 

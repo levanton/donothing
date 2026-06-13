@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
 import { initDatabase, wipeUserData } from './db';
@@ -434,9 +435,9 @@ function sessionTransition(
   // is back on the idle home screen.
   try {
     if (event === 'ARM') {
-      void activateKeepAwakeAsync('session').catch(() => {});
+      void activateKeepAwakeAsync(KEEP_AWAKE.SESSION).catch(() => {});
     } else if (next === 'idle') {
-      void deactivateKeepAwake('session').catch(() => {});
+      void deactivateKeepAwake(KEEP_AWAKE.SESSION).catch(() => {});
     }
   } catch {
     // keep-awake is best-effort (e.g. test envs without the native module)
@@ -577,6 +578,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // preserve what the user did. Save the elapsed slice silently if
     // it's plausible (1s ≤ elapsed; capped at MAX_SESSION_DURATION inside
     // dbAddSession, and at goal+25% if a finite goal was set).
+    let recoveredSession = false;
     const pending = readPendingSession();
     if (pending) {
       // A session killed while PAUSED recovers its frozen elapsed (the
@@ -596,6 +598,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (elapsedSec >= 1 && elapsedSec <= upperBound) {
         try {
           dbAddSession(elapsedSec);
+          recoveredSession = true;
         } catch (e) {
           console.error('[store.init] cold-start partial save failed:', e);
         }
@@ -627,6 +630,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       focusStep: wasShieldActive ? 'done' : 'hidden',
       ready: true,
     });
+
+    // A session recovered from a killed process is in the DB now but was
+    // saved AFTER achievedMilestones was read above — evaluate again so a
+    // threshold the recovered slice just crossed lands on this launch,
+    // not whenever the next unrelated save happens to re-check.
+    if (recoveredSession) {
+      get().checkMilestones();
+    }
   },
 
   // --- Session lifecycle ------------------------------------------------
@@ -687,6 +698,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    // The next run re-anchors this in beginCountdown/resumeSession, so a
+    // stale value is never read — but zeroing it on every terminal path
+    // keeps the module var honest and removes a footgun for future code.
+    sessionStartTime = 0;
     if (sessionNotificationId) {
       try { await cancelNotification(sessionNotificationId); } catch {}
       sessionNotificationId = null;
@@ -837,6 +852,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    sessionStartTime = 0;
     if (sessionNotificationId) {
       try { await cancelNotification(sessionNotificationId); } catch {}
       sessionNotificationId = null;

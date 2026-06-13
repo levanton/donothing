@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
@@ -71,7 +72,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const { contentStyle, fullyDark, wake } = useSessionScreen({
     active: started,
     suppressed: false,
-    distractionFree: false,
     faceDown,
     dimDurationMs: DIM_DURATION_MS,
   });
@@ -87,7 +87,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     haptics.medium();
     track('onboarding_session_armed');
     // Keep-awake from here: the armed phone may already be face down.
-    activateKeepAwakeAsync('onboarding-session');
+    activateKeepAwakeAsync(KEEP_AWAKE.ONBOARDING);
     setArming(true);
     yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
   }, []);
@@ -109,7 +109,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
       setElapsed(prev => {
         if (prev >= SESSION_DURATION - 1) {
           clearInterval(intervalRef.current);
-          deactivateKeepAwake('onboarding-session');
+          deactivateKeepAwake(KEEP_AWAKE.ONBOARDING);
           // Persist the onboarding minute as a real session so the home
           // screen stats aren't empty on first launch. recordSession also
           // refreshes weekStats and checks milestones in one shot.
@@ -157,7 +157,7 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      deactivateKeepAwake('onboarding-session');
+      deactivateKeepAwake(KEEP_AWAKE.ONBOARDING);
     };
   }, []);
 

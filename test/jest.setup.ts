@@ -96,6 +96,14 @@ jest.mock('expo-crypto', () => {
 // react-native-purchases — pure stub. Real RC needs the native bridge.
 jest.mock('react-native-purchases', () => ({
   __esModule: true,
+  // Mirror the real intro-eligibility status enum so subscription.ts can
+  // compare against it (only the ELIGIBLE member is read).
+  INTRO_ELIGIBILITY_STATUS: {
+    INTRO_ELIGIBILITY_STATUS_UNKNOWN: 0,
+    INTRO_ELIGIBILITY_STATUS_INELIGIBLE: 1,
+    INTRO_ELIGIBILITY_STATUS_ELIGIBLE: 2,
+    INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS: 3,
+  },
   default: {
     configure: jest.fn(),
     getCustomerInfo: jest.fn(),
@@ -105,6 +113,7 @@ jest.mock('react-native-purchases', () => ({
     restorePurchases: jest.fn(),
     addCustomerInfoUpdateListener: jest.fn(),
     removeCustomerInfoUpdateListener: jest.fn(),
+    checkTrialOrIntroductoryPriceEligibility: jest.fn().mockResolvedValue({}),
   },
 }));
 

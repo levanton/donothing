@@ -4,6 +4,7 @@ import { Alert, Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { KEEP_AWAKE } from '@/constants/keepAwake';
 import Animated, {
   interpolate,
   interpolateColor,
@@ -367,8 +368,8 @@ export default function HomeShell() {
   // Deactivate keep awake when focus ends (unblock only happens on explicit unlock).
   useEffect(() => {
     if (focusStep === 'hidden') {
-      deactivateKeepAwake('focus');
-      deactivateKeepAwake('scheduled-block');
+      deactivateKeepAwake(KEEP_AWAKE.FOCUS);
+      deactivateKeepAwake(KEEP_AWAKE.BLOCK);
     }
   }, [focusStep]);
 
@@ -388,7 +389,7 @@ export default function HomeShell() {
     // unlock UI is their only way out — entitlement is enforced where
     // blocks get CREATED, not at the exit.
     if (useAppStore.getState().requestBlockUnlock(isBlockActive()) === 'shown') {
-      activateKeepAwakeAsync('scheduled-block');
+      activateKeepAwakeAsync(KEEP_AWAKE.BLOCK);
     }
   }, [started]);
 
@@ -401,7 +402,7 @@ export default function HomeShell() {
     // both stop the poll; 'none' keeps it retrying. No subscription gate —
     // see the comment in the started→false effect above.
     const result = useAppStore.getState().requestBlockUnlock(isBlockActive());
-    if (result === 'shown') activateKeepAwakeAsync('scheduled-block');
+    if (result === 'shown') activateKeepAwakeAsync(KEEP_AWAKE.BLOCK);
     return result !== 'none';
   }, []);
 
@@ -472,8 +473,8 @@ export default function HomeShell() {
   // main screen so the user always has an out.
   const handleForceUnlock = useCallback(() => {
     haptics.success();
-    deactivateKeepAwake('focus');
-    deactivateKeepAwake('scheduled-block');
+    deactivateKeepAwake(KEEP_AWAKE.FOCUS);
+    deactivateKeepAwake(KEEP_AWAKE.BLOCK);
     useAppStore.getState().releaseBlockShield().catch(() => {});
     useAppStore.getState().unlockFocus();
   }, []);
@@ -575,7 +576,6 @@ export default function HomeShell() {
   const { contentStyle, fullyDark, wake } = useSessionScreen({
     active: started,
     suppressed,
-    distractionFree: false,
     faceDown: runningFaceDown,
   });
 
@@ -670,8 +670,8 @@ export default function HomeShell() {
   // device with no way to recover until the next unlock cycle.
   const handleSheetUnlock = useCallback(async () => {
     haptics.success();
-    deactivateKeepAwake('focus');
-    deactivateKeepAwake('scheduled-block');
+    deactivateKeepAwake(KEEP_AWAKE.FOCUS);
+    deactivateKeepAwake(KEEP_AWAKE.BLOCK);
     // AWAITED on purpose: stopSession() flips started → false, which
     // triggers the shield polls below (requestBlockUnlock). If the
     // native shield teardown is still in flight at that point, the poll

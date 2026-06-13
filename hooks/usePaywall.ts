@@ -19,6 +19,7 @@ import {
 import { useAppStore } from '@/lib/store';
 import {
   getOfferings,
+  isIntroEligible,
   purchasePackage,
   restorePurchases,
 } from '@/lib/subscription';
@@ -83,7 +84,17 @@ export function usePaywall({ onClose, enabled = true }: Options) {
       const winback = offering.availablePackages.find(
         (p) => p.product.identifier === WINBACK_PRODUCT_ID,
       );
-      if (winback) setWinbackPkg(winback);
+      // Only arm the win-back if the user can ACTUALLY redeem its intro
+      // price. Apple gives an intro offer once per subscription group, so
+      // a returning subscriber would see "50% off" and then be charged
+      // full price — a broken promise. Gating winbackPkg here means every
+      // downstream `if (winbackPkg)` (the skip-promo, the purchase) is
+      // automatically skipped for ineligible users.
+      if (winback) {
+        isIntroEligible(winback.product.identifier).then((eligible) => {
+          if (!cancelled && eligible) setWinbackPkg(winback);
+        });
+      }
     });
     return () => {
       cancelled = true;

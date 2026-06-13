@@ -28,7 +28,6 @@ import {
 const DIM_FLOOR = 0.25;
 const RESTORE_MS = 480;
 const CONTENT_RESTORE_MS = 500;
-const MANUAL_FADE_MS = 720; // distraction-free toggle is snappy
 const STEP_MS = 32;
 
 interface Args {
@@ -36,8 +35,6 @@ interface Args {
   active: boolean;
   /** Don't dim — paused / interrupt sheet up (lock surfaces it). */
   suppressed: boolean;
-  /** Manual distraction-free toggle. */
-  distractionFree: boolean;
   /** The phone lies face down — nobody sees the screen, so the backlight
    *  goes to true zero instead of the dim floor; back the moment it's
    *  lifted. */
@@ -49,7 +46,6 @@ interface Args {
 export function useSessionScreen({
   active,
   suppressed,
-  distractionFree,
   faceDown = false,
   dimDurationMs = 5500,
 }: Args) {
@@ -63,8 +59,8 @@ export function useSessionScreen({
   const floorRef = useRef(floor);
   floorRef.current = floor;
 
-  const dark = (active && !suppressed && !awake) || distractionFree;
-  const fadeMs = distractionFree ? MANUAL_FADE_MS : dimDurationMs;
+  const dark = active && !suppressed && !awake;
+  const fadeMs = dimDurationMs;
 
   // Content (camera + timer) opacity — hidden while dark so it's truly black.
   const contentFade = useSharedValue(1);

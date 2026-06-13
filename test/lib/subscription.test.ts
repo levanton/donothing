@@ -46,6 +46,7 @@ beforeEach(() => {
   Purchases.getOfferings.mockReset();
   Purchases.addCustomerInfoUpdateListener.mockReset();
   Purchases.removeCustomerInfoUpdateListener.mockReset();
+  Purchases.checkTrialOrIntroductoryPriceEligibility.mockReset();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -114,6 +115,63 @@ describe('getCurrentStatus', () => {
     const sub = loadModule();
     sub.initRevenueCat();
     expect(await sub.getCurrentStatus()).toBe('unknown');
+  });
+});
+
+describe('isIntroEligible', () => {
+  // The intro/discount offer ("first year 50% off") is Apple's
+  // introductory offer — redeemable only by customers who have never
+  // used the intro for this subscription group (i.e. brand-new
+  // subscribers). A returning subscriber is ineligible and would be
+  // charged full price, so the promo must not be shown to them.
+  const ELIGIBLE = 2;
+  const INELIGIBLE = 1;
+  const UNKNOWN = 0;
+  const PROD = 'yearly_40_discount';
+
+  it('returns false before initRevenueCat', async () => {
+    const sub = loadModule();
+    expect(await sub.isIntroEligible(PROD)).toBe(false);
+  });
+
+  it('returns true only for an ELIGIBLE verdict (never-subscribed user)', async () => {
+    const Purchases = rc();
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockResolvedValue({
+      [PROD]: { status: ELIGIBLE },
+    });
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.isIntroEligible(PROD)).toBe(true);
+  });
+
+  it('returns false for a returning subscriber (INELIGIBLE)', async () => {
+    const Purchases = rc();
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockResolvedValue({
+      [PROD]: { status: INELIGIBLE },
+    });
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.isIntroEligible(PROD)).toBe(false);
+  });
+
+  it('returns false on UNKNOWN — never promise a discount we cannot confirm', async () => {
+    const Purchases = rc();
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockResolvedValue({
+      [PROD]: { status: UNKNOWN },
+    });
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.isIntroEligible(PROD)).toBe(false);
+  });
+
+  it('returns false when RC throws', async () => {
+    const Purchases = rc();
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockRejectedValue(
+      new Error('storekit'),
+    );
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.isIntroEligible(PROD)).toBe(false);
   });
 });
 
