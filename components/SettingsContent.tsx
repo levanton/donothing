@@ -164,7 +164,7 @@ export default function SettingsContent({ onClose, insets, onOpenAccount }: Sett
       {!isSubscribed && (
         <MembershipBanner
           title="Unlock scheduled blocks"
-          subtitle="Join to schedule blocks and lock distracting apps."
+          subtitle="Join to schedule nothing — your apps wait, you rest."
           onPress={openPaywall}
         />
       )}

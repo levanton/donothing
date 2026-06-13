@@ -101,6 +101,10 @@ const styles = StyleSheet.create({
   },
   textBlock: {
     marginBottom: 120,
+    // Text always paints above the decorative circle — on narrow screens
+    // (SE) the absolute image overlaps the copy's right edge, and without
+    // this the later-rendered image would cover the words.
+    zIndex: 1,
   },
   image: {
     position: 'absolute',
@@ -108,6 +112,8 @@ const styles = StyleSheet.create({
     bottom: -50,
     width: 240,
     aspectRatio: 577 / 800,
+    // Behind the text — purely decorative.
+    zIndex: 0,
   },
   buttonArea: {
     position: 'absolute',
