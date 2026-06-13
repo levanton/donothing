@@ -966,6 +966,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (from === 'active' && next === 'inactive') {
           await pauseAllBlocksForExpiry(get().scheduledBlocks);
           await maybeNotifyBlocksPaused(get().scheduledBlocks);
+          // pauseAllBlocksForExpiry dropped the native shield, so a
+          // block session that's still running no longer guards
+          // anything. Demote it to a normal session: the pause sheet
+          // and completion screen stop offering "hold to unlock" /
+          // unlock actions for a shield that's already gone, and the
+          // run ends as an ordinary do-nothing session.
+          if (get().started && get().sessionOrigin === 'block') {
+            set({ sessionOrigin: 'normal' });
+          }
         } else if (next === 'active') {
           // unknown→active or inactive→active. Either way, native side may
           // have stopped monitors (StoreKit-guard self-cleanup during a

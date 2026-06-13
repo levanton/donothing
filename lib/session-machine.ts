@@ -76,6 +76,11 @@ const TRANSITIONS: Record<SessionPhase, Partial<Record<SessionEvent, SessionPhas
   paused: {
     RESUME: 'running',
     START_OVER: 'arming',
+    // Stopwatch finish from the pause sheet: the phone is already in
+    // hand (that's why the sheet is up), so we go straight to the
+    // celebration — never COMPLETE_HELD, which waits for a pick-up that
+    // already happened.
+    COMPLETE: 'celebrating',
     END: 'idle',
   },
   holding: {

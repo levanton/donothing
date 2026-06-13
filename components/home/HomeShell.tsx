@@ -647,6 +647,16 @@ export default function HomeShell() {
     useAppStore.getState().dismissSessionEnded();
   }, []);
 
+  // Stopwatch finish from the pause sheet — the in-run "done" pill is
+  // hidden behind the face-down phone, so this is where a free-mode run
+  // is actually completed. completeSession reads the frozen elapsed and
+  // transitions paused → celebrating (phone already in hand, never
+  // holding), so the sheet closes and the celebration flow runs.
+  const handleSheetFinish = useCallback(() => {
+    void useAppStore.getState().completeSession();
+    useAppStore.getState().dismissSessionEnded();
+  }, []);
+
   const handleSheetEnd = useCallback(async () => {
     await useAppStore.getState().stopSession();
     useAppStore.getState().dismissSessionEnded();
@@ -883,6 +893,7 @@ export default function HomeShell() {
         sessionOrigin={sessionOrigin}
         onContinue={handleSheetContinue}
         onStartOver={handleSheetStartOver}
+        onFinish={handleSheetFinish}
         onEnd={handleSheetEnd}
         onUnlock={handleSheetUnlock}
       />

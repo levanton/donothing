@@ -35,6 +35,13 @@ describe('session-machine', () => {
     expect(nextPhase('running', 'START_OVER')).toBe('arming');
   });
 
+  it('finishing from the pause sheet completes straight to celebrating', () => {
+    // Stopwatch "done" on the pause sheet — phone already in hand, so no
+    // holding beat. COMPLETE_HELD stays illegal from paused.
+    expect(nextPhase('paused', 'COMPLETE')).toBe('celebrating');
+    expect(nextPhase('paused', 'COMPLETE_HELD')).toBeNull();
+  });
+
   it('cancelling the gate goes home without a session', () => {
     expect(nextPhase('arming', 'CANCEL_ARM')).toBe('idle');
   });

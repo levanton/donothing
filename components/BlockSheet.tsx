@@ -5,8 +5,9 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { haptics } from '@/lib/haptics';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
+  AppState,
   Dimensions,
   Image,
   Pressable,
@@ -27,7 +28,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
-import { palette, type AppTheme } from '@/lib/theme';
+import { palette, themes, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 import EyebrowChip from '@/components/EyebrowChip';
 
@@ -138,6 +139,19 @@ function BlockSheet({
       });
     }, [holdProgress]);
 
+    // Backgrounding mid-hold must cancel the gesture. Reanimated freezes
+    // the timing animation while the app is inactive, so without this a
+    // user who backgrounds at 1.3s and returns with their finger still
+    // down would have the hold silently complete from the frozen
+    // position — an unlock they never deliberately finished. onPressOut
+    // does NOT fire on background, so we cancel explicitly.
+    useEffect(() => {
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') handleHoldEnd();
+      });
+      return () => sub.remove();
+    }, [handleHoldEnd]);
+
     // Two-layer feedback: full-pill terracotta tint that fades in (no
     // sharp vertical sweep edge) and a thin progress bar at the bottom for
     // honest "how close am I to unlocking?" signal. Avoids the prior
@@ -177,7 +191,14 @@ function BlockSheet({
         <View
           style={[
             styles.card,
-            { backgroundColor: theme.bg, marginBottom: insets.bottom + 4 },
+            {
+              backgroundColor: theme.bg,
+              marginBottom: insets.bottom + 4,
+              // Black shadow reads far heavier on the light card's cream
+              // than on the dark card's charcoal — soften it sharply in
+              // light mode so it stays a lift, not a smear.
+              shadowOpacity: theme === themes.light ? 0.12 : 0.4,
+            },
           ]}
         >
           {/* Eyebrow */}
@@ -316,8 +337,9 @@ const styles = StyleSheet.create({
   sheetWrap: {
     paddingHorizontal: 12,
   },
-  // The visible floating card — colour and bottom gutter applied inline.
-  // Soft drop shadow lifts the card off the terracotta backdrop.
+  // The visible floating card — colour, bottom gutter and shadowOpacity
+  // (theme-dependent) applied inline. Soft drop shadow lifts the card
+  // off the terracotta backdrop.
   card: {
     borderRadius: 36,
     paddingHorizontal: 28,
@@ -325,7 +347,6 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
   },

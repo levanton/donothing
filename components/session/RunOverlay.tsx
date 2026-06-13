@@ -22,8 +22,13 @@ import { Fonts } from '@/constants/theme';
 import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import { timerDisplay } from '@/lib/format';
 import { palette, type AppTheme } from '@/lib/theme';
+import { Asset } from 'expo-asset';
 
 const phoneDownImage = require('@/assets/images/phone-down-7-trimmed.png');
+// Decode at module load so the bitmap is ready the first time the gate
+// opens — otherwise iOS decodes on first mount and the illustration
+// pops in a beat after the terracotta sweep lands.
+Asset.fromModule(phoneDownImage).downloadAsync().catch(() => {});
 
 interface RunOverlayProps {
   theme: AppTheme;

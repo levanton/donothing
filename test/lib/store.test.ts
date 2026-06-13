@@ -269,6 +269,26 @@ describe('cold-start pending-session recovery', () => {
   });
 });
 
+describe('completeSession from the pause sheet (stopwatch finish)', () => {
+  it('completes a paused stopwatch run: saves the frozen elapsed and celebrates', async () => {
+    const { store, sessions } = loadStore();
+    const s = store.useAppStore.getState();
+    s.setGoalFromSlider(0); // stopwatch mode (no countdown)
+    s.startSession();
+    s.beginCountdown();
+    store.useAppStore.setState({ elapsed: 180 });
+    store.useAppStore.getState().pauseSession();
+    expect(store.useAppStore.getState().phase).toBe('paused');
+
+    await store.useAppStore.getState().completeSession();
+    const after = store.useAppStore.getState();
+    expect(after.phase).toBe('celebrating');
+    const saved = sessions.getAllSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].duration).toBe(180);
+  });
+});
+
 describe('handleBackground', () => {
   it('cancels an ARMED session (face-down gate) instead of hanging in arming', async () => {
     const { store } = loadStore();
@@ -292,6 +312,28 @@ describe('handleBackground', () => {
     const after = store.useAppStore.getState();
     expect(after.phase).toBe('paused');
     expect(after.paused).toBe(true);
+  });
+});
+
+describe('releaseBlockShield', () => {
+  // The day-boundary safety hinges on this action: monitors are one-shot,
+  // and while a shield is up the foreground re-arm is intentionally
+  // skipped — so EVERY path that drops the shield must re-register all
+  // enabled blocks for their next occurrence, or a block that fired
+  // yesterday would never fire again.
+  it('drops the shield and re-arms every enabled block', async () => {
+    const { store } = loadStore();
+    const { forceUnblockAll, scheduleBlock } = require('@/lib/screen-time');
+    store.useAppStore.setState({
+      scheduledBlocks: [
+        { id: 'b1', hour: 21, minute: 0, durationMinutes: 30, weekdays: [], enabled: true, unlockGoalMinutes: 5 },
+        { id: 'b2', hour: 10, minute: 0, durationMinutes: 30, weekdays: [1], enabled: false, unlockGoalMinutes: 5 },
+      ],
+    });
+    await store.useAppStore.getState().releaseBlockShield();
+    expect(forceUnblockAll).toHaveBeenCalled();
+    expect(scheduleBlock).toHaveBeenCalledTimes(1);
+    expect(scheduleBlock).toHaveBeenCalledWith('b1', 21, 0, 30, []);
   });
 });
 
@@ -327,6 +369,36 @@ describe('setSubscriptionStatus', () => {
     expect(forceUnblockAll).toHaveBeenCalled();
     expect(store.useAppStore.getState().subscriptionStatus).toBe('inactive');
     expect(store.useAppStore.getState().isSubscribed).toBe(false);
+  });
+
+  it('demotes a running block session to normal when the shield is dropped', async () => {
+    const { store } = loadStore();
+    store.useAppStore.setState({
+      ready: true,
+      started: true,
+      sessionOrigin: 'block',
+      scheduledBlocks: [
+        { id: 'b1', hour: 9, minute: 0, durationMinutes: 30, weekdays: [1], enabled: true, unlockGoalMinutes: 5 },
+      ],
+    });
+    await store.useAppStore.getState().setSubscriptionStatus('active');
+    await store.useAppStore.getState().setSubscriptionStatus('inactive');
+    // The shield is gone, so the run is no longer a block session — the
+    // pause sheet / completion screen must stop offering unlock actions.
+    expect(store.useAppStore.getState().sessionOrigin).toBe('normal');
+  });
+
+  it('leaves a normal running session untouched on expiry', async () => {
+    const { store } = loadStore();
+    store.useAppStore.setState({
+      ready: true,
+      started: true,
+      sessionOrigin: 'normal',
+      scheduledBlocks: [],
+    });
+    await store.useAppStore.getState().setSubscriptionStatus('active');
+    await store.useAppStore.getState().setSubscriptionStatus('inactive');
+    expect(store.useAppStore.getState().sessionOrigin).toBe('normal');
   });
 
   it('on inactive → active it restores via reconcile + reschedule', async () => {

@@ -7,7 +7,7 @@ import {
 import { haptics } from '@/lib/haptics';
 import { useFaceDown } from '@/hooks/useFaceDown';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -22,8 +22,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { EASE_OUT } from '@/constants/animations';
+import { MIN_SAVABLE_DURATION } from '@/lib/db/sessions';
 import { timerDisplay } from '@/lib/format';
-import { palette, type AppTheme } from '@/lib/theme';
+import { palette, themes, type AppTheme } from '@/lib/theme';
 import { useBottomSheetModalVisibility } from '@/hooks/useBottomSheetModalVisibility';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -61,6 +62,11 @@ interface Props {
   onContinue?: () => void;
   /** Save what's elapsed so far + reset to 0 and keep running. */
   onStartOver?: () => void;
+  /** Stopwatch only: finish the run and land on the celebration screen.
+      The face-down ritual hides the in-run "done" pill (the phone is
+      down while it counts up), so the pause sheet is the only place a
+      free-mode session can actually be completed. */
+  onFinish?: () => void;
   /** Save the paused session and exit to home. */
   onEnd?: () => void;
   /** Block-flow only — unblock Screen Time + end the session. */
@@ -88,6 +94,7 @@ function SessionEndedSheet({
   sessionOrigin = 'normal',
   onContinue,
   onStartOver,
+  onFinish,
   onEnd,
   onUnlock,
   onClose,
@@ -170,6 +177,11 @@ function SessionEndedSheet({
       onEnd?.();
     }, [onEnd]);
 
+    const handleFinish = useCallback(() => {
+      haptics.success();
+      onFinish?.();
+    }, [onFinish]);
+
     const handleUnlock = useCallback(() => {
       haptics.success();
       onUnlock?.();
@@ -199,6 +211,17 @@ function SessionEndedSheet({
         easing: Easing.out(Easing.quad),
       });
     }, [holdProgress]);
+
+    // Cancel an in-flight hold when the app backgrounds — reanimated
+    // freezes the timing animation, so a finger still down on return
+    // would otherwise complete an unlock the user never finished.
+    // onPressOut doesn't fire on background.
+    useEffect(() => {
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') handleUnlockHoldEnd();
+      });
+      return () => sub.remove();
+    }, [handleUnlockHoldEnd]);
 
     const holdTintStyle = useAnimatedStyle(() => ({
       opacity: holdProgress.value * 0.35,
@@ -277,7 +300,14 @@ function SessionEndedSheet({
         <View
           style={[
             styles.card,
-            { backgroundColor: theme.bg, marginBottom: cardBottomGutter },
+            {
+              backgroundColor: theme.bg,
+              marginBottom: cardBottomGutter,
+              // A black drop shadow reads far heavier on the light card's
+              // cream than on the dark card's charcoal — soften it
+              // sharply in light mode so it stays a lift, not a smear.
+              shadowOpacity: theme === themes.light ? 0.12 : 0.4,
+            },
           ]}
         >
           {/* The next action, as the sheet's headline: putting the phone
@@ -384,6 +414,42 @@ function SessionEndedSheet({
               </View>
             </Animated.View>
           )}
+
+          {/* Finish — stopwatch only. The big terracotta CTA that takes
+              a free-mode run to the celebration / mood / farewell flow.
+              Locked below MIN_SAVABLE_DURATION with a countdown hint,
+              mirroring the in-run "done" pill the face-down ritual
+              hides. Goal-mode runs auto-complete at 00:00, so they don't
+              need it. */}
+          {!hasGoal && onFinish && (() => {
+            const canSave = elapsed >= MIN_SAVABLE_DURATION;
+            const remainingToSave = Math.max(0, MIN_SAVABLE_DURATION - elapsed);
+            return (
+              <Animated.View
+                entering={FadeIn.duration(400).delay(200)}
+                style={styles.finishWrap}
+              >
+                <Pressable
+                  onPress={canSave ? handleFinish : undefined}
+                  disabled={!canSave}
+                  style={[styles.finishBtn, !canSave && styles.finishBtnDisabled]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Finish session"
+                  accessibilityState={{ disabled: !canSave }}
+                >
+                  <Text style={[styles.finishText, { fontFamily: Fonts!.serif }]}>
+                    done
+                  </Text>
+                  {!canSave && (
+                    <Text style={[styles.finishHint, { fontFamily: Fonts!.mono }]}>
+                      {timerDisplay(remainingToSave)}
+                    </Text>
+                  )}
+                </Pressable>
+              </Animated.View>
+            );
+          })()}
 
           <Animated.View
             entering={FadeIn.duration(400).delay(240)}
@@ -499,8 +565,9 @@ const styles = StyleSheet.create({
   sheetWrap: {
     paddingHorizontal: 12,
   },
-  // The visible floating card — colour and bottom gutter applied inline.
-  // Soft drop shadow lifts the card off the terracotta backdrop.
+  // The visible floating card — colour, bottom gutter and shadowOpacity
+  // (theme-dependent) applied inline. Soft drop shadow lifts the card
+  // off the terracotta backdrop.
   card: {
     borderRadius: 36,
     paddingHorizontal: 28,
@@ -508,7 +575,6 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
   },
@@ -606,6 +672,41 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '600',
     letterSpacing: 0.6,
+  },
+  // Finish CTA (stopwatch only) — full-width terracotta pill, the app's
+  // primary-action identity. Sits above the secondary chip row as the
+  // emphasised "I'm done, celebrate it" choice. The wrapper carries the
+  // stretch so the FadeIn Animated.View doesn't shrink to content and
+  // strand the pill at intrinsic width.
+  finishWrap: {
+    alignSelf: 'stretch',
+  },
+  finishBtn: {
+    alignSelf: 'stretch',
+    backgroundColor: TERRACOTTA,
+    borderRadius: 100,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finishBtnDisabled: {
+    // Same fill, dimmed — reads as "the same button, not yet ready",
+    // matching the in-run done pill's disabled treatment.
+    opacity: 0.4,
+  },
+  finishText: {
+    color: CREAM,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+  },
+  finishHint: {
+    color: CREAM,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.5,
+    marginTop: 2,
+    opacity: 0.8,
   },
   // Secondary actions in the manual flow — twin warm-sand chips
   // side-by-side. Same vocabulary as BlockSheet's benefit chips so
