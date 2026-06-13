@@ -103,7 +103,7 @@ export default function TestimonialsScreen({ isActive, onNext, theme }: Props) {
             What happened when they stopped.
           </Text>
         </Animated.View>
-        <Animated.View entering={FadeIn.duration(1100).delay(1000)} style={{ height: cardHeight }}>
+        <Animated.View entering={FadeIn.duration(1100).delay(1000)} style={{ minHeight: cardHeight }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -120,7 +120,11 @@ export default function TestimonialsScreen({ isActive, onNext, theme }: Props) {
                   styles.card,
                   {
                     width: cardWidth,
-                    height: cardHeight,
+                    // minHeight, not height: a long quote on a narrow
+                    // screen (SE) grows the card instead of overflowing
+                    // onto the avatar/name row. Row alignItems:stretch
+                    // keeps every card as tall as the tallest.
+                    minHeight: cardHeight,
                     backgroundColor: t.bg,
                   },
                 ]}
@@ -180,12 +184,13 @@ const styles = StyleSheet.create({
   sliderContent: {
     paddingHorizontal: 24,
     gap: 12,
-    alignItems: 'center',
+    // stretch so every card matches the tallest (uniform row); the
+    // quote's flex:1 still pushes the avatar row to the foot.
+    alignItems: 'stretch',
   },
   card: {
     borderRadius: 20,
     padding: 22,
-    justifyContent: 'space-between',
   },
   quote: {
     fontFamily: Fonts?.serif,

@@ -167,7 +167,7 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
             What we lose by never stopping — and what we could gain by doing nothing
           </Text>
         </Animated.View>
-        <View style={{ height: cardHeight }}>
+        <View style={{ minHeight: cardHeight }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -190,7 +190,11 @@ export default function EvidenceScreen({ isActive, onNext, theme }: Props) {
                     styles.card,
                     {
                       width: cardWidth,
-                      height: cardHeight,
+                      // minHeight, not height: long fact copy on a narrow
+                      // screen (SE) grows the card instead of overflowing
+                      // onto the source row. Row alignItems:stretch keeps
+                      // every card as tall as the tallest.
+                      minHeight: cardHeight,
                       backgroundColor: cardTheme.bg,
                     },
                   ]}
@@ -251,12 +255,13 @@ const styles = StyleSheet.create({
   sliderContent: {
     paddingHorizontal: 24,
     gap: 12,
-    alignItems: 'center',
+    // stretch so every card matches the tallest (uniform row); each
+    // card's source chip stays pinned to its foot via marginTop:auto.
+    alignItems: 'stretch',
   },
   card: {
     borderRadius: 20,
     padding: 18,
-    justifyContent: 'space-between',
   },
   stat: {
     fontFamily: Fonts?.serif,
@@ -272,7 +277,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   cardBottom: {
-    flex: 1,
+    // Pinned to the card's foot when there's spare room (short cards),
+    // but NOT flex:1 — flex squeezed a long body and overflowed it up
+    // onto the line above. marginTop:auto lets the card grow instead.
+    marginTop: 'auto',
     justifyContent: 'flex-end',
   },
   body: {
