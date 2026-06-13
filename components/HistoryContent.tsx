@@ -448,6 +448,8 @@ export default function HistoryContent({
           viewYear={viewYear}
           viewMonth={viewMonth}
           durationMap={monthDurationMap}
+          interactive={isSubscribed}
+          onLockedTap={openPaywall}
         />
 
       </View>

@@ -86,6 +86,11 @@ interface ActivityCalendarProps {
   viewYear: number;
   viewMonth: number;
   durationMap: Map<string, number>;
+  /** When false, tapping a day opens the paywall instead of selecting it —
+   *  the activity circles stay visible, but day detail/delete is paid. */
+  interactive?: boolean;
+  /** Called when a locked (non-subscribed) user taps a day. */
+  onLockedTap?: () => void;
 }
 
 export default function ActivityCalendar({
@@ -93,6 +98,8 @@ export default function ActivityCalendar({
   viewYear,
   viewMonth,
   durationMap,
+  interactive = true,
+  onLockedTap,
 }: ActivityCalendarProps) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -161,9 +168,15 @@ export default function ActivityCalendar({
   // the cell that gained/lost selection does.
   const handleSelect = useCallback((key: string, isFuture: boolean) => {
     if (isFuture) return;
+    // Without a subscription the calendar is look-only: a tap is a nudge to
+    // the paywall, never a day selection.
+    if (!interactive) {
+      onLockedTap?.();
+      return;
+    }
     haptics.select();
     setSelectedDate((prev) => (prev === key ? null : key));
-  }, []);
+  }, [interactive, onLockedTap]);
 
   return (
     <View style={styles.container}>
