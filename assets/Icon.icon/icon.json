@@ -67,6 +67,7 @@
       }
     },
     {
+      "hidden" : true,
       "layers" : [
         {
           "glass" : false,
@@ -74,6 +75,105 @@
           "name" : "app-loo 2",
           "position" : {
             "scale" : 0.93,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "hidden" : true,
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "dot-log.png",
+          "name" : "dot-log",
+          "position" : {
+            "scale" : 0.86,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "hidden" : true,
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "119CBB39-A059-40C3-836B-2CEBFE7CB575.png",
+          "name" : "119CBB39-A059-40C3-836B-2CEBFE7CB575",
+          "position" : {
+            "scale" : 0.82,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "dot-riso.png",
+          "name" : "dot-riso",
+          "position" : {
+            "scale" : 0.82,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "dot-big-riso.png",
+          "name" : "dot-big-riso",
+          "position" : {
+            "scale" : 0.82,
             "translation-in-points" : [
               0,
               0
