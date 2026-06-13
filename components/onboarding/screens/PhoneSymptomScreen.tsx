@@ -13,7 +13,11 @@ const LINES: TypeLineSpec[] = [
   { segs: [{ text: 'what if…' }] },
   { segs: [{ text: 'you could stop time again?' }] },
   { segs: [{ text: 'one minute.' }] },
-  { segs: [{ text: 'no phone. no plans. no rush.' }] },
+  // NBSP between "no" and "rush" so the pair is one unbreakable word —
+  // if the line wraps on a tiny screen, "no rush" moves to the next row
+  // together (never orphaned). The teleprompter measures + centres each
+  // line, so a 2-row wrap animates fine.
+  { segs: [{ text: 'no phone. no plans. no rush.' }] },
   { segs: [{ text: 'just you.' }] },
   { segs: [{ text: 'even one minute a day' }] },
   { segs: [{ text: 'can change everything.', strong: true, accent: true }], stepMs: 65 },
