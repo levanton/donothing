@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
 
 import { palette, getStatusBarStyle } from '@/lib/theme';
 import { useOnboardingFlow } from '@/hooks/useOnboardingFlow';
@@ -15,11 +14,6 @@ export default function OnboardingRoute() {
   const flow = useOnboardingFlow();
 
   const { currentPage, currentIndex, screenTheme, isDark } = flow;
-
-  // Back button uses cream on dark/terracotta backgrounds
-  const backColor = currentPage.bg === palette.terracotta || isDark
-    ? palette.cream
-    : screenTheme.text;
 
   const showBottomButton = !currentPage.hasOwnButton && flow.canAdvance;
   const screen = SCREEN_REGISTRY[currentPage.id];
@@ -63,29 +57,20 @@ export default function OnboardingRoute() {
         </Animated.View>
       )}
 
-      {/* Top bar: back button + progress */}
-      {currentPage.showBackButton && (
+      {/* Top bar: progress */}
+      {currentPage.showProgress && (
         <View style={[styles.topBar, { top: insets.top + 10 }]}>
-          <Pressable
-            onPress={flow.goBack}
-            style={styles.backButton}
-            hitSlop={16}
-          >
-            <Feather name="chevron-left" size={22} color={backColor} />
-          </Pressable>
-          {currentPage.showProgress && (
-            <View style={[styles.progressTrack, { backgroundColor: palette.charcoal + '1F' }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    backgroundColor: palette.terracotta,
-                    width: `${flow.progress * 100}%`,
-                  },
-                ]}
-              />
-            </View>
-          )}
+          <View style={[styles.progressTrack, { backgroundColor: palette.charcoal + '1F' }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  backgroundColor: palette.terracotta,
+                  width: `${flow.progress * 100}%`,
+                },
+              ]}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -112,17 +97,10 @@ const styles = StyleSheet.create({
   },
   topBar: {
     position: 'absolute',
-    left: 16,
+    left: 23,
     right: 23,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  backButton: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   progressTrack: {
     flex: 1,
