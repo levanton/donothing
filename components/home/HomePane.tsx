@@ -1,5 +1,4 @@
 import { Entypo, Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { memo, type RefObject } from 'react';
 import {
@@ -194,32 +193,6 @@ export default function HomePane({
           </Text>
         </Animated.View>
       </View>
-
-      {/* Replay onboarding — top right, next to the theme toggle */}
-      <Pressable
-        onPress={() => {
-          haptics.light();
-          router.push('/onboarding');
-        }}
-        disabled={started}
-        accessibilityRole="button"
-        accessibilityLabel="Replay onboarding"
-        style={[
-          styles.onboardingButton,
-          {
-            top: insetsTop + 12,
-            opacity: started ? 0 : 1,
-          },
-        ]}
-        hitSlop={16}
-      >
-        <Feather
-          name="rotate-ccw"
-          size={20}
-          color={theme.text}
-          style={{ opacity: 0.9 }}
-        />
-      </Pressable>
 
       {/* Theme toggle — top right */}
       <Pressable
@@ -529,10 +502,6 @@ const styles = StyleSheet.create({
   themeToggle: {
     position: 'absolute',
     right: 24,
-  },
-  onboardingButton: {
-    position: 'absolute',
-    right: 64,
   },
   themeCircle: {
     width: 28,
