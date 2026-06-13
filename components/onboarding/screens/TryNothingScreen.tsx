@@ -67,12 +67,21 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
   // and stays on so the finish can wait for the pick-up gesture.
   const { faceDown, available } = useFaceDown((arming || started) && isActive);
 
+  // Lifting the phone mid-minute pauses the rehearsal (just like the real
+  // session) — the clock freezes and a "put it back down" message shows
+  // until the phone settles face down again. Gated on `available`: with
+  // no accelerometer the session runs via the fallback button and
+  // `faceDown` is permanently false, so WITHOUT this gate the run would
+  // be stuck "paused" forever and never tick. No sensor → no pause.
+  const paused = available && started && !finished && !faceDown;
+
   // Same screen-dimming behaviour as the real session timer: once started,
   // the brightness + timer fade to black; a tap anywhere then wakes it.
-  // While face down the backlight drops to true zero.
+  // While face down the backlight drops to true zero. `suppressed` while
+  // paused so the screen brightens and the pause message is readable.
   const { contentStyle, dimmed, wake } = useSessionScreen({
     active: started,
-    suppressed: false,
+    suppressed: paused,
     faceDown,
     dimDurationMs: DIM_DURATION_MS,
   });
@@ -114,10 +123,13 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
     transform: [{ translateY: -5 * breath.value }],
   }));
 
-  // begin: the phone settled face down.
+  // begin: the phone settled face down. Just flips state + the "it has
+  // begun" cues — the ticking itself lives in the face-down-aware effect
+  // below so a lift can pause it.
   const begin = useCallback(() => {
     setArming(false);
     setStarted(true);
+    setElapsed(0);
     track('onboarding_session_started');
     // Same "it has begun" as the real session — felt through the table,
     // heard even on silent, with a brief candle-glow off the torch
@@ -127,35 +139,55 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
     void torch.blink(1, 0.1, 220, 0);
 
     hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
-
-    setElapsed(0);
-    intervalRef.current = setInterval(() => {
-      setElapsed(prev => {
-        if (prev >= SESSION_DURATION - 1) {
-          clearInterval(intervalRef.current);
-          deactivateKeepAwake(KEEP_AWAKE.ONBOARDING);
-          // Persist the onboarding minute as a real session so the home
-          // screen stats aren't empty on first launch. recordSession also
-          // refreshes weekStats and checks milestones in one shot.
-          useAppStore.getState().recordSession(SESSION_DURATION);
-          track('onboarding_session_completed', { durationSec: SESSION_DURATION });
-          // Same end-of-timer ritual as the real session: the Opal-style
-          // haptic swell + the soft chime + the torch breathing light up
-          // off the table.
-          haptics.celebrate();
-          sound.complete();
-          void torch.blink();
-          setFinished(true);
-          return SESSION_DURATION;
-        }
-        return prev + 1;
-      });
-    }, 1000);
   }, [hintOpacity]);
 
   useEffect(() => {
     if (arming && faceDown) begin();
   }, [arming, faceDown, begin]);
+
+  // Guarded so the minute is only ever recorded ONCE — a side effect in a
+  // state updater (the old shape) could double-fire under React 19's
+  // re-invoked updaters and save two onboarding sessions.
+  const completedRef = useRef(false);
+  const completeMinute = useCallback(() => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    deactivateKeepAwake(KEEP_AWAKE.ONBOARDING);
+    // Persist the onboarding minute as a real session so the home screen
+    // stats aren't empty on first launch. recordSession also refreshes
+    // weekStats and checks milestones in one shot.
+    useAppStore.getState().recordSession(SESSION_DURATION);
+    track('onboarding_session_completed', { durationSec: SESSION_DURATION });
+    // Same end-of-timer ritual as the real session: the haptic swell +
+    // soft chime + the torch breathing light up off the table.
+    haptics.celebrate();
+    sound.complete();
+    void torch.blink();
+    setFinished(true);
+  }, []);
+
+  // The clock ticks while the minute is running and NOT paused. With an
+  // accelerometer, paused = phone lifted (gated above). Without one
+  // (fallback start), `available` is false so the run ticks straight
+  // through — the no-sensor path must not be held hostage by face-down.
+  // The updater stays pure (just increments); completion is detected in
+  // its own effect below.
+  useEffect(() => {
+    if (!started || finished) return;
+    if (available && !faceDown) return; // sensor present + lifted = paused
+    const id = setInterval(() => {
+      setElapsed((prev) => Math.min(prev + 1, SESSION_DURATION));
+    }, 1000);
+    intervalRef.current = id;
+    return () => clearInterval(id);
+  }, [started, finished, faceDown, available]);
+
+  // Completion — fires once the full minute has elapsed, exactly once.
+  useEffect(() => {
+    if (started && !finished && elapsed >= SESSION_DURATION) {
+      completeMinute();
+    }
+  }, [started, finished, elapsed, completeMinute]);
 
   // The reveal: the user lifts the phone, the next screen greets them.
   useEffect(() => {
@@ -203,6 +235,14 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
               fadeDuration={0}
             />
           </View>
+        )}
+
+        {/* Lifted mid-minute — the clock is frozen; tell them how to
+            resume. Same mono voice as the real pause sheet. */}
+        {paused && (
+          <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
+            paused —{'\n'}place your phone face down to continue
+          </Text>
         )}
 
         <Animated.View style={contentStyle}>
