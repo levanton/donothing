@@ -111,7 +111,7 @@ export async function scheduleBlock(
   // approval tap before the first block is created.
   const auth = await getAuth();
   if (auth !== 'approved') {
-    console.log('[ScreenTime] scheduleBlock skipped — auth status:', auth);
+    if (__DEV__) console.log('[ScreenTime] scheduleBlock skipped — auth status:', auth);
     return;
   }
 
@@ -122,7 +122,7 @@ export async function scheduleBlock(
   // extension's own gate reads the mirrored RC status at fire time, so a
   // truly-lapsed user is still refused there.
   if (useAppStore.getState().subscriptionStatus === 'inactive') {
-    console.log('[ScreenTime] scheduleBlock skipped — subscription inactive');
+    if (__DEV__) console.log('[ScreenTime] scheduleBlock skipped — subscription inactive');
     return;
   }
 
@@ -172,9 +172,11 @@ export async function scheduleBlock(
     [],
   );
 
-  console.log(
-    `[ScreenTime] Scheduled block ${blockId} for ${firstFire.toISOString()}`,
-  );
+  if (__DEV__) {
+    console.log(
+      `[ScreenTime] Scheduled block ${blockId} for ${firstFire.toISOString()}`,
+    );
+  }
 }
 
 export function unscheduleBlock(blockId: string): void {
@@ -261,13 +263,13 @@ export async function reconcileBlocks(
     const shieldStuck = isBlockActive() && validBlockIds.size === 0;
 
     if (dbEmpty || shieldStuck) {
-      console.log('[ScreenTime] Full reset (dbEmpty=%s, stuck=%s)', dbEmpty, shieldStuck);
+      if (__DEV__) console.log('[ScreenTime] Full reset (dbEmpty=%s, stuck=%s)', dbEmpty, shieldStuck);
       await forceUnblockAll();
       return;
     }
 
     if (orphans.length > 0) {
-      console.log('[ScreenTime] Stopping orphan monitors:', orphans);
+      if (__DEV__) console.log('[ScreenTime] Stopping orphan monitors:', orphans);
       stopMonitoring(orphans);
       try { disableBlockAllMode(); } catch {}
     }

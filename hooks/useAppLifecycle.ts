@@ -95,7 +95,7 @@ export function useAppLifecycle(
         Notifications.getPermissionsAsync(),
       ]);
       if (auth !== 'approved' || notif.status !== 'granted') {
-        console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
+        if (__DEV__) console.log('[ScheduledBlock] skipped — missing perms', { auth, notif: notif.status });
         return;
       }
       // Native DeviceActivity raises the shield at intervalDidStart; we
