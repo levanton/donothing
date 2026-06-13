@@ -3,9 +3,8 @@
 // read state from this hook and call its handlers, no RC plumbing in
 // the JSX layer.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import type { PurchasesPackage } from 'react-native-purchases';
 
 import { haptics } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
@@ -14,12 +13,11 @@ import {
   type PackagesByPlan,
   type PlanId,
   RC_PACKAGE_BY_PLAN,
-  WINBACK_PRODUCT_ID,
 } from '@/lib/paywall-config';
+import { usePromo } from '@/hooks/usePromo';
 import { useAppStore } from '@/lib/store';
 import {
   getOfferings,
-  isIntroEligible,
   purchasePackage,
   restorePurchases,
 } from '@/lib/subscription';
@@ -48,9 +46,19 @@ export function usePaywall({ onClose, enabled = true }: Options) {
 
   // Win-back promo — shown ON TOP of the paywall when the user taps the X,
   // instead of closing first and surfacing it later on the home screen.
-  const [winbackPkg, setWinbackPkg] = useState<PurchasesPackage | null>(null);
+  // The registry (via usePromo) picks the right offer for this user: the
+  // intro discount for new subscribers, or the returning win-back for
+  // lapsed ones — whichever is enabled and eligible.
   const [promoVisible, setPromoVisible] = useState(false);
-  const [promoPurchasing, setPromoPurchasing] = useState(false);
+  const closeAfterPromo = useCallback(() => {
+    setPromoVisible(false);
+    onClose();
+  }, [onClose]);
+  const {
+    promo,
+    purchasing: promoPurchasing,
+    purchase: promoPurchase,
+  } = usePromo('paywall', closeAfterPromo);
 
   // Auto-close once the store flips to 'active'. RC's customerInfo
   // listener can resolve before/after our purchasePackage() returns —
@@ -64,8 +72,8 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     track('paywall_viewed');
   }, []);
 
-  // Load packages once on mount — both the plan cards and the win-back
-  // promo product come from the same offering, so one fetch covers both.
+  // Load the plan-card packages once on mount. The win-back promo product
+  // is loaded separately by usePromo from the same offering.
   useEffect(() => {
     let cancelled = false;
     getOfferings().then((offering) => {
@@ -79,37 +87,11 @@ export function usePaywall({ onClose, enabled = true }: Options) {
         if (pkg) map[plan] = pkg;
       }
       setPackagesByPlan(map);
-      // Match by store product id — robust to whatever the discount package
-      // is named in the RC dashboard.
-      const winback = offering.availablePackages.find(
-        (p) => p.product.identifier === WINBACK_PRODUCT_ID,
-      );
-      // Only arm the win-back if the user can ACTUALLY redeem its intro
-      // price. Apple gives an intro offer once per subscription group, so
-      // a returning subscriber would see "50% off" and then be charged
-      // full price — a broken promise. Gating winbackPkg here means every
-      // downstream `if (winbackPkg)` (the skip-promo, the purchase) is
-      // automatically skipped for ineligible users.
-      if (winback) {
-        isIntroEligible(winback.product.identifier).then((eligible) => {
-          if (!cancelled && eligible) setWinbackPkg(winback);
-        });
-      }
     });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  // Real discount % computed live from the win-back product's intro vs full
-  // price — never hardcoded, since the actual deal may not be exactly 40%.
-  const winbackDiscountPct = useMemo(() => {
-    const product = winbackPkg?.product;
-    const full = product?.price;
-    const intro = product?.introPrice?.price;
-    if (full == null || intro == null || full <= 0) return undefined;
-    return Math.round((1 - intro / full) * 100);
-  }, [winbackPkg]);
 
   const skip = useCallback(() => {
     haptics.light();
@@ -126,13 +108,13 @@ export function usePaywall({ onClose, enabled = true }: Options) {
       console.warn('[paywall] skip-count read/write failed:', e);
     }
     // Surface the promo on top of the paywall every second dismissal, but
-    // only if the win-back package actually loaded. Otherwise just leave.
-    if (winbackPkg && count % 2 === 0) {
+    // only if a promo actually resolved for this user. Otherwise just leave.
+    if (promo && count % 2 === 0) {
       setPromoVisible(true);
     } else {
       onClose();
     }
-  }, [onClose, winbackPkg]);
+  }, [onClose, promo]);
 
   // Dismissing the promo means the user has now declined twice — leave the
   // paywall the same way the bare X used to.
@@ -140,37 +122,6 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     setPromoVisible(false);
     onClose();
   }, [onClose]);
-
-  const promoPurchase = useCallback(async () => {
-    if (promoPurchasing) return;
-    if (!winbackPkg) {
-      setPromoVisible(false);
-      onClose();
-      return;
-    }
-    setPromoPurchasing(true);
-    try {
-      const result = await purchasePackage(winbackPkg);
-      if (result === 'active') {
-        haptics.success();
-        track('purchase_completed', { plan: 'winback' });
-        // Optimistic — the auto-close watcher above also fires on 'active',
-        // but we update + close now so there's no flicker.
-        await useAppStore.getState().setSubscriptionStatus('active');
-        setPromoVisible(false);
-        onClose();
-      } else if (result === 'cancelled') {
-        // System sheet dismissed → leave the promo open to retry.
-        track('purchase_cancelled', { plan: 'winback' });
-      } else {
-        // Any other failure (network/storekit) → error haptic.
-        haptics.error();
-        track('purchase_failed', { plan: 'winback' });
-      }
-    } finally {
-      setPromoPurchasing(false);
-    }
-  }, [onClose, promoPurchasing, winbackPkg]);
 
   const purchase = useCallback(async () => {
     if (purchasing) return;
@@ -245,7 +196,7 @@ export function usePaywall({ onClose, enabled = true }: Options) {
     promoVisible,
     closePromo,
     promoPurchase,
-    winbackPkg,
-    winbackDiscountPct,
+    promoPurchasing,
+    promo,
   };
 }

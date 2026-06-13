@@ -28,6 +28,28 @@ const HERO_IMAGE = require('@/assets/images/present.png');
 // the modal opens — otherwise iOS shows a brief blank frame.
 Asset.fromModule(HERO_IMAGE).downloadAsync().catch(() => {});
 
+// Resolved (pct already substituted) copy — supplied by usePromo via the
+// promo registry. Optional so legacy callers fall back to the intro text.
+interface PromoCopyResolved {
+  headline: { before: string; bold: string; after: string };
+  bullets: [string, string];
+  cta: { before: string; bold: string; after: string };
+}
+
+// Default copy keeps the original intro-offer wording for any caller that
+// doesn't pass `copy`. `{bold}` here is computed from discountPct below.
+function defaultCopy(discountPct?: number): PromoCopyResolved {
+  return {
+    headline: {
+      before: 'What if your first year\nwas ',
+      bold: discountPct ? `${discountPct}% OFF` : 'on us',
+      after: '?',
+    },
+    bullets: ['cancel any time', 'full access'],
+    cta: { before: 'Try ', bold: 'nothing', after: ' now' },
+  };
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -38,6 +60,8 @@ interface Props {
   introPriceString?: string;
   // Real discount %, computed live from the prices (not hardcoded).
   discountPct?: number;
+  // Per-promo copy from the registry. Falls back to the intro wording.
+  copy?: PromoCopyResolved;
 }
 
 function PromoOffer({
@@ -47,7 +71,9 @@ function PromoOffer({
   priceString,
   introPriceString,
   discountPct,
+  copy,
 }: Props) {
+  const text = copy ?? defaultCopy(discountPct);
   const insets = useSafeAreaInsets();
 
   const backdropOpacity = useSharedValue(0);
@@ -135,27 +161,21 @@ function PromoOffer({
           <View style={styles.content}>
             {/* Headline */}
             <Text style={[styles.headline, { fontFamily: Fonts!.serif }]}>
-              What if your first year{'\n'}was{' '}
-              <Text style={styles.headlineBold}>
-                {discountPct ? `${discountPct}% OFF` : 'on us'}
-              </Text>
-              ?
+              {text.headline.before}
+              <Text style={styles.headlineBold}>{text.headline.bold}</Text>
+              {text.headline.after}
             </Text>
 
             {/* Bullet list */}
             <View style={styles.bullets}>
-              <View style={styles.bulletRow}>
-                <Feather name="check" size={16} color={palette.cream} />
-                <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                  cancel any time
-                </Text>
-              </View>
-              <View style={styles.bulletRow}>
-                <Feather name="check" size={16} color={palette.cream} />
-                <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
-                  full access
-                </Text>
-              </View>
+              {text.bullets.map((bullet, i) => (
+                <View key={i} style={styles.bulletRow}>
+                  <Feather name="check" size={16} color={palette.cream} />
+                  <Text style={[styles.bulletText, { fontFamily: Fonts!.serif }]}>
+                    {bullet}
+                  </Text>
+                </View>
+              ))}
             </View>
 
             {/* Price card */}
@@ -185,8 +205,9 @@ function PromoOffer({
             {/* CTA */}
             <Pressable onPress={handlePurchase} style={styles.cta}>
               <Text style={[styles.ctaText, { fontFamily: Fonts!.serif }]}>
-                Try{' '}
-                <Text style={styles.ctaTextBold}>nothing</Text> now
+                {text.cta.before}
+                <Text style={styles.ctaTextBold}>{text.cta.bold}</Text>
+                {text.cta.after}
               </Text>
             </Pressable>
           </View>

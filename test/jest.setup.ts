@@ -110,6 +110,8 @@ jest.mock('react-native-purchases', () => ({
     getOfferings: jest.fn(),
     getProducts: jest.fn().mockResolvedValue([]),
     purchasePackage: jest.fn(),
+    purchaseDiscountedPackage: jest.fn(),
+    getPromotionalOffer: jest.fn(),
     restorePurchases: jest.fn(),
     addCustomerInfoUpdateListener: jest.fn(),
     removeCustomerInfoUpdateListener: jest.fn(),

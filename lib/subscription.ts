@@ -4,6 +4,8 @@ import Purchases, {
   type CustomerInfo,
   type PurchasesOffering,
   type PurchasesPackage,
+  type PurchasesPromotionalOffer,
+  type PurchasesStoreProduct,
 } from 'react-native-purchases';
 import { userDefaultsSet } from 'react-native-device-activity';
 
@@ -199,6 +201,60 @@ export async function purchasePackage(
   } catch (e: any) {
     if (e?.userCancelled) return 'cancelled';
     console.warn('[subscription] purchasePackage failed:', e);
+    return 'inactive';
+  }
+}
+
+/**
+ * Sign a Promotional Offer for a returning/lapsed subscriber.
+ *
+ * Unlike an introductory offer (which Apple applies automatically inside
+ * a plain purchasePackage), a Promotional Offer must be SIGNED before it
+ * can be redeemed. RevenueCat signs it on its backend — we just hand it
+ * the StoreProduct + the matching discount. `offerId` is the identifier
+ * configured in App Store Connect (e.g. 'nothing_year_50_off'); it must
+ * appear in `product.discounts`.
+ *
+ * Returns null when RC isn't configured, the discount isn't on the
+ * product (not synced yet / wrong id), or signing fails — every caller
+ * then simply doesn't surface the offer rather than promising a price it
+ * can't charge.
+ */
+export async function getSignedPromoOffer(
+  product: PurchasesStoreProduct,
+  offerId: string,
+): Promise<PurchasesPromotionalOffer | null> {
+  if (!configured) return null;
+  try {
+    const discount = product.discounts?.find((d) => d.identifier === offerId);
+    if (!discount) return null;
+    const signed = await Purchases.getPromotionalOffer(product, discount);
+    return signed ?? null;
+  } catch (e) {
+    console.warn('[subscription] getPromotionalOffer failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Buy a package with a signed Promotional Offer. Mirrors purchasePackage's
+ * contract ('active' | 'inactive' | 'cancelled') so callers treat both
+ * purchase paths identically.
+ */
+export async function purchaseWithPromoOffer(
+  pkg: PurchasesPackage,
+  offer: PurchasesPromotionalOffer,
+): Promise<'active' | 'inactive' | 'cancelled'> {
+  if (!configured) return 'inactive';
+  try {
+    const { customerInfo } = await Purchases.purchaseDiscountedPackage(
+      pkg,
+      offer,
+    );
+    return resolveStatus(customerInfo);
+  } catch (e: any) {
+    if (e?.userCancelled) return 'cancelled';
+    console.warn('[subscription] purchaseDiscountedPackage failed:', e);
     return 'inactive';
   }
 }

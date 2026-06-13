@@ -116,8 +116,8 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
     promoVisible,
     closePromo,
     promoPurchase,
-    winbackPkg,
-    winbackDiscountPct,
+    promoPurchasing,
+    promo,
   } = usePaywall({ onClose, enabled });
 
   const scrollY = useSharedValue(0);
@@ -235,10 +235,11 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
       <PromoOffer
         visible={promoVisible}
         onClose={closePromo}
-        onPurchase={promoPurchase}
-        priceString={winbackPkg?.product.priceString}
-        introPriceString={winbackPkg?.product.introPrice?.priceString}
-        discountPct={winbackDiscountPct}
+        onPurchase={promoPurchasing ? undefined : promoPurchase}
+        priceString={promo?.priceString}
+        introPriceString={promo?.introPriceString}
+        discountPct={promo?.discountPct}
+        copy={promo?.copy}
       />
     </View>
   );

@@ -41,6 +41,8 @@ beforeEach(() => {
   Purchases.configure.mockReset();
   Purchases.getCustomerInfo.mockReset();
   Purchases.purchasePackage.mockReset();
+  Purchases.purchaseDiscountedPackage.mockReset();
+  Purchases.getPromotionalOffer.mockReset();
   Purchases.restorePurchases.mockReset();
   Purchases.getProducts.mockReset().mockResolvedValue([]);
   Purchases.getOfferings.mockReset();
@@ -243,6 +245,86 @@ describe('purchasePackage', () => {
   it('returns inactive when not configured', async () => {
     const sub = loadModule();
     expect(await sub.purchasePackage({} as any)).toBe('inactive');
+  });
+});
+
+describe('getSignedPromoOffer', () => {
+  const product = (discounts: any[] | null) =>
+    ({ discounts } as any);
+
+  it('returns null when not configured', async () => {
+    const sub = loadModule();
+    expect(await sub.getSignedPromoOffer(product([]), 'x')).toBeNull();
+  });
+
+  it('returns null when the discount id is not on the product', async () => {
+    const sub = loadModule();
+    sub.initRevenueCat();
+    const p = product([{ identifier: 'other' }]);
+    expect(await sub.getSignedPromoOffer(p, 'nothing_year_50_off')).toBeNull();
+  });
+
+  it('signs the matching discount and returns the signed offer', async () => {
+    const Purchases = rc();
+    const signed = { identifier: 'nothing_year_50_off', signature: 'sig' };
+    Purchases.getPromotionalOffer.mockResolvedValue(signed);
+    const sub = loadModule();
+    sub.initRevenueCat();
+    const discount = { identifier: 'nothing_year_50_off' };
+    const p = product([discount]);
+    expect(await sub.getSignedPromoOffer(p, 'nothing_year_50_off')).toBe(signed);
+    expect(Purchases.getPromotionalOffer).toHaveBeenCalledWith(p, discount);
+  });
+
+  it('returns null when RC returns undefined (ineligible / not signable)', async () => {
+    const Purchases = rc();
+    Purchases.getPromotionalOffer.mockResolvedValue(undefined);
+    const sub = loadModule();
+    sub.initRevenueCat();
+    const p = product([{ identifier: 'nothing_year_50_off' }]);
+    expect(await sub.getSignedPromoOffer(p, 'nothing_year_50_off')).toBeNull();
+  });
+
+  it('returns null when RC throws', async () => {
+    const Purchases = rc();
+    Purchases.getPromotionalOffer.mockRejectedValue(new Error('storekit'));
+    const sub = loadModule();
+    sub.initRevenueCat();
+    const p = product([{ identifier: 'nothing_year_50_off' }]);
+    expect(await sub.getSignedPromoOffer(p, 'nothing_year_50_off')).toBeNull();
+  });
+});
+
+describe('purchaseWithPromoOffer', () => {
+  it('returns active when the discounted purchase grants the entitlement', async () => {
+    const Purchases = rc();
+    Purchases.purchaseDiscountedPackage.mockResolvedValue({
+      customerInfo: customerInfo({ full: {} }),
+    });
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.purchaseWithPromoOffer({} as any, {} as any)).toBe('active');
+  });
+
+  it('returns cancelled when userCancelled is set on the rejection', async () => {
+    const Purchases = rc();
+    Purchases.purchaseDiscountedPackage.mockRejectedValue({ userCancelled: true });
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.purchaseWithPromoOffer({} as any, {} as any)).toBe('cancelled');
+  });
+
+  it('returns inactive on other errors', async () => {
+    const Purchases = rc();
+    Purchases.purchaseDiscountedPackage.mockRejectedValue(new Error('boom'));
+    const sub = loadModule();
+    sub.initRevenueCat();
+    expect(await sub.purchaseWithPromoOffer({} as any, {} as any)).toBe('inactive');
+  });
+
+  it('returns inactive when not configured', async () => {
+    const sub = loadModule();
+    expect(await sub.purchaseWithPromoOffer({} as any, {} as any)).toBe('inactive');
   });
 });
 

@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import PromoOffer from '@/components/promo/PromoOffer';
 import { EASE_OUT } from '@/constants/animations';
 import { Fonts } from '@/constants/theme';
-import { useWinbackOffer } from '@/hooks/useWinbackOffer';
+import { usePromo } from '@/hooks/usePromo';
 import { track } from '@/lib/analytics';
 import { haptics } from '@/lib/haptics';
 import { palette } from '@/lib/theme';
@@ -40,8 +40,7 @@ interface Props {
 function BlocksPausedModal({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<'pitch' | 'winback'>('pitch');
-  const { winbackPkg, discountPct, purchasing, purchase } =
-    useWinbackOffer(onClose);
+  const { promo, purchasing, purchase } = usePromo('blocksPaused', onClose);
 
   useEffect(() => {
     if (visible) {
@@ -82,12 +81,12 @@ function BlocksPausedModal({ visible, onClose }: Props) {
     router.push('/paywall');
   };
 
-  // Declining the pitch earns the discount beat — but only if the
-  // win-back package actually loaded; otherwise just leave quietly.
+  // Declining the pitch earns the discount beat — but only if a win-back
+  // promo actually resolved for this user; otherwise just leave quietly.
   const handleDismissPitch = () => {
     haptics.select();
     track('blocks_paused_promo_dismissed');
-    if (winbackPkg) {
+    if (promo) {
       setStep('winback');
     } else {
       onClose();
@@ -171,14 +170,15 @@ function BlocksPausedModal({ visible, onClose }: Props) {
         </View>
       </Animated.View>
 
-      {/* Win-back beat — the paywall's own discount offer, reused. */}
+      {/* Win-back beat — the registry-resolved discount offer, reused. */}
       <PromoOffer
         visible={visible && step === 'winback'}
         onClose={onClose}
         onPurchase={purchasing ? undefined : purchase}
-        priceString={winbackPkg?.product.priceString}
-        introPriceString={winbackPkg?.product.introPrice?.priceString}
-        discountPct={discountPct}
+        priceString={promo?.priceString}
+        introPriceString={promo?.introPriceString}
+        discountPct={promo?.discountPct}
+        copy={promo?.copy}
       />
     </>
   );
