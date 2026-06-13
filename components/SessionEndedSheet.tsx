@@ -160,10 +160,11 @@ function SessionEndedSheet({
     // The ritual continues the session: putting the phone back face down
     // resumes it (same sustained-reading detector as the start gate). The
     // instruction text below stays tappable as the no-sensor fallback.
+    // The resume cue (pulse + chime) fires in resumeSession via onContinue,
+    // so it's NOT duplicated here.
     const { faceDown } = useFaceDown(visible);
     useEffect(() => {
       if (!visible || !faceDown) return;
-      haptics.begin();
       onContinue?.();
     }, [visible, faceDown, onContinue]);
 

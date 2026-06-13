@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { haptics } from '@/lib/haptics';
-import { sound } from '@/lib/sound';
+import { cueSessionStart, cueSessionResume, cueSessionComplete } from '@/lib/session-cues';
 import { initDatabase, wipeUserData } from './db';
 import {
   addSession as dbAddSession,
@@ -42,7 +42,6 @@ import {
   configureNotifications,
   cancelNotification,
 } from './notifications';
-import torch from 'torch';
 import type { SubscriptionStatus } from './subscription';
 import { captureError } from './sentry';
 import { track } from './analytics';
@@ -703,14 +702,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     sessionStartTime = Date.now();
     const goalSeconds = get().goalSeconds;
     track('session_started', { goalSec: goalSeconds, origin: get().sessionOrigin });
-    // "It has begun" — felt through the table AND heard (even on silent),
-    // so a disabled-vibration setting can't make the start go unnoticed.
-    // A brief candle-glow off the torch echoes the end-of-session light,
-    // bookending the minute with the same soft signal (short pulse here
-    // vs. the long breath at completion). No-ops without hardware.
-    haptics.begin();
-    sound.start();
-    void torch.blink(1, 0.1, 220, 0);
+    // "It has begun" — felt, heard, and seen. Shared with the onboarding
+    // rehearsal so a start always feels the same. See cueSessionStart.
+    cueSessionStart();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       set({ elapsed: Math.floor((Date.now() - sessionStartTime) / 1000) });
@@ -821,9 +815,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       return;
     }
-    // The same "it has begun" cue as beginCountdown — the clock resuming
-    // is a start too, and must never be silent.
-    sound.start();
+    // The clock resuming is a start too, and must never be silent — the
+    // resume cue (pulse + chime) now lives here for ALL resume paths, so
+    // the SessionEndedSheet no longer fires its own haptic.
+    cueSessionResume();
     // Re-anchor sessionStartTime to the frozen elapsed so the next
     // interval tick continues from where we paused.
     sessionStartTime = Date.now() - elapsed * 1000;
@@ -908,11 +903,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const session = saveSessionWithRetry(duration);
     track('session_completed', { durationSec: duration, origin: get().sessionOrigin });
-    haptics.success();
-    sound.complete();
-    // The phone usually lies face down — breathe light up off the table so
-    // the end is visible across the room, not just audible.
-    void torch.blink();
+    // Quiet success haptic + chime + torch breathing up off the table.
+    // (The richer celebrate swell fires separately in the HomeShell cascade.)
+    cueSessionComplete('success');
     sessionTransition(set, get, event, {
       elapsed: 0,
       weekStats: getWeekStats(),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { KEEP_AWAKE } from '@/constants/keepAwake';
@@ -14,11 +14,9 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { Asset } from 'expo-asset';
-import torch from 'torch';
 
 import { EASE_OUT } from '@/constants/animations';
-import { haptics } from '@/lib/haptics';
-import { sound } from '@/lib/sound';
+import { cueSessionStart, cueSessionResume, cueSessionComplete } from '@/lib/session-cues';
 import { track } from '@/lib/analytics';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
 import GhostButton from '@/components/GhostButton';
@@ -37,6 +35,11 @@ const DIM_DURATION_MS = 15000;
 // module load so it's ready the first time the screen opens.
 const phoneDownImage = require('@/assets/images/phone-down-7-trimmed.png');
 Asset.fromModule(phoneDownImage).downloadAsync().catch(() => {});
+
+// The same pause artwork the real session shows when the phone is lifted
+// (SessionEndedSheet). Preloaded so the pause never flashes empty.
+const pauseImage = require('@/assets/images/pause-trimmed.png');
+Asset.fromModule(pauseImage).downloadAsync().catch(() => {});
 
 interface Props {
   isActive: boolean;
@@ -131,12 +134,8 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
     setStarted(true);
     setElapsed(0);
     track('onboarding_session_started');
-    // Same "it has begun" as the real session — felt through the table,
-    // heard even on silent, with a brief candle-glow off the torch
-    // (the same soft light that marks the end, a short pulse here).
-    haptics.begin();
-    sound.start();
-    void torch.blink(1, 0.1, 220, 0);
+    // Exactly the same "it has begun" cue as the real session.
+    cueSessionStart();
 
     hintOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
   }, [hintOpacity]);
@@ -144,6 +143,21 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
   useEffect(() => {
     if (arming && faceDown) begin();
   }, [arming, faceDown, begin]);
+
+  // Resuming after a lift — placing the phone back face down continues
+  // the minute with the same resume cue (pulse + chime) the real session
+  // fires. No torch flash — that marks the beginning and the end.
+  const wasPausedRef = useRef(false);
+  useEffect(() => {
+    if (paused) {
+      wasPausedRef.current = true;
+      return;
+    }
+    if (wasPausedRef.current && started && !finished) {
+      wasPausedRef.current = false;
+      cueSessionResume();
+    }
+  }, [paused, started, finished]);
 
   // Guarded so the minute is only ever recorded ONCE — a side effect in a
   // state updater (the old shape) could double-fire under React 19's
@@ -158,11 +172,9 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
     // weekStats and checks milestones in one shot.
     useAppStore.getState().recordSession(SESSION_DURATION);
     track('onboarding_session_completed', { durationSec: SESSION_DURATION });
-    // Same end-of-timer ritual as the real session: the haptic swell +
-    // soft chime + the torch breathing light up off the table.
-    haptics.celebrate();
-    sound.complete();
-    void torch.blink();
+    // Same end-of-timer ritual as the real session: the special celebrate
+    // vibration swell + chime + torch breathing up off the table.
+    cueSessionComplete('celebrate');
     setFinished(true);
   }, []);
 
@@ -238,11 +250,15 @@ export default function TryNothingScreen({ isActive, onNext }: Props) {
         )}
 
         {/* Lifted mid-minute — the clock is frozen; tell them how to
-            resume. Same mono voice as the real pause sheet. */}
+            resume. The same pause artwork the real session shows, above
+            the mono resume line. */}
         {paused && (
-          <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
-            paused —{'\n'}place your phone face down to continue
-          </Text>
+          <View style={styles.pausedGroup}>
+            <Image source={pauseImage} style={styles.pauseIllustration} fadeDuration={0} />
+            <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
+              paused — place your phone{'\n'}face down to continue
+            </Text>
+          </View>
         )}
 
         <Animated.View style={contentStyle}>
@@ -319,12 +335,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: palette.cream,
     textAlign: 'center',
+    // Keep the copy off the screen edges so a long line wraps inside a
+    // calm column instead of stretching the centred content full-width.
+    maxWidth: 300,
   },
   gateIllustration: {
     // Trimmed artwork, ~1.4:1 — same box as the real gate.
     width: 170,
     height: 120,
     marginTop: 28,
+    resizeMode: 'contain',
+  },
+  // Paused header — pause artwork stacked over the mono resume line.
+  pausedGroup: {
+    alignItems: 'center',
+    gap: 18,
+  },
+  pauseIllustration: {
+    width: 130,
+    height: 130,
     resizeMode: 'contain',
   },
   footerGroup: {
