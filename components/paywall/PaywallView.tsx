@@ -18,7 +18,12 @@ import PromoOffer from '@/components/promo/PromoOffer';
 import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 import { usePaywall } from '@/hooks/usePaywall';
-import { ctaLabel, type PlanId } from '@/lib/paywall-config';
+import {
+  ctaLabel,
+  freeTrialDays,
+  annualAnchorPrice,
+  type PlanId,
+} from '@/lib/paywall-config';
 import { palette } from '@/lib/theme';
 import { PRIVACY_URL, TERMS_URL } from '@/constants/links';
 
@@ -31,41 +36,12 @@ const PLANS: {
   id: PlanId;
   name: string;
   periodSuffix?: string;
-  subtitle?: string;
   badge?: string;
 }[] = [
   { id: 'monthly', name: 'Monthly', periodSuffix: ' / month' },
-  {
-    id: 'yearly',
-    name: 'Yearly',
-    periodSuffix: ' / year',
-    subtitle: 'First 3 days FREE!',
-    badge: 'Popular',
-  },
-  {
-    id: 'lifetime',
-    name: 'Lifetime',
-    subtitle: 'Pay once, own forever',
-    badge: 'Limited',
-  },
+  { id: 'yearly', name: 'Yearly', periodSuffix: ' / year', badge: 'Popular' },
+  { id: 'lifetime', name: 'Lifetime', badge: 'Limited' },
 ];
-
-// Marketing "was" price: the live price marked up, formatted by reusing the
-// store's own priceString as a template — so the currency symbol, decimal
-// separator and placement always match the locale. Not a real Apple tier;
-// it's only ever shown struck through next to the actual price.
-const ANCHOR_MARKUP = 1.2;
-
-function anchorPrice(product: { price: number; priceString: string }): string | undefined {
-  const { price, priceString } = product;
-  if (!price || price <= 0 || !priceString) return undefined;
-  const token = priceString.match(/\d[\d.,]*/)?.[0];
-  if (!token) return undefined;
-  const sep = /,\d{1,2}$/.test(token) ? ',' : '.';
-  const decimals = token.includes(sep) ? token.split(sep)[1].length : 0;
-  const value = (price * ANCHOR_MARKUP).toFixed(decimals).replace('.', sep);
-  return priceString.replace(token, value);
-}
 
 function HeroImage({ scrollY }: { scrollY: SharedValue<number> }) {
   const parallaxStyle = useAnimatedStyle(() => ({
@@ -128,6 +104,8 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
   const ctaColor =
     selectedPlan === 'lifetime' ? LIFETIME_COLOR : palette.terracotta;
   const yearlyPrice = packagesByPlan.yearly?.product.priceString;
+  // Real free-trial length from the product's intro offer (null when none).
+  const yearlyTrialDays = freeTrialDays(packagesByPlan.yearly);
 
   return (
     <View style={styles.container}>
@@ -164,14 +142,16 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
               ? `${basePrice}${plan.periodSuffix ?? ''}`
               : '';
             const oldPrice =
-              plan.id === 'yearly' && pkg ? anchorPrice(pkg.product) : undefined;
+              plan.id === 'yearly'
+                ? annualAnchorPrice(packagesByPlan.monthly, packagesByPlan.yearly)
+                : undefined;
             return (
               <PlanCard
                 key={plan.id}
                 name={plan.name}
                 price={price}
                 oldPrice={oldPrice}
-                subtitle={plan.subtitle}
+                trialDays={plan.id === 'yearly' ? yearlyTrialDays : undefined}
                 badge={plan.badge}
                 variant={plan.id === 'lifetime' ? 'dark' : 'default'}
                 isSelected={selectedPlan === plan.id}
@@ -201,9 +181,9 @@ export default function PaywallView({ onClose, enabled = true }: Props) {
               },
             ]}
           />
-          {selectedPlan === 'yearly' && yearlyPrice && (
+          {selectedPlan === 'yearly' && yearlyTrialDays && yearlyPrice && (
             <Text style={styles.ctaHelper}>
-              3 days free, then {yearlyPrice}/year. Cancel anytime.
+              {yearlyTrialDays} days free, then {yearlyPrice}/year. Cancel anytime.
             </Text>
           )}
         </Animated.View>

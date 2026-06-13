@@ -8,7 +8,10 @@ interface PlanCardProps {
   name: string;
   price: string;
   oldPrice?: string;
-  subtitle?: string;
+  /** Free-trial length in days, from the product's real intro offer. When
+   *  set, the card shows the "First {N} days FREE!" + "After Trial" layout;
+   *  null/undefined means no trial is advertised. */
+  trialDays?: number | null;
   badge?: string;
   variant?: 'default' | 'dark';
   isSelected: boolean;
@@ -20,7 +23,7 @@ export default function PlanCard({
   name,
   price,
   oldPrice,
-  subtitle,
+  trialDays,
   badge,
   variant = 'default',
   isSelected,
@@ -31,7 +34,7 @@ export default function PlanCard({
     onSelect();
   };
 
-  const hasDetail = !!subtitle || !!oldPrice;
+  const hasDetail = trialDays != null || !!oldPrice;
   const isDark = variant === 'dark';
 
   return (
@@ -62,14 +65,16 @@ export default function PlanCard({
         </>
       ) : hasDetail ? (
         <View style={styles.detailContent}>
-          {subtitle ? (
+          {trialDays != null ? (
             <Text style={styles.subtitleLine}>
-              <Text style={styles.subtitleLight}>First 3 days </Text>
+              <Text style={styles.subtitleLight}>First {trialDays} days </Text>
               <Text style={styles.subtitleBold}>FREE!</Text>
             </Text>
           ) : null}
           <View style={styles.priceLine}>
-            <Text style={styles.afterLabel}>After Trial: </Text>
+            {trialDays != null ? (
+              <Text style={styles.afterLabel}>After Trial: </Text>
+            ) : null}
             {oldPrice ? (
               <View style={styles.oldPriceWrap}>
                 <Text style={styles.oldPrice}>{oldPrice}</Text>
