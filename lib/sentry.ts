@@ -57,6 +57,11 @@ export function initSentry(): void {
   if (!dsn) return;
   Sentry.init({
     dsn,
+    // Tags every event so the dashboard can separate App Store releases
+    // (`production` profile) from internal/TestFlight ad-hoc builds
+    // (`preview`). Set per build profile in eas.json; release builds with
+    // no env var default to `production`.
+    environment: process.env.EXPO_PUBLIC_APP_ENV ?? 'production',
     sendDefaultPii: false,
     tracesSampleRate: 0,
     debug: __DEV__,
