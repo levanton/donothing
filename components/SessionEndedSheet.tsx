@@ -162,7 +162,11 @@ function SessionEndedSheet({
     // instruction text below stays tappable as the no-sensor fallback.
     // The resume cue (pulse + chime) fires in resumeSession via onContinue,
     // so it's NOT duplicated here.
-    const { faceDown } = useFaceDown(visible);
+    // `available` is false on a simulator / pre-rebuild dev client / a phone
+    // whose accelerometer never reports — there the flip-to-resume gesture
+    // can never fire, so we surface an explicit "continue" button below
+    // instead of leaving the user stuck on a tap-the-heading secret.
+    const { faceDown, available } = useFaceDown(visible);
     useEffect(() => {
       if (!visible || !faceDown) return;
       onContinue?.();
@@ -451,6 +455,33 @@ function SessionEndedSheet({
               </Animated.View>
             );
           })()}
+
+          {/* No-sensor fallback. When the accelerometer is unavailable the
+              face-down flip can't resume the session, so give an explicit
+              full-width "continue" pill. Hidden whenever the sensor works —
+              there, the ritual flip (or the tappable heading) is the way
+              back, and a button would undercut the put-it-down gesture. */}
+          {!available && (
+            <Animated.View
+              entering={FadeIn.duration(400).delay(220)}
+              style={styles.finishWrap}
+            >
+              <Pressable
+                onPress={handleContinue}
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                ]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Continue session"
+              >
+                <Text style={[styles.primaryText, { fontFamily: Fonts!.serif }]}>
+                  continue
+                </Text>
+              </Pressable>
+            </Animated.View>
+          )}
 
           <Animated.View
             entering={FadeIn.duration(400).delay(240)}
