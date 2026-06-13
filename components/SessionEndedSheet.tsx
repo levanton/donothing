@@ -715,9 +715,14 @@ const styles = StyleSheet.create({
   },
   finishBtn: {
     alignSelf: 'stretch',
+    // Fixed height, not vertical padding: the "00:59" save-countdown hint
+    // is conditional, so a padding-sized button shrank by a line the
+    // instant it cleared MIN_SAVABLE_DURATION (and again when the hint
+    // vanished), making the pill jump. A fixed height sized for the
+    // two-line state keeps "done" centred whether or not the hint shows.
+    height: 64,
     backgroundColor: TERRACOTTA,
     borderRadius: 100,
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
