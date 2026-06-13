@@ -142,13 +142,24 @@ export default function ActivityCalendar({
     let startDow = firstDay.getDay() - 1;
     if (startDow < 0) startDow = 6;
 
-    const cells: Array<{ day: number; key: string } | null> = [];
+    const cells: ({ day: number; key: string } | null)[] = [];
     for (let i = 0; i < startDow; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(viewYear, viewMonth, d);
       cells.push({ day: d, key: dateKey(date) });
     }
-    return cells;
+    // Pad the final week to a full 7 so every row has exactly seven flex
+    // columns — otherwise the last row's cells would stretch wider.
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    // Chunk into explicit week rows. We lay the grid out as rows of 7
+    // `flex: 1` cells instead of `width: 100/7%` + flexWrap: percentage
+    // widths accumulate sub-pixel rounding, and on narrow screens (SE)
+    // seven cells round to just over 100%, so only six fit per row and
+    // the seventh column (Sunday) is pushed off — leaving it blank.
+    const weeks: ({ day: number; key: string } | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks;
   }, [viewYear, viewMonth]);
 
   const handleDeleteDay = useCallback(() => {
@@ -188,23 +199,27 @@ export default function ActivityCalendar({
       </View>
 
       <View style={styles.grid}>
-        {calendarDays.map((cell, i) => {
-          if (!cell) return <View key={`empty-${i}`} style={styles.cell} />;
-          const duration = durationMap.get(cell.key) || 0;
-          return (
-            <DayCell
-              key={cell.key}
-              day={cell.day}
-              dayKey={cell.key}
-              duration={duration}
-              isSelected={cell.key === selectedDate}
-              isFuture={cell.key > todayKey}
-              intensity={duration > 0 ? 0.2 + 0.8 * (duration / maxDuration) : 0}
-              theme={theme}
-              onSelect={handleSelect}
-            />
-          );
-        })}
+        {calendarDays.map((week, wi) => (
+          <View key={`week-${wi}`} style={styles.weekRow}>
+            {week.map((cell, ci) => {
+              if (!cell) return <View key={`empty-${wi}-${ci}`} style={styles.cell} />;
+              const duration = durationMap.get(cell.key) || 0;
+              return (
+                <DayCell
+                  key={cell.key}
+                  day={cell.day}
+                  dayKey={cell.key}
+                  duration={duration}
+                  isSelected={cell.key === selectedDate}
+                  isFuture={cell.key > todayKey}
+                  intensity={duration > 0 ? 0.2 + 0.8 * (duration / maxDuration) : 0}
+                  theme={theme}
+                  onSelect={handleSelect}
+                />
+              );
+            })}
+          </View>
+        ))}
       </View>
 
 
@@ -295,9 +310,12 @@ const styles = StyleSheet.create({
   dayHeaders: { flexDirection: 'row', marginBottom: 8 },
   dayHeaderLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '400', letterSpacing: 0.5 },
 
-  // Grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  // Grid — a column of week rows; each row is 7 equal flex columns so
+  // they always align with the headers and never drop a column to
+  // sub-pixel rounding.
+  grid: {},
+  weekRow: { flexDirection: 'row' },
+  cell: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   dayCircle: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: CELL_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
   dayNumber: { fontSize: 15, fontWeight: '300', zIndex: 1, position: 'absolute' },
   activityBubble: { position: 'absolute' },
