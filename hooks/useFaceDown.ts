@@ -41,10 +41,17 @@ export function useFaceDown(enabled: boolean): {
     const sub = native.addListener('onChange', ({ faceDown: down }) => {
       setFaceDown(down);
     });
-    native.start(ENTER_Z, EXIT_Z, HOLD_MS);
+    // Synchronous native call — guard it so a hardware/module fault degrades
+    // to "no transitions" instead of throwing through the effect into the
+    // error boundary. Same for stop() on teardown (same module could fault).
+    try {
+      native.start(ENTER_Z, EXIT_Z, HOLD_MS);
+    } catch {}
     return () => {
       sub.remove();
-      native.stop();
+      try {
+        native.stop();
+      } catch {}
       setFaceDown(false);
     };
   }, [enabled]);
