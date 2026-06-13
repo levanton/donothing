@@ -4,12 +4,15 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { KEEP_AWAKE } from '@/constants/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeIn,
+  cancelAnimation,
+  Easing,
   useSharedValue,
   useAnimatedStyle,
+  withRepeat,
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { Asset } from 'expo-asset';
 import torch from 'torch';
 
 import { EASE_OUT } from '@/constants/animations';
@@ -17,6 +20,7 @@ import { haptics } from '@/lib/haptics';
 import { sound } from '@/lib/sound';
 import { track } from '@/lib/analytics';
 import AnimatedTimerDisplay from '@/components/AnimatedTimerDisplay';
+import PillButton from '@/components/PillButton';
 import { Fonts } from '@/constants/theme';
 import { palette } from '@/lib/theme';
 import { useAppStore } from '@/lib/store';
@@ -24,12 +28,14 @@ import { useFaceDown } from '@/hooks/useFaceDown';
 import { useSessionScreen } from '@/hooks/useSessionScreen';
 
 const SESSION_DURATION = 60;
-const YES_BUTTON_SIZE = 140;
 // Slower auto-dim than the real timer (default 5.5s) — this onboarding
 // minute eases into darkness more gently.
 const DIM_DURATION_MS = 15000;
-// Manual escape hatch if the face-down sensor never triggers.
-const FALLBACK_AFTER_MS = 7000;
+
+// Same illustration as the real face-down gate (RunOverlay). Decode at
+// module load so it's ready the first time the screen opens.
+const phoneDownImage = require('@/assets/images/phone-down-7-trimmed.png');
+Asset.fromModule(phoneDownImage).downloadAsync().catch(() => {});
 
 interface Props {
   isActive: boolean;
@@ -40,7 +46,9 @@ interface Props {
 
 export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const insets = useSafeAreaInsets();
-  // idle → (yes) → arming ("put me face down") → running → done.
+  // arming ("place your phone face down") → running → done. No "yes" tap:
+  // the rehearsal IS the face-down ritual, so the screen arms itself the
+  // moment it becomes active and the user's only job is to flip the phone.
   const [arming, setArming] = useState(false);
   const [started, setStarted] = useState(false);
   // The minute is over but the phone still lies face down — the next
@@ -59,12 +67,11 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   const entryOpacity = useSharedValue(0);
   const entryTranslateY = useSharedValue(12);
 
-  const yesOpacity = useSharedValue(1);
   const hintOpacity = useSharedValue(1);
 
   // The accelerometer starts the minute the phone settles face down —
   // and stays on so the finish can wait for the pick-up gesture.
-  const { faceDown, available } = useFaceDown((arming || started) && isActive);
+  const { faceDown } = useFaceDown((arming || started) && isActive);
 
   // Same screen-dimming behaviour as the real session timer: once started,
   // the brightness + timer fade to black; a tap anywhere then wakes it.
@@ -82,17 +89,38 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     entryTranslateY.value = withDelay(300, withTiming(0, { duration: 700, easing: EASE_OUT }));
   }, [isActive]);
 
-  // Step 1 — arm: the user said yes, now teach the ritual.
-  const arm = useCallback(() => {
-    haptics.medium();
+  // Arm the rehearsal the moment the screen becomes active.
+  const armed = useRef(false);
+  useEffect(() => {
+    if (!isActive || armed.current) return;
+    armed.current = true;
     track('onboarding_session_armed');
     // Keep-awake from here: the armed phone may already be face down.
     activateKeepAwakeAsync(KEEP_AWAKE.ONBOARDING);
     setArming(true);
-    yesOpacity.value = withTiming(0, { duration: 500, easing: EASE_OUT });
-  }, []);
+  }, [isActive]);
 
-  // Step 2 — begin: the phone settled face down (or manual fallback).
+  // The illustration breathes while we wait for the flip — same gentle
+  // float as the real gate (RunOverlay): a 5pt drift, a whisper of opacity.
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    if (isActive && !started) {
+      breath.value = withRepeat(
+        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        true,
+      );
+      return;
+    }
+    cancelAnimation(breath);
+    breath.value = 0;
+  }, [isActive, started, breath]);
+  const breathStyle = useAnimatedStyle(() => ({
+    opacity: 0.74 + 0.08 * breath.value,
+    transform: [{ translateY: -5 * breath.value }],
+  }));
+
+  // begin: the phone settled face down.
   const begin = useCallback(() => {
     setArming(false);
     setStarted(true);
@@ -127,32 +155,16 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
         return prev + 1;
       });
     }, 1000);
-  }, [onNext]);
+  }, [hintOpacity]);
 
   useEffect(() => {
     if (arming && faceDown) begin();
   }, [arming, faceDown, begin]);
 
   // The reveal: the user lifts the phone, the next screen greets them.
-  // (A fallback-started session was never face down — advances at once.)
   useEffect(() => {
     if (finished && !faceDown) onNext();
   }, [finished, faceDown, onNext]);
-
-  // Never strand anyone: manual start appears if the sensor stays quiet.
-  const [fallbackVisible, setFallbackVisible] = useState(false);
-  useEffect(() => {
-    if (!arming) {
-      setFallbackVisible(false);
-      return;
-    }
-    if (!available) {
-      setFallbackVisible(true);
-      return;
-    }
-    const t = setTimeout(() => setFallbackVisible(true), FALLBACK_AFTER_MS);
-    return () => clearTimeout(t);
-  }, [arming, available]);
 
   useEffect(() => {
     return () => {
@@ -166,10 +178,6 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
     transform: [{ translateY: entryTranslateY.value }],
   }));
 
-  const yesStyle = useAnimatedStyle(() => ({
-    opacity: yesOpacity.value,
-  }));
-
   const hintStyle = useAnimatedStyle(() => ({
     opacity: hintOpacity.value,
   }));
@@ -179,78 +187,59 @@ export default function TryNothingScreen({ isActive, onNext, onSkip }: Props) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, entryStyle]}>
-        {/* Header: the question, then the ritual instruction. Gone once
-            the minute is running. */}
+        {/* Gate intro — title + illustration above the timer, centred as
+            one group. Same shape and mono voice as the real face-down
+            gate (RunOverlay), with the onboarding's own wording. */}
         {!started && (
-          <Text style={[styles.headerText, { fontFamily: Fonts?.serif }]}>
-            {arming ? 'place your phone face down' : 'Ready to try nothing?'}
-          </Text>
+          <View style={styles.gateIntro}>
+            <Text style={[styles.gateTitle, { fontFamily: Fonts!.mono }]}>
+              when you’re ready,{'\n'}place your phone face down
+            </Text>
+            <Animated.Image
+              source={phoneDownImage}
+              style={[styles.gateIllustration, breathStyle]}
+              fadeDuration={0}
+            />
+          </View>
         )}
 
         <Animated.View style={contentStyle}>
           <AnimatedTimerDisplay
             seconds={remaining}
             color={palette.cream}
-            fontSize={96}
+            fontSize={76}
           />
         </Animated.View>
 
-        <View style={styles.yesWrap}>
-          {!arming && (
-            <Animated.View style={yesStyle} pointerEvents={started ? 'none' : 'auto'}>
-              <Pressable onPress={!started && !arming ? arm : undefined}>
-                <View style={styles.yesButton}>
-                  <Text style={[styles.yesLabel, { fontFamily: Fonts?.serif }]}>
-                    yes
-                  </Text>
-                </View>
-              </Pressable>
-            </Animated.View>
-          )}
-          {arming && fallbackVisible && (
-            <Animated.View entering={FadeIn.duration(500)}>
-              <Pressable
-                onPress={begin}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="Start without flipping"
-                style={styles.fallbackBtn}
-              >
-                <Text style={[styles.fallbackText, { fontFamily: Fonts?.serif }]}>
-                  can’t flip it? tap to start
-                </Text>
-              </Pressable>
-            </Animated.View>
-          )}
-        </View>
-
-        <Animated.View style={[styles.footerGroup, hintStyle]} pointerEvents="none">
-          {arming ? (
+        {/* The vibe first — be here, do nothing — then a quiet line on
+            how we'll let them know it's over. */}
+        {!started && (
+          <Animated.View style={[styles.footerGroup, hintStyle]} pointerEvents="none">
             <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
-              you’ll hear a chime when it’s done — even on silent.
+              just look around. be here.
             </Text>
-          ) : (
-            <>
-              <Text style={[styles.footer, { fontFamily: Fonts?.serif }]}>
-                just look around. be here.
-              </Text>
-              <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
-                and do nothing.
-              </Text>
-            </>
-          )}
-        </Animated.View>
+            <Text style={[styles.footer, styles.footerStrong, { fontFamily: Fonts?.serif }]}>
+              and do nothing.
+            </Text>
+            <Text style={[styles.footerSub, { fontFamily: Fonts?.serif }]}>
+              a gentle chime tells you when{'\n'}the minute’s up — even on silent.
+            </Text>
+          </Animated.View>
+        )}
       </Animated.View>
 
-      {/* Skip is offered any time before the minute actually runs. */}
+      {/* Skip — same large translucent-cream outline pill as the real
+          gate's "back" button, before the minute actually runs. */}
       {!started && (
-        <Pressable
+        <PillButton
+          label="skip"
           onPress={handleSkip}
-          style={[styles.skipButton, { bottom: insets.bottom + 28 }]}
-          hitSlop={16}
-        >
-          <Text style={[styles.skipLabel, { fontFamily: Fonts?.serif }]}>skip</Text>
-        </Pressable>
+          outline
+          size="large"
+          color="rgba(249, 242, 224, 0.4)"
+          style={[styles.skipButton, { bottom: insets.bottom + 30 }]}
+          labelStyle={[styles.skipLabel, { fontFamily: Fonts!.serif }]}
+        />
       )}
 
       {/* Once the auto-dim has faded fully black, a tap anywhere wakes it —
@@ -272,23 +261,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.terracotta,
   },
-  headerText: {
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: 1,
-    fontWeight: '400',
-    color: palette.cream,
-    textAlign: 'center',
-  },
   content: {
     alignItems: 'center',
     gap: 28,
   },
-  yesWrap: {
-    width: YES_BUTTON_SIZE,
-    height: YES_BUTTON_SIZE,
+  // Mirrors RunOverlay's gate: title + illustration centred above the
+  // timer as one group.
+  gateIntro: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  gateTitle: {
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 27,
+    letterSpacing: 0.5,
+    color: palette.cream,
+    textAlign: 'center',
+  },
+  gateIllustration: {
+    // Trimmed artwork, ~1.4:1 — same box as the real gate.
+    width: 170,
+    height: 120,
+    marginTop: 28,
+    resizeMode: 'contain',
   },
   footerGroup: {
     alignItems: 'center',
@@ -303,45 +299,23 @@ const styles = StyleSheet.create({
   footerStrong: {
     fontWeight: '600',
   },
-  yesButton: {
-    width: YES_BUTTON_SIZE,
-    height: YES_BUTTON_SIZE,
-    borderRadius: YES_BUTTON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.cream,
-    overflow: 'hidden',
-  },
-  yesLabel: {
-    fontSize: 22,
+  // Quiet practical line under the vibe — how we signal the end.
+  footerSub: {
+    fontSize: 14,
     fontWeight: '400',
-    letterSpacing: 0.5,
-    color: palette.terracotta,
-  },
-  fallbackBtn: {
-    borderWidth: 1.5,
-    borderColor: palette.cream,
-    borderRadius: 100,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-  },
-  fallbackText: {
-    fontSize: 15,
+    lineHeight: 20,
     color: palette.cream,
+    textAlign: 'center',
+    marginTop: 14,
   },
   skipButton: {
     position: 'absolute',
     alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
   },
   wakeCatcher: {
     zIndex: 100,
   },
   skipLabel: {
-    fontSize: 16,
-    fontWeight: '400',
-    letterSpacing: 0.5,
     color: palette.cream,
   },
 });

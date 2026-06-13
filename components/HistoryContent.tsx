@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, interpolate, runOnJS, useAnimatedReaction, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
+import LockedRegion from './LockedRegion';
 import type { GestureType } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,7 +18,6 @@ import {
 } from '@/lib/db/sessions';
 import ActivityCalendar from './ActivityCalendar';
 import MembershipBanner from './MembershipBanner';
-import LockedRegion from './LockedRegion';
 import { useAppStore } from '@/lib/store';
 import { track } from '@/lib/analytics';
 
@@ -34,10 +34,10 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-// When Journey is locked we keep the exact layout but mask the real numbers
-// with this placeholder, and feed the calendar an empty map (no activity dots).
+// When Journey is locked we keep the exact layout but mask the real
+// headline numbers with this placeholder. The calendar activity dots are
+// NOT masked — they're always shown (see the ActivityCalendar below).
 const STAT_MASK = '•••';
-const EMPTY_DURATIONS = new Map<string, number>();
 
 // ── Main component ────────────────────────────────────────────────────
 interface HistoryContentProps {
@@ -425,23 +425,32 @@ export default function HistoryContent({
           </Pressable>
         </View>
       </View>
+      </LockedRegion>
 
       {/* Below-card content — restored horizontal padding so the
-          calendar/footer stay at the page's normal gutter. */}
+          calendar/footer stay at the page's normal gutter. Deliberately
+          OUTSIDE the LockedRegion: the calendar (its activity circles)
+          is the one piece of the Journey shown without a subscription,
+          and keeping it out of the pointerEvents:'none' region also lets
+          the swipe-down-to-close gesture work over this large area —
+          the stats card and month switcher above stay locked. */}
       <View style={styles.belowCard}>
         {/* Hairline between stats and calendar */}
         <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
-        {/* Calendar */}
+        {/* Calendar — the activity circles show regardless of
+            subscription. The headline stats stay masked (STAT_MASK) as
+            the paid hook, but the at-a-glance "days I showed up" texture
+            is always visible: it's the emotional core of the Journey and
+            a stronger pull to subscribe than an empty grid. */}
         <ActivityCalendar
           theme={theme}
           viewYear={viewYear}
           viewMonth={viewMonth}
-          durationMap={isSubscribed ? monthDurationMap : EMPTY_DURATIONS}
+          durationMap={monthDurationMap}
         />
 
       </View>
-      </LockedRegion>
       </Animated.ScrollView>
     </View>
   );
