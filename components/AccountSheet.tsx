@@ -14,7 +14,6 @@ import {
   PRIVACY_URL,
   SUPPORT_EMAIL_ADDRESS,
   IOS_SUBSCRIPTIONS_URL,
-  APP_STORE_WRITE_REVIEW,
 } from '@/constants/links';
 import { getAppUserId } from '@/lib/subscription';
 
@@ -61,11 +60,6 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
     } finally {
       setRestoring(false);
     }
-  };
-
-  const handleRate = async () => {
-    haptics.select();
-    try { await Linking.openURL(APP_STORE_WRITE_REVIEW); } catch {}
   };
 
   // "make Nothing better" — opens a pre-addressed email with a short,
@@ -169,13 +163,6 @@ const AccountSheet = forwardRef<BottomSheet, Props>(({ theme, onDismiss, onDelet
             sublabel="make Nothing better"
             theme={theme}
             onPress={handleFeedback}
-            isLast={false}
-          />
-          <Row
-            icon="star"
-            label="Rate Nothing"
-            theme={theme}
-            onPress={handleRate}
             isLast
           />
         </View>
