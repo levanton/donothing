@@ -67,9 +67,10 @@
       }
     },
     {
-      "hidden" : true,
+      "hidden" : false,
       "layers" : [
         {
+          "fill" : "none",
           "glass" : false,
           "image-name" : "app-loo 2.jpg",
           "name" : "app-loo 2",
@@ -96,6 +97,7 @@
       "layers" : [
         {
           "glass" : false,
+          "hidden" : true,
           "image-name" : "dot-log.png",
           "name" : "dot-log",
           "position" : {
@@ -167,16 +169,27 @@
       }
     },
     {
+      "hidden" : false,
       "layers" : [
         {
+          "fill-specializations" : [
+            {
+              "value" : "none"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "none"
+            }
+          ],
           "glass" : false,
+          "hidden" : true,
           "image-name" : "dot-big-riso.png",
           "name" : "dot-big-riso",
           "position" : {
-            "scale" : 0.82,
+            "scale" : 0.95,
             "translation-in-points" : [
-              0,
-              0
+              -83.64999999999998,
+              -83.64999999999975
             ]
           }
         }
