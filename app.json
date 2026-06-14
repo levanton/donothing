@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.levanton.nothing",
       "appleTeamId": "45DBHDBF45",
       "icon": "./assets/Icon.icon",
