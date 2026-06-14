@@ -105,7 +105,7 @@ export default function PersonalizedResultScreen({ isActive, theme: screenTheme,
             <View style={[styles.proBadge, { backgroundColor: palette.terracotta }]}>
               <Feather name="lock" size={10} color={palette.cream} />
               <Text style={[styles.proLabel, { color: palette.cream, fontFamily: Fonts?.serif }]}>
-                PRO
+                NOTHING FULL
               </Text>
             </View>
           </View>
